@@ -57,13 +57,15 @@ inline SnareKit* loadKit(const std::string& contractsDir, const std::string& ass
 
   SnareKit* kit = snare_kit_create();
   int count = 0;
-  for (const auto& entry : doc.at("voices").object) {
-    const auto role = roles.indexById.find(entry.first);
+  const json::Value& voices = doc.at("voices");
+  for (std::size_t i = 0; i < voices.keys.size(); ++i) {
+    const std::string& roleId = voices.keys[i];
+    const auto role = roles.indexById.find(roleId);
     if (role == roles.indexById.end()) {
       snare_kit_destroy(kit);
-      throw std::runtime_error("kit " + kitId + " maps unknown role " + entry.first);
+      throw std::runtime_error("kit " + kitId + " maps unknown role " + roleId);
     }
-    const json::Value& voice = entry.second;
+    const json::Value& voice = voices.values[i];
     const wav::Audio audio = wav::readFile(base + "/" + voice.at("file").string);
     const int result = snare_kit_set_voice(
         kit, role->second, audio.pcm.data(), audio.frames, audio.channels, audio.sampleRate,
@@ -71,9 +73,9 @@ inline SnareKit* loadKit(const std::string& contractsDir, const std::string& ass
         voice.at("chokeGroup").asInt());
     if (result != SNARE_OK) {
       snare_kit_destroy(kit);
-      throw std::runtime_error("kit " + kitId + " rejected voice " + entry.first);
+      throw std::runtime_error("kit " + kitId + " rejected voice " + roleId);
     }
-    if (info && voice.has("substitute")) info->substitutedRoles.push_back(entry.first);
+    if (info && voice.has("substitute")) info->substitutedRoles.push_back(roleId);
     ++count;
   }
   if (info) {

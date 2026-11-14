@@ -44,3 +44,31 @@ test('kit buttons are reachable by touch', async ({ page }) => {
   const box = (await page.getByTestId('kit-909').boundingBox())!;
   expect(box.height).toBeGreaterThanOrEqual(44);
 });
+
+test('the hardware panel stays usable on a phone', async ({ page }) => {
+  await page.getByTestId('mode-hardware').tap();
+  const panel = page.getByTestId('panel');
+  await expect(panel).toBeVisible();
+
+  // The faceplate keeps a workable size and scrolls sideways inside its
+  // frame; the page itself does not scroll sideways.
+  const first = panel.locator('[data-panel-step]').first();
+  const zoomed = (await first.boundingBox())!;
+  expect(zoomed.width).toBeGreaterThanOrEqual(30);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  // The instrument strip is the touch-sized way to pick a voice.
+  const strip = page.getByTestId('strip-voice-snare');
+  expect((await strip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await strip.tap();
+  await first.tap();
+  expect(lane(await project(page), 'snare')[0]).toBe(100);
+
+  // Fit shows the whole faceplate at once.
+  await page.getByRole('button', { name: 'Fit to screen' }).tap();
+  const fitted = (await panel.boundingBox())!;
+  expect(fitted.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+});

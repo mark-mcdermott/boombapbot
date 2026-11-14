@@ -20,18 +20,22 @@ struct Value {
   double number = 0.0;
   std::string string;
   std::vector<Value> array;
-  std::vector<std::pair<std::string, Value>> object;
+  // Object members, in file order: keys[i] names values[i]. Kept as two
+  // vectors because a vector of pairs of this still-incomplete type is not
+  // portable.
+  std::vector<std::string> keys;
+  std::vector<Value> values;
 
   bool has(const std::string& key) const {
-    for (const auto& entry : object) {
-      if (entry.first == key) return true;
+    for (const auto& candidate : keys) {
+      if (candidate == key) return true;
     }
     return false;
   }
 
   const Value& at(const std::string& key) const {
-    for (const auto& entry : object) {
-      if (entry.first == key) return entry.second;
+    for (std::size_t i = 0; i < keys.size(); ++i) {
+      if (keys[i] == key) return values[i];
     }
     throw std::runtime_error("missing JSON key: " + key);
   }
@@ -96,7 +100,8 @@ class Parser {
       for (;;) {
         std::string key = parseString();
         expect(':');
-        value.object.emplace_back(std::move(key), parseValue());
+        value.keys.push_back(std::move(key));
+        value.values.push_back(parseValue());
         if (peek() == ',') {
           ++pos_;
           continue;

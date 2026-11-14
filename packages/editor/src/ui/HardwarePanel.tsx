@@ -156,12 +156,15 @@ export function HardwarePanel() {
   const currentStep = useEditorState((state) => state.currentStep);
   const manifest = useAssetManifest();
   const [fit, setFit] = useState(false);
+  // A photo that fails to load falls back to the drawn panel.
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const panel = getPanel(kitId);
   const kit = KITS[kitId];
   const photoPath = manifest?.faceplates[kitId];
-  const photo = photoPath ? runtime.assetUrl(photoPath) : null;
+  const photoUrl = photoPath ? runtime.assetUrl(photoPath) : null;
+  const photo = photoUrl && photoUrl !== failedPhoto ? photoUrl : null;
   const roles = panelRoles(panel);
   // A lane chosen in Modern may not exist on this panel; fall back to the
   // panel's first voice without changing the shared selection.
@@ -199,7 +202,13 @@ export function HardwarePanel() {
           }
         >
           {photo ? (
-            <img className="sb-panel-photo" src={photo} alt="" draggable={false} />
+            <img
+              className="sb-panel-photo"
+              src={photo}
+              alt=""
+              draggable={false}
+              onError={() => setFailedPhoto(photo)}
+            />
           ) : (
             <>
               {panel.wells.map((well, i) => (

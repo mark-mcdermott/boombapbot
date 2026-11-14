@@ -126,13 +126,22 @@ export class SnareWasm {
     return new SnareWasm(await WebAssembly.instantiate(module, buildImports(module)));
   }
 
-  // Views are re-made on every use because growing memory detaches old ones.
+  // Growing memory replaces its buffer and detaches old views, so a view is
+  // reused only while the buffer is the same one. Rendering never grows
+  // memory, so the audio thread does not allocate here.
+  private u8: Uint8Array | null = null;
+  private f32: Float32Array | null = null;
+
   get heapU8(): Uint8Array {
-    return new Uint8Array(this.exports.memory.buffer);
+    const buffer = this.exports.memory.buffer;
+    if (!this.u8 || this.u8.buffer !== buffer) this.u8 = new Uint8Array(buffer);
+    return this.u8;
   }
 
   get heapF32(): Float32Array {
-    return new Float32Array(this.exports.memory.buffer);
+    const buffer = this.exports.memory.buffer;
+    if (!this.f32 || this.f32.buffer !== buffer) this.f32 = new Float32Array(buffer);
+    return this.f32;
   }
 
   alloc(bytes: number): number {

@@ -51,6 +51,19 @@ jobs:
       - name: Build the native engine and run CTest
         run: pnpm build:engine
 
+      - name: Build and test the engine with Clang
+        run: |
+          cmake -S engine -B build/clang -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++
+          cmake --build build/clang
+          ctest --test-dir build/clang --output-on-failure
+
+      - name: Engine tests under AddressSanitizer and UBSan
+        run: |
+          cmake -S engine -B build/asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+          cmake --build build/asan
+          ctest --test-dir build/asan --output-on-failure
+
       - name: Build the WebAssembly engine
         run: pnpm build:wasm
 
