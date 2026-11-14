@@ -1,0 +1,194 @@
+{
+  "format": "boombapbot.panel",
+  "schemaVersion": 1,
+  "id": "909",
+  "kit": "909",
+  "name": "909 panel",
+  "faceplate": {
+    "file": "909.png",
+    "width": 2000,
+    "height": 1181
+  },
+  "theme": {
+    "panel": "#dbd9d1",
+    "ink": "#3b4553",
+    "accent": "#f58a1f",
+    "button": "#cbc8be",
+    "well": "#4a5568",
+    "led": "#ff4030"
+  },
+  "wells": [
+    [278, 786, 1530, 116]
+  ],
+  "steps": [
+    {
+      "hit": [289.0, 926, 93, 92],
+      "button": [297.5, 935, 76, 78],
+      "led": [335.5, 944]
+    },
+    {
+      "hit": [383.7, 926, 93, 92],
+      "button": [392.2, 935, 76, 78],
+      "led": [430.2, 944]
+    },
+    {
+      "hit": [478.5, 926, 93, 92],
+      "button": [487.0, 935, 76, 78],
+      "led": [525.0, 944]
+    },
+    {
+      "hit": [573.2, 926, 93, 92],
+      "button": [581.7, 935, 76, 78],
+      "led": [619.7, 944]
+    },
+    {
+      "hit": [667.9, 926, 93, 92],
+      "button": [676.4, 935, 76, 78],
+      "led": [714.4, 944]
+    },
+    {
+      "hit": [762.7, 926, 93, 92],
+      "button": [771.2, 935, 76, 78],
+      "led": [809.2, 944]
+    },
+    {
+      "hit": [857.4, 926, 93, 92],
+      "button": [865.9, 935, 76, 78],
+      "led": [903.9, 944]
+    },
+    {
+      "hit": [952.1, 926, 93, 92],
+      "button": [960.6, 935, 76, 78],
+      "led": [998.6, 944]
+    },
+    {
+      "hit": [1046.8, 926, 93, 92],
+      "button": [1055.3, 935, 76, 78],
+      "led": [1093.3, 944]
+    },
+    {
+      "hit": [1141.6, 926, 93, 92],
+      "button": [1150.1, 935, 76, 78],
+      "led": [1188.1, 944]
+    },
+    {
+      "hit": [1236.3, 926, 93, 92],
+      "button": [1244.8, 935, 76, 78],
+      "led": [1282.8, 944]
+    },
+    {
+      "hit": [1331.0, 926, 93, 92],
+      "button": [1339.5, 935, 76, 78],
+      "led": [1377.5, 944]
+    },
+    {
+      "hit": [1425.8, 926, 93, 92],
+      "button": [1434.3, 935, 76, 78],
+      "led": [1472.3, 944]
+    },
+    {
+      "hit": [1520.5, 926, 93, 92],
+      "button": [1529.0, 935, 76, 78],
+      "led": [1567.0, 944]
+    },
+    {
+      "hit": [1615.2, 926, 93, 92],
+      "button": [1623.7, 935, 76, 78],
+      "led": [1661.7, 944]
+    },
+    {
+      "hit": [1710.0, 926, 93, 92],
+      "button": [1718.5, 935, 76, 78],
+      "led": [1756.5, 944]
+    }
+  ],
+  "ledRadius": 8,
+  "ledsLitInPhoto": false,
+  "transport": [
+    {
+      "action": "start",
+      "label": "START",
+      "hit": [166, 677, 77, 77]
+    },
+    {
+      "action": "stop",
+      "label": "STOP/CONT",
+      "hit": [269, 677, 77, 77]
+    }
+  ],
+  "tempo": {
+    "label": "TEMPO",
+    "cx": 660,
+    "cy": 698,
+    "r": 48,
+    "minDeg": -140,
+    "maxDeg": 140,
+    "photoDeg": 34
+  },
+  "voiceSelect": {
+    "kind": "keys",
+    "label": "INSTRUMENT",
+    "positions": [
+      {
+        "label": "BASS DRUM",
+        "role": "kick",
+        "hit": [298, 1054, 172, 27]
+      },
+      {
+        "label": "SNARE DRUM",
+        "role": "snare",
+        "hit": [487, 1054, 173, 27]
+      },
+      {
+        "label": "LOW TOM",
+        "role": "low_tom",
+        "hit": [676, 1054, 172, 27]
+      },
+      {
+        "label": "MID TOM",
+        "hit": [865, 1054, 173, 27]
+      },
+      {
+        "label": "HI TOM",
+        "role": "high_tom",
+        "hit": [1055, 1054, 172, 27]
+      },
+      {
+        "label": "RIM SHOT",
+        "hit": [1245, 1054, 85, 27]
+      },
+      {
+        "label": "HAND CLAP",
+        "role": "clap",
+        "hit": [1332, 1054, 85, 27]
+      },
+      {
+        "label": "CLOSED",
+        "role": "closed_hat",
+        "hit": [1435, 1054, 65, 27]
+      },
+      {
+        "label": "OPEN",
+        "role": "open_hat",
+        "hit": [1502, 1054, 44, 27]
+      },
+      {
+        "label": "CRASH",
+        "role": "cymbal",
+        "hit": [1625, 1054, 80, 27]
+      },
+      {
+        "label": "RIDE",
+        "hit": [1715, 1054, 82, 27]
+      }
+    ]
+  },
+  "pending": [
+    "On the hardware an instrument is chosen by holding INSTRUMENT SELECT and pressing a step key. Here you press the instrument's name under the keys.",
+    "On the hardware an open hat is entered with both hi-hat keys together. Here OPEN selects the open hat lane directly.",
+    "Mid Tom, Rim Shot and Ride have no lane in v0.1.",
+    "Total accent, shuffle and flam, scale, last step, pattern banks, track play and write, tap write and external instrument are not modelled.",
+    "The voice knobs (tune, level, attack, decay, tone, snappy) are not connected.",
+    "Step lamps show the selected instrument's steps and the running step. The hardware's exact lamp behaviour in each mode is unverified."
+  ]
+}

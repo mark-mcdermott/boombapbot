@@ -1,0 +1,210 @@
+{
+  "format": "boombapbot.panel",
+  "schemaVersion": 1,
+  "id": "808",
+  "kit": "808",
+  "name": "808 panel",
+  "faceplate": {
+    "file": "808.jpg",
+    "width": 2000,
+    "height": 1190
+  },
+  "theme": {
+    "panel": "#2b2c30",
+    "ink": "#f1ebd9",
+    "accent": "#ff5a2a",
+    "button": "#f08a3a",
+    "well": "#8b8883",
+    "led": "#ff3020"
+  },
+  "wells": [
+    [158, 785, 1684, 296]
+  ],
+  "steps": [
+    {
+      "hit": [493.5, 926, 73, 106],
+      "button": [502.0, 932, 56, 96],
+      "led": [528.3, 949.2]
+    },
+    {
+      "hit": [567.7, 926, 73, 106],
+      "button": [576.2, 932, 56, 96],
+      "led": [602.8, 948.6]
+    },
+    {
+      "hit": [641.8, 926, 73, 106],
+      "button": [650.3, 932, 56, 96],
+      "led": [676.1, 949.1]
+    },
+    {
+      "hit": [716.0, 926, 73, 106],
+      "button": [724.5, 932, 56, 96],
+      "led": [751.6, 947.1]
+    },
+    {
+      "hit": [790.1, 926, 73, 106],
+      "button": [798.6, 932, 56, 96],
+      "led": [826.0, 947.2]
+    },
+    {
+      "hit": [864.3, 926, 73, 106],
+      "button": [872.8, 932, 56, 96],
+      "led": [899.0, 947.8]
+    },
+    {
+      "hit": [938.5, 926, 73, 106],
+      "button": [947.0, 932, 56, 96],
+      "led": [972.9, 947.2]
+    },
+    {
+      "hit": [1012.6, 926, 73, 106],
+      "button": [1021.1, 932, 56, 96],
+      "led": [1046.8, 947.9]
+    },
+    {
+      "hit": [1086.8, 926, 73, 106],
+      "button": [1095.3, 932, 56, 96],
+      "led": [1122.1, 947.2]
+    },
+    {
+      "hit": [1160.9, 926, 73, 106],
+      "button": [1169.4, 932, 56, 96],
+      "led": [1195.9, 947.3]
+    },
+    {
+      "hit": [1235.1, 926, 73, 106],
+      "button": [1243.6, 932, 56, 96],
+      "led": [1269.0, 948.7]
+    },
+    {
+      "hit": [1309.3, 926, 73, 106],
+      "button": [1317.8, 932, 56, 96],
+      "led": [1341.9, 948.9]
+    },
+    {
+      "hit": [1383.4, 926, 73, 106],
+      "button": [1391.9, 932, 56, 96],
+      "led": [1416.5, 951.6]
+    },
+    {
+      "hit": [1457.6, 926, 73, 106],
+      "button": [1466.1, 932, 56, 96],
+      "led": [1492.7, 950.1]
+    },
+    {
+      "hit": [1531.7, 926, 73, 106],
+      "button": [1540.2, 932, 56, 96],
+      "led": [1567.4, 951.1]
+    },
+    {
+      "hit": [1605.9, 926, 73, 106],
+      "button": [1614.4, 932, 56, 96],
+      "led": [1641.0, 950.9]
+    }
+  ],
+  "ledRadius": 9,
+  "ledsLitInPhoto": false,
+  "transport": [
+    {
+      "action": "toggle",
+      "label": "START/STOP",
+      "hit": [198, 942, 152, 76]
+    }
+  ],
+  "tempo": {
+    "label": "TEMPO",
+    "cx": 259.5,
+    "cy": 639,
+    "r": 82,
+    "minDeg": -150,
+    "maxDeg": 150,
+    "photoDeg": -79
+  },
+  "voiceSelect": {
+    "kind": "rotary",
+    "label": "INSTRUMENT SELECT",
+    "knob": {
+      "cx": 407,
+      "cy": 316,
+      "r": 33,
+      "photoDeg": -75
+    },
+    "positions": [
+      {
+        "label": "AC",
+        "deg": -165,
+        "hit": [372, 374, 33, 18]
+      },
+      {
+        "label": "BD",
+        "deg": -135,
+        "hit": [338, 349, 33, 18],
+        "role": "kick"
+      },
+      {
+        "label": "SD",
+        "deg": -105,
+        "hit": [327, 324, 33, 18],
+        "role": "snare"
+      },
+      {
+        "label": "LT",
+        "deg": -75,
+        "hit": [327, 296, 32, 18],
+        "role": "low_tom"
+      },
+      {
+        "label": "MT",
+        "deg": -45,
+        "hit": [338, 272, 33, 18]
+      },
+      {
+        "label": "HT",
+        "deg": -15,
+        "hit": [371, 248, 33, 18],
+        "role": "high_tom"
+      },
+      {
+        "label": "RS",
+        "deg": 15,
+        "hit": [421, 248, 33, 18]
+      },
+      {
+        "label": "CP",
+        "deg": 45,
+        "hit": [456, 272, 35, 18],
+        "role": "clap"
+      },
+      {
+        "label": "CB",
+        "deg": 75,
+        "hit": [468, 296, 32, 18]
+      },
+      {
+        "label": "CY",
+        "deg": 105,
+        "hit": [468, 324, 32, 18],
+        "role": "cymbal"
+      },
+      {
+        "label": "OH",
+        "deg": 135,
+        "hit": [457, 349, 34, 18],
+        "role": "open_hat"
+      },
+      {
+        "label": "CH",
+        "deg": 165,
+        "hit": [421, 374, 34, 18],
+        "role": "closed_hat"
+      }
+    ]
+  },
+  "pending": [
+    "Accent (AC) is a separate track on the hardware. This prototype stores velocity per step and leaves the AC position inactive.",
+    "Mid Tom, Rim Shot, Cowbell and the conga, claves and maracas switches have no lane in v0.1.",
+    "First and second part, A, B and AB basic variation, intro and fill-in, auto fill-in, pre-scale and the compose and play modes are not modelled.",
+    "The level, tone, decay, tuning and snappy knobs are not connected.",
+    "Step lamps show the selected instrument's steps and the running step. The hardware's exact lamp behaviour in each mode is unverified."
+  ]
+}

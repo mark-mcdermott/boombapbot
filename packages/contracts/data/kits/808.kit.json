@@ -1,0 +1,77 @@
+{
+  "format": "boombapbot.kit",
+  "schemaVersion": 1,
+  "id": "808",
+  "version": "0.1.0-demo.1",
+  "name": "808 demo",
+  "demo": true,
+  "description": "Long boomy kick and metallic hats. Synthesised placeholder, not sampled from hardware.",
+  "assetBase": "kits/808",
+  "sampleRate": 44100,
+  "voices": {
+    "kick": {
+      "file": "kick.wav",
+      "label": "Bass Drum",
+      "short": "BD",
+      "gain": 0.85,
+      "pan": 0.0,
+      "chokeGroup": 0
+    },
+    "snare": {
+      "file": "snare.wav",
+      "label": "Snare Drum",
+      "short": "SD",
+      "gain": 0.75,
+      "pan": 0.0,
+      "chokeGroup": 0
+    },
+    "closed_hat": {
+      "file": "closed_hat.wav",
+      "label": "Closed Hat",
+      "short": "CH",
+      "gain": 0.4,
+      "pan": 0.2,
+      "chokeGroup": 1
+    },
+    "open_hat": {
+      "file": "open_hat.wav",
+      "label": "Open Hat",
+      "short": "OH",
+      "gain": 0.4,
+      "pan": 0.2,
+      "chokeGroup": 1
+    },
+    "low_tom": {
+      "file": "low_tom.wav",
+      "label": "Low Tom",
+      "short": "LT",
+      "gain": 0.7,
+      "pan": -0.3,
+      "chokeGroup": 0
+    },
+    "high_tom": {
+      "file": "high_tom.wav",
+      "label": "Hi Tom",
+      "short": "HT",
+      "gain": 0.7,
+      "pan": 0.3,
+      "chokeGroup": 0
+    },
+    "clap": {
+      "file": "clap.wav",
+      "label": "Hand Clap",
+      "short": "CP",
+      "gain": 0.8,
+      "pan": -0.1,
+      "chokeGroup": 0
+    },
+    "cymbal": {
+      "file": "cymbal.wav",
+      "label": "Cymbal",
+      "short": "CY",
+      "gain": 0.55,
+      "pan": -0.2,
+      "chokeGroup": 0
+    }
+  }
+}
