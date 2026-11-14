@@ -115,6 +115,7 @@ headless via Playwright 1.63.
 | `pnpm test:unit` | 47 of 47 pass |
 | `pnpm build` | Build check passes |
 | `pnpm test:e2e` | 37 of 37 pass |
+| VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on Linux; processor self-test passes 137 of 137 checks |
 
 The same sequence was also run from a fresh clone with a fresh Emscripten
 install, start to finish, and passed. The WASM binary from that run was
@@ -226,7 +227,31 @@ itself and in [`docs/follow-ups.md`](docs/follow-ups.md).
 
 ## VST3 compile spike
 
-VST3_PLACEHOLDER
+`plugins/vst3/` is a small JUCE VST3 instrument that links the same engine and
+plays the built-in 808 demo kit from MIDI notes, placing each hit on its
+sample offset inside the block. It is a separate CMake project and is not part
+of the web build. JUCE 8.0.9 is fetched at configure time, not vendored.
+
+```bash
+cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
+```
+
+```bash
+cmake --build build/vst3
+```
+
+```bash
+ctest --test-dir build/vst3 --output-on-failure
+```
+
+On Linux this compiles and produces a `.vst3` bundle that exports the VST3
+entry points and contains the engine, and the processor self-test passes. That
+is all it shows. **Windows and macOS builds, scanning in a host, the Steinberg
+validator, transport sync and state recall in a host are all pending** until
+they are run on those systems. JUCE 8 is AGPLv3 or commercial, and a licence
+path has to be chosen before anything built from it is distributed. Details,
+Linux packages and the full not-verified list:
+[`plugins/vst3/README.md`](plugins/vst3/README.md).
 
 ## Next milestone
 

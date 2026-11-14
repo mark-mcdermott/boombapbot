@@ -81,6 +81,9 @@ the compile spike. Beyond it:
   should move to a Worker; `renderLoop` has no DOM dependencies.
 - **Draft storage.** One draft in `localStorage`. Multiple beats and offline
   kit caching want IndexedDB. Two tabs editing at once overwrite each other.
+- **Stack items not used yet.** The build spec lists TanStack Query, Better
+  Auth, Drizzle, Neon, Vercel Blob and Resend. v0.1 has no remote data, so none
+  of them are installed. They arrive with the cloud API.
 - **Kit switch preview.** Substituted voices are shown on the lane and in the
   kit note after switching. A preview before committing the switch is not
   built.

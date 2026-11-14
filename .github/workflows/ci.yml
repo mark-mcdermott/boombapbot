@@ -91,3 +91,29 @@ jobs:
             playwright-report
             test-results
           retention-days: 7
+
+  vst3:
+    name: VST3 compile spike (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JUCE build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config libx11-dev libxext-dev libxrandr-dev \
+            libxinerama-dev libxcursor-dev libfreetype-dev libfontconfig-dev \
+            libasound2-dev libgl1-mesa-dev
+
+      # Compilation and the processor self-test only. Host scanning, the
+      # validator and Windows and macOS builds are not covered here.
+      - name: Configure (fetches JUCE)
+        run: cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build/vst3
+
+      - name: Processor self-test
+        run: ctest --test-dir build/vst3 --output-on-failure
