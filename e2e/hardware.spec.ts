@@ -84,3 +84,48 @@ test('panel steps can be walked with the arrow keys', async ({ page }) => {
   await page.keyboard.press('ArrowLeft');
   await expect(steps.nth(15)).toBeFocused();
 });
+
+for (const kit of ['606', '707', '808', '909']) {
+  test(`the ${kit} panel programs its own instruments`, async ({ page }) => {
+    await page.getByTestId(`kit-${kit}`).click();
+    await page.getByTestId('mode-hardware').click();
+    const panel = page.getByTestId('panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('[data-panel-step]')).toHaveCount(16);
+
+    // Every instrument the panel offers selects its own lane.
+    const voices = panel.locator('[data-testid^="panel-voice-"]');
+    const count = await voices.count();
+    expect(count).toBeGreaterThanOrEqual(7);
+    for (let i = 0; i < count; i += 1) {
+      const voice = voices.nth(i);
+      const role = (await voice.getAttribute('data-testid'))!.replace('panel-voice-', '');
+      await voice.click();
+      await expect(voice).toHaveAttribute('aria-checked', 'true');
+      const before = lane(await project(page), role);
+      const target = before.findIndex((velocity) => velocity === 0);
+      await panel.locator('[data-panel-step]').nth(target).click();
+      const after = lane(await project(page), role);
+      expect(after[target]).toBe(100);
+      expect(after.filter((_, index) => index !== target)).toEqual(before.filter((_, index) => index !== target));
+    }
+
+    // The instrument strip under the panel selects the same lanes.
+    await page.getByTestId('strip-voice-snare').click();
+    await expect(page.getByTestId('panel-voice-snare')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('panel-voice')).toContainText('Snare Drum');
+
+    // Step and control areas stay inside the faceplate and do not overlap.
+    const boxes = await panel.locator('[data-panel-step]').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, width: rect.width, height: rect.height };
+      }),
+    );
+    boxes.forEach((box, index) => {
+      expect(box.width).toBeGreaterThan(20);
+      expect(box.height).toBeGreaterThan(20);
+      if (index > 0) expect(box.left).toBeGreaterThanOrEqual(boxes[index - 1]!.right - 0.5);
+    });
+  });
+}

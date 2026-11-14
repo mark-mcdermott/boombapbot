@@ -124,7 +124,7 @@ export function StepGrid() {
                 type="button"
                 className="sb-pad"
                 data-testid={`audition-${lane.role}`}
-                aria-label={`Audition ${voice.label}`}
+                aria-label={`${voice.short}, audition ${voice.label}`}
                 onClick={() => {
                   store.select(lane.role);
                   void runtime.audition(lane.role);

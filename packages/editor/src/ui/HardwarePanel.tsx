@@ -256,7 +256,11 @@ export function HardwarePanel() {
                   className="sb-panel-voice"
                   style={box(panel, position.hit)}
                   aria-checked={checked}
-                  aria-label={role ? kit.voices[role].label : `${position.label}, not available in this prototype`}
+                  aria-label={
+                    role
+                      ? `${position.label}, ${kit.voices[role].label}`
+                      : `${position.label}, not available in this prototype`
+                  }
                   disabled={!role}
                   data-testid={role ? `panel-voice-${role}` : undefined}
                   onClick={() => {
@@ -278,9 +282,7 @@ export function HardwarePanel() {
               className="sb-panel-transport"
               style={box(panel, control.hit)}
               data-testid={`panel-${control.action}`}
-              aria-label={
-                control.action === 'toggle' ? (playing ? 'Stop' : 'Run') : control.action === 'start' ? 'Start' : 'Stop'
-              }
+              aria-label={control.label}
               aria-pressed={control.action === 'stop' ? undefined : playing}
               onClick={() => {
                 if (control.action === 'toggle') void runtime.togglePlay();
