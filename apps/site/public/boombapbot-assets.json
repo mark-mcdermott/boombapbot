@@ -1,8 +1,0 @@
-{
-  "engine": {
-    "worklet": "engine/boombapbot-worklet.0597d283bc.js",
-    "wasm": "engine/boombapbot-engine.f899e754d1.wasm"
-  },
-  "kits": "",
-  "faceplates": {}
-}

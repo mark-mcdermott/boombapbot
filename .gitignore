@@ -15,6 +15,7 @@ coverage/
 apps/site/public/engine/
 apps/site/public/kits/
 apps/site/public/faceplates/
+apps/site/public/boombapbot-assets.json
 
 # Owner-supplied faceplate photos. Rights and provenance are not recorded yet,
 # so they stay out of public source. See misc/assets/README.md.
