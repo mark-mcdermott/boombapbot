@@ -72,20 +72,39 @@ test('the panel runs the transport and sets tempo', async ({ page }) => {
   await page.getByTestId('panel-toggle').click();
   await expect(editor).toHaveAttribute('data-playing', 'false');
 
+  // The tempo knob turns in forty click stops; the fine knob adds up to one
+  // stop either way.
   const knob = page.getByTestId('panel-tempo');
-  const bpm = Math.round(bpmOf(await project(page)));
-  await expect(knob).toHaveAttribute('aria-valuenow', String(bpm));
+  const fine = page.getByTestId('panel-fine');
+  const start = (await project(page)).tempo;
+  await expect(knob).toHaveAccessibleName('Tempo');
+  await expect(knob).toHaveAttribute('aria-valuenow', String(start.coarse));
+  await expect(knob).toHaveAttribute('aria-valuemax', '39');
   await knob.focus();
   await page.keyboard.press('ArrowUp');
-  await page.keyboard.press('PageUp');
-  expect(bpmOf(await project(page))).toBeCloseTo(bpm + 11, 1);
-  await expect(knob).toHaveAttribute('aria-valuenow', String(bpm + 11));
-  await expect(knob).toHaveAttribute('aria-valuetext', `${bpm + 11} beats per minute`);
+  await page.keyboard.press('ArrowUp');
+  expect((await project(page)).tempo).toEqual({ coarse: start.coarse + 2, fine: start.fine });
+  await expect(knob).toHaveAttribute('aria-valuetext', /beats per minute, stop \d+ of 40$/);
+
+  await fine.focus();
+  await page.keyboard.press('End');
+  expect((await project(page)).tempo).toEqual({ coarse: start.coarse + 2, fine: 1 });
+  expect(bpmOf(await project(page))).toBeCloseTo(40 + ((start.coarse + 3) * 260) / 39, 6);
+  await page.keyboard.press('Home');
+  expect((await project(page)).tempo.fine).toBe(-1);
+
   // The machine runs from 40 to 300.
+  await knob.focus();
+  await page.keyboard.press('End');
+  await fine.focus();
   await page.keyboard.press('End');
   expect(bpmOf(await project(page))).toBe(300);
+  await knob.focus();
+  await page.keyboard.press('Home');
+  await fine.focus();
   await page.keyboard.press('Home');
   expect(bpmOf(await project(page))).toBe(40);
+  await expect(page.getByTestId('notice')).toHaveCount(0);
 });
 
 test('the lamps show the steps that are on and follow the running step', async ({ page }) => {
@@ -169,20 +188,106 @@ test('a sound knob changes its own voice, in exports and while playing', async (
   await expect(page.getByTestId('notice')).toHaveCount(0);
 });
 
-test('every tuning, tone, decay and snappy knob on the panel turns', async ({ page }) => {
+test('every knob of every column turns', async ({ page }) => {
+  // A level for each of the twelve columns, and ten tone, decay, tuning and snappy knobs.
   const knobs = page.getByTestId('panel').locator('[data-testid^="panel-knob-"]');
-  await expect(knobs).toHaveCount(10);
-  for (let index = 0; index < 10; index += 1) {
+  await expect(knobs).toHaveCount(22);
+  for (let index = 0; index < 22; index += 1) {
     const knob = knobs.nth(index);
     const [track, param] = (await knob.getAttribute('data-testid'))!.replace('panel-knob-', '').split('-') as [
       string,
-      'tune' | 'tone' | 'decay' | 'snappy',
+      'level' | 'tune' | 'tone' | 'decay' | 'snappy',
     ];
     await knob.focus();
     await page.keyboard.press('Home');
-    expect((await project(page)).sound.knobs[track]![param]).toBe(0);
+    const { sound } = await project(page);
+    const position = track === 'accent' ? sound.accent : param === 'level' ? sound.levels[track] : sound.knobs[track]![param];
+    expect(position, `${track} ${param}`).toBe(0);
     await expect(knob).toHaveAttribute('aria-valuenow', '0');
   }
+});
+
+test('the level, accent and master volume knobs set the mix', async ({ page }) => {
+  const render = () => page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  const turn = async (testId: string, key: string) => {
+    await page.getByTestId(testId).focus();
+    await page.keyboard.press(key);
+  };
+  const full = await render();
+  await expect(page.getByTestId('panel-knob-kick-level')).toHaveAccessibleName('Bass Drum level');
+  await expect(page.getByTestId('panel-knob-accent-level')).toHaveAccessibleName('Accent level');
+  await expect(page.getByTestId('panel-master')).toHaveAttribute('aria-valuenow', '75');
+
+  // With the bass drum fully left the rhythm is quieter, on the same steps.
+  await turn('panel-knob-kick-level', 'Home');
+  const noKick = await render();
+  expect(noKick.events).toEqual(full.events);
+  expect(noKick.rms).toBeLessThan(full.rms * 0.9);
+
+  // With no accent every hit is as loud as a plain one.
+  await turn('panel-knob-accent-level', 'Home');
+  const flat = await render();
+  expect(flat.rms).toBeLessThan(noKick.rms);
+
+  // Master volume scales everything, and fully left is silence.
+  await turn('panel-master', 'End');
+  const loud = await render();
+  expect(loud.rms).toBeGreaterThan(flat.rms * 1.3);
+  expect(loud.peak).toBeLessThanOrEqual(1);
+  await turn('panel-master', 'Home');
+  const silent = await render();
+  expect(silent.peak).toBe(0);
+  expect(silent.events).toEqual(full.events);
+
+  // Live, a moved level reaches the engine without stopping the beat or re-synthesising anything.
+  await turn('panel-master', 'End');
+  await page.getByTestId('panel-toggle').click();
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-audio', 'running');
+  await expect.poll(async () => (await debug(page)).soundsTaken).toBe(16);
+  await turn('panel-knob-snare-level', 'End');
+  await turn('panel-knob-kick-level', 'End');
+  await expect.poll(async () => (await debug(page)).stats?.peak ?? 0).toBeGreaterThan(0.05);
+  expect((await debug(page)).soundsSent).toBe(16);
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
+});
+
+test('a voice switch gives its column the alternate sound', async ({ page }) => {
+  const render = () => page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  const panel = page.getByTestId('panel');
+  await expect(panel.getByRole('switch')).toHaveCount(5);
+  const conga = page.getByTestId('panel-switch-low_tom');
+  await expect(conga).toHaveAccessibleName('Low Conga in place of Low Tom');
+  await expect(conga).toHaveAttribute('aria-checked', 'false');
+  const lever = panel.locator('.sb-panel-lever').first();
+  const down = (await lever.boundingBox())!;
+  const before = await render();
+
+  await conga.click();
+  await expect(conga).toHaveAttribute('aria-checked', 'true');
+  expect((await project(page)).sound.alternates).toEqual({
+    low_tom: true,
+    mid_tom: false,
+    high_tom: false,
+    rim_shot: false,
+    clap: false,
+  });
+  // The lever moves up, toward the conga's plate.
+  await expect.poll(async () => (await lever.boundingBox())!.y).toBeLessThan(down.y - 5);
+
+  // The column keeps its steps and its knobs; what is on them is now a conga.
+  await selectTrack(page, 'low_tom');
+  await expect(stepButton(page, 15)).toHaveAccessibleName('Low Conga, step 16, on');
+  await expect(page.getByTestId('panel-knob-low_tom-tune')).toHaveAccessibleName('Low Conga tuning');
+  const after = await render();
+  expect(after.events).toEqual(before.events);
+  expect(after.rms).not.toBe(before.rms);
+
+  // The keyboard throws it back.
+  await conga.focus();
+  await page.keyboard.press('Space');
+  await expect(conga).toHaveAttribute('aria-checked', 'false');
+  await expect(stepButton(page, 15)).toHaveAccessibleName('Low Tom, step 16, on');
+  expect((await render()).rms).toBe(before.rms);
 });
 
 test('panel steps can be walked with the arrow keys', async ({ page }) => {

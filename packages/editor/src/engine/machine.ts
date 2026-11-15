@@ -18,6 +18,7 @@ import {
   type Rhythm,
   type Role,
   type SoundSettings,
+  type TrackId,
   type Variation,
 } from '@boombapbot/contracts';
 import type { EnginePattern, EngineTrack, SynthSound, WasmEngine } from './wasm-engine';
@@ -56,6 +57,11 @@ function isAlternate(id: InstrumentId, sound: SoundSettings): boolean {
 /** The sound each instrument plays now, given its voice switch. */
 export function instrumentRole(id: InstrumentId, sound: SoundSettings): Role {
   return trackRole(id, isAlternate(id, sound));
+}
+
+/** What a track is called now: the sound its voice switch selects. */
+export function trackLabel(id: TrackId, sound: SoundSettings): string {
+  return id === 'accent' ? getTrack(id).label : instrumentRole(id, sound).name;
 }
 
 export function engineTracks(sound: SoundSettings): EngineTrack[] {

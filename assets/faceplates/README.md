@@ -49,8 +49,10 @@ git-ignored `misc/assets/` folder and are used for local development only.
   embedded, so there is nobody to credit, and `808.panel.json` sets
   `faceplate.original` in place of a credit.
 - **Where the layout comes from:** the controls the editor makes live (step
-  keys and lamps, instrument selector, start/stop, tempo and the tone, decay,
-  tuning and snappy knobs) are placed from `808.panel.json`. Those coordinates were measured on the photograph below.
+  keys and lamps, instrument selector, start/stop, the tempo and fine knobs,
+  every knob of the instrument columns, master volume and the voice
+  switches) are placed from `808.panel.json`. A live switch is drawn as its
+  slot only; the editor draws the lever. Those coordinates were measured on the photograph below.
   The fixed controls and lettering were placed by eye against the same
   photograph, as a record of where things are on the machine.
 - **Licence of this file:** the owner's own artwork. No licence has been

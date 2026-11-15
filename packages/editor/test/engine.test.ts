@@ -142,6 +142,21 @@ describe('WebAssembly engine', () => {
     expect(Buffer.from(a.left.buffer).equals(Buffer.from(b.left.buffer))).toBe(true);
   });
 
+  it('plays the alternate sound of a switched track, on the same steps', () => {
+    // Rhythm 3 of the fixture has rim shots; the fixture has that track switched to claves.
+    const claves = renderLoop(wasm, fixture, patternIndex(2, 'a'), 44100);
+    const rimShot = renderLoop(
+      wasm,
+      { ...fixture, sound: { ...fixture.sound, alternates: { ...fixture.sound.alternates, rim_shot: false } } },
+      patternIndex(2, 'a'),
+      44100,
+    );
+    expect(rimShot.events).toEqual(claves.events);
+    expect(claves.events.some((event) => event.track === 6)).toBe(true);
+    const difference = claves.left.map((sample, index) => sample - rimShot.left[index]!);
+    expect(rms(difference)).toBeGreaterThan(0.005);
+  });
+
   it('follows the mix: a level knob, the accent and the master volume', () => {
     const plain = renderLoop(wasm, fixture, 0, 44100);
     const quiet = renderLoop(wasm, { ...fixture, sound: { ...fixture.sound, master: 0.4 } }, 0, 44100);

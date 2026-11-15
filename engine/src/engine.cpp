@@ -31,6 +31,9 @@ constexpr double kChokeSeconds = 0.004;
 constexpr double kDeclickSeconds = 0.0015;
 // A level or volume knob reaches its new setting over about this long.
 constexpr double kSmoothSeconds = 0.006;
+// A knob that has come this close to its setting is on it. Without this a
+// level turned to zero would fade for ever, through ever smaller numbers.
+constexpr float kSettled = 1e-5f;
 // Level ramps are worked out this many frames at a time.
 constexpr int kChunk = 128;
 // Room for a few loud voices landing on one step before the limiter acts.
@@ -88,6 +91,7 @@ struct Track {
   int chokeGroup = 0;
   float level = 1.0f;        // where the level knob is heading
   float smoothed = 1.0f;     // where it is now
+  bool levelSet = false;     // the first setting is taken at once, not faded to
 };
 
 struct Voice {
@@ -105,6 +109,12 @@ struct Voice {
   float lastLeft = 0.0f;
   float lastRight = 0.0f;
 };
+
+// One frame of a knob moving toward where it was turned to.
+inline float approach(float value, float target, float coefficient) {
+  const float next = value + (target - value) * coefficient;
+  return std::fabs(target - next) < kSettled ? target : next;
+}
 
 // Keeps peaks inside [-1, 1] without touching ordinary levels.
 inline float softLimit(float x) {
@@ -171,6 +181,7 @@ struct SnareEngine {
   float accentGain = 1.0f;
   float masterVolume = 1.0f;
   float masterSmoothed = 1.0f;
+  bool masterSet = false;
   float levelRamp[SNARE_TRACKS][snare::kChunk];
 
   double bpm = 120.0;
@@ -402,15 +413,21 @@ struct SnareEngine {
         tracks[command.a].chokeGroup = command.c;
         tracks[command.a].pan = static_cast<float>(command.value);
         break;
-      case CommandType::SetTrackLevel:
-        tracks[command.a].level = static_cast<float>(command.value);
+      case CommandType::SetTrackLevel: {
+        snare::Track& track = tracks[command.a];
+        track.level = static_cast<float>(command.value);
+        if (!track.levelSet) track.smoothed = track.level;
+        track.levelSet = true;
         break;
+      }
       case CommandType::SetAccent:
         plainGain = static_cast<float>(command.value);
         accentGain = static_cast<float>(command.value2);
         break;
       case CommandType::SetMasterVolume:
         masterVolume = static_cast<float>(command.value);
+        if (!masterSet) masterSmoothed = masterVolume;
+        masterSet = true;
         break;
       case CommandType::SetPattern:
         bank[command.a] = command.pattern;
@@ -463,7 +480,7 @@ struct SnareEngine {
       const float target = track.level;
       float* ramp = levelRamp[trackIndex];
       for (int i = 0; i < count; ++i) {
-        value += (target - value) * smoothing;
+        value = snare::approach(value, target, smoothing);
         ramp[i] = value;
       }
       track.smoothed = value;
@@ -579,7 +596,7 @@ struct SnareEngine {
     }
 
     for (int i = 0; i < frames; ++i) {
-      masterSmoothed += (masterVolume - masterSmoothed) * smoothing;
+      masterSmoothed = snare::approach(masterSmoothed, masterVolume, smoothing);
       left[i] = snare::softLimit(left[i] * snare::kHeadroom) * masterSmoothed;
       right[i] = snare::softLimit(right[i] * snare::kHeadroom) * masterSmoothed;
     }

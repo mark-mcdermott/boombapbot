@@ -33,8 +33,13 @@ export type SwitchedId = (typeof SWITCHED_IDS)[number];
 export const SOUND_PARAMS = ['tune', 'tone', 'decay', 'snappy'] as const;
 export type SoundParam = (typeof SOUND_PARAMS)[number];
 
+/** Every knob a panel column can have. The accent column has a level and nothing else. */
+export const KNOB_PARAMS = ['level', ...SOUND_PARAMS] as const;
+export type KnobParam = (typeof KNOB_PARAMS)[number];
+
 /** What each knob is called on the panel. */
-export const SOUND_PARAM_LABELS: Record<SoundParam, string> = {
+export const KNOB_PARAM_LABELS: Record<KnobParam, string> = {
+  level: 'level',
   tune: 'tuning',
   tone: 'tone',
   decay: 'decay',

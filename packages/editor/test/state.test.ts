@@ -111,14 +111,45 @@ describe('editor store', () => {
 
   it('sets the tempo as a click stop and a fine adjustment, inside the machine\'s range', () => {
     const store = makeStore();
-    store.setBpm(133);
-    expect(tempoBpm(store.getState().project.tempo)).toBeCloseTo(133, 1);
-    expect(Number.isInteger(store.getState().project.tempo.coarse)).toBe(true);
-    store.setBpm(10);
+    store.setTempo({ coarse: 20 });
+    expect(store.getState().project.tempo).toEqual({ coarse: 20, fine: -0.4 });
+    store.setTempo({ fine: 0.5 });
+    expect(tempoBpm(store.getState().project.tempo)).toBeCloseTo(40 + (20.5 * 260) / 39, 6);
+    // A drag reports fractions of a stop; the knob clicks to the nearest one.
+    store.setTempo({ coarse: 7.6 });
+    expect(store.getState().project.tempo.coarse).toBe(8);
+    store.setTempo({ coarse: -3, fine: -9 });
+    expect(store.getState().project.tempo).toEqual({ coarse: 0, fine: -1 });
     expect(tempoBpm(store.getState().project.tempo)).toBe(40);
-    store.setBpm(1000);
+    store.setTempo({ coarse: 99, fine: 9 });
+    expect(store.getState().project.tempo).toEqual({ coarse: 39, fine: 1 });
     expect(tempoBpm(store.getState().project.tempo)).toBe(300);
     expect(store.getState().canUndo).toBe(false);
+  });
+
+  it('turns the level, accent and master knobs and throws the voice switches', () => {
+    const store = makeStore();
+    const before = store.getState().project;
+    store.setKnob('cymbal', 'level', 0.3);
+    store.setKnob('accent', 'level', 1);
+    store.setMasterVolume(1.4);
+    store.setAlternate('clap', true);
+    const { sound } = store.getState().project;
+    expect(sound.levels.cymbal).toBe(0.3);
+    expect(sound.levels.kick).toBe(before.sound.levels.kick);
+    expect(sound.accent).toBe(1);
+    expect(sound.master).toBe(1);
+    expect(sound.alternates).toEqual({ ...before.sound.alternates, clap: true });
+    expect(store.getState().project.rhythms).toBe(before.rhythms);
+    expect(store.getState().canUndo).toBe(false);
+
+    // Setting a control to where it already is changes nothing at all.
+    const settled = store.getState().project;
+    store.setKnob('cymbal', 'level', 0.3);
+    store.setMasterVolume(1);
+    store.setAlternate('clap', true);
+    store.setTempo({ coarse: settled.tempo.coarse });
+    expect(store.getState().project).toBe(settled);
   });
 
   it('turns a sound knob without touching the rhythms or the undo history', () => {
@@ -137,13 +168,13 @@ describe('editor store', () => {
     const store = makeStore();
     store.toggleStep(1);
     store.setKnob('kick', 'decay', 0.2);
-    store.setBpm(90);
+    store.setTempo({ coarse: 3, fine: 0 });
     store.setName('Kept');
     store.undo();
     const { project } = store.getState();
     expect(isStepOn(project.rhythms[0]!.a.kick, 1)).toBe(false);
     expect(project.sound.knobs.kick.decay).toBe(0.2);
-    expect(tempoBpm(project.tempo)).toBeCloseTo(90, 1);
+    expect(project.tempo).toEqual({ coarse: 3, fine: 0 });
     expect(project.name).toBe('Kept');
   });
 
@@ -164,7 +195,9 @@ describe('local draft', () => {
     const store = makeStore();
     store.selectTrack('clap');
     store.toggleStep(3);
-    store.setBpm(131);
+    store.setTempo({ coarse: 30, fine: 0.25 });
+    store.setAlternate('rim_shot', false);
+    store.setKnob('accent', 'level', 0.4);
     store.setKnob('cymbal', 'tone', 0.25);
     expect(saveDraft(storage, store.getState().project)).toEqual({ ok: true });
 

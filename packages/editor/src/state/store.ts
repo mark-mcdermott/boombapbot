@@ -1,18 +1,20 @@
 import {
   PART_STEPS,
+  TEMPO_STOPS,
   TRACK_IDS,
   clampKnob,
   createEmptyVariation,
   createProject,
   createStarterRhythms,
   isStepOn,
-  tempoBpm,
-  tempoFromBpm,
+  knobPosition,
+  withKnob,
   withStep,
-  type InstrumentId,
+  type KnobParam,
   type Project,
   type Rhythm,
-  type SoundParam,
+  type SwitchedId,
+  type Tempo,
   type TrackId,
   type Variation,
 } from '@boombapbot/contracts';
@@ -231,23 +233,36 @@ export class EditorStore {
 
   // ---- Knobs and switches ---------------------------------------------------
 
-  /** Sets the tempo in beats per minute: the nearest click stop, then the fine knob. */
-  setBpm(bpm: number): void {
+  /** Turns the tempo knob to a click stop, the fine knob, or both. */
+  setTempo(change: Partial<Tempo>): void {
     const { project } = this.state;
-    const tempo = tempoFromBpm(bpm);
-    if (tempoBpm(tempo) === tempoBpm(project.tempo)) return;
-    this.adjust({ ...project, tempo });
+    const coarse = Math.min(TEMPO_STOPS - 1, Math.max(0, Math.round(change.coarse ?? project.tempo.coarse)));
+    const fine = Math.min(1, Math.max(-1, change.fine ?? project.tempo.fine));
+    if (coarse === project.tempo.coarse && fine === project.tempo.fine) return;
+    this.adjust({ ...project, tempo: { coarse, fine } });
   }
 
-  /** Turns a tone, decay, tuning or snappy knob. Positions run from 0 to 1. */
-  setKnob(track: InstrumentId, param: SoundParam, value: number): void {
+  /** Turns a knob of an instrument column, or the accent level. Positions run from 0 to 1. */
+  setKnob(track: TrackId, param: KnobParam, value: number): void {
     const { project } = this.state;
-    const position = clampKnob(value);
-    const knobs = project.sound.knobs[track];
-    if (position === knobs[param]) return;
+    if (knobPosition(project.sound, track, param) === clampKnob(value)) return;
+    this.adjust({ ...project, sound: withKnob(project.sound, track, param, value) });
+  }
+
+  setMasterVolume(value: number): void {
+    const { project } = this.state;
+    const master = clampKnob(value);
+    if (master === project.sound.master) return;
+    this.adjust({ ...project, sound: { ...project.sound, master } });
+  }
+
+  /** Throws a voice switch: on selects the column's alternate sound. */
+  setAlternate(track: SwitchedId, on: boolean): void {
+    const { project } = this.state;
+    if (project.sound.alternates[track] === on) return;
     this.adjust({
       ...project,
-      sound: { ...project.sound, knobs: { ...project.sound.knobs, [track]: { ...knobs, [param]: position } } },
+      sound: { ...project.sound, alternates: { ...project.sound.alternates, [track]: on } },
     });
   }
 

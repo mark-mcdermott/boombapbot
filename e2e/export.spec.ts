@@ -70,6 +70,18 @@ test('exports a MIDI file with tempo and drum notes on channel 10', async ({ pag
   }
 });
 
+test('the MIDI file names the sound a switched column plays', async ({ page }) => {
+  const snapshot = await project(page);
+  const toms = stepsOn(snapshot, 'low_tom');
+  expect(toms.length).toBeGreaterThan(0);
+  await page.getByTestId('panel-switch-low_tom').click();
+  const midi = parseMidi(await downloadBytes(await exportVia(page, 'export-midi')));
+  const noteOns = midi.notes.filter((note) => note.on);
+  // General MIDI: 45 is the low tom, 64 the low conga.
+  expect(noteOns.filter((note) => note.note === 45)).toHaveLength(0);
+  expect(noteOns.filter((note) => note.note === 64).map((note) => note.tick)).toEqual(toms.map((index) => index * 120));
+});
+
 test('exports the project as JSON and imports it back', async ({ page }) => {
   await selectTrack(page, 'cymbal');
   await stepButton(page, 0).click();

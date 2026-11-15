@@ -186,6 +186,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   creates the `AudioContext` synchronously inside the click for that reason.
 - `window.__boombapbot` exposes `debug()` and `renderLoop()` for tests. The
   browser tests use it to check that the worklet really rendered sound.
+- A control is live only if the panel manifest lists it. The drawing reads
+  the same entries, and draws a live knob without its light and a live switch
+  without its lever, because the editor supplies those.
 - The panel manifest has a `pending` list of what is not modelled yet. It is
   shown in settings, so keep it true as controls are connected.
 - `pnpm dev` serves the Astro dev server; the browser tests and `pnpm serve`

@@ -56,7 +56,10 @@ test('edits made while playing keep the beat running', async ({ page }) => {
   await expect(editor).toHaveAttribute('data-audio', 'running');
   const tempo = page.getByTestId('panel-tempo');
   await tempo.focus();
-  for (let press = 0; press < 4; press += 1) await page.keyboard.press('PageUp');
+  for (let press = 0; press < 4; press += 1) await page.keyboard.press('ArrowUp');
+  await page.getByTestId('panel-switch-clap').click();
+  await page.getByTestId('panel-knob-closed_hat-level').focus();
+  await page.keyboard.press('PageDown');
   await selectTrack(page, 'cymbal');
   await stepButton(page, 0).click();
   await selectTrack(page, 'accent');

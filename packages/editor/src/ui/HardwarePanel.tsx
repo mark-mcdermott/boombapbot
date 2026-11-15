@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import {
-  BPM_MAX,
-  BPM_MIN,
+  KNOB_PARAM_LABELS,
   PANEL,
   PART_STEPS,
-  SOUND_PARAM_LABELS,
+  TEMPO_STOPS,
   TRACKS,
   countSteps,
+  getRole,
   getTrack,
   isStepOn,
+  knobPosition,
   rhythmLength,
   tempoBpm,
+  type PanelKnob,
   type PanelManifest,
   type PanelRect,
+  type PanelSwitch,
 } from '@boombapbot/contracts';
+import { trackLabel } from '../engine/machine';
 import type { AssetManifest } from '../runtime';
 import { editTarget } from '../state/store';
 import { useEditorState, useRuntime } from './context';
@@ -184,51 +188,138 @@ function Knob(props: KnobProps) {
   );
 }
 
-function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | null }) {
+interface FaceplateProps {
+  panel: PanelManifest;
+  photo: string | null;
+}
+
+const PERCENT = { min: 0, max: 100, step: 2, perPixel: 0.5 } as const;
+
+function useBpmText(): string {
+  const bpm = useEditorState((state) => tempoBpm(state.project.tempo));
+  return `${Math.round(bpm * 10) / 10} beats per minute`;
+}
+
+/** The tempo knob turns in click stops: forty of them across its travel. */
+function TempoKnob({ panel, photo }: FaceplateProps) {
   const { store } = useRuntime();
-  const bpm = useEditorState((state) => Math.round(tempoBpm(state.project.tempo)));
+  const stop = useEditorState((state) => state.project.tempo.coarse);
+  const bpm = useBpmText();
   return (
     <Knob
       panel={panel}
       photo={photo}
       geometry={panel.tempo}
-      label={`${panel.tempo.label || 'Tempo'} in beats per minute`}
+      label="Tempo"
       testId="panel-tempo"
-      value={bpm}
-      min={BPM_MIN}
-      max={BPM_MAX}
+      value={stop}
+      min={0}
+      max={TEMPO_STOPS - 1}
       step={1}
-      // Two pixels per beat per minute.
-      perPixel={0.5}
-      valueText={`${bpm} beats per minute`}
-      onChange={(value) => store.setBpm(value)}
+      // Its whole travel in 200 pixels.
+      perPixel={(TEMPO_STOPS - 1) / 200}
+      valueText={`${bpm}, stop ${stop + 1} of ${TEMPO_STOPS}`}
+      onChange={(value) => store.setTempo({ coarse: value })}
     />
   );
 }
 
-type PanelKnob = NonNullable<PanelManifest['knobs']>[number];
-
-/** A tone, decay, tuning or snappy knob. Its travel reads as 0 to 100. */
-function SoundKnob({ panel, photo, knob }: { panel: PanelManifest; photo: string | null; knob: PanelKnob }) {
+/** The fine knob moves the tempo by up to one click stop either way. */
+function FineKnob({ panel, photo }: FaceplateProps) {
   const { store } = useRuntime();
-  const position = useEditorState((state) => state.project.sound.knobs[knob.track][knob.param]);
-  const percent = Math.round(position * 100);
+  const fine = useEditorState((state) => Math.round(state.project.tempo.fine * 100));
+  const bpm = useBpmText();
+  return (
+    <Knob
+      panel={panel}
+      photo={photo}
+      geometry={panel.fine}
+      label="Fine tempo"
+      testId="panel-fine"
+      value={fine}
+      min={-100}
+      max={100}
+      step={5}
+      perPixel={1}
+      valueText={bpm}
+      onChange={(value) => store.setTempo({ fine: value / 100 })}
+    />
+  );
+}
+
+function MasterKnob({ panel, photo }: FaceplateProps) {
+  const { store } = useRuntime();
+  const percent = useEditorState((state) => Math.round(state.project.sound.master * 100));
+  return (
+    <Knob
+      panel={panel}
+      photo={photo}
+      geometry={panel.master}
+      label="Master volume"
+      testId="panel-master"
+      value={percent}
+      {...PERCENT}
+      valueText={`${percent}%`}
+      onChange={(value) => store.setMasterVolume(value / 100)}
+    />
+  );
+}
+
+/** A knob of an instrument column: its level, or its tone, decay, tuning or snappy. */
+function ColumnKnob({ panel, photo, knob }: FaceplateProps & { knob: PanelKnob }) {
+  const { store } = useRuntime();
+  const percent = useEditorState((state) =>
+    Math.round(knobPosition(state.project.sound, knob.track, knob.param) * 100),
+  );
+  const name = useEditorState((state) => trackLabel(knob.track, state.project.sound));
   return (
     <Knob
       panel={panel}
       photo={photo}
       geometry={knob}
-      label={`${getTrack(knob.track).label} ${SOUND_PARAM_LABELS[knob.param]}`}
+      label={`${name} ${KNOB_PARAM_LABELS[knob.param]}`}
       testId={`panel-knob-${knob.track}-${knob.param}`}
       value={percent}
-      min={0}
-      max={100}
-      step={2}
-      // Its whole travel in 200 pixels.
-      perPixel={0.5}
+      {...PERCENT}
       valueText={`${percent}%`}
       onChange={(value) => store.setKnob(knob.track, knob.param, value / 100)}
     />
+  );
+}
+
+/** Lever height and the gap it keeps from the ends of its slot, in faceplate pixels. */
+const LEVER = { height: 20, inset: 3, gap: 5 };
+
+/** A slide switch that gives a column its alternate sound when pushed up. */
+function VoiceSwitch({ panel, entry }: { panel: PanelManifest; entry: PanelSwitch }) {
+  const runtime = useRuntime();
+  const on = useEditorState((state) => state.project.sound.alternates[entry.track]);
+  const track = getTrack(entry.track);
+  const [x, y, width, height] = entry.slot;
+  const top = on ? y + LEVER.gap : y + height - LEVER.gap - LEVER.height;
+  return (
+    <>
+      <button
+        type="button"
+        role="switch"
+        className="sb-panel-switch"
+        style={box(panel, entry.hit)}
+        data-testid={`panel-switch-${entry.track}`}
+        aria-checked={on}
+        aria-label={`${getRole(track.alternate!).name} in place of ${getRole(track.sound!).name}`}
+        onClick={() => {
+          runtime.store.setAlternate(entry.track, !on);
+          runtime.auditionIfRunning(entry.track);
+        }}
+      >
+        <span className="sb-panel-text">{getRole(track.alternate!).short}</span>
+      </button>
+      <span
+        className="sb-panel-lever"
+        aria-hidden="true"
+        style={box(panel, [x + LEVER.inset, top, width - LEVER.inset * 2, LEVER.height])}
+      />
+    </>
   );
 }
 
@@ -248,7 +339,7 @@ export function HardwarePanel() {
   const panel = PANEL;
   const photoUrl = manifest?.faceplate ? runtime.assetUrl(manifest.faceplate) : null;
   const photo = photoUrl && photoUrl !== failedPhoto ? photoUrl : null;
-  const track = getTrack(target.track);
+  const trackName = useEditorState((state) => trackLabel(target.track, state.project.sound));
   const row = rhythm[target.variation][target.track];
   const select = panel.voiceSelect;
   const activePosition = select.positions.find((position) => position.track === target.track);
@@ -310,8 +401,13 @@ export function HardwarePanel() {
             : null}
 
           <TempoKnob panel={panel} photo={photo} />
-          {(panel.knobs ?? []).map((knob) => (
-            <SoundKnob key={`${knob.track}-${knob.param}`} panel={panel} photo={photo} knob={knob} />
+          <FineKnob panel={panel} photo={photo} />
+          <MasterKnob panel={panel} photo={photo} />
+          {panel.knobs.map((knob) => (
+            <ColumnKnob key={`${knob.track}-${knob.param}`} panel={panel} photo={photo} knob={knob} />
+          ))}
+          {panel.switches.map((entry) => (
+            <VoiceSwitch key={entry.track} panel={panel} entry={entry} />
           ))}
           {!photo ? (
             <span
@@ -378,7 +474,7 @@ export function HardwarePanel() {
             </button>
           ))}
 
-          <div className="sb-panel-layer" role="group" aria-label={`${track.label} steps`}>
+          <div className="sb-panel-layer" role="group" aria-label={`${trackName} steps`}>
             {panel.steps.map((step, index) => {
               const on = stepOn(index);
               return (
@@ -390,7 +486,7 @@ export function HardwarePanel() {
                   data-panel-step={index}
                   data-on={on}
                   aria-pressed={on}
-                  aria-label={`${track.label}, step ${index + 1}, ${on ? 'on' : 'off'}`}
+                  aria-label={`${trackName}, step ${index + 1}, ${on ? 'on' : 'off'}`}
                   onClick={() => {
                     if (store.toggleStep(index) && !store.getState().playing) runtime.auditionIfRunning(target.track);
                   }}
@@ -443,7 +539,7 @@ export function HardwarePanel() {
         />
         <div className="sb-panel-info">
           <p data-testid="panel-voice">
-            <span className="sb-label">Instrument</span> <strong>{track.label}</strong> ·{' '}
+            <span className="sb-label">Instrument</span> <strong>{trackName}</strong> ·{' '}
             {countSteps(row, rhythmLength(rhythm))} steps on
           </p>
           <button type="button" className="sb-button" aria-pressed={fit} onClick={() => setFit(!fit)}>

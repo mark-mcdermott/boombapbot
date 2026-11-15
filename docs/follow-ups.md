@@ -10,22 +10,18 @@ The engine and the project file already hold the pattern bank, 1st and 2nd
 parts, pre-scale, accent, levels, voice switches and rhythm tracks. What is
 left, in the order it is being done:
 
-1. **Every control on the panel.** The five voice switches (congas, claves,
-   maracas), the eleven level knobs, the accent level and master volume, and
-   a tempo knob with its click stops and a separate fine knob. The panel
-   manifest and the drawing list every control.
-2. **Pattern memory and writing.** The mode selector, the 16 rhythm buttons
+1. **Pattern memory and writing.** The mode selector, the 16 rhythm buttons
    with their A and B versions, clear, setting the last step with clear held,
    pre-scale, 1st and 2nd part, and tap write.
-3. **Manual play.** Rhythm selection that waits for the bar line (and the
+2. **Manual play.** Rhythm selection that waits for the bar line (and the
    first-beat rule), the A/AB/B switch, intro and fill-in by tap, and auto
    fill-in every 2 to 16 measures. The engine takes over every decision made
    at a bar line, in a `sequencer.h` beside `timeline.h`, and reports a log of
    the measures it played. Until then `snare_engine_cue_pattern` switches
    pattern at the bar line and nothing more.
-4. **Rhythm tracks.** Compose, play and edit, twelve tracks of 64 measures
+3. **Rhythm tracks.** Compose, play and edit, twelve tracks of 64 measures
    chained up to 768, and export of a whole track.
-5. **Starter rhythms**, screenshots and a last pass over these documents.
+4. **Starter rhythms**, screenshots and a last pass over these documents.
 
 Left out for good, because a browser cannot do them: DIN sync, trigger
 outputs, separate instrument outputs, pedal jacks and memory protection.

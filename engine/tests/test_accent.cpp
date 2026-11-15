@@ -87,9 +87,31 @@ SNARE_TEST(a_level_knob_reaches_a_hit_that_is_still_ringing_without_a_jump) {
   }
   CHECK(audio.left[0] - audio.left[1] < 0.002f);          // a frame at a time
   CHECK_NEAR(audio.left[3999], out(0.25), 1e-4);          // to the new level
+  // Turned fully left it arrives at silence, not at ever smaller numbers.
   snare_engine_set_track_level(engine, 1, 0.0);
   audio = snare::io::render(engine, 4000, 256);
-  CHECK_NEAR(audio.left[3999], 0.0, 1e-4);
+  CHECK_EQ(audio.left[3999], 0.0f);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(the_first_setting_of_a_level_or_the_volume_is_taken_at_once) {
+  SnareEngine* engine = snare_engine_create(kRate);
+  snare_engine_set_accent(engine, 1.0, 1.0);
+  snare_engine_set_track(engine, 1, 0, 0.0f, 0);
+  snare_engine_set_track_level(engine, 1, 0.5);
+  snare_engine_set_master_volume(engine, 0.5);
+  giveSound(engine, 0, constant(8000, 0.5f), kRate);
+  snare_engine_trigger(engine, 1, 0);
+  auto audio = snare::io::render(engine, 2000, 256);
+  CHECK_NEAR(audio.left[0], out(0.25) * 0.5, 1e-6);  // no fade down from full level
+  CHECK_NEAR(audio.left[1999], out(0.25) * 0.5, 1e-6);
+
+  // Volume turned to zero ends in exact silence while the hit still rings.
+  snare_engine_set_master_volume(engine, 0.0);
+  audio = snare::io::render(engine, 4000, 256);
+  CHECK(audio.left[0] > 0.05f);
+  CHECK_EQ(audio.left[3999], 0.0f);
+  CHECK_EQ(snare_engine_active_voices(engine), 1);
   snare_engine_destroy(engine);
 }
 

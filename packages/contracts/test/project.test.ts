@@ -19,11 +19,13 @@ import {
   clampKnob,
   countHits,
   countSteps,
+  createDefaultSound,
   createEmptyRhythm,
   createProject,
   createStarterRhythms,
   getTrack,
   isStepOn,
+  knobPosition,
   levelGain,
   masterGain,
   parseProject,
@@ -36,6 +38,7 @@ import {
   tempoBpm,
   tempoFromBpm,
   trackRole,
+  withKnob,
   withStep,
 } from '../src';
 
@@ -289,6 +292,7 @@ describe('the 808 panel', () => {
       ...PANEL.steps.map((step) => step.hit),
       ...PANEL.transport.map((control) => control.hit),
       ...PANEL.voiceSelect.positions.map((position) => position.hit),
+      ...PANEL.switches.flatMap((entry) => [entry.hit, entry.slot]),
     ];
     for (const [x, y, w, h] of rects) {
       expect(x).toBeGreaterThanOrEqual(0);
@@ -306,21 +310,56 @@ describe('the 808 panel', () => {
     expect(PANEL.voiceSelect.positions.map((position) => position.label)).toEqual(TRACKS.map((track) => track.short));
   });
 
-  it('has a knob for every sound control of every column', () => {
-    const knobs = PANEL.knobs ?? [];
-    for (const knob of knobs) {
+  it('has a level knob for every column and a knob for each of its sound controls', () => {
+    for (const knob of [...PANEL.knobs, PANEL.tempo, PANEL.fine, PANEL.master]) {
       expect(knob.cx - knob.r).toBeGreaterThanOrEqual(0);
+      expect(knob.cx + knob.r).toBeLessThanOrEqual(width);
       expect(knob.cy + knob.r).toBeLessThanOrEqual(height);
       expect(knob.minDeg).toBeLessThan(knob.maxDeg);
+      expect(knob.photoDeg).toBeGreaterThanOrEqual(knob.minDeg);
+      expect(knob.photoDeg).toBeLessThanOrEqual(knob.maxDeg);
     }
-    const listed = knobs.map((knob) => `${knob.track}:${knob.param}`).sort();
-    const expected = INSTRUMENT_IDS.flatMap((id) => getTrack(id).knobs.map((param) => `${id}:${param}`)).sort();
+    const listed = PANEL.knobs.map((knob) => `${knob.track}:${knob.param}`).sort();
+    const expected = [
+      ...TRACK_IDS.map((id) => `${id}:level`),
+      ...INSTRUMENT_IDS.flatMap((id) => getTrack(id).knobs.map((param) => `${id}:${param}`)),
+    ].sort();
     expect(listed).toEqual(expected);
+    expect(listed).toHaveLength(22);
+  });
+
+  it('has a switch under each alternate sound, inside the area that throws it', () => {
+    expect(PANEL.switches.map((entry) => entry.track)).toEqual([...SWITCHED_IDS]);
+    for (const { hit, slot } of PANEL.switches) {
+      expect(slot[0]).toBeGreaterThanOrEqual(hit[0]);
+      expect(slot[0] + slot[2]).toBeLessThanOrEqual(hit[0] + hit[2]);
+      expect(slot[1]).toBeGreaterThanOrEqual(hit[1]);
+      expect(slot[1] + slot[3]).toBeLessThanOrEqual(hit[1] + hit[3]);
+    }
   });
 
   it('is drawn for boombapbot, so it carries no credit', () => {
     expect(PANEL.faceplate.original).toBe(true);
     expect(PANEL.faceplate.credit).toBeUndefined();
     expect(PANEL.faceplate.file).toMatch(/\.svg$/);
+  });
+});
+
+describe('knobs', () => {
+  it('reads and turns the knob of any column', () => {
+    const sound = createDefaultSound();
+    expect(knobPosition(sound, 'accent', 'level')).toBe(sound.accent);
+    expect(knobPosition(sound, 'cowbell', 'level')).toBe(0.75);
+    expect(knobPosition(sound, 'snare', 'snappy')).toBe(0.5);
+
+    const turned = withKnob(withKnob(withKnob(sound, 'accent', 'level', 0.2), 'cowbell', 'level', 2), 'snare', 'snappy', -1);
+    expect(turned.accent).toBe(0.2);
+    expect(turned.levels.cowbell).toBe(1);
+    expect(turned.knobs.snare.snappy).toBe(0);
+    // Nothing else moved, and the original is untouched.
+    expect(turned.levels.kick).toBe(sound.levels.kick);
+    expect(turned.knobs.kick).toBe(sound.knobs.kick);
+    expect(turned.master).toBe(sound.master);
+    expect(sound.accent).toBe(0.75);
   });
 });

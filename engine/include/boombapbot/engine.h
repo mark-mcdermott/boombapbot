@@ -162,14 +162,15 @@ int32_t snare_engine_set_tempo(SnareEngine* engine, double bpm);
  * N. 0 is no group. A track always cuts its own previous hit. */
 int32_t snare_engine_set_track(SnareEngine* engine, int32_t track, int32_t slot,
                                float pan, int32_t choke_group);
-/* Linear gain of an instrument track. Changes are smoothed, and reach a hit
- * that is still ringing. */
+/* Linear gain of an instrument track. The first setting applies at once;
+ * later changes are smoothed, and reach a hit that is still ringing. */
 int32_t snare_engine_set_track_level(SnareEngine* engine, int32_t track,
                                      double gain);
 /* Gains of a hit on a plain step and on an accented step. */
 int32_t snare_engine_set_accent(SnareEngine* engine, double plain_gain,
                                 double accent_gain);
-/* Output volume from 0 to 1, applied after the limiter and smoothed. */
+/* Output volume from 0 to 1, applied after the limiter. The first setting
+ * applies at once; later changes are smoothed. */
 int32_t snare_engine_set_master_volume(SnareEngine* engine, double volume);
 
 /* ---- Queued control messages: the pattern bank --------------------------- */

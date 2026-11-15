@@ -26,7 +26,14 @@ test('the draft is saved locally and restored on reload', async ({ page }) => {
   await selectTrack(page, 'kick');
   await stepButton(page, 0).click(); // off
   await page.getByTestId('panel-tempo').focus();
-  await page.keyboard.press('PageDown');
+  await page.keyboard.press('ArrowDown');
+  await page.getByTestId('panel-fine').focus();
+  await page.keyboard.press('End');
+  await page.getByTestId('panel-switch-clap').click();
+  await page.getByTestId('panel-knob-cowbell-level').focus();
+  await page.keyboard.press('Home');
+  await page.getByTestId('panel-master').focus();
+  await page.keyboard.press('End');
   await page.getByTestId('panel-knob-cymbal-tone').focus();
   await page.keyboard.press('End');
   await openSettings(page);
@@ -39,7 +46,11 @@ test('the draft is saved locally and restored on reload', async ({ page }) => {
   await expect(page.getByTestId('editor')).toBeVisible();
   const after = await project(page);
   expect(after).toEqual(before);
-  expect(bpmOf(after)).toBeCloseTo(108, 1);
+  expect(after.tempo).toEqual({ coarse: before.tempo.coarse, fine: 1 });
+  expect(bpmOf(after)).toBeCloseTo(40 + ((after.tempo.coarse + 1) * 260) / 39, 6);
+  expect(after.sound.alternates.clap).toBe(true);
+  expect(after.sound.levels.cowbell).toBe(0);
+  expect(after.sound.master).toBe(1);
   expect(after.name).toBe('Reload test');
   expect(after.sound.knobs.cymbal!.tone).toBe(1);
   expect(stepsOn(after, 'high_tom')).toContain(2);
@@ -48,6 +59,9 @@ test('the draft is saved locally and restored on reload', async ({ page }) => {
   await expect(page.getByTestId('panel-voice-kick')).toHaveAttribute('aria-checked', 'true');
   await expect(stepButton(page, 0)).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByTestId('panel-knob-cymbal-tone')).toHaveAttribute('aria-valuenow', '100');
+  await expect(page.getByTestId('panel-switch-clap')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('panel-master')).toHaveAttribute('aria-valuenow', '100');
+  await expect(page.getByTestId('panel-fine')).toHaveAttribute('aria-valuenow', '100');
   await openSettings(page);
   await expect(page.getByTestId('draft-status')).toHaveAttribute('data-origin', 'restored');
   await expect(page.getByTestId('beat-name')).toHaveValue('Reload test');

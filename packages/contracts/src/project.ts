@@ -14,10 +14,12 @@ import {
   SOUND_PARAMS,
   SWITCHED_IDS,
   TEMPO_STOPS,
+  clampKnob,
   TRACK_IDS,
   countSteps,
   tempoFromBpm,
   type InstrumentId,
+  type KnobParam,
   type SoundParam,
   type SwitchedId,
   type TrackId,
@@ -262,6 +264,20 @@ function fromV1(beat: V1Beat): Project {
     rhythmTracks: Array.from({ length: RHYTHM_TRACKS }, () => []),
     panel: createDefaultPanel(),
   };
+}
+
+/** Where a knob of a panel column stands. The accent column has only a level. */
+export function knobPosition(sound: SoundSettings, track: TrackId, param: KnobParam): number {
+  if (track === 'accent') return sound.accent;
+  return param === 'level' ? sound.levels[track] : sound.knobs[track][param];
+}
+
+/** The sound settings with one knob turned. Positions run from 0 to 1. */
+export function withKnob(sound: SoundSettings, track: TrackId, param: KnobParam, value: number): SoundSettings {
+  const position = clampKnob(value);
+  if (track === 'accent') return { ...sound, accent: position };
+  if (param === 'level') return { ...sound, levels: { ...sound.levels, [track]: position } };
+  return { ...sound, knobs: { ...sound.knobs, [track]: { ...sound.knobs[track], [param]: position } } };
 }
 
 /** Steps a rhythm plays in one measure. */

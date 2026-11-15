@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import panel808 from '../data/panels/808.panel.json';
-import { INSTRUMENT_IDS, PART_STEPS, SOUND_PARAMS, TRACK_IDS } from './machine';
+import { KNOB_PARAMS, PART_STEPS, SWITCHED_IDS, TRACK_IDS, getTrack } from './machine';
 
 /**
  * Hardware panel manifests: control geometry and behaviour notes for the
@@ -21,6 +21,14 @@ const knobSchema = z.object({
   r: z.number().positive(),
   /** Pointer angle in the photo, in degrees clockwise from straight up. */
   photoDeg: z.number(),
+});
+
+/** A knob with a pointer that sweeps between two angles. */
+const sweepKnobSchema = knobSchema.extend({
+  label: z.string(),
+  /** Pointer angles with the knob fully left and fully right. */
+  minDeg: z.number(),
+  maxDeg: z.number(),
 });
 
 const voicePositionSchema = z.object({
@@ -94,24 +102,29 @@ export const panelManifestSchema = z.object({
       }),
     )
     .min(1),
-  tempo: knobSchema.extend({
-    label: z.string(),
-    /** Pointer angles at the slowest and fastest tempo. */
-    minDeg: z.number(),
-    maxDeg: z.number(),
-  }),
-  /** Sound knobs the editor turns. A knob not listed here is only drawn. */
-  knobs: z
+  /** The tempo knob, which turns in click stops, and the fine knob beside it. */
+  tempo: sweepKnobSchema,
+  fine: sweepKnobSchema,
+  master: sweepKnobSchema,
+  /** The knobs of the instrument columns: a level each, and their sound knobs. */
+  knobs: z.array(
+    sweepKnobSchema.omit({ label: true }).extend({
+      track: z.enum(TRACK_IDS),
+      param: z.enum(KNOB_PARAMS),
+    }),
+  ),
+  /** The switches that select a column's alternate sound. Up is the alternate. */
+  switches: z
     .array(
-      knobSchema.extend({
-        track: z.enum(INSTRUMENT_IDS),
-        param: z.enum(SOUND_PARAMS),
-        /** Pointer angles with the knob fully left and fully right. */
-        minDeg: z.number(),
-        maxDeg: z.number(),
+      z.object({
+        track: z.enum(SWITCHED_IDS),
+        /** The area that throws the switch: its slot and the plate above it. */
+        hit: rectSchema,
+        /** The slot the lever travels in. */
+        slot: rectSchema,
       }),
     )
-    .optional(),
+    .length(SWITCHED_IDS.length),
   voiceSelect: z.object({
     kind: z.enum(['rotary', 'keys']),
     label: z.string(),
@@ -126,5 +139,23 @@ export type PanelManifest = z.infer<typeof panelManifestSchema>;
 export type PanelRect = z.infer<typeof rectSchema>;
 export type FaceplateCredit = NonNullable<PanelManifest['faceplate']['credit']>;
 
+export type PanelKnob = PanelManifest['knobs'][number];
+export type PanelSwitch = PanelManifest['switches'][number];
+
+function loadPanel(): PanelManifest {
+  const panel = panelManifestSchema.parse(panel808);
+  const wanted = TRACK_IDS.flatMap((id) =>
+    id === 'accent' ? ['accent level'] : ['level', ...getTrack(id).knobs].map((param) => `${id} ${param}`),
+  );
+  const listed = panel.knobs.map((knob) => `${knob.track} ${knob.param}`);
+  if (wanted.length !== listed.length || wanted.some((knob) => !listed.includes(knob))) {
+    throw new Error('808.panel.json must list exactly the knobs the machine has');
+  }
+  if (SWITCHED_IDS.some((id) => !panel.switches.some((entry) => entry.track === id))) {
+    throw new Error('808.panel.json must list a switch for every alternate sound');
+  }
+  return panel;
+}
+
 /** The 808's panel. */
-export const PANEL: PanelManifest = panelManifestSchema.parse(panel808);
+export const PANEL: PanelManifest = loadPanel();

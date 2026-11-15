@@ -7,13 +7,14 @@ your machine with no accounts, secrets or external services.
 
 Open the editor and the page is a drum machine: the 808. Press its start
 button and you hear a rhythm; pick an instrument with the selector, press step
-buttons to write it, and turn the tempo and sound knobs on the faceplate.
+buttons to write it, and work the knobs and voice switches on the faceplate.
 Everything else is behind the cog in the footer: the beat's name, undo, and
 export as WAV, MIDI or a project file. Reload and your beat is still there.
 
 The aim is the whole machine, worked from its operation manual. This build has
-its sounds, its twelve tracks and its accent; pattern memory, the mode
-selector, fill-ins and rhythm tracks are in progress, and
+its sounds, its twelve tracks, its accent and every knob and voice switch;
+pattern memory, the mode selector, fill-ins and rhythm tracks are in
+progress, and
 [what is modelled so far](#the-machine) says exactly where it stands.
 
 The 808 panel above is original artwork, drawn in code by
@@ -73,14 +74,16 @@ pnpm serve
   toms and three congas, rim shot and claves, hand clap and maracas, cowbell,
   cymbal, open and closed hi-hat. The engine builds each one from its knob
   settings, so the tone, decay, tuning and snappy knobs on the faceplate
-  re-synthesise their own sound as they turn. It is a model made by ear,
-  not a recording and not checked against hardware. See
-  [Sounds](#sounds-provenance).
+  re-synthesise their own sound as they turn, and the five voice switches
+  put a conga, the claves or the maracas in place of a tom, the rim shot or
+  the clap. It is a model made by ear, not a recording and not checked
+  against hardware. See [Sounds](#sounds-provenance).
 - **Twelve tracks, steps that are on or off, and an accent.** The instrument
   selector has its twelve positions: the accent and eleven instruments. A
   step is on or off; an accented step makes every instrument sounding on it
-  louder. A track has one voice, as on the machine, and the two hi-hats cut
-  each other off.
+  louder, by as much as the accent's level knob says. Each instrument has a
+  level knob, and master volume sits after everything. A track has one
+  voice, as on the machine, and the two hi-hats cut each other off.
 - **One engine everywhere.** A C++20 drum machine core (`engine/`) with a C
   ABI: a bank of 32 one-measure patterns of up to 32 steps at three, four,
   six or eight steps to the beat, a fixed pool of voices with deterministic
@@ -108,9 +111,10 @@ What the build models, against the operation manual:
 | --- | --- |
 | Sixteen sounds from their tone, decay, tuning and snappy knobs | Modelled by ear |
 | Twelve-position instrument selector, sixteen step buttons and lamps, start/stop | Working |
-| Accent track | Working; its level is fixed until the accent knob is connected |
-| Tempo, 40 to 300 | Working from one knob; the fine knob is not yet separate |
-| Level knobs, master volume, the five voice switches (congas, claves, maracas) | In the engine and the project file; not yet on the panel |
+| Accent track and its level knob | Working |
+| Tempo, 40 to 300: a knob with 40 click stops, and a fine knob | Working |
+| Eleven level knobs and master volume | Working; how far each reaches is a guess |
+| The five voice switches (congas, claves, maracas) | Working |
 | 1st and 2nd part, step count, pre-scale, A and B versions, 16 rhythms | In the engine and the project file; the panel writes the 1st part of Basic Rhythm 1 A |
 | Mode selector, clear, tap, intro and fill-in, auto fill-in, A/AB/B switch | Not yet |
 | Rhythm tracks: compose, play, chaining | Stored in the project file; not yet playable |
@@ -148,11 +152,11 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | `pnpm kits:check` | 24 of 24 files match |
 | `pnpm faceplates:check` | 1 of 1 drawing matches |
 | `pnpm build:engine` | 11 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
-| `pnpm build:wasm` | 59,798-byte module, one import, no threads or shared memory |
+| `pnpm build:wasm` | 59,843-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 81 of 81 pass |
+| `pnpm test:unit` | 85 of 85 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 36 of 36 pass |
+| `pnpm test:e2e` | 39 of 39 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
 
 Earlier versions of this build were also run on Linux x86-64 with GCC 13 and
@@ -220,8 +224,8 @@ they are kept, with their check, for when those machines come back. Details:
 
 ## The faceplate
 
-The panel puts step buttons, lamps, the instrument selector, start/stop and
-the knobs where they are on the machine. The layout comes from the manifest
+The panel puts step buttons, lamps, the instrument selector, start/stop, the
+knobs and the voice switches where they are on the machine. The layout comes from the manifest
 in `packages/contracts/data/panels/808.panel.json`. State, keyboard and
 accessibility do not depend on the picture: if the image fails to load, the
 panel is drawn from the same layout.

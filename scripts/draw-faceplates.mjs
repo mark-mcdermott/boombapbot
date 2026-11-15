@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // Draws faceplate artwork as SVG. The drawings are original: every shape is
 // produced by this script, and no photograph is traced or embedded. Controls
-// the editor makes live (steps, lamps, instrument selector, start/stop, tempo)
-// are placed from the machine's panel manifest, so the artwork and the hit
-// areas cannot drift apart.
+// the editor makes live (steps, lamps, instrument selector, start/stop, the
+// knobs and the voice switches) are placed from the machine's panel manifest,
+// so the artwork and the hit areas cannot drift apart.
 //
 // The editor turns a knob by rotating a round crop of this image, so the
-// knobs it turns (tempo, instrument selector and the sound knobs the manifest
-// lists) are shaded evenly here and the editor lays a fixed light over them.
-// Every other knob never moves and is lit in the drawing itself, with the
-// same light.
+// knobs it turns are shaded evenly here and the editor lays a fixed light
+// over them. A knob that never moves is lit in the drawing itself, with the
+// same light. The editor draws a live switch's lever, so only its slot is
+// drawn here.
 //
 //   node scripts/draw-faceplates.mjs           write assets/faceplates/*.svg
 //   node scripts/draw-faceplates.mjs --check   fail if a committed file differs
@@ -256,13 +256,17 @@ function plate(cx, y, parts) {
   ]);
 }
 
-function slideSwitch(cx, cy) {
+/** A knob the editor turns: its body and pointer, with no light of its own. */
+function liveDial(knob, ribs) {
   return group({}, [
-    rect(cx - 11, cy - 23, 22, 46, { rx: 3, fill: '#0b0c0e' }),
-    rect(cx - 8, cy - 2, 16, 20, { rx: 2, fill: '#2f3035' }),
-    ...[2, 7, 12].map((dy) => line(cx - 6, cy + dy, cx + 6, cy + dy, { stroke: '#15161a', 'stroke-width': 1.5 })),
+    castShadow(knob.cx, knob.cy, knob.r),
+    knobBody(knob.cx, knob.cy, knob.r - 1, ribs),
+    pointer(knob.cx, knob.cy, knob.r - 1, knob.photoDeg),
   ]);
 }
+
+/** The slot of a slide switch. The editor draws the lever in it. */
+const switchSlot = ([x, y, w, h]) => rect(x, y, w, h, { rx: 3, fill: '#0b0c0e' });
 
 /** A lever switch in a rounded slot, thrown fully to the left. */
 function leverSwitch(cx, cy, width) {
@@ -373,9 +377,7 @@ function draw808(panel) {
     out.push(text(x + w / 2, y + h - 4.2, position.label, { size: 13, fill: C.plateInk }));
     out.push(text(nx, ny + 3, index + 1, { size: 8, fill: C.orange, weight: 400 }));
   });
-  out.push(castShadow(knob.cx, knob.cy, knob.r));
-  out.push(knobBody(knob.cx, knob.cy, knob.r - 1, 30));
-  out.push(pointer(knob.cx, knob.cy, knob.r - 1, knob.photoDeg));
+  out.push(liveDial(knob, 30));
 
   // Auto fill-in.
   for (const [label, deg] of [['MANUAL', -92], ['16', -55], ['12', -18], ['8', 18], ['4', 55], ['2', 92]]) {
@@ -408,62 +410,71 @@ function draw808(panel) {
   out.push(pointer(tempo.cx, tempo.cy, tempo.r - 1, tempo.photoDeg));
 
   // Fine tempo.
-  out.push(text(416, 636, 'FINE', { size: 13, fill: C.label, spacing: 0.5 }));
+  const fine = panel.fine;
+  out.push(text(fine.cx, fine.cy - 52, fine.label, { size: 13, fill: C.label, spacing: 0.5 }));
   for (let i = 0; i <= 6; i += 1) {
-    const [x, y] = polar(416, 688, 36, -90 + i * 30);
+    const [x, y] = polar(fine.cx, fine.cy, 36, fine.minDeg + (i * (fine.maxDeg - fine.minDeg)) / 6);
     out.push(circle(x, y, 2, { fill: C.label }));
   }
-  out.push(dial(416, 688, 27, -70));
-  out.push(text(380, 728, 'SLOW', { size: 9.5, fill: C.label }));
-  out.push(text(456, 728, 'FAST', { size: 9.5, fill: C.label }));
+  out.push(liveDial(fine, 24));
+  out.push(text(fine.cx - 36, fine.cy + 40, 'SLOW', { size: 9.5, fill: C.label }));
+  out.push(text(fine.cx + 40, fine.cy + 40, 'FAST', { size: 9.5, fill: C.label }));
 
-  // Instrument columns. A sound knob the manifest lists is one the editor
-  // turns: it is drawn at its rest angle, where the manifest says it is.
-  const liveKnobs = new Set(panel.knobs ?? []);
-  const soundKnob = (cx, cy, restDeg) => {
-    const live = [...liveKnobs].find((knob) => Math.abs(knob.cx - cx) < 0.5 && Math.abs(knob.cy - cy) < 0.5);
-    if (!live) return smallKnob(cx, cy, { cap: C.capWhite, deg: restDeg });
-    liveKnobs.delete(live);
-    if (live.r !== 22) throw new Error(`the ${live.track} ${live.param} knob must have radius 22`);
-    return smallKnob(cx, cy, { cap: C.capWhite, deg: live.photoDeg, live: true });
+  // Instrument columns. Every knob and switch here is one the editor works,
+  // so each is drawn where the manifest says it is.
+  const unplaced = new Set([...panel.knobs, ...panel.switches]);
+  const placed = (found, what) => {
+    if (!found) throw new Error(`the manifest has no ${what} where the drawing has one`);
+    unplaced.delete(found);
+    return found;
+  };
+  const columnKnob = (cx, cy, look) => {
+    const knob = placed(
+      panel.knobs.find((entry) => Math.abs(entry.cx - cx) < 0.5 && Math.abs(entry.cy - cy) < 0.5),
+      `knob at ${n(cx)}, ${cy}`,
+    );
+    if (knob.r !== 22) throw new Error(`the ${knob.track} ${knob.param} knob must have radius 22`);
+    return smallKnob(cx, cy, { ...look, deg: knob.photoDeg, live: true });
   };
   COLUMNS.forEach((column, index) => {
     const cx = columnCentre(index);
     out.push(text(cx, 229, 'LEVEL', { size: 13, fill: C.label, spacing: 0.5 }));
-    out.push(smallKnob(cx, 268, { cap: C.capOrange, deg: 96 + ((index * 37) % 50), marker: true }));
+    out.push(columnKnob(cx, 268, { cap: C.capOrange, marker: true }));
     if (column.mid) {
       out.push(text(cx, 350, column.mid, { size: 13, fill: C.label, spacing: 0.5 }));
-      out.push(soundKnob(cx, 389, -20 + ((index * 53) % 70)));
+      out.push(columnKnob(cx, 389, { cap: C.capWhite }));
     }
     if (column.low) {
       out.push(text(cx, 470, column.low, { size: 13, fill: C.label, spacing: 0.5 }));
-      out.push(soundKnob(cx, 509, -40 + ((index * 71) % 90)));
+      out.push(columnKnob(cx, 509, { cap: C.capWhite }));
     }
     if (column.alt) {
       out.push(plate(cx, 482, column.alt));
-      out.push(slideSwitch(cx, 546));
+      const entry = placed(
+        panel.switches.find((candidate) => Math.abs(candidate.slot[0] + candidate.slot[2] / 2 - cx) < 0.5),
+        `switch in column ${index + 1}`,
+      );
+      out.push(switchSlot(entry.slot));
     }
     out.push(plate(cx, 578, column.plate));
   });
-  if (liveKnobs.size > 0) {
-    const [stray] = liveKnobs;
-    throw new Error(`the ${stray.track} ${stray.param} knob is not where the drawing has a knob`);
+  if (unplaced.size > 0) {
+    const [stray] = unplaced;
+    throw new Error(`the ${stray.track} ${stray.param ?? 'switch'} is not where the drawing has one`);
   }
 
   // Model name on its rule, and master volume.
   out.push(line(545, 704, 1688, 704, { stroke: C.orange, 'stroke-width': 2.5 }));
   out.push(text(1584, 696, panel.id, { size: 50, fill: C.orange, weight: 400, spacing: 1 }));
-  for (let i = 1; i <= 7; i += 1) {
-    const deg = -120 + (i - 1) * 28;
-    const [dx, dy] = polar(1768, 688, 50, deg);
-    const [lx, ly] = polar(1768, 688, 62, deg);
+  const master = panel.master;
+  for (let i = 0; i <= 10; i += 1) {
+    const [dx, dy] = polar(master.cx, master.cy, 50, master.minDeg + (i * (master.maxDeg - master.minDeg)) / 10);
     out.push(circle(dx, dy, 2, { fill: C.label }));
-    out.push(text(lx, ly + 3.5, i, { size: 10, fill: C.label }));
   }
-  out.push(dial(1768, 688, 40, 20));
-  out.push(text(1728, 742, 'MIN', { size: 9.5, fill: C.label }));
-  out.push(text(1806, 742, 'MAX', { size: 9.5, fill: C.label }));
-  out.push(text(1767, 756, 'MASTER VOLUME', { size: 12, fill: C.label, maxWidth: 118 }));
+  out.push(liveDial(master, 36));
+  out.push(text(master.cx - 44, master.cy + 54, 'MIN', { size: 9.5, fill: C.label }));
+  out.push(text(master.cx + 44, master.cy + 54, 'MAX', { size: 9.5, fill: C.label }));
+  out.push(text(master.cx, master.cy + 70, master.label, { size: 12, fill: C.label, maxWidth: 118 }));
 
   // The rule above the step section.
   out.push(rect(well[0], 760, wellRight - well[0] - 4, 7, { fill: C.rule }));
