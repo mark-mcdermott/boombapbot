@@ -7,7 +7,14 @@
   "faceplate": {
     "file": "707.jpg",
     "width": 1483,
-    "height": 943
+    "height": 943,
+    "credit": {
+      "title": "Roland TR-707",
+      "author": "Speculos",
+      "source": "https://commons.wikimedia.org/wiki/File:Roland_TR-707.jpg",
+      "licence": "CC BY-SA 3.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+    }
   },
   "theme": {
     "panel": "#d8d4c7",

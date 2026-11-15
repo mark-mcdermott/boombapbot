@@ -1094,6 +1094,19 @@
   margin: 0;
 }
 
+.sb-panel-credit {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sb-panel-credit a {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .sb-panel-fit {
   display: none;
 }

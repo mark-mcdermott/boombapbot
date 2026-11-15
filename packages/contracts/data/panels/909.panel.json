@@ -7,7 +7,14 @@
   "faceplate": {
     "file": "909.png",
     "width": 2000,
-    "height": 1181
+    "height": 1181,
+    "credit": {
+      "title": "Roland TR-909 (large)",
+      "author": "Brandon Daniel; derivative work by Clusternote",
+      "source": "https://commons.wikimedia.org/wiki/File:Roland_TR-909_(large).png",
+      "licence": "CC BY-SA 2.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/2.0/"
+    }
   },
   "theme": {
     "panel": "#dbd9d1",

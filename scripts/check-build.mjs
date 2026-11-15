@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Checks the production build of the site: the page, the engine, the worklet
-// and every kit sample must resolve from the built output, and the engine
-// must not need shared memory (so no cross-origin isolation headers).
+// and every kit sample must resolve from the built output, the engine must
+// not need shared memory (so no cross-origin isolation headers), and only
+// committed faceplate images may be present.
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -71,15 +72,45 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
   }
   notes.push(`${samples} kit samples`);
 
-  // Faceplate photos must not ship unless that was asked for explicitly.
-  const photos = Object.keys(manifest.faceplates ?? {});
-  const allowed = process.env.BOOMBAPBOT_INCLUDE_FACEPLATES === '1';
-  check(
-    allowed || (photos.length === 0 && !existsSync(join(dist, 'faceplates'))),
-    'the build contains faceplate photos. Rebuild with pnpm build (not after pnpm dev output) ' +
-      'or set BOOMBAPBOT_INCLUDE_FACEPLATES=1 once the photos are cleared for distribution.',
+  // Every faceplate in the build must be one committed under assets/faceplates.
+  // The owner's local originals in misc/assets must never ship.
+  const shipped = Object.entries(manifest.faceplates ?? {});
+  for (const [id, path] of shipped) {
+    const name = path.split('/').pop();
+    // The photographs are Creative Commons works that must be credited.
+    const panel = JSON.parse(
+      readFileSync(join(root, 'packages/contracts/data/panels', `${id}.panel.json`), 'utf8'),
+    );
+    const credit = panel.faceplate.credit;
+    check(
+      credit && credit.author && credit.title && credit.source && credit.licence && credit.licenceUrl,
+      `the ${id} faceplate ships without a credit. Add faceplate.credit to ${id}.panel.json.`,
+    );
+    const record = join(root, 'assets/faceplates/README.md');
+    check(
+      existsSync(record) && readFileSync(record, 'utf8').includes(name),
+      `assets/faceplates/README.md has no provenance entry for ${name}`,
+    );
+    const committed = join(root, 'assets/faceplates', name);
+    const built = join(dist, path);
+    check(existsSync(built), `faceplate ${path} is listed but missing from the build`);
+    check(
+      existsSync(committed) &&
+        existsSync(built) &&
+        readFileSync(committed).equals(readFileSync(built)),
+      `the ${id} faceplate in the build is not the committed assets/faceplates/${name}. ` +
+        'Local originals from misc/assets must not ship; rebuild with pnpm build.',
+    );
+  }
+  if (existsSync(join(dist, 'faceplates'))) {
+    const listed = new Set(shipped.map(([, path]) => path.split('/').pop()));
+    for (const name of readdirSync(join(dist, 'faceplates'))) {
+      check(listed.has(name), `faceplates/${name} is in the build but not in the asset manifest`);
+    }
+  }
+  notes.push(
+    shipped.length > 0 ? `faceplates: ${shipped.map(([id]) => id).join(', ')}` : 'no faceplates',
   );
-  notes.push(photos.length > 0 ? `faceplate photos: ${photos.join(', ')}` : 'no faceplate photos');
 }
 
 if (problems.length > 0) {

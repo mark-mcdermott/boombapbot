@@ -1,14 +1,15 @@
 #!/usr/bin/env node
-// Puts the engine, the worklet and the kit samples where the site can serve
-// them, and writes the manifest the editor reads to find them.
+// Puts the engine, the worklet, the kit samples and the faceplate images
+// where the site can serve them, and writes the manifest the editor reads to
+// find them.
 //
-//   node scripts/prepare-assets.mjs         production: no faceplate photos
-//   node scripts/prepare-assets.mjs --dev   also copies local faceplate photos
+//   node scripts/prepare-assets.mjs         production
+//   node scripts/prepare-assets.mjs --dev   also uses local faceplate originals
 //
-// Faceplate photos in misc/assets are owner-supplied and their rights are not
-// recorded yet. They are copied for local development only. A production
-// build includes them only when BOOMBAPBOT_INCLUDE_FACEPLATES=1 is set, which
-// should happen only once they are cleared for distribution.
+// Faceplates committed under assets/faceplates are cleared for distribution
+// and are always included. Images in misc/assets are the owner's local
+// originals: they are used with --dev only and never reach a production
+// build.
 
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -19,7 +20,7 @@ import { build } from 'esbuild';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const publicDir = join(root, 'apps/site/public');
 const dev = process.argv.includes('--dev');
-const includeFaceplates = dev || process.env.BOOMBAPBOT_INCLUDE_FACEPLATES === '1';
+const includeLocalFaceplates = dev;
 
 function fail(message) {
   console.error(`prepare-assets: ${message}`);
@@ -87,23 +88,37 @@ for (const file of readdirSync(manifestDir).filter((name) => name.endsWith('.kit
   }
 }
 
-// ---- Faceplate photos ------------------------------------------------------
+// ---- Faceplates -----------------------------------------------------------
+//
+// A faceplate image comes from one of two places, looked up by the file name
+// in the panel manifest:
+//
+//   assets/faceplates/  committed and cleared for distribution. Always used.
+//   misc/assets/        the owner's local originals, ignored by git. Used for
+//                       local development only, never in a production build.
 
 const faceplateDir = join(publicDir, 'faceplates');
-// Always start clean so photos copied by an earlier dev run cannot leak into
+// Always start clean so images copied by an earlier dev run cannot leak into
 // a production build.
 rmSync(faceplateDir, { recursive: true, force: true });
 const faceplates = {};
-if (includeFaceplates) {
-  const panelDir = join(root, 'packages/contracts/data/panels');
-  for (const file of readdirSync(panelDir).filter((name) => name.endsWith('.panel.json'))) {
-    const panel = readJson(join(panelDir, file));
-    const source = join(root, 'misc/assets', panel.faceplate.file);
-    if (!existsSync(source)) continue;
-    mkdirSync(faceplateDir, { recursive: true });
-    cpSync(source, join(faceplateDir, panel.faceplate.file));
-    faceplates[panel.id] = `faceplates/${panel.faceplate.file}`;
+const localOnly = [];
+const panelDir = join(root, 'packages/contracts/data/panels');
+for (const file of readdirSync(panelDir).filter((name) => name.endsWith('.panel.json'))) {
+  const panel = readJson(join(panelDir, file));
+  const cleared = join(root, 'assets/faceplates', panel.faceplate.file);
+  const local = join(root, 'misc/assets', panel.faceplate.file);
+  let source = null;
+  if (existsSync(cleared)) {
+    source = cleared;
+  } else if (includeLocalFaceplates && existsSync(local)) {
+    source = local;
+    localOnly.push(panel.id);
   }
+  if (!source) continue;
+  mkdirSync(faceplateDir, { recursive: true });
+  cpSync(source, join(faceplateDir, panel.faceplate.file));
+  faceplates[panel.id] = `faceplates/${panel.faceplate.file}`;
 }
 
 // ---- Manifest --------------------------------------------------------------
@@ -115,9 +130,10 @@ const manifest = {
 };
 writeFileSync(join(publicDir, 'boombapbot-assets.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
-const photos = Object.keys(faceplates);
+const shown = Object.keys(faceplates);
 console.log(
   `prepare-assets: engine ${wasmName} (${wasmBytes.length} bytes), worklet ${workletName} ` +
     `(${workletBytes.length} bytes), ${sampleCount} samples, ` +
-    (photos.length > 0 ? `faceplate photos for ${photos.join(', ')}` : 'no faceplate photos'),
+    (shown.length > 0 ? `faceplates for ${shown.join(', ')}` : 'no faceplates') +
+    (localOnly.length > 0 ? ` (local originals, dev only: ${localOnly.join(', ')})` : ''),
 );

@@ -104,9 +104,10 @@ checked against the machine's manual. The common gaps:
 - Knob art: the tempo and instrument knobs are round crops of the photo that
   rotate. Their rest angles in each photo are estimates, and lighting rotates
   with the crop. Clean knob art needs close-ups, as the build spec expects.
-- Rights and provenance of the four faceplate photos are not recorded. Until
-  they are, the photos stay out of the repository and out of production
-  builds.
+- Faceplates: the debranded 606 is committed with its credit. The 707, 808
+  and 909 still need debranded versions; their sources and licences are
+  recorded in `assets/faceplates/README.md`. When each arrives, re-fit its
+  step lamps on the new image as was done for the 606.
 
 ## Product
 

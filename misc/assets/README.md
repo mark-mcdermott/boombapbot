@@ -1,26 +1,24 @@
-# Local faceplate photos
+# Local faceplate originals
 
-Put the owner-supplied machine photos here to use them in Hardware mode
-during local development:
+This folder is for the owner's unedited machine photos. Everything in it
+except this file is ignored by git, and nothing in it ever reaches a
+production build.
 
-| Machine | File      |
-| ------- | --------- |
-| 606     | `606.jpg` |
+`pnpm dev` uses an image here when its name matches `faceplate.file` in the
+machine's panel manifest (`packages/contracts/data/panels/<id>.panel.json`)
+and there is no cleared image of that name in `assets/faceplates/`:
+
+| Machine | File name the manifest expects today |
+| ------- | ------------------------------------ |
+| 606     | `606.webp` (a cleared copy is committed, so this is not needed) |
 | 707     | `707.jpg` |
 | 808     | `808.jpg` |
 | 909     | `909.png` |
 
-Everything in this folder except this file is ignored by git. The photos'
-rights and provenance are not recorded yet, so they are kept out of the public
-repository and out of production builds:
+The originals carry brand names, so they stay local. A version cleared for
+distribution goes in `assets/faceplates/` instead, with a provenance entry;
+see [`assets/faceplates/README.md`](../../assets/faceplates/README.md).
 
-- `pnpm dev` copies any photos found here into the dev site.
-- `pnpm build` does not, and `scripts/check-build.mjs` fails a build that
-  contains them.
-- Once a photo is cleared for distribution, build with
-  `BOOMBAPBOT_INCLUDE_FACEPLATES=1 pnpm build`.
-
-Without a photo, Hardware mode draws a stand-in panel from the same control
-geometry (`packages/contracts/data/panels/*.panel.json`). That geometry is
-measured in each photo's own coordinate space, so a photo with the same
-framing works at any resolution.
+Without any image, Hardware mode draws a stand-in panel from the same control
+layout. The layout is measured in each photo's own coordinate space, so an
+image with the same framing works at any resolution.

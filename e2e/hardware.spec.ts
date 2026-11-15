@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { debug, hitCount, lane, openEditor, project, step } from './helpers';
+import { debug, faceplates, hitCount, lane, openEditor, project, step } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await openEditor(page);
@@ -11,8 +11,6 @@ test('hardware and modern editors share one beat', async ({ page }) => {
   await page.getByTestId('mode-hardware').click();
   const panel = page.getByTestId('panel');
   await expect(panel).toBeVisible();
-  // Production builds carry no faceplate photo; the panel is drawn.
-  await expect(panel).toHaveAttribute('data-photo', 'drawn');
   expect(await project(page)).toEqual(before);
 
   // Select the snare on the panel and program two steps.
@@ -93,6 +91,31 @@ for (const kit of ['606', '707', '808', '909']) {
     await expect(panel).toBeVisible();
     await expect(panel.locator('[data-panel-step]')).toHaveCount(16);
 
+    // The panel is the faceplate image where the build ships one, and is
+    // drawn from the same layout where it does not. Both must work.
+    const image = (await faceplates(page))[kit];
+    await expect(panel).toHaveAttribute('data-photo', image ? 'photo' : 'drawn');
+    if (image) {
+      const photo = panel.locator('img.sb-panel-photo');
+      await expect(photo).toHaveAttribute('src', new RegExp(`${image}$`));
+      await expect
+        .poll(() => photo.evaluate((element: HTMLImageElement) => element.naturalWidth))
+        .toBeGreaterThan(0);
+      await expect(panel.locator('.sb-knob-photo')).not.toHaveCount(0);
+      await expect(panel.locator('.sb-panel-key')).toHaveCount(0);
+
+      // A shipped photograph is shown with its credit, source and licence.
+      const credit = page.getByTestId('panel-credit');
+      await expect(credit).toBeVisible();
+      await expect(credit).toContainText(/by \S+/);
+      await expect(credit.locator('a[href^="https://commons.wikimedia.org/"]')).toHaveCount(1);
+      await expect(credit.locator('a[href^="https://creativecommons.org/licenses/"]')).toHaveCount(1);
+    } else {
+      await expect(page.getByTestId('panel-credit')).toHaveCount(0);
+      await expect(panel.locator('img.sb-panel-photo')).toHaveCount(0);
+      await expect(panel.locator('.sb-panel-key')).toHaveCount(16);
+    }
+
     // Every instrument the panel offers selects its own lane.
     const voices = panel.locator('[data-testid^="panel-voice-"]');
     const count = await voices.count();
@@ -129,3 +152,17 @@ for (const kit of ['606', '707', '808', '909']) {
     });
   });
 }
+
+test('a faceplate image that fails to load falls back to the drawn panel', async ({ page }) => {
+  const shipped = await faceplates(page);
+  const kit = Object.keys(shipped)[0];
+  test.skip(!kit, 'this build ships no faceplate images');
+  await page.route(`**/${shipped[kit!]}`, (route) => route.abort());
+  await page.getByTestId(`kit-${kit}`).click();
+  await page.getByTestId('mode-hardware').click();
+  const panel = page.getByTestId('panel');
+  await expect(panel).toHaveAttribute('data-photo', 'drawn');
+  await expect(panel.locator('.sb-panel-key')).toHaveCount(16);
+  await panel.locator('[data-panel-step]').nth(3).click();
+  await expect(panel.locator('[data-panel-step]').nth(3)).toHaveAttribute('aria-pressed', 'true');
+});

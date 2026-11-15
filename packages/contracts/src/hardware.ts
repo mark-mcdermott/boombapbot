@@ -52,6 +52,22 @@ export const panelManifestSchema = z.object({
      */
     width: z.number().positive(),
     height: z.number().positive(),
+    /**
+     * Who made the photograph and under what licence. Required before an
+     * image may ship: the licences need the credit shown with the image.
+     */
+    credit: z
+      .object({
+        /** Title of the original work, as its source names it. */
+        title: z.string().min(1).max(120),
+        author: z.string().min(1).max(120),
+        source: z.url({ protocol: /^https$/ }),
+        licence: z.string().min(1).max(40),
+        licenceUrl: z.url({ protocol: /^https$/ }),
+        /** What was changed from the original, when the image is an adaptation. */
+        changes: z.string().min(1).max(200).optional(),
+      })
+      .optional(),
   }),
   /** Colours for the drawn panel used when no photo is available. */
   theme: z.object({
@@ -97,6 +113,7 @@ export const panelManifestSchema = z.object({
 
 export type PanelManifest = z.infer<typeof panelManifestSchema>;
 export type PanelRect = z.infer<typeof rectSchema>;
+export type FaceplateCredit = NonNullable<PanelManifest['faceplate']['credit']>;
 
 export const PANELS: Readonly<Record<KitId, PanelManifest>> = {
   '606': panelManifestSchema.parse(panel606),

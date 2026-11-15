@@ -22,6 +22,13 @@ export async function openEditor(page: Page): Promise<void> {
   await expect(page.getByTestId('editor')).toBeVisible();
 }
 
+/** Machines this build has a faceplate image for, from the asset manifest. */
+export async function faceplates(page: Page): Promise<Record<string, string>> {
+  const response = await page.request.get('/boombapbot-assets.json');
+  const manifest = (await response.json()) as { faceplates?: Record<string, string> };
+  return manifest.faceplates ?? {};
+}
+
 export function debug(page: Page): Promise<DebugSnapshot> {
   return page.evaluate(() => window.__boombapbot!.debug() as unknown as DebugSnapshot);
 }

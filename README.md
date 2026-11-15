@@ -95,7 +95,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: rendering through every kit, native versus WASM output, WAV and MIDI contents, project schema, import, draft recovery, store |
-| `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet, the engine and all kit samples resolve in the built site, the engine needs no shared memory, and no faceplate photos are included |
+| `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet, the engine and all kit samples resolve in the built site, the engine needs no shared memory, and only committed, credited faceplate images are included |
 | `pnpm test:e2e` | Playwright against the production build in headless Chromium: grid, keyboard, touch layout, playback activation, kit switch, reload, downloads, import rejection, hardware mode on all four panels, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
@@ -114,7 +114,7 @@ headless via Playwright 1.63.
 | `pnpm typecheck` | 0 errors |
 | `pnpm test:unit` | 47 of 47 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 37 of 37 pass |
+| `pnpm test:e2e` | 38 of 38 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on Linux; processor self-test passes 137 of 137 checks |
 
 The same sequence was also run from a fresh clone with a fresh Emscripten
@@ -170,27 +170,36 @@ a kit switch is obvious; they are placeholders until licensed recordings
 replace them. Details and how to replace them:
 [`assets/kits/README.md`](assets/kits/README.md).
 
-## Hardware mode and faceplate photos
+## Hardware mode and faceplates
 
-![The drawn 606 panel](docs/screenshots/hardware-drawn.png)
+![The 606 panel in Hardware mode, playing](docs/screenshots/hardware-606.jpg)
 
 Hardware mode puts step buttons, lamps, an instrument selector, transport and
 a tempo knob where they are on each machine's faceplate. The layout comes from
-manifests in `packages/contracts/data/panels/`, measured on the owner's
-photos. State, keyboard and accessibility do not depend on the picture.
+manifests in `packages/contracts/data/panels/`. State, keyboard and
+accessibility do not depend on the picture.
 
-**The photos are not in this repository and not in production builds.** Their
-rights and provenance are not recorded, and the handoff says not to copy
-uncleared photos into public source or release artifacts. So:
+A faceplate image ships only once it is cleared, and there are two places one
+can live:
 
-- With no photo, the panel is drawn from the manifest (the screenshot above).
-  That is what a fresh clone, CI and `pnpm build` show.
-- Put `606.jpg`, `707.jpg`, `808.jpg` and `909.png` in `misc/assets/` (ignored
-  by git) and `pnpm dev` uses them as the faceplate, with the knobs cut from
-  the photo and rotating in place.
-- `pnpm build` leaves them out, and `check-build` fails a build that contains
-  them. Once a photo is cleared, `BOOMBAPBOT_INCLUDE_FACEPLATES=1 pnpm build`
-  includes it.
+- **`assets/faceplates/`** holds cleared images. They are committed, ship in
+  every build, and each has a provenance entry in
+  [`assets/faceplates/README.md`](assets/faceplates/README.md). The **606**
+  is here: the owner's edit of a Creative Commons photograph with the brand
+  names removed.
+- **`misc/assets/`** holds the owner's unedited originals. It is ignored by
+  git. `pnpm dev` uses what it finds there; `pnpm build` never does.
+
+Where a machine has no image, the panel is drawn from the same layout. That
+is what the 707, 808 and 909 show in a build today.
+
+The photographs are Creative Commons works (CC BY-SA 3.0, CC BY-SA 2.0 and
+CC BY 2.0) by Midas Wouters, Speculos, Bryan Pocius and Brandon Daniel. Their
+licences require credit, so the app shows the author, source and licence
+under any faceplate it displays, and `check-build` fails a build that ships
+one without a credit and a provenance entry. The image above is adapted from
+[“Roland TR-606”](https://commons.wikimedia.org/wiki/File:Roland_TR-606.jpg)
+by Midas Wouters, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
 
 Hardware mode is a prototype. Edits made on a panel and in Modern are the same
 beat. Hits on lanes a panel has no control for are kept, keep playing, and are
@@ -207,10 +216,11 @@ itself and in [`docs/follow-ups.md`](docs/follow-ups.md).
 | `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft |
 | `apps/site/` | Astro site; the editor is a client-only island |
 | `assets/kits/` | Generated demo kit WAVs |
+| `assets/faceplates/` | Cleared faceplate images and their provenance |
 | `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |
 | `e2e/` | Playwright tests |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |
-| `misc/assets/` | Local faceplate photos (ignored by git) |
+| `misc/assets/` | The owner's unedited faceplate originals (ignored by git) |
 
 ## File formats
 
@@ -264,8 +274,8 @@ stack" and most of "build one end-to-end beat". Next:
    AVAudioEngine and Oboe on mobile, and the VST3 in a real host on Windows
    and macOS. Prerequisites for each are in
    [`docs/follow-ups.md`](docs/follow-ups.md).
-3. Clear the faceplate photos and replace the demo kits with licensed
-   recordings, recording rights and provenance for both.
+3. Commit the debranded 707, 808 and 909 faceplates, and replace the demo
+   kits with licensed recordings, recording rights and provenance for them.
 4. Validate one machine's panel workflow against its manual and sign off its
    control profile, then the other three.
 5. Grow the project document: multiple patterns, arrangement, per-lane mix,

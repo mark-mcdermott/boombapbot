@@ -215,7 +215,7 @@ export function HardwarePanel() {
                 <span key={i} className="sb-panel-well" style={box(panel, well)} />
               ))}
               <span className="sb-panel-title">{panel.name}</span>
-              <span className="sb-panel-note">Drawn stand-in. The faceplate photo is not in this build.</span>
+              <span className="sb-panel-note">Drawn stand-in. This build has no faceplate image for this machine.</span>
             </>
           )}
 
@@ -380,6 +380,20 @@ export function HardwarePanel() {
         </button>
       </div>
 
+      {photo && panel.faceplate.credit ? (
+        <p className="sb-panel-credit" data-testid="panel-credit">
+          Faceplate {panel.faceplate.credit.changes ? 'adapted from' : 'photo:'}{' '}
+          <a href={panel.faceplate.credit.source} target="_blank" rel="noreferrer noopener">
+            “{panel.faceplate.credit.title}”
+          </a>{' '}
+          by {panel.faceplate.credit.author}, licensed{' '}
+          <a href={panel.faceplate.credit.licenceUrl} target="_blank" rel="noreferrer noopener">
+            {panel.faceplate.credit.licence}
+          </a>
+          .{panel.faceplate.credit.changes ? ` ${panel.faceplate.credit.changes}` : ''}
+        </p>
+      ) : null}
+
       {outside.length > 0 ? (
         <p className="sb-panel-outside" data-testid="panel-outside">
           This beat also has hits this panel cannot show:{' '}
@@ -400,8 +414,8 @@ export function HardwarePanel() {
         </ul>
         <p>
           {photo
-            ? 'Showing a faceplate photo from your local misc/assets folder. It is not part of the repository or of production builds.'
-            : 'Showing a drawn panel. To use a faceplate photo locally, put it in misc/assets and run pnpm dev.'}
+            ? 'The panel is the faceplate image; the controls sit on top of it.'
+            : 'No faceplate image is available for this machine in this build, so the panel is drawn from its control layout.'}
         </p>
       </details>
     </section>

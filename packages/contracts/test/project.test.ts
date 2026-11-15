@@ -149,6 +149,12 @@ describe('hardware panels', () => {
       panel.steps.forEach((step, i) => {
         if (i > 0) expect(step.hit[0]).toBeGreaterThanOrEqual(panel.steps[i - 1]!.hit[0] + panel.steps[i - 1]!.hit[2] - 0.01);
       });
+      // Every faceplate photograph is a Creative Commons work with a credit.
+      const credit = panel.faceplate.credit;
+      expect(credit).toBeDefined();
+      expect(credit!.source).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
+      expect(credit!.licenceUrl).toMatch(/^https:\/\/creativecommons\.org\/licenses\/by(-sa)?\/\d\.\d\/$/);
+      expect(credit!.licence).toMatch(/^CC BY(-SA)? \d\.\d$/);
       expect(panelRoles(panel).length).toBeGreaterThanOrEqual(6);
       expect([...panelRoles(panel), ...rolesOutsidePanel(panel)].sort()).toEqual([...ROLE_IDS].sort());
     }
