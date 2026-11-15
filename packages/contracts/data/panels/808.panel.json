@@ -5,17 +5,10 @@
   "kit": "808",
   "name": "808 panel",
   "faceplate": {
-    "file": "808.webp",
+    "file": "808.svg",
     "width": 2000,
     "height": 1190,
-    "credit": {
-      "title": "TR-808 - MIM, Phoenix (cropped)",
-      "author": "Bryan Pocius",
-      "source": "https://commons.wikimedia.org/wiki/File:TR-808_-_MIM,_Phoenix_(2019-08-30_14.59.26_by_Bryan_Pocius)_(cropped).jpg",
-      "licence": "CC BY 2.0",
-      "licenceUrl": "https://creativecommons.org/licenses/by/2.0/",
-      "changes": "Brand and product names removed and the model name replaced with “808”; resized."
-    }
+    "original": true
   },
   "theme": {
     "panel": "#2b2c30",

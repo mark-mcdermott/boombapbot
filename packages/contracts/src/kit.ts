@@ -3,10 +3,18 @@ import kit606 from '../data/kits/606.kit.json';
 import kit707 from '../data/kits/707.kit.json';
 import kit808 from '../data/kits/808.kit.json';
 import kit909 from '../data/kits/909.kit.json';
+import offeredKits from '../data/offered-kits.json';
 import { ROLE_IDS, type RoleId } from './roles';
 
 export const KIT_IDS = ['606', '707', '808', '909'] as const;
 export type KitId = (typeof KIT_IDS)[number];
+
+/**
+ * Kits the editor offers, first choice first. Every kit stays defined and
+ * tested; one that is not listed is held back from the page until its panel
+ * is ready. The build reads the same file to decide which faceplates ship.
+ */
+export const OFFERED_KIT_IDS: readonly KitId[] = z.array(z.enum(KIT_IDS)).min(1).parse(offeredKits);
 
 export const kitVoiceSchema = z.object({
   /** WAV file name inside the kit's asset folder. */

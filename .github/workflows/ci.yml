@@ -48,6 +48,9 @@ jobs:
       - name: Demo kits match their generator
         run: pnpm kits:check
 
+      - name: Drawn faceplates match their generator
+        run: pnpm faceplates:check
+
       - name: Build the native engine and run CTest
         run: pnpm build:engine
 

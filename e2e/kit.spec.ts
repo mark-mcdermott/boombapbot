@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { debug, openEditor, project } from './helpers';
+import { chooseKit, debug, openModern, openSettings, project } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openEditor(page);
+  await openModern(page);
 });
 
 test('changing kit keeps the rhythm and changes the sound', async ({ page }) => {
@@ -10,9 +10,7 @@ test('changing kit keeps the rhythm and changes the sound', async ({ page }) => 
   const renders: Record<string, Awaited<ReturnType<NonNullable<Window['__boombapbot']>['renderLoop']>>> = {};
 
   for (const kit of ['606', '707', '808', '909']) {
-    await page.getByTestId(`kit-${kit}`).click();
-    await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', kit);
-    await expect(page.getByTestId(`kit-${kit}`)).toHaveAttribute('aria-checked', 'true');
+    await chooseKit(page, kit);
 
     const after = await project(page);
     expect(after.kit.id).toBe(kit);
@@ -35,13 +33,12 @@ test('changing kit keeps the rhythm and changes the sound', async ({ page }) => 
 });
 
 test('lane names follow the kit and stand-in voices are marked', async ({ page }) => {
-  await page.getByTestId('kit-606').click();
+  await chooseKit(page, '606');
   const clap = page.getByTestId('lane-clap');
   await expect(clap).toContainText('Snare Accent');
   await expect(clap.locator('.sb-badge')).toHaveText('stand-in');
-  await expect(page.getByTestId('kit-note')).toContainText('Clap plays Snare Accent');
 
-  await page.getByTestId('kit-909').click();
+  await chooseKit(page, '909');
   await expect(clap).toContainText('Hand Clap');
   await expect(clap.locator('.sb-badge')).toHaveCount(0);
   await expect(page.getByTestId('lane-cymbal')).toContainText('Crash');
@@ -51,13 +48,22 @@ test('a kit switch reaches the running engine', async ({ page }) => {
   await page.getByTestId('play').click();
   await expect(page.getByTestId('editor')).toHaveAttribute('data-audio', 'running');
   for (const kit of ['909', '606']) {
-    await page.getByTestId(`kit-${kit}`).click();
+    await chooseKit(page, kit);
     await expect.poll(async () => (await debug(page)).engineKit).toBe(kit);
   }
   await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
 });
 
+test('settings offers a kit picker only when there is a choice', async ({ page }) => {
+  await openSettings(page);
+  const offered = await page.locator('[data-testid^="kit-"][role="radio"]').count();
+  expect(offered).not.toBe(1);
+  if (offered === 0) await expect(page.getByTestId('kit-note')).toHaveCount(0);
+});
+
 test('the kit picker works from the keyboard', async ({ page }) => {
+  await openSettings(page);
+  test.skip((await page.getByTestId('kit-909').count()) === 0, 'the page offers one kit, so it has no picker');
   await page.getByTestId('kit-808').focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('kit-909')).toBeFocused();

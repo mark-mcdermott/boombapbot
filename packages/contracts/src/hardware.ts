@@ -44,8 +44,8 @@ export const panelManifestSchema = z.object({
   kit: z.enum(KIT_IDS),
   name: z.string().min(1).max(40),
   faceplate: z.object({
-    /** File name expected in misc/assets. Never committed. */
-    file: z.string().regex(/^[a-z0-9_-]+\.(jpg|png|webp)$/),
+    /** File name in assets/faceplates, or in misc/assets during development. */
+    file: z.string().regex(/^[a-z0-9_-]+\.(jpg|png|webp|svg)$/),
     /**
      * Size of the coordinate space every rectangle below is measured in. A
      * photo of the same framing at another resolution works unchanged.
@@ -53,8 +53,13 @@ export const panelManifestSchema = z.object({
     width: z.number().positive(),
     height: z.number().positive(),
     /**
-     * Who made the photograph and under what licence. Required before an
-     * image may ship: the licences need the credit shown with the image.
+     * True for artwork drawn for boombapbot by scripts/draw-faceplates.mjs. It
+     * needs no credit; any other image needs one before it may ship.
+     */
+    original: z.boolean().optional(),
+    /**
+     * Who made the photograph and under what licence. Required before a
+     * photograph may ship: the licences need the credit shown with the image.
      */
     credit: z
       .object({

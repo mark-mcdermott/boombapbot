@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   KITS,
   KIT_IDS,
+  OFFERED_KIT_IDS,
   PANELS,
   PROJECT_FORMAT,
   ROLES,
@@ -10,6 +11,7 @@ import {
   countHits,
   createProject,
   createStarterPattern,
+  onOfferedKit,
   panelRoles,
   parseProject,
   parseProjectText,
@@ -128,6 +130,28 @@ describe('roles and kits', () => {
   });
 });
 
+describe('offered kits', () => {
+  it('lists at least one defined kit, without repeats', () => {
+    expect(OFFERED_KIT_IDS.length).toBeGreaterThan(0);
+    expect(new Set(OFFERED_KIT_IDS).size).toBe(OFFERED_KIT_IDS.length);
+    for (const id of OFFERED_KIT_IDS) expect(KIT_IDS).toContain(id);
+  });
+
+  it('moves a beat off a kit that is held back and changes nothing else', () => {
+    const offered = OFFERED_KIT_IDS[0]!;
+    const base = createProject({ id: 'p', now: new Date(0), kit: offered, pattern: createStarterPattern() });
+    expect(onOfferedKit(base)).toBe(base);
+
+    const heldBack = KIT_IDS.find((id) => !OFFERED_KIT_IDS.includes(id));
+    if (!heldBack) return;
+    const elsewhere = { ...base, kit: { id: heldBack, version: KITS[heldBack].version } };
+    const moved = onOfferedKit(elsewhere);
+    expect(moved.kit).toEqual({ id: offered, version: KITS[offered].version });
+    expect({ ...moved, kit: elsewhere.kit }).toEqual(elsewhere);
+    expect(parseProject(moved).ok).toBe(true);
+  });
+});
+
 describe('hardware panels', () => {
   it('have valid geometry inside the faceplate', () => {
     const panels = Object.values(PANELS);
@@ -149,12 +173,18 @@ describe('hardware panels', () => {
       panel.steps.forEach((step, i) => {
         if (i > 0) expect(step.hit[0]).toBeGreaterThanOrEqual(panel.steps[i - 1]!.hit[0] + panel.steps[i - 1]!.hit[2] - 0.01);
       });
-      // Every faceplate photograph is a Creative Commons work with a credit.
+      // A faceplate is either drawn for boombapbot, or a Creative Commons
+      // photograph with a credit. Never both, never neither.
       const credit = panel.faceplate.credit;
-      expect(credit).toBeDefined();
-      expect(credit!.source).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
-      expect(credit!.licenceUrl).toMatch(/^https:\/\/creativecommons\.org\/licenses\/by(-sa)?\/\d\.\d\/$/);
-      expect(credit!.licence).toMatch(/^CC BY(-SA)? \d\.\d$/);
+      if (panel.faceplate.original) {
+        expect(credit).toBeUndefined();
+        expect(panel.faceplate.file).toMatch(/\.svg$/);
+      } else {
+        expect(credit).toBeDefined();
+        expect(credit!.source).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
+        expect(credit!.licenceUrl).toMatch(/^https:\/\/creativecommons\.org\/licenses\/by(-sa)?\/\d\.\d\/$/);
+        expect(credit!.licence).toMatch(/^CC BY(-SA)? \d\.\d$/);
+      }
       expect(panelRoles(panel).length).toBeGreaterThanOrEqual(6);
       expect([...panelRoles(panel), ...rolesOutsidePanel(panel)].sort()).toEqual([...ROLE_IDS].sort());
     }

@@ -3,12 +3,16 @@
 A drums-only beat maker. This is **v0.1**: the web editor, running entirely on
 your machine with no accounts, secrets or external services.
 
-![The Modern editor playing the starter beat on the 909 demo kit](docs/screenshots/modern.png)
+![The page as it opens: the 808 panel playing the starter beat](docs/screenshots/hardware-808.jpg)
 
-Open the editor, press Play, and you hear a beat. Toggle steps, shape their
-velocity, change tempo and swing, switch between four kits without losing the
-rhythm, reload and find your beat still there, and export it as WAV, MIDI or a
-project file.
+Open the editor and the page is a drum machine. Press its start button and you
+hear a beat; toggle steps and turn the tempo knob on the faceplate. Everything
+else is behind the cog in the footer: change swing, move to a grid of every
+lane at once, and export the beat as WAV, MIDI or a project file. Reload and
+your beat is still there.
+
+The 808 panel above is original artwork, drawn in code by
+[`scripts/draw-faceplates.mjs`](scripts/draw-faceplates.mjs).
 
 ## Run it
 
@@ -56,19 +60,30 @@ pnpm serve
 
 ## What v0.1 does
 
-- **Modern editor.** Eight lanes by 16 steps in 4/4, play and stop, tempo
-  (40 to 240 BPM), swing (50 to 75%), per-step velocity, voice audition pads,
-  kit selection, undo and redo, a starter beat and a clear action. Works with
-  mouse, keyboard and touch; on a phone each lane wraps into two rows of
-  eight.
-- **Four demo kits** labelled 606, 707, 808 and 909. They are synthesised
-  placeholders, not recordings of hardware. See
+- **A page that is just the machine.** The mascot and wordmark, the drum
+  machine, and a footer with a cog. The cog opens a settings sheet holding
+  the beat name, tempo (40 to 240 BPM), swing (50 to 75%), the choice of
+  editor, undo and redo, a starter beat, a clear action, import and export,
+  and the save and audio status.
+- **Hardware editor (prototype).** What the page opens on: the 808 panel,
+  with step buttons, instrument selector, start/stop and tempo knob on the
+  faceplate. See [Hardware mode](#hardware-mode-and-faceplates).
+- **Modern editor.** Chosen in settings, and editing the same beat: eight
+  lanes by 16 steps in 4/4, play and stop, per-step velocity and voice
+  audition pads. Works with mouse, keyboard and touch; on a phone each lane
+  wraps into two rows of eight.
+- **The 808, for now.** The page offers one kit and has no kit picker. Kits
+  and panels for the 606, 707 and 909 are in the repository and still tested,
+  but held back until the 808 is finished;
+  `packages/contracts/data/offered-kits.json` lists what the page offers. All
+  four kits are synthesised placeholders, not recordings of hardware. See
   [Demo kits](#demo-kits-provenance).
-- **Kit switching keeps the beat.** Steps belong to stable drum roles (`kick`,
+- **A kit never changes the beat.** Steps belong to stable drum roles (`kick`,
   `snare`, `closed_hat`, ...). A kit maps roles to samples, so changing kit
-  changes the sound and nothing else. Where a kit has no native voice for a
-  role (the 606 has no clap) the manifest names a stand-in and the lane is
-  marked.
+  changes the sound and nothing else. That is why a draft or an imported
+  project made on a held-back kit opens on the 808 with every step intact,
+  and says so. Where a kit has no native voice for a role (the 606 has no
+  clap) the manifest names a stand-in and the lane is marked.
 - **One engine everywhere.** A C++20 sampler and scheduler (`engine/`) with a
   C ABI: a fixed pool of 64 overlapping voices, hat chokes, deterministic
   voice stealing, and step times computed from the audio sample clock. The
@@ -80,9 +95,10 @@ pnpm serve
   rejected and never replaces the current beat), a one-bar seamless PCM WAV
   loop (24 or 16-bit stereo, 44.1 kHz), and a Type 1 Standard MIDI File with a
   tempo track and General MIDI drum notes on channel 10.
-- **Hardware mode (prototype).** A panel for each of the four machines,
-  sharing the same beat as the Modern editor. See
-  [Hardware mode](#hardware-mode-and-faceplate-photos).
+
+![Settings open over the 808 panel](docs/screenshots/settings.jpg)
+
+![The Modern editor playing the starter beat](docs/screenshots/modern.png)
 
 ## Tests
 
@@ -91,12 +107,13 @@ Run in this order; later steps use what earlier ones build.
 | Command | What it checks |
 | --- | --- |
 | `pnpm kits:check` | The committed demo WAVs match their generator script |
+| `pnpm faceplates:check` | The committed faceplate drawings match their generator script, and carry no brand names |
 | `pnpm build:engine` | Builds the native engine and runs CTest: scheduler timing across buffer sizes, ten minutes without drift, voices and stealing, hat chokes, swing and loop length, kit mapping across all four kits, MIDI |
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: rendering through every kit, native versus WASM output, WAV and MIDI contents, project schema, import, draft recovery, store |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet, the engine and all kit samples resolve in the built site, the engine needs no shared memory, and only committed, credited faceplate images are included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: grid, keyboard, touch layout, playback activation, kit switch, reload, downloads, import rejection, hardware mode on all four panels, accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, grid, keyboard, touch layout, playback activation, kit switch, reload, downloads, import rejection, hardware mode on all four panels, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -121,6 +138,23 @@ The same sequence was also run from a fresh clone with a fresh Emscripten
 install, start to finish, and passed. The WASM binary from that run was
 byte-identical to the working build.
 
+### Results on macOS
+
+Run again after the page was reduced to the machine and a settings sheet, on
+macOS 26.6 on Apple silicon with Apple clang 21, Node 22.23.4, Emscripten
+6.0.13 and the same headless Chromium. The VST3 spike was not built here.
+
+| Step | Result |
+| --- | --- |
+| `pnpm kits:check` | 32 of 32 files match |
+| `pnpm faceplates:check` | 1 of 1 drawing matches |
+| `pnpm build:engine` | 6 CTest suites, all pass with Apple clang 21 |
+| `pnpm build:wasm` | 40,353-byte module; a clean rebuild was byte-identical |
+| `pnpm typecheck` | 0 errors |
+| `pnpm test:unit` | 49 of 49 pass |
+| `pnpm build` | Build check passes |
+| `pnpm test:e2e` | 47 pass; 2 kit picker tests are skipped while one kit is offered |
+
 Two cross-checks worth knowing about:
 
 - **Native versus WASM.** For the shared fixture through all four kits, event
@@ -144,12 +178,13 @@ Two cross-checks worth knowing about:
 - **Deployment.** The Vercel adapter build was produced locally, never
   deployed.
 - **Hardware behaviour.** The panels are checked against the photos, not
-  against the machines' manuals. Each panel lists what is unverified.
+  against the machines' manuals. Settings lists what is unverified for the
+  panel on screen.
 - **Device performance.** See the benchmark below; it says nothing about
   phones.
 
-To reproduce the audio check by hand: `pnpm dev`, press Play, and switch
-between the four kits while it plays.
+To reproduce the audio check by hand: `pnpm dev`, then press the panel's
+start button.
 
 ### Engine load
 
@@ -172,40 +207,42 @@ replace them. Details and how to replace them:
 
 ## Hardware mode and faceplates
 
-![The 606 panel in Hardware mode, playing](docs/screenshots/hardware-606.jpg)
-
 Hardware mode puts step buttons, lamps, an instrument selector, transport and
 a tempo knob where they are on each machine's faceplate. The layout comes from
 manifests in `packages/contracts/data/panels/`. State, keyboard and
 accessibility do not depend on the picture.
 
-A faceplate image ships only once it is cleared, and there are two places one
-can live:
+A faceplate image ships only once it is cleared, and only for a kit the page
+offers, so today the build carries the drawn 808 and nothing else. There are
+two places an image can live:
 
-- **`assets/faceplates/`** holds cleared images. They are committed, ship in
-  every build, and each has a provenance entry in
-  [`assets/faceplates/README.md`](assets/faceplates/README.md). All four
-  machines are here: the owner's edits of Creative Commons photographs with
-  the brand names removed.
+- **`assets/faceplates/`** holds cleared images. They are committed, and each
+  has a provenance entry in
+  [`assets/faceplates/README.md`](assets/faceplates/README.md). The 808 is
+  original artwork drawn by `scripts/draw-faceplates.mjs` from the panel's
+  own layout, so it needs no credit. The 606, 707 and 909 are the owner's
+  edits of Creative Commons photographs with the brand names removed.
 - **`misc/assets/`** holds the owner's unedited originals. It is ignored by
   git. `pnpm dev` uses what it finds there; `pnpm build` never does.
 
 Where a machine has no image, or its image fails to load, the panel is drawn
 from the same layout.
 
-The photographs are Creative Commons works (CC BY-SA 3.0, CC BY-SA 2.0 and
-CC BY 2.0) by Midas Wouters, Speculos, Bryan Pocius and Brandon Daniel. Their
-licences require credit, so the app shows the author, source and licence
-under any faceplate it displays, and `check-build` fails a build that ships
-one without a credit and a provenance entry. The image above is adapted from
-[“Roland TR-606”](https://commons.wikimedia.org/wiki/File:Roland_TR-606.jpg)
-by Midas Wouters, [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
+The photographs are Creative Commons works (CC BY-SA 3.0 and CC BY-SA 2.0)
+by Midas Wouters, Speculos and Brandon Daniel. Their licences require credit,
+so the app shows the author, source and licence under any photograph it
+displays, and `check-build` fails a build that ships one without a credit and
+a provenance entry. A drawing avoids the photograph's copyright and credit;
+it does not settle the manufacturer's rights in the look of the machine.
 
 Hardware mode is a prototype. Edits made on a panel and in Modern are the same
 beat. Hits on lanes a panel has no control for are kept, keep playing, and are
-pointed out. What each panel does not yet model (accent tracks, A/B variation,
-first and second parts, scale, chaining and so on) is listed in the panel
-itself and in [`docs/follow-ups.md`](docs/follow-ups.md).
+pointed out under the panel. What each panel does not yet model (accent
+tracks, A/B variation, first and second parts, scale, chaining and so on) is
+listed in settings while that panel is showing, and in
+[`docs/follow-ups.md`](docs/follow-ups.md). On a phone, where the faceplate's
+own selector is too small to tap, an instrument strip and a fit-to-screen
+button sit under the panel.
 
 ## Layout
 
@@ -216,7 +253,7 @@ itself and in [`docs/follow-ups.md`](docs/follow-ups.md).
 | `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft |
 | `apps/site/` | Astro site; the editor is a client-only island |
 | `assets/kits/` | Generated demo kit WAVs |
-| `assets/faceplates/` | Cleared faceplate images and their provenance |
+| `assets/faceplates/` | Cleared faceplate images, drawn or photographed, and their provenance |
 | `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |
 | `e2e/` | Playwright tests |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |

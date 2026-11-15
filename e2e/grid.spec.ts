@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { hitCount, lane, openEditor, project, step } from './helpers';
+import { hitCount, lane, openModern, openSettings, project, step } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openEditor(page);
+  await openModern(page);
 });
 
 test('starts with an audible beat on eight 16-step lanes', async ({ page }) => {
@@ -10,6 +10,7 @@ test('starts with an audible beat on eight 16-step lanes', async ({ page }) => {
   await expect(page.locator('.sb-step')).toHaveCount(8 * 16);
   const snapshot = await project(page);
   expect(hitCount(snapshot)).toBeGreaterThan(10);
+  await openSettings(page);
   await expect(page.getByTestId('hit-count')).toContainText(`${hitCount(snapshot)} hits`);
   await expect(step(page, 'kick', 0)).toHaveAttribute('aria-pressed', 'true');
 });
@@ -84,6 +85,7 @@ test('dragging on the velocity lane sets velocity', async ({ page }) => {
 
 test('clear empties the pattern and undo brings it back', async ({ page }) => {
   const before = await project(page);
+  await openSettings(page);
   await page.getByTestId('clear').click();
   expect(hitCount(await project(page))).toBe(0);
   await expect(page.locator('.sb-step[aria-pressed="true"]')).toHaveCount(0);
@@ -98,6 +100,7 @@ test('clear empties the pattern and undo brings it back', async ({ page }) => {
 });
 
 test('tempo and swing controls edit the project', async ({ page }) => {
+  await openSettings(page);
   const bpm = page.getByTestId('bpm');
   await bpm.fill('140');
   await bpm.press('Enter');
@@ -129,12 +132,13 @@ test('the header shows the mascot and the wordmark', async ({ page }) => {
   const wordmark = page.getByRole('img', { name: 'boombapbot' });
   await expect(wordmark).toBeVisible();
 
-  // Mascot to the left of the wordmark, and a little taller than it.
+  // Mascot to the left of the wordmark, and under twice its height: the
+  // wordmark is all capitals, so it sits lower than the mascot stands.
   const mascotBox = (await mascot.boundingBox())!;
   const wordmarkBox = (await wordmark.boundingBox())!;
   expect(mascotBox.x + mascotBox.width).toBeLessThanOrEqual(wordmarkBox.x);
-  expect(mascotBox.height).toBeGreaterThan(wordmarkBox.height);
-  expect(mascotBox.height).toBeLessThan(wordmarkBox.height * 1.5);
+  expect(mascotBox.height).toBeGreaterThan(wordmarkBox.height * 1.5);
+  expect(mascotBox.height).toBeLessThan(wordmarkBox.height * 2);
   // Vertically centred on each other.
   const offset = mascotBox.y + mascotBox.height / 2 - (wordmarkBox.y + wordmarkBox.height / 2);
   expect(Math.abs(offset)).toBeLessThanOrEqual(2);

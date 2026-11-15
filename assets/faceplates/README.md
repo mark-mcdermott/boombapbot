@@ -1,9 +1,11 @@
 # Faceplate images
 
-Images in this folder are cleared for distribution and ship in every build.
-Each one is listed here with where it came from, who made it, its licence and
-what was changed. `scripts/check-build.mjs` fails a build that ships a
-faceplate without an entry here and a credit in its panel manifest.
+Images in this folder are cleared for distribution. A build ships the one
+each panel manifest names in `faceplate.file`. Each image is listed here with
+where it came from, who made it, its licence and what was changed.
+`scripts/check-build.mjs` fails a build that ships a faceplate without an
+entry here, and without either a credit in its panel manifest or
+`faceplate.original` for artwork drawn in this repository.
 
 The owner's unedited originals are not in the repository. They live in the
 git-ignored `misc/assets/` folder and are used for local development only.
@@ -37,7 +39,31 @@ git-ignored `misc/assets/` folder and are used for local development only.
   as an adaptation of a share-alike work. Credit Speculos and note the
   changes above.
 
+### `808.svg`
+
+- **Original work:** drawn for boombapbot by
+  [`scripts/draw-faceplates.mjs`](../../scripts/draw-faceplates.mjs). Every
+  shape in the file is produced by that script. No photograph is traced or
+  embedded, so there is nobody to credit, and `808.panel.json` sets
+  `faceplate.original` in place of a credit.
+- **Where the layout comes from:** the controls the editor makes live (step
+  keys and lamps, instrument selector, start/stop, tempo) are placed from
+  `808.panel.json`. Those coordinates were measured on the photograph below.
+  The fixed controls and lettering were placed by eye against the same
+  photograph, as a record of where things are on the machine.
+- **Licence of this file:** the owner's own artwork. No licence has been
+  chosen for it.
+- **Changing it:** edit the script and run `pnpm faceplates:draw`. Do not edit
+  the SVG by hand; `pnpm faceplates:check` fails if the two differ.
+- **What a drawing does not settle:** it avoids the photograph's copyright
+  and its credit. It says nothing about the manufacturer's rights in the look
+  of the machine itself. That needs advice before a public release.
+
 ### `808.webp`
+
+Not shipped at present: the 808 panel uses the drawing above. The photograph
+is kept so the panel can go back to it, by pointing `faceplate.file` at this
+file and restoring its `faceplate.credit`.
 
 - **Original work:** [“TR-808 - MIM, Phoenix (cropped)”](https://commons.wikimedia.org/wiki/File:TR-808_-_MIM,_Phoenix_(2019-08-30_14.59.26_by_Bryan_Pocius)_(cropped).jpg)
   by Bryan Pocius (2019), from Wikimedia Commons; the crop was uploaded there
@@ -66,7 +92,7 @@ git-ignored `misc/assets/` folder and are used for local development only.
   as an adaptation of a share-alike work. Credit Brandon Daniel and
   Clusternote and note the changes above.
 
-All four entries were checked against their Wikimedia Commons file pages on
+The four photograph entries were checked against their Wikimedia Commons file pages on
 2026-11-15: author, date, licence, and that each file's dimensions match the
 owner's original. The credit for each is shown in the app under its panel,
 from `faceplate.credit` in the machine's panel manifest.
@@ -99,8 +125,9 @@ No edit introduced rotation, and the fit error was under a pixel in each.
 
 This is a summary, not legal advice.
 
-- **Attribution (all four):** credit the author, link the source and the
-  licence, and say what was changed. The app does this under the panel.
+- **Attribution (all four photographs):** credit the author, link the source
+  and the licence, and say what was changed. The app does this under the
+  panel.
 - **Share-alike (606, 707, 909):** an adapted version of the image has to be
   offered under the same licence. That applies to the edited image, which is
   why each committed file states its own licence here.

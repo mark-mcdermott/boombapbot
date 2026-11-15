@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { debug, lane, openEditor, project, step } from './helpers';
+import { chooseMode, debug, lane, openEditor, project, step } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await openEditor(page);
 });
 
 test('the grid fits a phone and has touch-sized steps', async ({ page }) => {
+  await chooseMode(page, 'modern');
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
@@ -25,6 +26,7 @@ test('the grid fits a phone and has touch-sized steps', async ({ page }) => {
 });
 
 test('tapping toggles steps and the docked Play starts audio', async ({ page }) => {
+  await chooseMode(page, 'modern');
   await step(page, 'open_hat', 3).tap();
   await expect(step(page, 'open_hat', 3)).toHaveAttribute('aria-pressed', 'true');
   expect(lane(await project(page), 'open_hat')[3]).toBe(100);
@@ -38,7 +40,18 @@ test('tapping toggles steps and the docked Play starts audio', async ({ page }) 
   await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'false');
 });
 
+test('settings is reachable by touch', async ({ page }) => {
+  const cog = (await page.getByTestId('settings').boundingBox())!;
+  expect(Math.min(cog.width, cog.height)).toBeGreaterThanOrEqual(44);
+  await page.getByTestId('settings').tap();
+  await expect(page.getByTestId('settings-sheet')).toBeVisible();
+  const mode = (await page.getByTestId('mode-modern').boundingBox())!;
+  expect(mode.height).toBeGreaterThanOrEqual(34);
+});
+
 test('kit buttons are reachable by touch', async ({ page }) => {
+  await page.getByTestId('settings').tap();
+  test.skip((await page.getByTestId('kit-909').count()) === 0, 'the page offers one kit, so it has no picker');
   await page.getByTestId('kit-909').tap();
   await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', '909');
   const box = (await page.getByTestId('kit-909').boundingBox())!;
@@ -46,7 +59,6 @@ test('kit buttons are reachable by touch', async ({ page }) => {
 });
 
 test('the hardware panel stays usable on a phone', async ({ page }) => {
-  await page.getByTestId('mode-hardware').tap();
   const panel = page.getByTestId('panel');
   await expect(panel).toBeVisible();
 

@@ -84,6 +84,12 @@ the compile spike. Beyond it:
 - **Stack items not used yet.** The build spec lists TanStack Query, Better
   Auth, Drizzle, Neon, Vercel Blob and Resend. v0.1 has no remote data, so none
   of them are installed. They arrive with the cloud API.
+- **The other three machines.** The page offers the 808 alone. To bring one
+  back, add it to `packages/contracts/data/offered-kits.json`: the kit picker
+  returns in settings once there is a choice, its faceplate ships again, and
+  the two skipped kit picker tests run. Each needs its panel finished first.
+- **Editor choice.** The page always opens in Hardware mode. The choice of
+  Modern is not saved with the draft, so a reload returns to the faceplate.
 - **Kit switch preview.** Substituted voices are shown on the lane and in the
   kit note after switching. A preview before committing the switch is not
   built.
@@ -101,12 +107,17 @@ checked against the machine's manual. The common gaps:
 - Instrument selection by holding a button and pressing a step key (707, 909).
 - Voices with no v0.1 lane: mid tom, rim shot, cowbell, tambourine, ride, and
   the 808's congas, claves and maracas.
-- Knob art: the tempo and instrument knobs are round crops of the photo that
-  rotate. Their rest angles in each photo are estimates, and lighting rotates
-  with the crop. Clean knob art needs close-ups, as the build spec expects.
-- Faceplates: all four debranded images are committed with their credits
-  and provenance (`assets/faceplates/README.md`). The 808 edit's own licence
-  is not chosen yet; its original is attribution-only.
+- Knob art: the tempo and instrument knobs are round crops of the faceplate
+  that rotate. On the three photographs their rest angles are estimates, and
+  lighting rotates with the crop; clean knob art there needs close-ups, as
+  the build spec expects. The drawn 808 has neither problem.
+- Faceplates: the 808 is a drawing made by `scripts/draw-faceplates.mjs`,
+  tried first to see whether drawn panels are wanted. If they are, the 606,
+  707 and 909 need the same, which removes the remaining photo credits. The
+  three photographs are committed with their credits and provenance
+  (`assets/faceplates/README.md`). The drawing's own licence is not chosen,
+  and the manufacturer's rights in the look of the machines need advice
+  before a public release, whichever kind of image ships.
 
 ## Product
 

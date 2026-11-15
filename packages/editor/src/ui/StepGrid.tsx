@@ -7,6 +7,7 @@ import {
   type RoleId,
 } from '@boombapbot/contracts';
 import { useEditorState, useRuntime } from './context';
+import { PlayButton } from './Transport';
 
 const BEATS = [0, 1, 2, 3];
 const VELOCITY_NUDGE = 8;
@@ -94,9 +95,9 @@ export function StepGrid() {
       data-testid="grid"
       data-playhead={playing ? currentStep : -1}
     >
-      <div className="sb-grid-ruler" aria-hidden="true">
-        <span />
-        <div className="sb-steps">
+      <div className="sb-grid-ruler">
+        <PlayButton className="sb-grid-play" testId="play" />
+        <div className="sb-steps" aria-hidden="true">
           {BEATS.map((beat) => (
             <div className="sb-beat" key={beat}>
               {[0, 1, 2, 3].map((offset) => (

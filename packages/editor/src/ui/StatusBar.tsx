@@ -17,7 +17,6 @@ export function PatternActions() {
         <RedoIcon />
         <span>Redo</span>
       </button>
-      <span className="sb-actions-gap" />
       <button type="button" className="sb-button" data-testid="starter" onClick={() => store.loadStarterBeat()}>
         Starter beat
       </button>
@@ -86,7 +85,7 @@ export function StatusBar() {
         : 'Draft will be saved in this browser';
 
   return (
-    <footer className="sb-status">
+    <div className="sb-status">
       <span data-testid="draft-status" data-state={draftState} data-origin={draftOrigin}>
         {saved}
         {draftOrigin === 'restored' ? ' · restored from your last visit' : ''}
@@ -98,6 +97,6 @@ export function StatusBar() {
       <span data-testid="hit-count">
         {hits} {hits === 1 ? 'hit' : 'hits'} · 16 steps · 4/4
       </span>
-    </footer>
+    </div>
   );
 }

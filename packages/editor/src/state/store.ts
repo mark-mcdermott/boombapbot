@@ -104,7 +104,7 @@ export class EditorStore {
     this.newId = options.newId ?? defaultId;
     this.state = {
       project: options.project ?? this.starterProject(),
-      mode: 'modern',
+      mode: 'hardware',
       selectedRole: 'kick',
       selectedStep: 0,
       playing: false,

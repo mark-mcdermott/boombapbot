@@ -7,9 +7,9 @@
 //   node scripts/prepare-assets.mjs --dev   also uses local faceplate originals
 //
 // Faceplates committed under assets/faceplates are cleared for distribution
-// and are always included. Images in misc/assets are the owner's local
-// originals: they are used with --dev only and never reach a production
-// build.
+// and are included for every kit the editor offers. Images in misc/assets are
+// the owner's local originals: they are used with --dev only and never reach
+// a production build.
 
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -104,8 +104,12 @@ rmSync(faceplateDir, { recursive: true, force: true });
 const faceplates = {};
 const localOnly = [];
 const panelDir = join(root, 'packages/contracts/data/panels');
+// A kit that is held back never shows its panel, so its photograph would
+// ship without the credit its licence asks for. Leave it out.
+const offered = new Set(readJson(join(root, 'packages/contracts/data/offered-kits.json')));
 for (const file of readdirSync(panelDir).filter((name) => name.endsWith('.panel.json'))) {
   const panel = readJson(join(panelDir, file));
+  if (!offered.has(panel.kit)) continue;
   const cleared = join(root, 'assets/faceplates', panel.faceplate.file);
   const local = join(root, 'misc/assets', panel.faceplate.file);
   let source = null;

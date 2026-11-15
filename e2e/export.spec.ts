@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
 import {
+  chooseKit,
   downloadBytes,
   exportVia,
   hitCount,
   lane,
-  openEditor,
+  openModern,
+  openSettings,
   parseMidi,
   parseWav,
   project,
@@ -12,7 +14,7 @@ import {
 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openEditor(page);
+  await openModern(page);
 });
 
 test('exports a one-bar WAV loop with audio in it', async ({ page }) => {
@@ -64,7 +66,7 @@ test('exports a MIDI file with tempo and drum notes on channel 10', async ({ pag
 
 test('exports the project as JSON and imports it back', async ({ page }) => {
   await step(page, 'cymbal', 0).click();
-  await page.getByTestId('kit-606').click();
+  await chooseKit(page, '606');
   const saved = await project(page);
 
   const download = await exportVia(page, 'export-project');
@@ -77,19 +79,23 @@ test('exports the project as JSON and imports it back', async ({ page }) => {
   expect(document.kit.id).toBe('606');
 
   // Change the beat, then import the file to get it back.
+  await openSettings(page);
   await page.getByTestId('clear').click();
-  await page.getByTestId('kit-909').click();
   expect(hitCount(await project(page))).toBe(0);
   await page.getByTestId('import-input').setInputFiles({
     name: 'starter-beat.boombapbot.json',
     mimeType: 'application/json',
     buffer: bytes,
   });
+  // Importing closes settings, so the result is in view.
+  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
   await expect(page.getByTestId('notice')).toContainText('Imported');
+  // The beat comes back whole. Its kit is held back, so it plays on the 808.
   const restored = await project(page);
   expect(restored.pattern).toEqual(saved.pattern);
-  expect(restored.kit.id).toBe('606');
-  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', '606');
+  expect(restored.kit.id).toBe('808');
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', '808');
+  await expect(page.getByTestId('notice')).toContainText('made on the 606 kit');
 });
 
 test('an invalid import is rejected and the current beat is untouched', async ({ page }) => {

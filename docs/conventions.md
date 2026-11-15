@@ -21,6 +21,7 @@ Checks, in the order CI runs them:
 
 ```bash
 pnpm kits:check            # committed demo WAVs match their generator
+pnpm faceplates:check      # committed faceplate drawings match their generator
 pnpm build:engine          # also runs the engine tests
 pnpm build:wasm
 pnpm typecheck
@@ -77,6 +78,12 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - Steps belong to stable role IDs (`kick`, `snare`, `closed_hat`, ...), and a
   role's `index` in `packages/contracts/data/roles.json` is its engine slot.
   Never reorder or reuse an index.
+- The page offers only the kits in `packages/contracts/data/offered-kits.json`
+  (`OFFERED_KIT_IDS`), currently the 808. With one kit there is no picker. A
+  held-back kit stays defined, built and tested: browser tests reach it with
+  `chooseKit`, which goes through `window.__boombapbot.setKit`. A draft or
+  import on a held-back kit opens on the first offered kit (`onOfferedKit`),
+  and the build ships faceplates for offered kits only.
 - A kit switch changes only the role-to-sample mapping. It must not touch
   steps, velocities, tempo or swing.
 - The demo kits in `assets/kits/` are synthesised by
@@ -91,11 +98,16 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - The owner does not want manufacturer or product brand names in the app or
   its images. The machines are "606", "707", "808" and "909". The one
   exception is the photo credit line, which has to name the original work.
-- Faceplate images in `assets/faceplates/` are the owner's debranded edits of
-  Creative Commons photographs. Each needs a `faceplate.credit` in its panel
-  manifest and an entry in `assets/faceplates/README.md`; `check-build` fails
-  without both. The credit shown under the panel is a licence requirement, so
-  do not remove it.
+- A faceplate in `assets/faceplates/` is one of two things, and `check-build`
+  fails a build whose faceplate is neither or has no entry in
+  `assets/faceplates/README.md`:
+  - A drawing made by `scripts/draw-faceplates.mjs` (the 808). Its manifest
+    sets `faceplate.original` and has no credit. Change the script and run
+    `pnpm faceplates:draw`; do not hand-edit the SVG. The script places live
+    controls from the panel manifest, so keep reading positions from there.
+  - The owner's debranded edit of a Creative Commons photograph (606, 707,
+    909). Its manifest needs a `faceplate.credit`. The credit shown under the
+    panel is a licence requirement, so do not remove it.
 - `misc/assets/` is git-ignored and is for the owner's unedited originals.
   Nothing from it may reach a production build or a commit.
 - Panel coordinates are in each image's own pixel space
@@ -104,6 +116,18 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - The header mascot (`packages/editor/src/assets/mascot.svg`) is the owner's
   artwork and is used unaltered. Its cream outline on the dark background is
   CSS, in `.sb-mascot`.
+
+**Page layout**
+
+- The page is the brand, the machine and the footer, nothing else. Every
+  other control lives in the settings sheet behind the footer's cog
+  (`packages/editor/src/ui/Settings.tsx`); put new controls there.
+- What stays on the page with the machine: its Play (the faceplate's own
+  start/stop in Hardware, the grid's corner in Modern), import and error
+  notices, the faceplate credit, and the note about hits a panel cannot show.
+- The editor opens in Hardware mode, and the mode is not saved with the
+  draft. Browser tests that work on the grid start with `openModern`, and
+  reach buried controls through `openSettings` (`e2e/helpers.ts`).
 
 **Build output**
 

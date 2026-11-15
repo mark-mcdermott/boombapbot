@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { debug, openEditor } from './helpers';
+import { chooseKit, closeSettings, debug, openModern, openSettings } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openEditor(page);
+  await openModern(page);
 });
 
 test('audio stays off until a user gesture, then the engine renders sound', async ({ page }) => {
@@ -13,7 +13,9 @@ test('audio stays off until a user gesture, then the engine renders sound', asyn
   await page.getByTestId('play').click();
   await expect(editor).toHaveAttribute('data-audio', 'running');
   await expect(editor).toHaveAttribute('data-playing', 'true');
+  await openSettings(page);
   await expect(page.getByTestId('audio-status')).toHaveText('Audio is running');
+  await closeSettings(page);
 
   // The worklet reports what it rendered: frames advance and the output is
   // not silence.
@@ -61,12 +63,14 @@ test('edits made while playing keep the beat running', async ({ page }) => {
   const editor = page.getByTestId('editor');
   await page.getByTestId('play').click();
   await expect(editor).toHaveAttribute('data-audio', 'running');
+  await openSettings(page);
   await page.getByTestId('bpm').fill('160');
-  await page.getByTestId('kit-707').click();
+  await closeSettings(page);
+  await chooseKit(page, '707');
   await page.locator('.sb-step[data-role="cymbal"][data-step="0"]').click();
   await expect.poll(async () => (await debug(page)).engineKit).toBe('707');
-  const before = (await debug(page)).stats!.frames;
-  await expect.poll(async () => (await debug(page)).stats!.frames).toBeGreaterThan(before + 10_000);
+  const before = (await debug(page)).stats?.frames ?? 0;
+  await expect.poll(async () => (await debug(page)).stats?.frames ?? 0).toBeGreaterThan(before + 10_000);
   await expect(editor).toHaveAttribute('data-playing', 'true');
 });
 

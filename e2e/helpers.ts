@@ -22,11 +22,63 @@ export async function openEditor(page: Page): Promise<void> {
   await expect(page.getByTestId('editor')).toBeVisible();
 }
 
+/** Opens the editor and switches from the faceplate it starts on to the grid. */
+export async function openModern(page: Page): Promise<void> {
+  await openEditor(page);
+  await chooseMode(page, 'modern');
+}
+
+/** Opens the settings sheet behind the cog, unless it is open already. */
+export async function openSettings(page: Page): Promise<void> {
+  const sheet = page.getByTestId('settings-sheet');
+  if (await sheet.isVisible()) return;
+  await page.getByTestId('settings').click();
+  await expect(sheet).toBeVisible();
+}
+
+/** Closes the settings sheet and waits until the machine is reachable again. */
+export async function closeSettings(page: Page): Promise<void> {
+  const sheet = page.getByTestId('settings-sheet');
+  if (!(await sheet.isVisible())) return;
+  await page.getByTestId('settings-close').click();
+  await expect(sheet).toHaveCount(0);
+}
+
+/**
+ * Switches kit through the diagnostics hook. The page only offers some kits,
+ * and the ones it holds back still have to keep working.
+ */
+export async function chooseKit(page: Page, kit: string): Promise<void> {
+  await page.evaluate((id) => window.__boombapbot!.setKit(id), kit);
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', kit);
+}
+
+/** Waits until the draft in this browser is on the given kit. */
+export async function draftOnKit(page: Page, kit: string): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('boombapbot.draft.v1') ?? '{}').kit?.id))
+    .toBe(kit);
+}
+
+export async function chooseMode(page: Page, mode: 'modern' | 'hardware'): Promise<void> {
+  await openSettings(page);
+  await page.getByTestId(`mode-${mode}`).click();
+  await closeSettings(page);
+}
+
 /** Machines this build has a faceplate image for, from the asset manifest. */
 export async function faceplates(page: Page): Promise<Record<string, string>> {
   const response = await page.request.get('/boombapbot-assets.json');
   const manifest = (await response.json()) as { faceplates?: Record<string, string> };
   return manifest.faceplates ?? {};
+}
+
+/** Whether a machine's faceplate is a credited photograph or our own drawing. */
+export function faceplateIsCredited(kit: string): boolean {
+  const manifest = JSON.parse(readFileSync(`packages/contracts/data/panels/${kit}.panel.json`, 'utf8')) as {
+    faceplate: { credit?: unknown };
+  };
+  return manifest.faceplate.credit !== undefined;
 }
 
 export function debug(page: Page): Promise<DebugSnapshot> {
@@ -60,8 +112,9 @@ export async function downloadBytes(download: Download): Promise<Buffer> {
   return readFileSync(path);
 }
 
-/** Opens the Export menu and picks an item, returning the download. */
+/** Opens the Export menu in settings and picks an item, returning the download. */
 export async function exportVia(page: Page, itemTestId: string): Promise<Download> {
+  await openSettings(page);
   await page.getByTestId('export-menu').click();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -163,6 +216,7 @@ declare global {
   interface Window {
     __boombapbot?: {
       debug(): unknown;
+      setKit(id: string): void;
       renderLoop(sampleRate?: number): Promise<{
         frames: number;
         sampleRate: number;

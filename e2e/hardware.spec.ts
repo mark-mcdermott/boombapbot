@@ -1,21 +1,32 @@
 import { expect, test } from '@playwright/test';
-import { debug, faceplates, hitCount, lane, openEditor, project, step } from './helpers';
+import {
+  chooseKit,
+  chooseMode,
+  debug,
+  draftOnKit,
+  faceplateIsCredited,
+  faceplates,
+  hitCount,
+  lane,
+  openEditor,
+  project,
+  step,
+} from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await openEditor(page);
-  await page.getByTestId('kit-606').click();
+  await chooseKit(page, '606');
 });
 
 test('hardware and modern editors share one beat', async ({ page }) => {
   const before = await project(page);
-  await page.getByTestId('mode-hardware').click();
   const panel = page.getByTestId('panel');
   await expect(panel).toBeVisible();
   expect(await project(page)).toEqual(before);
 
   // Select the snare on the panel and program two steps.
   await page.getByTestId('panel-voice-snare').click();
-  await expect(page.getByTestId('panel-voice')).toContainText('Snare Drum');
+  await expect(page.getByTestId('panel-voice-snare')).toHaveAttribute('aria-checked', 'true');
   const steps = panel.locator('[data-panel-step]');
   await expect(steps).toHaveCount(16);
   await expect(steps.nth(4)).toHaveAttribute('aria-pressed', 'true');
@@ -25,7 +36,7 @@ test('hardware and modern editors share one beat', async ({ page }) => {
   await expect(steps.nth(4)).toHaveAttribute('aria-pressed', 'false');
 
   // Back in Modern the same edits are there, and nothing else moved.
-  await page.getByTestId('mode-modern').click();
+  await chooseMode(page, 'modern');
   await expect(step(page, 'snare', 6)).toHaveAttribute('aria-pressed', 'true');
   await expect(step(page, 'snare', 4)).toHaveAttribute('aria-pressed', 'false');
   const after = await project(page);
@@ -34,14 +45,13 @@ test('hardware and modern editors share one beat', async ({ page }) => {
 
   // A Modern edit shows up on the panel.
   await step(page, 'snare', 9).click();
-  await page.getByTestId('mode-hardware').click();
+  await chooseMode(page, 'hardware');
   await expect(panel.locator('[data-panel-step]').nth(9)).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('hits the panel cannot show are kept and pointed out', async ({ page }) => {
   const before = await project(page);
   expect(lane(before, 'clap').some((velocity) => velocity > 0)).toBe(true);
-  await page.getByTestId('mode-hardware').click();
   const outside = page.getByTestId('panel-outside');
   await expect(outside).toContainText('Snare Accent (1)');
   await page.getByTestId('panel-voice-kick').click();
@@ -54,7 +64,6 @@ test('hits the panel cannot show are kept and pointed out', async ({ page }) => 
 });
 
 test('the panel runs the transport and sets tempo', async ({ page }) => {
-  await page.getByTestId('mode-hardware').click();
   const editor = page.getByTestId('editor');
   await page.getByTestId('panel-toggle').click();
   await expect(editor).toHaveAttribute('data-playing', 'true');
@@ -73,7 +82,6 @@ test('the panel runs the transport and sets tempo', async ({ page }) => {
 });
 
 test('panel steps can be walked with the arrow keys', async ({ page }) => {
-  await page.getByTestId('mode-hardware').click();
   const steps = page.getByTestId('panel').locator('[data-panel-step]');
   await steps.nth(0).focus();
   await page.keyboard.press('ArrowRight');
@@ -85,8 +93,7 @@ test('panel steps can be walked with the arrow keys', async ({ page }) => {
 
 for (const kit of ['606', '707', '808', '909']) {
   test(`the ${kit} panel programs its own instruments`, async ({ page }) => {
-    await page.getByTestId(`kit-${kit}`).click();
-    await page.getByTestId('mode-hardware').click();
+    await chooseKit(page, kit);
     const panel = page.getByTestId('panel');
     await expect(panel).toBeVisible();
     await expect(panel.locator('[data-panel-step]')).toHaveCount(16);
@@ -105,11 +112,16 @@ for (const kit of ['606', '707', '808', '909']) {
       await expect(panel.locator('.sb-panel-key')).toHaveCount(0);
 
       // A shipped photograph is shown with its credit, source and licence.
+      // Artwork drawn for boombapbot has nobody to credit.
       const credit = page.getByTestId('panel-credit');
-      await expect(credit).toBeVisible();
-      await expect(credit).toContainText(/by \S+/);
-      await expect(credit.locator('a[href^="https://commons.wikimedia.org/"]')).toHaveCount(1);
-      await expect(credit.locator('a[href^="https://creativecommons.org/licenses/"]')).toHaveCount(1);
+      if (faceplateIsCredited(kit)) {
+        await expect(credit).toBeVisible();
+        await expect(credit).toContainText(/by \S+/);
+        await expect(credit.locator('a[href^="https://commons.wikimedia.org/"]')).toHaveCount(1);
+        await expect(credit.locator('a[href^="https://creativecommons.org/licenses/"]')).toHaveCount(1);
+      } else {
+        await expect(credit).toHaveCount(0);
+      }
     } else {
       await expect(page.getByTestId('panel-credit')).toHaveCount(0);
       await expect(panel.locator('img.sb-panel-photo')).toHaveCount(0);
@@ -133,10 +145,8 @@ for (const kit of ['606', '707', '808', '909']) {
       expect(after.filter((_, index) => index !== target)).toEqual(before.filter((_, index) => index !== target));
     }
 
-    // The instrument strip under the panel selects the same lanes.
-    await page.getByTestId('strip-voice-snare').click();
-    await expect(page.getByTestId('panel-voice-snare')).toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByTestId('panel-voice')).toContainText('Snare Drum');
+    // Nothing but the faceplate and its credit: the touch strip is for phones.
+    await expect(page.getByTestId('strip-voice-snare')).toBeHidden();
 
     // Step and control areas stay inside the faceplate and do not overlap.
     const boxes = await panel.locator('[data-panel-step]').evaluateAll((nodes) =>
@@ -157,9 +167,11 @@ test('a faceplate image that fails to load falls back to the drawn panel', async
   const shipped = await faceplates(page);
   const kit = Object.keys(shipped)[0];
   test.skip(!kit, 'this build ships no faceplate images');
+  await chooseKit(page, kit!);
+  await draftOnKit(page, kit!);
+  // The editor opens on the faceplate, so fail the image on a fresh load.
   await page.route(`**/${shipped[kit!]}`, (route) => route.abort());
-  await page.getByTestId(`kit-${kit}`).click();
-  await page.getByTestId('mode-hardware').click();
+  await page.reload();
   const panel = page.getByTestId('panel');
   await expect(panel).toHaveAttribute('data-photo', 'drawn');
   await expect(panel.locator('.sb-panel-key')).toHaveCount(16);

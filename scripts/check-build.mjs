@@ -77,14 +77,17 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
   const shipped = Object.entries(manifest.faceplates ?? {});
   for (const [id, path] of shipped) {
     const name = path.split('/').pop();
-    // The photographs are Creative Commons works that must be credited.
+    // A faceplate is either artwork drawn for boombapbot, or a Creative Commons
+    // photograph that must be credited.
     const panel = JSON.parse(
       readFileSync(join(root, 'packages/contracts/data/panels', `${id}.panel.json`), 'utf8'),
     );
     const credit = panel.faceplate.credit;
     check(
-      credit && credit.author && credit.title && credit.source && credit.licence && credit.licenceUrl,
-      `the ${id} faceplate ships without a credit. Add faceplate.credit to ${id}.panel.json.`,
+      panel.faceplate.original === true ||
+        (credit && credit.author && credit.title && credit.source && credit.licence && credit.licenceUrl),
+      `the ${id} faceplate ships without a credit. Add faceplate.credit to ${id}.panel.json, ` +
+        'or set faceplate.original if it was drawn by scripts/draw-faceplates.mjs.',
     );
     const record = join(root, 'assets/faceplates/README.md');
     check(

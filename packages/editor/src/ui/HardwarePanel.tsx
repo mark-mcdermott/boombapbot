@@ -84,6 +84,14 @@ function KnobFace(props: {
   );
 }
 
+/**
+ * Artwork drawn for boombapbot shades its knobs evenly, so the light on them
+ * can stay put while they turn. A photograph carries its own light.
+ */
+function knobLighting(panel: PanelManifest, photo: string | null): 'fixed' | undefined {
+  return photo && panel.faceplate.original ? 'fixed' : undefined;
+}
+
 function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | null }) {
   const { store } = useRuntime();
   const bpm = useEditorState((state) => state.project.bpm);
@@ -120,6 +128,7 @@ function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | nul
       role="slider"
       tabIndex={0}
       data-testid="panel-tempo"
+      data-lighting={knobLighting(panel, photo)}
       aria-label={`${tempo.label || 'Tempo'} in beats per minute`}
       aria-valuemin={BPM_MIN}
       aria-valuemax={BPM_MAX}
@@ -238,6 +247,7 @@ export function HardwarePanel() {
           {select.knob ? (
             <span
               className="sb-panel-knob sb-panel-knob-passive"
+              data-lighting={knobLighting(panel, photo)}
               style={circle(panel, select.knob.cx, select.knob.cy, select.knob.r)}
               aria-hidden="true"
             >
@@ -355,33 +365,47 @@ export function HardwarePanel() {
         </div>
       </div>
 
-      <Segmented
-        label="Instrument"
-        className="sb-panel-strip"
-        value={activeRole}
-        onChange={(role) => {
-          store.select(role);
-          void runtime.audition(role);
-        }}
-        options={roles.map((role) => ({
-          value: role,
-          label: kit.voices[role].short,
-          name: kit.voices[role].label,
-          testId: `strip-voice-${role}`,
-        }))}
-      />
-
-      <div className="sb-panel-info">
-        <p data-testid="panel-voice">
-          <span className="sb-label">Instrument</span> <strong>{voice.label}</strong> · {countHits({ ...pattern, lanes: [lane] })} steps on
-        </p>
-        <button type="button" className="sb-button sb-panel-fit" aria-pressed={fit} onClick={() => setFit(!fit)}>
-          {fit ? 'Zoom in' : 'Fit to screen'}
-        </button>
+      {/* On a phone the faceplate's own selector is too small to tap. */}
+      <div className="sb-panel-touch">
+        <Segmented
+          label="Instrument"
+          className="sb-segmented-fill sb-panel-strip"
+          value={activeRole}
+          onChange={(role) => {
+            store.select(role);
+            void runtime.audition(role);
+          }}
+          options={roles.map((role) => ({
+            value: role,
+            label: kit.voices[role].short,
+            name: kit.voices[role].label,
+            testId: `strip-voice-${role}`,
+          }))}
+        />
+        <div className="sb-panel-info">
+          <p data-testid="panel-voice">
+            <span className="sb-label">Instrument</span> <strong>{voice.label}</strong> ·{' '}
+            {countHits({ ...pattern, lanes: [lane] })} steps on
+          </p>
+          <button type="button" className="sb-button" aria-pressed={fit} onClick={() => setFit(!fit)}>
+            {fit ? 'Zoom in' : 'Fit to screen'}
+          </button>
+        </div>
       </div>
 
+      {outside.length > 0 ? (
+        <p className="sb-panel-meta" data-testid="panel-outside">
+          This beat also has hits this panel cannot show:{' '}
+          {outside.map((entry) => `${kit.voices[entry.role].label} (${entry.hits})`).join(', ')}. They keep playing
+          and stay in the beat.{' '}
+          <button type="button" className="sb-link" onClick={() => store.setMode('modern')}>
+            Edit them in Modern
+          </button>
+        </p>
+      ) : null}
+
       {photo && panel.faceplate.credit ? (
-        <p className="sb-panel-credit" data-testid="panel-credit">
+        <p className="sb-panel-meta" data-testid="panel-credit">
           Faceplate {panel.faceplate.credit.changes ? 'adapted from' : 'photo:'}{' '}
           <a href={panel.faceplate.credit.source} target="_blank" rel="noreferrer noopener">
             “{panel.faceplate.credit.title}”
@@ -393,31 +417,22 @@ export function HardwarePanel() {
           .{panel.faceplate.credit.changes ? ` ${panel.faceplate.credit.changes}` : ''}
         </p>
       ) : null}
-
-      {outside.length > 0 ? (
-        <p className="sb-panel-outside" data-testid="panel-outside">
-          This beat also has hits this panel cannot show:{' '}
-          {outside.map((entry) => `${kit.voices[entry.role].label} (${entry.hits})`).join(', ')}. They keep playing
-          and stay in the beat.{' '}
-          <button type="button" className="sb-link" onClick={() => store.setMode('modern')}>
-            Edit them in Modern
-          </button>
-        </p>
-      ) : null}
-
-      <details className="sb-panel-pending">
-        <summary>Prototype: what still needs checking against the hardware</summary>
-        <ul>
-          {panel.pending.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        <p>
-          {photo
-            ? 'The panel is the faceplate image; the controls sit on top of it.'
-            : 'No faceplate image is available for this machine in this build, so the panel is drawn from its control layout.'}
-        </p>
-      </details>
     </section>
+  );
+}
+
+/** What the current machine's panel does not model yet. Shown in settings. */
+export function PanelNotes() {
+  const kitId = useEditorState((state) => state.project.kit.id);
+  const panel = getPanel(kitId);
+  return (
+    <details className="sb-panel-pending" data-testid="panel-pending">
+      <summary>Prototype: what still needs checking against the hardware</summary>
+      <ul>
+        {panel.pending.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </details>
   );
 }

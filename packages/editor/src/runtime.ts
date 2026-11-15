@@ -1,7 +1,8 @@
 import {
   KITS,
-  KIT_IDS,
+  OFFERED_KIT_IDS,
   getRole,
+  onOfferedKit,
   type KitId,
   type Project,
   type RoleId,
@@ -75,9 +76,13 @@ export class EditorRuntime {
     const draft = this.storage ? loadDraft(this.storage) : { status: 'empty' as const };
     this.store = new EditorStore(
       draft.status === 'restored'
-        ? { project: draft.project, draftOrigin: 'restored' }
+        ? { project: onOfferedKit(draft.project), draftOrigin: 'restored' }
         : { draftOrigin: draft.status === 'unreadable' ? 'recovered' : 'new' },
     );
+    if (draft.status === 'restored') {
+      const moved = movedKitNote(draft.project, this.store.getState().project);
+      if (moved) this.store.notify('info', moved);
+    }
     if (draft.status === 'unreadable') {
       this.store.notify(
         'error',
@@ -197,9 +202,9 @@ export class EditorRuntime {
     return cached;
   }
 
-  /** Fetches the other kits in the background so switching is instant. */
+  /** Fetches the other offered kits in the background so switching is instant. */
   preloadKits(): void {
-    for (const id of KIT_IDS) void this.kit(id).catch(() => undefined);
+    for (const id of OFFERED_KIT_IDS) void this.kit(id).catch(() => undefined);
   }
 
   // ---- Audio --------------------------------------------------------------
@@ -325,8 +330,13 @@ export class EditorRuntime {
       this.store.notify('error', `${name} was not imported. Your current beat is unchanged.`, result.errors);
       return false;
     }
-    this.store.replaceProject(result.project);
-    this.store.notify('info', `Imported “${result.project.name}”. Undo brings back the previous beat.`);
+    const project = onOfferedKit(result.project);
+    this.store.replaceProject(project);
+    const moved = movedKitNote(result.project, project);
+    this.store.notify(
+      'info',
+      `Imported “${project.name}”. Undo brings back the previous beat.${moved ? ` ${moved}` : ''}`,
+    );
     return true;
   }
 
@@ -342,6 +352,12 @@ export class EditorRuntime {
       project: state.project,
     };
   }
+}
+
+/** What to tell the user when a beat had to move off a kit that is held back. */
+function movedKitNote(from: Project, to: Project): string | null {
+  if (from.kit.id === to.kit.id) return null;
+  return `It was made on the ${from.kit.id} kit, which is held back for now, so it plays on the ${to.kit.id}.`;
 }
 
 function describe(error: unknown): string {

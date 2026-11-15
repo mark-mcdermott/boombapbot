@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { OFFERED_KIT_IDS, isKitId } from '@boombapbot/contracts';
 import { EditorRuntime } from '../runtime';
-import { RuntimeContext, useEditorState, useRuntime } from './context';
+import { Brand } from './Brand';
+import { RuntimeContext, useEditorState } from './context';
+import { Footer } from './Footer';
 import { HardwarePanel } from './HardwarePanel';
-import { PlayIcon, StopIcon } from './icons';
-import { Header } from './Header';
-import { KitPicker } from './KitPicker';
-import { NoticeBanner, PatternActions, StatusBar } from './StatusBar';
+import { NoticeBanner } from './StatusBar';
 import { StepGrid } from './StepGrid';
-import { Transport } from './Transport';
+import { PlayButton } from './Transport';
 import { VelocityLane } from './VelocityLane';
 
 export interface BoombapbotEditorProps {
@@ -20,6 +20,8 @@ declare global {
     /** Diagnostics for automated tests and support. Not a stable API. */
     __boombapbot?: {
       debug(): ReturnType<EditorRuntime['debug']>;
+      /** Switches to any defined kit, including ones the page holds back. */
+      setKit(id: string): void;
       renderLoop(sampleRate?: number): Promise<{
         frames: number;
         sampleRate: number;
@@ -48,25 +50,19 @@ function isActivatable(target: EventTarget | null): boolean {
 
 /** Play and tempo, pinned to the bottom of a phone screen under a long grid. */
 function Dock() {
-  const runtime = useRuntime();
-  const playing = useEditorState((state) => state.playing);
   const bpm = useEditorState((state) => state.project.bpm);
   const kitId = useEditorState((state) => state.project.kit.id);
   return (
     <div className="sb-dock" role="group" aria-label="Quick transport">
-      <button
-        type="button"
-        className="sb-play sb-dock-play"
-        data-testid="dock-play"
-        data-playing={playing}
-        aria-pressed={playing}
-        onClick={() => void runtime.togglePlay()}
-      >
-        {playing ? <StopIcon /> : <PlayIcon />}
-        <span>{playing ? 'Stop' : 'Play'}</span>
-      </button>
+      <PlayButton className="sb-dock-play" testId="dock-play" />
       <span className="sb-dock-info">
-        <strong>{bpm}</strong> BPM · kit <strong>{kitId}</strong>
+        <strong>{bpm}</strong> BPM
+        {OFFERED_KIT_IDS.length > 1 ? (
+          <>
+            {' '}
+            · kit <strong>{kitId}</strong>
+          </>
+        ) : null}
       </span>
     </div>
   );
@@ -77,6 +73,7 @@ function EditorBody({ runtime }: { runtime: EditorRuntime }) {
   const kitId = useEditorState((state) => state.project.kit.id);
   const audioStatus = useEditorState((state) => state.audioStatus);
   const playing = useEditorState((state) => state.playing);
+  const sheetContainer = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -108,12 +105,10 @@ function EditorBody({ runtime }: { runtime: EditorRuntime }) {
       data-audio={audioStatus}
       data-playing={playing}
     >
-      <Header />
+      <header className="sb-header">
+        <Brand />
+      </header>
       <NoticeBanner />
-      <div className="sb-controls">
-        <Transport />
-        <KitPicker />
-      </div>
       {mode === 'modern' ? (
         <>
           <StepGrid />
@@ -122,13 +117,9 @@ function EditorBody({ runtime }: { runtime: EditorRuntime }) {
       ) : (
         <HardwarePanel />
       )}
-      <PatternActions />
-      <StatusBar />
+      <Footer sheetContainer={sheetContainer} />
       <Dock />
-      <p className="sb-footnote">
-        Keys: <kbd>Space</kbd> play or stop · arrows move between steps · <kbd>Enter</kbd> toggles a step ·{' '}
-        <kbd>+</kbd> <kbd>−</kbd> change velocity · <kbd>A</kbd> accent · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
-      </p>
+      <div ref={sheetContainer} className="sb-sheet-root" />
     </div>
   );
 }
@@ -141,6 +132,9 @@ export function BoombapbotEditor({ baseUrl = '/' }: BoombapbotEditorProps) {
     runtime.attach();
     window.__boombapbot = {
       debug: () => runtime.debug(),
+      setKit: (id) => {
+        if (isKitId(id)) runtime.store.setKit(id);
+      },
       renderLoop: async (sampleRate = 44100) => {
         const render = await runtime.renderLoop(sampleRate);
         let peak = 0;

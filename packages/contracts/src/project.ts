@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { KIT_IDS, KITS, type KitId } from './kit';
+import { KIT_IDS, KITS, OFFERED_KIT_IDS, type KitId } from './kit';
 import { ROLE_IDS, type RoleId } from './roles';
 
 /**
@@ -162,6 +162,16 @@ export function createProject(options: NewProjectOptions): Project {
     kit: { id: kit, version: KITS[kit].version },
     pattern: options.pattern ?? createEmptyPattern(),
   };
+}
+
+/**
+ * The same beat on a kit the editor offers. A beat made on a kit that is held
+ * back moves to the first one offered; steps, tempo and swing are untouched.
+ */
+export function onOfferedKit(project: Project): Project {
+  if (OFFERED_KIT_IDS.includes(project.kit.id)) return project;
+  const id = OFFERED_KIT_IDS[0]!;
+  return { ...project, kit: { id, version: KITS[id].version } };
 }
 
 export function findLane(pattern: Pattern, role: RoleId): Lane {

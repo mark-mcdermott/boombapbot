@@ -1,4 +1,4 @@
-import { KITS, KIT_IDS, getRole, substitutedRoles, type KitId } from '@boombapbot/contracts';
+import { KITS, OFFERED_KIT_IDS, getRole, substitutedRoles, type KitId } from '@boombapbot/contracts';
 import { useEditorState, useRuntime } from './context';
 import { Segmented } from './Segmented';
 
@@ -31,7 +31,7 @@ export function KitPicker() {
         className="sb-kit-options"
         value={kitId}
         onChange={(id) => runtime.store.setKit(id)}
-        options={KIT_IDS.map((id) => ({
+        options={OFFERED_KIT_IDS.map((id) => ({
           value: id,
           name: `${KITS[id].name}${substitutionNote(id) ? `. ${substitutionNote(id)}` : ''}`,
           description: KITS[id].description,

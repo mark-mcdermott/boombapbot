@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { openEditor } from './helpers';
+import { chooseKit, openEditor, openModern, openSettings } from './helpers';
 
 function summarize(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['violations']) {
   return violations.map((violation) => ({
@@ -12,25 +12,34 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['viola
 }
 
 test('the Modern editor has no detectable accessibility violations', async ({ page }) => {
-  await openEditor(page);
+  await openModern(page);
   const results = await new AxeBuilder({ page }).analyze();
   expect(summarize(results.violations)).toEqual([]);
+});
+
+test('the settings sheet has no detectable accessibility violations', async ({ page }) => {
+  await openEditor(page);
+  for (const mode of ['modern', 'hardware'] as const) {
+    await openSettings(page);
+    await page.getByTestId(`mode-${mode}`).click();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(summarize(results.violations)).toEqual([]);
+  }
 });
 
 test('the Hardware editor has no detectable accessibility violations', async ({ page }) => {
   await openEditor(page);
   for (const kit of ['606', '909']) {
-    await page.getByTestId(`kit-${kit}`).click();
-    await page.getByTestId('mode-hardware').click();
+    await chooseKit(page, kit);
     await expect(page.getByTestId('panel')).toBeVisible();
     const results = await new AxeBuilder({ page }).analyze();
     expect(summarize(results.violations)).toEqual([]);
-    await page.getByTestId('mode-modern').click();
   }
 });
 
 test('every control has an accessible name', async ({ page }) => {
   await openEditor(page);
+  await openSettings(page);
   const unnamed = await page.evaluate(() => {
     const controls = document.querySelectorAll('button, input, [role="slider"], [role="radio"]');
     return [...controls]
