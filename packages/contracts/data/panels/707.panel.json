@@ -5,7 +5,7 @@
   "kit": "707",
   "name": "707 panel",
   "faceplate": {
-    "file": "707.jpg",
+    "file": "707.webp",
     "width": 1483,
     "height": 943,
     "credit": {
@@ -13,7 +13,8 @@
       "author": "Speculos",
       "source": "https://commons.wikimedia.org/wiki/File:Roland_TR-707.jpg",
       "licence": "CC BY-SA 3.0",
-      "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/"
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "changes": "Brand and product names removed and the model name replaced with “707”; resized."
     }
   },
   "theme": {

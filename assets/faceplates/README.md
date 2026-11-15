@@ -23,23 +23,67 @@ git-ignored `misc/assets/` folder and are used for local development only.
   image is itself licensed [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
   Anyone may reuse it under those terms, crediting Midas Wouters and noting
   the changes above.
-- **Credit shown in the app:** under the panel in Hardware mode, from
-  `faceplate.credit` in `packages/contracts/data/panels/606.panel.json`.
-- **Verified:** on 2026-11-15 the Wikimedia Commons file page listed the
-  author, date and licence above, and the file's dimensions (1123 × 556)
-  matched the owner's original.
 
-## Sources of the other three
+### `707.webp`
 
-Not committed yet; the owner is preparing versions with brand names removed.
-Their sources were checked on Wikimedia Commons on 2026-11-15. All three are
-the lead images of their English Wikipedia articles.
+- **Original work:** [“Roland TR-707”](https://commons.wikimedia.org/wiki/File:Roland_TR-707.jpg)
+  by Speculos (own work, 2008), from Wikimedia Commons. It is the lead image
+  of the English Wikipedia article on the instrument.
+- **Licence of the original:** [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
+- **Changes:** edited by the repository owner. Brand and product names were
+  removed, the model name was replaced with “707”, and the image was resized
+  from 1483 × 943 to 2000 × 1272.
+- **Licence of this file:** [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/),
+  as an adaptation of a share-alike work. Credit Speculos and note the
+  changes above.
 
-| Machine | Original work | Author | Licence |
-| --- | --- | --- | --- |
-| 707 | [“Roland TR-707”](https://commons.wikimedia.org/wiki/File:Roland_TR-707.jpg) | Speculos (own work, 2008) | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
-| 808 | [“TR-808 - MIM, Phoenix (cropped)”](https://commons.wikimedia.org/wiki/File:TR-808_-_MIM,_Phoenix_(2019-08-30_14.59.26_by_Bryan_Pocius)_(cropped).jpg) | Bryan Pocius (2019) | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/) |
-| 909 | [“Roland TR-909 (large)”](https://commons.wikimedia.org/wiki/File:Roland_TR-909_(large).png) | Brandon Daniel; derivative work by Clusternote (2011) | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
+### `808.webp`
+
+- **Original work:** [“TR-808 - MIM, Phoenix (cropped)”](https://commons.wikimedia.org/wiki/File:TR-808_-_MIM,_Phoenix_(2019-08-30_14.59.26_by_Bryan_Pocius)_(cropped).jpg)
+  by Bryan Pocius (2019), from Wikimedia Commons; the crop was uploaded there
+  by Rudolfs Davis Strazds. It is the lead image of the English Wikipedia
+  article on the instrument.
+- **Licence of the original:** [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/).
+- **Changes:** edited by the repository owner. Brand and product names were
+  removed, the model name was replaced with “808”, and the image was resized
+  from 3764 × 2240 to 2000 × 1190.
+- **Licence of this file:** the original's licence asks for attribution but
+  not share-alike, so the edit could carry other terms. None have been chosen;
+  until the owner says otherwise treat it as [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/),
+  crediting Bryan Pocius and noting the changes above.
+
+### `909.webp`
+
+- **Original work:** [“Roland TR-909 (large)”](https://commons.wikimedia.org/wiki/File:Roland_TR-909_(large).png),
+  a derivative by Clusternote (2011) of a photograph by Brandon Daniel, from
+  Wikimedia Commons. It is the lead image of the English Wikipedia article on
+  the instrument.
+- **Licence of the original:** [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/).
+- **Changes:** edited by the repository owner. Brand and product names were
+  removed, the model name was replaced with “909”, the top of the image was
+  cropped away, and it was resized: 2284 × 1349 became 2000 × 930.
+- **Licence of this file:** [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/),
+  as an adaptation of a share-alike work. Credit Brandon Daniel and
+  Clusternote and note the changes above.
+
+All four entries were checked against their Wikimedia Commons file pages on
+2026-11-15: author, date, licence, and that each file's dimensions match the
+owner's original. The credit for each is shown in the app under its panel,
+from `faceplate.credit` in the machine's panel manifest.
+
+## How each edit was fitted
+
+The control layout was measured on the originals. Each edit was registered
+against its original by feature matching, which gives the exact transform:
+
+| Machine | Transform from original to edit | Effect on the layout |
+| --- | --- | --- |
+| 606 | uniform resize | none; step lamps re-fitted on the new image |
+| 707 | uniform resize | none |
+| 808 | identical framing | none |
+| 909 | same scale, 251 px cropped from the top | every control moved up 251 px |
+
+No edit introduced rotation, and the fit error was under a pixel in each.
 
 ## Adding one
 

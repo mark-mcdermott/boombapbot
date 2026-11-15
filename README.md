@@ -184,14 +184,14 @@ can live:
 
 - **`assets/faceplates/`** holds cleared images. They are committed, ship in
   every build, and each has a provenance entry in
-  [`assets/faceplates/README.md`](assets/faceplates/README.md). The **606**
-  is here: the owner's edit of a Creative Commons photograph with the brand
-  names removed.
+  [`assets/faceplates/README.md`](assets/faceplates/README.md). All four
+  machines are here: the owner's edits of Creative Commons photographs with
+  the brand names removed.
 - **`misc/assets/`** holds the owner's unedited originals. It is ignored by
   git. `pnpm dev` uses what it finds there; `pnpm build` never does.
 
-Where a machine has no image, the panel is drawn from the same layout. That
-is what the 707, 808 and 909 show in a build today.
+Where a machine has no image, or its image fails to load, the panel is drawn
+from the same layout.
 
 The photographs are Creative Commons works (CC BY-SA 3.0, CC BY-SA 2.0 and
 CC BY 2.0) by Midas Wouters, Speculos, Bryan Pocius and Brandon Daniel. Their
@@ -274,8 +274,8 @@ stack" and most of "build one end-to-end beat". Next:
    AVAudioEngine and Oboe on mobile, and the VST3 in a real host on Windows
    and macOS. Prerequisites for each are in
    [`docs/follow-ups.md`](docs/follow-ups.md).
-3. Commit the debranded 707, 808 and 909 faceplates, and replace the demo
-   kits with licensed recordings, recording rights and provenance for them.
+3. Replace the demo kits with licensed recordings, recording rights and
+   provenance for them as was done for the faceplates.
 4. Validate one machine's panel workflow against its manual and sign off its
    control profile, then the other three.
 5. Grow the project document: multiple patterns, arrangement, per-lane mix,
