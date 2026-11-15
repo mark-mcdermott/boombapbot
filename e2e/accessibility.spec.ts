@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { chooseKit, openEditor, openModern, openSettings } from './helpers';
+import { openEditor, openSettings, selectTrack } from './helpers';
 
 function summarize(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['violations']) {
   return violations.map((violation) => ({
@@ -11,30 +11,23 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['viola
   }));
 }
 
-test('the Modern editor has no detectable accessibility violations', async ({ page }) => {
-  await openModern(page);
-  const results = await new AxeBuilder({ page }).analyze();
-  expect(summarize(results.violations)).toEqual([]);
+test('the machine has no detectable accessibility violations', async ({ page }) => {
+  await openEditor(page);
+  await expect(page.getByTestId('panel')).toBeVisible();
+  // With the accent selected, and with an instrument selected and running.
+  await selectTrack(page, 'accent');
+  expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
+  await selectTrack(page, 'open_hat');
+  await page.getByTestId('panel-toggle').click();
+  expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
 });
 
 test('the settings sheet has no detectable accessibility violations', async ({ page }) => {
   await openEditor(page);
-  for (const mode of ['modern', 'hardware'] as const) {
-    await openSettings(page);
-    await page.getByTestId(`mode-${mode}`).click();
-    const results = await new AxeBuilder({ page }).analyze();
-    expect(summarize(results.violations)).toEqual([]);
-  }
-});
-
-test('the Hardware editor has no detectable accessibility violations', async ({ page }) => {
-  await openEditor(page);
-  for (const kit of ['606', '909']) {
-    await chooseKit(page, kit);
-    await expect(page.getByTestId('panel')).toBeVisible();
-    const results = await new AxeBuilder({ page }).analyze();
-    expect(summarize(results.violations)).toEqual([]);
-  }
+  await openSettings(page);
+  await page.getByTestId('panel-pending').locator('summary').click();
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(summarize(results.violations)).toEqual([]);
 });
 
 test('every control has an accessible name', async ({ page }) => {

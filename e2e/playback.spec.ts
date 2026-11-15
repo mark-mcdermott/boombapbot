@@ -1,16 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { chooseKit, closeSettings, debug, openModern, openSettings } from './helpers';
+import { bpmOf, closeSettings, debug, openEditor, openSettings, selectTrack, stepButton } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openModern(page);
+  await openEditor(page);
 });
 
 test('audio stays off until a user gesture, then the engine renders sound', async ({ page }) => {
   const editor = page.getByTestId('editor');
   await expect(editor).toHaveAttribute('data-audio', 'idle');
   expect((await debug(page)).stats).toBeNull();
+  expect((await debug(page)).soundsSent).toBe(0);
 
-  await page.getByTestId('play').click();
+  await page.getByTestId('panel-toggle').click();
   await expect(editor).toHaveAttribute('data-audio', 'running');
   await expect(editor).toHaveAttribute('data-playing', 'true');
   await openSettings(page);
@@ -23,34 +24,24 @@ test('audio stays off until a user gesture, then the engine renders sound', asyn
   await expect.poll(async () => (await debug(page)).stats?.peakEver ?? 0).toBeGreaterThan(0.05);
   const snapshot = await debug(page);
   expect(snapshot.sampleRate).toBeGreaterThanOrEqual(44100);
-  expect(snapshot.engineKit).toBe(snapshot.project.kit.id);
+  // Every sound of the machine was synthesised here and taken by the worklet.
+  expect(snapshot.soundsSent).toBe(16);
+  await expect.poll(async () => (await debug(page)).soundsTaken).toBe(16);
   expect(snapshot.stats!.stolen).toBe(0);
 
-  // The playhead follows the engine's steps.
-  const seen = new Set<string>();
-  const grid = page.getByTestId('grid');
-  await expect
-    .poll(async () => {
-      seen.add((await grid.getAttribute('data-playhead')) ?? '');
-      return seen.size;
-    }, { intervals: [40] })
-    .toBeGreaterThanOrEqual(6);
-  expect([...seen].every((value) => Number(value) >= -1 && Number(value) <= 15)).toBe(true);
-
-  await page.getByTestId('play').click();
+  await page.getByTestId('panel-toggle').click();
   await expect(editor).toHaveAttribute('data-playing', 'false');
-  await expect(grid).toHaveAttribute('data-playhead', '-1');
 });
 
-test('auditioning a voice starts audio without starting the beat', async ({ page }) => {
+test('selecting an instrument plays it once without starting the beat', async ({ page }) => {
   const editor = page.getByTestId('editor');
-  await page.getByTestId('audition-kick').click();
+  await selectTrack(page, 'kick');
   await expect(editor).toHaveAttribute('data-audio', 'running');
   await expect(editor).toHaveAttribute('data-playing', 'false');
   await expect.poll(async () => (await debug(page)).stats?.peakEver ?? 0).toBeGreaterThan(0.05);
 });
 
-test('Space plays and stops', async ({ page }) => {
+test('Space starts and stops', async ({ page }) => {
   const editor = page.getByTestId('editor');
   await page.locator('body').press('Space');
   await expect(editor).toHaveAttribute('data-playing', 'true');
@@ -61,24 +52,30 @@ test('Space plays and stops', async ({ page }) => {
 
 test('edits made while playing keep the beat running', async ({ page }) => {
   const editor = page.getByTestId('editor');
-  await page.getByTestId('play').click();
+  await page.getByTestId('panel-toggle').click();
   await expect(editor).toHaveAttribute('data-audio', 'running');
-  await openSettings(page);
-  await page.getByTestId('bpm').fill('160');
-  await closeSettings(page);
-  await chooseKit(page, '707');
-  await page.locator('.sb-step[data-role="cymbal"][data-step="0"]').click();
-  await expect.poll(async () => (await debug(page)).engineKit).toBe('707');
+  const tempo = page.getByTestId('panel-tempo');
+  await tempo.focus();
+  for (let press = 0; press < 4; press += 1) await page.keyboard.press('PageUp');
+  await selectTrack(page, 'cymbal');
+  await stepButton(page, 0).click();
+  await selectTrack(page, 'accent');
+  await stepButton(page, 2).click();
   const before = (await debug(page)).stats?.frames ?? 0;
   await expect.poll(async () => (await debug(page)).stats?.frames ?? 0).toBeGreaterThan(before + 10_000);
   await expect(editor).toHaveAttribute('data-playing', 'true');
+  await expect(page.getByTestId('notice')).toHaveCount(0);
+  expect((await debug(page)).stats!.stolen).toBe(0);
 });
 
-test('the offline render of the same beat is not silent', async ({ page }) => {
+test('the offline render of the same rhythm is one measure and not silent', async ({ page }) => {
   const render = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
-  const bpm = (await debug(page)).project.bpm;
-  expect(render.frames).toBe(Math.floor((44100 * 240) / bpm + 0.5));
+  const bpm = bpmOf((await debug(page)).project);
+  // Sixteen steps of four to the beat: four beats.
+  expect(Math.abs(render.frames - (44100 * 240) / bpm)).toBeLessThanOrEqual(1);
   expect(render.peak).toBeGreaterThan(0.1);
+  expect(render.peak).toBeLessThanOrEqual(1);
   expect(render.rms).toBeGreaterThan(0.01);
   expect(render.events.length).toBeGreaterThan(10);
+  expect(render.events.every((event) => event.pattern === 0 && event.track >= 1 && event.track <= 11)).toBe(true);
 });

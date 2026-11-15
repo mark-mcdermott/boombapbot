@@ -1,19 +1,56 @@
 import { readFileSync } from 'node:fs';
 import { expect, type Download, type Page } from '@playwright/test';
 
+/** The engine's tracks, in panel order. The accent is track 0. */
+export const TRACK_IDS = [
+  'accent',
+  'kick',
+  'snare',
+  'low_tom',
+  'mid_tom',
+  'high_tom',
+  'rim_shot',
+  'clap',
+  'cowbell',
+  'cymbal',
+  'open_hat',
+  'closed_hat',
+] as const;
+export type TrackId = (typeof TRACK_IDS)[number];
+
+export const DRAFT_KEY = 'boombapbot.draft.v2';
+export const LEGACY_DRAFT_KEY = 'boombapbot.draft.v1';
+export const LEGACY_FIXTURE = 'packages/contracts/fixtures/v1-kick-snare-hat.project.json';
+
+export interface RhythmSnapshot {
+  preScale: number;
+  firstLength: number;
+  secondLength: number;
+  a: Record<TrackId, string>;
+  b: Record<TrackId, string>;
+}
+
 export interface ProjectSnapshot {
+  schemaVersion: number;
   name: string;
-  bpm: number;
-  swing: number;
-  kit: { id: string; version: string };
-  pattern: { lanes: Array<{ id: string; role: string; steps: number[] }> };
+  updatedAt: string;
+  tempo: { coarse: number; fine: number };
+  sound: {
+    master: number;
+    accent: number;
+    levels: Record<string, number>;
+    knobs: Record<string, Record<'tune' | 'tone' | 'decay' | 'snappy', number>>;
+    alternates: Record<string, boolean>;
+  };
+  rhythms: RhythmSnapshot[];
+  rhythmTracks: number[][];
+  panel: { selector: number; basicRhythm: number; basicVariation: string };
 }
 
 export interface DebugSnapshot {
   audioStatus: string;
   sampleRate: number | null;
   stats: { frames: number; peak: number; peakEver: number; voices: number; stolen: number } | null;
-  engineKit: string | null;
   soundsSent: number;
   soundsTaken: number;
   project: ProjectSnapshot;
@@ -22,12 +59,6 @@ export interface DebugSnapshot {
 export async function openEditor(page: Page): Promise<void> {
   await page.goto('/');
   await expect(page.getByTestId('editor')).toBeVisible();
-}
-
-/** Opens the editor and switches from the faceplate it starts on to the grid. */
-export async function openModern(page: Page): Promise<void> {
-  await openEditor(page);
-  await chooseMode(page, 'modern');
 }
 
 /** Opens the settings sheet behind the cog, unless it is open already. */
@@ -46,38 +77,16 @@ export async function closeSettings(page: Page): Promise<void> {
   await expect(sheet).toHaveCount(0);
 }
 
-/**
- * Switches kit through the diagnostics hook. The page only offers some kits,
- * and the ones it holds back still have to keep working.
- */
-export async function chooseKit(page: Page, kit: string): Promise<void> {
-  await page.evaluate((id) => window.__boombapbot!.setKit(id), kit);
-  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', kit);
-}
-
-/** Waits until the draft in this browser is on the given kit. */
-export async function draftOnKit(page: Page, kit: string): Promise<void> {
-  await expect
-    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('boombapbot.draft.v1') ?? '{}').kit?.id))
-    .toBe(kit);
-}
-
-export async function chooseMode(page: Page, mode: 'modern' | 'hardware'): Promise<void> {
-  await openSettings(page);
-  await page.getByTestId(`mode-${mode}`).click();
-  await closeSettings(page);
-}
-
-/** Machines this build has a faceplate image for, from the asset manifest. */
-export async function faceplates(page: Page): Promise<Record<string, string>> {
+/** The faceplate image this build ships, from the asset manifest. */
+export async function faceplate(page: Page): Promise<string | null> {
   const response = await page.request.get('/boombapbot-assets.json');
-  const manifest = (await response.json()) as { faceplates?: Record<string, string> };
-  return manifest.faceplates ?? {};
+  const manifest = (await response.json()) as { faceplate?: string | null };
+  return manifest.faceplate ?? null;
 }
 
-/** Whether a machine's faceplate is a credited photograph or our own drawing. */
-export function faceplateIsCredited(kit: string): boolean {
-  const manifest = JSON.parse(readFileSync(`packages/contracts/data/panels/${kit}.panel.json`, 'utf8')) as {
+/** Whether the faceplate is a credited photograph or our own drawing. */
+export function faceplateIsCredited(): boolean {
+  const manifest = JSON.parse(readFileSync('packages/contracts/data/panels/808.panel.json', 'utf8')) as {
     faceplate: { credit?: unknown };
   };
   return manifest.faceplate.credit !== undefined;
@@ -91,21 +100,31 @@ export async function project(page: Page): Promise<ProjectSnapshot> {
   return (await debug(page)).project;
 }
 
-export function lane(snapshot: ProjectSnapshot, role: string): number[] {
-  const found = snapshot.pattern.lanes.find((candidate) => candidate.role === role);
-  if (!found) throw new Error(`no lane for ${role}`);
-  return found.steps;
+/** Steps that are on in one track of version A of a rhythm. */
+export function stepsOn(snapshot: ProjectSnapshot, track: TrackId, rhythm = 0): number[] {
+  return [...snapshot.rhythms[rhythm]!.a[track]].flatMap((mark, index) => (mark === 'x' ? [index] : []));
 }
 
-export function hitCount(snapshot: ProjectSnapshot): number {
-  return snapshot.pattern.lanes.reduce(
-    (total, candidate) => total + candidate.steps.filter((velocity) => velocity > 0).length,
-    0,
-  );
+/** Hits on the instrument tracks of version A of a rhythm. */
+export function hitCount(snapshot: ProjectSnapshot, rhythm = 0): number {
+  return TRACK_IDS.slice(1).reduce((total, track) => total + stepsOn(snapshot, track, rhythm).length, 0);
 }
 
-export function step(page: Page, role: string, index: number) {
-  return page.locator(`.sb-step[data-role="${role}"][data-step="${index}"]`);
+/** Tempo in beats per minute: 40 click stops across 40 to 300, plus the fine knob. */
+export function bpmOf(snapshot: ProjectSnapshot): number {
+  const bpm = 40 + ((snapshot.tempo.coarse + snapshot.tempo.fine) * 260) / 39;
+  return Math.min(300, Math.max(40, bpm));
+}
+
+/** Turns the instrument selector on the faceplate. */
+export async function selectTrack(page: Page, track: TrackId): Promise<void> {
+  await page.getByTestId(`panel-voice-${track}`).click();
+  await expect(page.getByTestId(`panel-voice-${track}`)).toHaveAttribute('aria-checked', 'true');
+}
+
+/** One of the sixteen step buttons. */
+export function stepButton(page: Page, index: number) {
+  return page.getByTestId('panel').locator(`[data-panel-step="${index}"]`);
 }
 
 export async function downloadBytes(download: Download): Promise<Buffer> {
@@ -218,13 +237,12 @@ declare global {
   interface Window {
     __boombapbot?: {
       debug(): unknown;
-      setKit(id: string): void;
       renderLoop(sampleRate?: number): Promise<{
         frames: number;
         sampleRate: number;
         peak: number;
         rms: number;
-        events: Array<{ frame: number; step: number; role: number; velocity: number }>;
+        events: Array<{ frame: number; step: number; track: number; accent: boolean; pattern: number }>;
       }>;
     };
   }

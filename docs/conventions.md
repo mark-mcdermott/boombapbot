@@ -1,9 +1,11 @@
 # boombapbot
 
-A drums-only beat maker. This repo holds v0.1: a web editor that runs
-entirely locally, plus a VST3 compile spike. `README.md` covers what it does
-and how it was verified; `docs/follow-ups.md` covers what is left. The build
-spec's wider scope (cloud, accounts, native shells, billing) is not started.
+A drums-only beat maker. This repo holds v0.1: a web editor that is one drum
+machine, the 808, running entirely locally, plus a VST3 compile spike. It is
+being brought up to the whole machine from its operation manual; `README.md`
+says what is modelled so far and how it was verified, and
+`docs/follow-ups.md` has what is left and in what order. The build spec's
+wider scope (cloud, accounts, native shells, billing) is not started.
 
 ## Commands
 
@@ -20,8 +22,8 @@ pnpm dev                   # http://localhost:4321
 Checks, in the order CI runs them:
 
 ```bash
-pnpm kits:check            # committed demo WAVs match their generator
-pnpm faceplates:check      # committed faceplate drawings match their generator
+pnpm kits:check            # committed 606/707/909 WAVs match their generator
+pnpm faceplates:check      # committed faceplate drawing matches its generator
 pnpm build:engine          # also runs the engine tests
 pnpm build:wasm
 pnpm typecheck
@@ -32,8 +34,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 - `pnpm test:e2e` tests the production build, so run `pnpm build` first.
   It needs `pnpm exec playwright install chromium` once on a new machine.
-- One engine test binary: `./build/native/test_scheduler` (also `voices`,
-  `choke`, `swing`, `kit_mapping`, `midi`).
+- One engine test binary: `./build/native/test_scheduler` (also `timeline`,
+  `pattern_bank`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
+  `realtime`, `synth`).
 - One Vitest file: `pnpm exec vitest run packages/editor/test/engine.test.ts`.
 - One Playwright file: `pnpm exec playwright test e2e/hardware.spec.ts`.
 - VST3 spike: `cmake -S plugins/vst3 -B build/vst3 -G Ninja`, then
@@ -41,17 +44,23 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 ## How it fits together
 
-- `engine/` is the only audio engine: a C++20 sampler and scheduler behind a
-  C ABI (`engine/include/boombapbot/engine.h`). It builds natively and to
-  WebAssembly from the same sources. Do not add a second engine in
-  JavaScript, even to work around a failing WASM build.
+- `engine/` is the only audio engine: a C++20 drum machine core behind a C
+  ABI (`engine/include/boombapbot/engine.h`). It holds a bank of 32 patterns,
+  twelve tracks (the accent and eleven instruments), sixteen sound slots, the
+  808's synthesiser and a mix bus. It builds natively and to WebAssembly from
+  the same sources. Do not add a second engine in JavaScript, even to work
+  around a failing WASM build.
 - `packages/contracts/` is the source of truth for data shapes: the Zod
-  project schema, drum roles, kit manifests and hardware panel geometry. The
-  C++ tests read the same JSON files, so a change there is checked on both
-  sides.
-- `packages/editor/` is the React editor. `EditorStore` holds the beat;
+  project schema (`project.ts`, version 2, with the move from version 1 in
+  `legacy.ts`), the machine's tracks, tempo and level model (`machine.ts`,
+  `data/machine-808.json`), the sounds (`roles.ts`) and the panel geometry.
+  The C++ tests read the same JSON files, so a change there is checked on
+  both sides.
+- `packages/editor/` is the React editor. `EditorStore` holds the project;
   `EditorRuntime` connects it to audio, local storage and the exporters;
   `AudioController` is the only thing that talks to the AudioWorklet.
+  `engine/machine.ts` turns a project into what the engine takes, for live
+  playback and offline rendering alike.
 - `apps/site/` is an Astro site that mounts the editor as a client-only
   island. It has no API routes and reads no environment variables.
 
@@ -61,9 +70,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 - Nothing in `snare_engine_render` may allocate, lock, do I/O or call out.
   Control calls go through the command queue and apply at the next buffer.
-- Step times are computed from an anchor, never accumulated. Playback,
-  offline render and MIDI export all use `timeline.h`, so they cannot drift
-  apart. Keep it that way.
+- Time is counted in ticks, 24 to the beat, so a step at any pre-scale is a
+  whole number of them. Step frames are computed from an anchor, never
+  accumulated. Playback, offline render and MIDI export all use `timeline.h`,
+  so they cannot drift apart. Keep it that way.
+- A pattern's 2nd part lives at steps 16 to 31 whatever the length of its 1st
+  part (`stepPosition`). Its length and step size are fixed for a measure
+  when that measure begins; step edits apply at the next buffer.
 - Output must not depend on buffer size. `test_scheduler` checks that renders
   at different block sizes are bit-identical.
 - The functions the WASM build exports are listed in `engine/CMakeLists.txt`
@@ -77,76 +90,85 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   and keep its own noise generator: that is what holds native and WASM to
   one 24-bit step per sound. Never synthesise on the audio thread; render
   the sound elsewhere and hand over PCM.
-- Each sound slot holds its own sound (`snare_engine_set_sound`); the kit
-  calls are a layer over that. A replaced sound is freed on the control
-  thread by `snare_engine_collect`, never in render. When a sound knob
-  moves, `EditorRuntime.sendSound` re-synthesises that one voice on the main
-  thread and posts it; one sound per slot is in flight at a time and the
-  newest setting follows when the worklet acknowledges.
+- Each sound slot holds its own sound (`snare_engine_set_sound`). A replaced
+  sound is freed on the control thread by `snare_engine_collect`, never in
+  render. When a sound knob moves, `EditorRuntime.sendSound` re-synthesises
+  that one sound on the main thread and posts it; one sound per slot is in
+  flight at a time and the newest setting follows when the worklet
+  acknowledges.
+- A track has one voice: its new hit fades the old one. The engine takes
+  linear gains; the knob tapers live in `packages/contracts/src/machine.ts`
+  and are mirrored in `engine/tools/project_io.h` and
+  `plugins/vst3/Source/Machine808.h`. Track level and master volume are
+  smoothed per sample, in a way that does not depend on buffer size.
+- The engine, not TypeScript, decides what plays at a bar line. Today that is
+  only `snare_engine_cue_pattern`; variations, fill-ins and rhythm tracks go
+  into the engine too, not into timers on the main thread.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.
 
-**Beats and kits**
+**The project and the machine**
 
-- Steps belong to stable role IDs (`kick`, `snare`, `closed_hat`, ...), and a
-  role's `index` in `packages/contracts/data/roles.json` is its engine slot.
-  Never reorder or reuse an index.
-- The page offers only the kits in `packages/contracts/data/offered-kits.json`
-  (`OFFERED_KIT_IDS`), currently the 808. With one kit there is no picker. A
-  held-back kit stays defined, built and tested: browser tests reach it with
-  `chooseKit`, which goes through `window.__boombapbot.setKit`. A draft or
-  import on a held-back kit opens on the first offered kit (`onOfferedKit`),
-  and the build ships faceplates for offered kits only.
-- A kit switch changes only the role-to-sample mapping. It must not touch
-  steps, velocities, tempo or swing.
-- The demo kits in `assets/kits/` are synthesised by
-  `scripts/gen_demo_kits.py` and are placeholders. Change the script and run
-  `pnpm kits:generate`; do not hand-edit the WAVs. They are not recordings of
-  hardware and must not be described as such.
+- A track's position in `TRACK_IDS` is its engine track (the accent is 0), and
+  a role's `index` in `packages/contracts/data/roles.json` is its sound slot
+  and the synthesiser's sound number. Never reorder or reuse either.
+- A step is on or off. Loudness comes from the accent track and the level
+  knobs. There is no per-step velocity and no swing; do not bring them back
+  as a convenience.
+- The engine's pattern for a rhythm is `rhythm * 2`, plus one for its B
+  version (`patternIndex`).
+- Undo covers what the machine remembers (`rhythms`, `rhythmTracks`) and a
+  whole-project import. Knobs, switches, tempo and the name are not undo
+  steps.
+- An older project is brought up to date in `parseProject`, which also
+  reports what was lost; the page shows that list. Add a step there for every
+  schema change, with a fixture.
 - An invalid project import must never replace the current draft, and an
   unreadable saved draft is set aside, not deleted.
+- `assets/kits/` holds generated sample kits for the 606, 707 and 909, made by
+  `scripts/gen_demo_kits.py`. Nothing loads them at the moment. Do not
+  hand-edit the WAVs, and do not describe them as recordings of hardware.
 
 **Naming and faceplates**
 
 - The owner does not want manufacturer or product brand names in the app or
-  its images. The machines are "606", "707", "808" and "909". The one
-  exception is the photo credit line, which has to name the original work.
-- A faceplate in `assets/faceplates/` is one of two things, and `check-build`
-  fails a build whose faceplate is neither or has no entry in
-  `assets/faceplates/README.md`:
-  - A drawing made by `scripts/draw-faceplates.mjs` (the 808). Its manifest
-    sets `faceplate.original` and has no credit. Change the script and run
-    `pnpm faceplates:draw`; do not hand-edit the SVG. The script places live
-    controls from the panel manifest, so keep reading positions from there.
-  - The owner's debranded edit of a Creative Commons photograph (606, 707,
-    909). Its manifest needs a `faceplate.credit`. The credit shown under the
-    panel is a licence requirement, so do not remove it.
+  its images. The machine is the "808". The one exception would be a photo
+  credit line, which has to name the original work.
+- The faceplate is a drawing made by `scripts/draw-faceplates.mjs`. Its
+  manifest sets `faceplate.original` and has no credit. Change the script and
+  run `pnpm faceplates:draw`; do not hand-edit the SVG. The script places live
+  controls from the panel manifest, so keep reading positions from there.
+  `check-build` fails a build whose faceplate is not the committed one, or has
+  no entry in `assets/faceplates/README.md`, or is a photograph without a
+  `faceplate.credit`.
+- The 606, 707 and 909 photographs in `assets/faceplates/` are the owner's
+  debranded edits of Creative Commons works, kept for later. If one ships
+  again it needs its credit shown under the panel; that is a licence
+  requirement.
 - `misc/assets/` is git-ignored and is for the owner's unedited originals.
   Nothing from it may reach a production build or a commit.
-- Panel coordinates are in each image's own pixel space
-  (`faceplate.width` and `height`). If an image is re-cropped, re-fit the
-  layout; `assets/faceplates/README.md` records how each was fitted.
+- Panel coordinates are in the image's own pixel space (`faceplate.width`
+  and `height`). `assets/faceplates/README.md` records how it was fitted.
 - The header mascot (`packages/editor/src/assets/mascot.svg`) is the owner's
   artwork and is used unaltered. Its cream outline on the dark background is
   CSS, in `.sb-mascot`.
 
 **Page layout**
 
-- The page is the brand, the machine and the footer, nothing else. Every
-  other control lives in the settings sheet behind the footer's cog
-  (`packages/editor/src/ui/Settings.tsx`); put new controls there.
-- What stays on the page with the machine: its Play (the faceplate's own
-  start/stop in Hardware, the grid's corner in Modern), import and error
-  notices, the faceplate credit, and the note about hits a panel cannot show.
-- The editor opens in Hardware mode, and the mode is not saved with the
-  draft. Browser tests that work on the grid start with `openModern`, and
-  reach buried controls through `openSettings` (`e2e/helpers.ts`).
+- The page is the brand, the machine and the footer, nothing else. A control
+  the machine has belongs on its faceplate. Anything else lives in the
+  settings sheet behind the footer's cog
+  (`packages/editor/src/ui/Settings.tsx`).
+- What stays on the page with the machine: import and error notices, and on
+  a phone the instrument strip and the docked start button.
+- Browser tests reach buried controls through `openSettings`, and the
+  machine through `selectTrack` and `stepButton` (`e2e/helpers.ts`).
 
 **Build output**
 
 - These are generated and git-ignored; never commit them:
-  `apps/site/public/engine/`, `public/kits/`, `public/faceplates/`,
+  `apps/site/public/engine/`, `public/faceplates/`,
   `public/boombapbot-assets.json`, `build/`, `.tools/`.
 - The worklet is bundled separately by `scripts/prepare-assets.mjs`. After
   changing `engine/worklet/processor.ts` or `wasm-engine.ts`, restart
@@ -164,15 +186,17 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   creates the `AudioContext` synchronously inside the click for that reason.
 - `window.__boombapbot` exposes `debug()` and `renderLoop()` for tests. The
   browser tests use it to check that the worklet really rendered sound.
-- Hardware mode is a prototype. Each panel manifest has a `pending` list of
-  behaviour not yet checked against the machine's manual.
+- The panel manifest has a `pending` list of what is not modelled yet. It is
+  shown in settings, so keep it true as controls are connected.
+- `pnpm dev` serves the Astro dev server; the browser tests and `pnpm serve`
+  use the production build, so run `pnpm build` before either.
 
 ## Not verified yet
 
-Nobody has listened to this build: audio has only been checked numerically.
-Also untested are browsers other than headless Chromium, real phones, macOS
-and Windows builds, deployment, and the VST3 in any host. Say so rather than
-assuming these work.
+The owner has listened to an earlier build; the sounds are a model made by
+ear and have not been compared with a real machine. Also untested are
+browsers other than headless Chromium, real phones, Windows builds,
+deployment, and the VST3 in any host. Say so rather than assuming these work.
 
 ## Working in this repo
 

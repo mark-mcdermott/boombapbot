@@ -1,28 +1,35 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
-  chooseKit,
+  DRAFT_KEY,
+  LEGACY_DRAFT_KEY,
+  LEGACY_FIXTURE,
+  bpmOf,
   closeSettings,
-  draftOnKit,
   hitCount,
-  lane,
   openEditor,
-  openModern,
   openSettings,
   project,
-  step,
+  selectTrack,
+  stepButton,
+  stepsOn,
 } from './helpers';
 
 test('the draft is saved locally and restored on reload', async ({ page }) => {
-  await openModern(page);
+  await openEditor(page);
   await openSettings(page);
   await expect(page.getByTestId('draft-status')).toHaveAttribute('data-origin', 'new');
   await closeSettings(page);
 
-  await step(page, 'high_tom', 2).click();
-  await step(page, 'kick', 0).click(); // off
+  await selectTrack(page, 'high_tom');
+  await stepButton(page, 2).click();
+  await selectTrack(page, 'kick');
+  await stepButton(page, 0).click(); // off
+  await page.getByTestId('panel-tempo').focus();
+  await page.keyboard.press('PageDown');
+  await page.getByTestId('panel-knob-cymbal-tone').focus();
+  await page.keyboard.press('End');
   await openSettings(page);
-  await page.getByTestId('bpm').fill('97');
-  await page.getByTestId('bpm').press('Enter');
   await page.getByTestId('beat-name').fill('Reload test');
   await page.getByTestId('beat-name').press('Enter');
   const before = await project(page);
@@ -32,45 +39,66 @@ test('the draft is saved locally and restored on reload', async ({ page }) => {
   await expect(page.getByTestId('editor')).toBeVisible();
   const after = await project(page);
   expect(after).toEqual(before);
-  expect(after.bpm).toBe(97);
+  expect(bpmOf(after)).toBeCloseTo(108, 1);
   expect(after.name).toBe('Reload test');
-  expect(lane(after, 'high_tom')[2]).toBe(100);
-  expect(lane(after, 'kick')[0]).toBe(0);
+  expect(after.sound.knobs.cymbal!.tone).toBe(1);
+  expect(stepsOn(after, 'high_tom')).toContain(2);
+  expect(stepsOn(after, 'kick')).not.toContain(0);
+  // The selector is where it was left, and the faceplate shows it.
+  await expect(page.getByTestId('panel-voice-kick')).toHaveAttribute('aria-checked', 'true');
+  await expect(stepButton(page, 0)).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('panel-knob-cymbal-tone')).toHaveAttribute('aria-valuenow', '100');
   await openSettings(page);
   await expect(page.getByTestId('draft-status')).toHaveAttribute('data-origin', 'restored');
   await expect(page.getByTestId('beat-name')).toHaveValue('Reload test');
-  await page.getByTestId('mode-modern').click();
-  await expect(step(page, 'high_tom', 2)).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('a draft left on a kit that is held back opens on the 808', async ({ page }) => {
+test('a draft from the earlier version becomes Basic Rhythm 1, and says what it lost', async ({ page }) => {
+  const legacy = readFileSync(LEGACY_FIXTURE, 'utf8');
+  await page.addInitScript(
+    ([key, text]) => {
+      if (!sessionStorage.getItem('seeded')) {
+        sessionStorage.setItem('seeded', '1');
+        localStorage.setItem(key!, text!);
+      }
+    },
+    [LEGACY_DRAFT_KEY, legacy],
+  );
   await openEditor(page);
-  await chooseKit(page, '909');
-  await draftOnKit(page, '909');
-  const before = await project(page);
+  const notice = page.getByTestId('notice');
+  await expect(notice).toContainText('earlier version');
+  await expect(notice).toContainText('Basic Rhythm 1');
+  await expect(notice.locator('li')).not.toHaveCount(0);
 
+  const snapshot = await project(page);
+  expect(snapshot.schemaVersion).toBe(2);
+  expect(snapshot.name).toBe(JSON.parse(legacy).name);
+  expect(hitCount(snapshot)).toBe(22);
+  expect(bpmOf(snapshot)).toBeCloseTo(JSON.parse(legacy).bpm, 1);
+  expect(snapshot.rhythms.slice(1).every((_, index) => hitCount(snapshot, index + 1) === 0)).toBe(true);
+
+  // It is saved in the current format, so the next visit is quiet. The old
+  // draft is left where it was.
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key) !== null, DRAFT_KEY)).toBe(true);
   await page.reload();
-  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', '808');
-  const after = await project(page);
-  expect(after.kit.id).toBe('808');
-  expect(after.pattern).toEqual(before.pattern);
-  expect(after.bpm).toBe(before.bpm);
-  await expect(page.getByTestId('notice')).toContainText('made on the 909 kit');
-  await draftOnKit(page, '808');
+  await expect(page.getByTestId('editor')).toBeVisible();
+  await expect(page.getByTestId('notice')).toHaveCount(0);
+  expect(await project(page)).toEqual(snapshot);
+  expect(await page.evaluate((key) => localStorage.getItem(key), LEGACY_DRAFT_KEY)).toBe(legacy);
 });
 
-test('an unreadable draft is set aside and a starter beat loads', async ({ page }) => {
-  await page.addInitScript(() => {
+test('an unreadable draft is set aside and the starter rhythms load', async ({ page }) => {
+  await page.addInitScript((key) => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
-      localStorage.setItem('boombapbot.draft.v1', '{"format":"boombapbot.project","schemaVersion":1,"bpm":"fast"');
+      localStorage.setItem(key, '{"format":"boombapbot.project","schemaVersion":2,"tempo":"fast"');
     }
-  });
+  }, DRAFT_KEY);
   await openEditor(page);
   await expect(page.getByTestId('notice')).toContainText('could not be read');
   expect(hitCount(await project(page))).toBeGreaterThan(10);
   const kept = await page.evaluate(() => localStorage.getItem('boombapbot.draft.unreadable'));
-  expect(kept).toContain('"bpm":"fast"');
+  expect(kept).toContain('"tempo":"fast"');
 
   // The replacement draft is valid, so the next load restores it quietly.
   await page.reload();

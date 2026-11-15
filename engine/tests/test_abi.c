@@ -11,9 +11,15 @@
 _Static_assert(sizeof(SnareEvent) == 24, "SnareEvent is read as 24 bytes by wasm-engine.ts");
 _Static_assert(offsetof(SnareEvent, frame) == 0, "SnareEvent.frame");
 _Static_assert(offsetof(SnareEvent, step) == 8, "SnareEvent.step");
-_Static_assert(offsetof(SnareEvent, role) == 12, "SnareEvent.role");
-_Static_assert(offsetof(SnareEvent, velocity) == 16, "SnareEvent.velocity");
-_Static_assert(offsetof(SnareEvent, reserved) == 20, "SnareEvent.reserved");
+_Static_assert(offsetof(SnareEvent, track) == 12, "SnareEvent.track");
+_Static_assert(offsetof(SnareEvent, accent) == 16, "SnareEvent.accent");
+_Static_assert(offsetof(SnareEvent, pattern) == 20, "SnareEvent.pattern");
+
+_Static_assert(sizeof(SnarePattern) == 52, "SnarePattern is written as 52 bytes by wasm-engine.ts");
+_Static_assert(offsetof(SnarePattern, rows) == 0, "SnarePattern.rows");
+_Static_assert(offsetof(SnarePattern, len1) == 48, "SnarePattern.len1");
+_Static_assert(offsetof(SnarePattern, len2) == 49, "SnarePattern.len2");
+_Static_assert(offsetof(SnarePattern, steps_per_beat) == 50, "SnarePattern.steps_per_beat");
 
 _Static_assert(sizeof(SnareSoundParams) == 24, "SnareSoundParams is written as 24 bytes by wasm-engine.ts");
 _Static_assert(offsetof(SnareSoundParams, sound) == 0, "SnareSoundParams.sound");

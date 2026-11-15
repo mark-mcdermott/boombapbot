@@ -1,9 +1,9 @@
 import rolesDocument from '../data/roles.json';
 
 /**
- * Drum roles are the stable identity of a lane. A beat stores hits against
- * roles; a kit decides which sample a role plays. The `index` is the slot the
- * engine uses and must never be reassigned.
+ * A role is one sound the engine can play. Its `index` is the engine's sound
+ * slot and the synthesiser's sound number, and must never be reassigned: new
+ * roles are appended.
  */
 export const ROLE_IDS = [
   'kick',
@@ -14,13 +14,21 @@ export const ROLE_IDS = [
   'high_tom',
   'clap',
   'cymbal',
+  'mid_tom',
+  'rim_shot',
+  'cowbell',
+  'low_conga',
+  'mid_conga',
+  'high_conga',
+  'claves',
+  'maracas',
 ] as const;
 
 export type RoleId = (typeof ROLE_IDS)[number];
 
 export interface Role {
   id: RoleId;
-  /** Engine slot. */
+  /** Engine sound slot. */
   index: number;
   name: string;
   short: string;

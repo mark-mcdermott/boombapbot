@@ -4,7 +4,7 @@
  * This file is bundled on its own (scripts/prepare-assets.mjs) and loaded with
  * audioWorklet.addModule. All scheduling happens inside the engine against the
  * audio sample clock; the main thread only sends edits and transport commands.
- * Sample decoding happens on the main thread and arrives here as transferred
+ * Sounds are synthesised on the main thread and arrive here as transferred
  * buffers, outside process().
  */
 import { PROCESSOR_NAME, type EngineCommand, type EngineReport, type ProcessorOptions } from '../messages';
@@ -23,6 +23,7 @@ const STATS_SECONDS = 0.1;
 class BoombapbotProcessor extends AudioWorkletProcessor {
   private engine: WasmEngine | null = null;
   private lastStep = -1;
+  private lastPattern = -1;
   private lastPlaying = false;
   private peak = 0;
   private peakEver = 0;
@@ -50,23 +51,25 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
     if (!engine) return;
     try {
       switch (command.type) {
-        case 'kit':
-          engine.loadKit(command.voices);
-          engine.collect();
-          this.report({ type: 'kit', id: command.id });
-          break;
         case 'sound':
           engine.setSound(command.slot, command.pcm, command.channels, command.sampleRate);
           this.report({ type: 'sound', slot: command.slot });
           break;
-        case 'pattern':
-          command.rows.forEach((row, role) => engine.setRow(role, row));
+        case 'tracks':
+          command.tracks.forEach((track) => engine.setTrack(track));
+          break;
+        case 'mix':
+          engine.setAccent(command.plain, command.accented);
+          engine.setMasterVolume(command.master);
+          break;
+        case 'patterns':
+          command.patterns.forEach(({ index, pattern }) => engine.setPattern(index, pattern));
           break;
         case 'tempo':
           engine.setTempo(command.bpm);
           break;
-        case 'swing':
-          engine.setSwing(command.swing);
+        case 'cue':
+          engine.cuePattern(command.pattern);
           break;
         case 'play':
           engine.play();
@@ -75,10 +78,7 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
           engine.stop();
           break;
         case 'trigger':
-          engine.trigger(command.role, command.velocity);
-          break;
-        case 'collect':
-          engine.collect();
+          engine.trigger(command.track, command.accent);
           break;
       }
     } catch (error) {
@@ -105,11 +105,13 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
     this.peak = peak;
 
     const step = engine.currentStep;
+    const pattern = engine.currentPattern;
     const playing = engine.playing;
-    if (step !== this.lastStep || playing !== this.lastPlaying) {
+    if (step !== this.lastStep || pattern !== this.lastPattern || playing !== this.lastPlaying) {
       this.lastStep = step;
+      this.lastPattern = pattern;
       this.lastPlaying = playing;
-      this.report({ type: 'position', step, playing });
+      this.report({ type: 'position', step, pattern, playing });
     }
 
     this.framesSinceStats += frames;

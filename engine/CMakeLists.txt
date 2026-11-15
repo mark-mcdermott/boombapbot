@@ -20,18 +20,20 @@ set(SNARE_FLOAT_FLAGS -ffp-contract=off)
 # Functions the WebAssembly build exports. Keep in step with engine.h.
 set(SNARE_WASM_EXPORTS
   malloc free
-  snare_abi_version snare_step_time snare_frames_per_step snare_loop_frames
+  snare_abi_version snare_step_ticks snare_pattern_ticks snare_frames_per_tick snare_tick_frame
   snare_synth_frames snare_synth_render
   snare_sound_create snare_sound_data snare_sound_destroy
-  snare_kit_create snare_kit_destroy snare_kit_set_voice
-  snare_engine_create snare_engine_destroy snare_engine_set_sound snare_engine_commit_kit snare_engine_collect
-  snare_engine_set_tempo snare_engine_set_swing snare_engine_set_master_gain snare_engine_set_slot
-  snare_engine_set_step snare_engine_set_row snare_engine_clear_pattern
-  snare_engine_play snare_engine_play_loops snare_engine_stop snare_engine_trigger snare_engine_render
-  snare_engine_is_playing snare_engine_current_step snare_engine_frames_rendered
+  snare_engine_create snare_engine_destroy snare_engine_set_sound snare_engine_synth_sound snare_engine_collect
+  snare_engine_set_tempo snare_engine_set_track snare_engine_set_track_level snare_engine_set_accent
+  snare_engine_set_master_volume
+  snare_engine_set_pattern snare_engine_set_step
+  snare_engine_cue_pattern snare_engine_play snare_engine_play_measures snare_engine_stop snare_engine_trigger
+  snare_engine_render
+  snare_engine_is_playing snare_engine_current_step snare_engine_current_pattern snare_engine_current_measure
+  snare_engine_frames_rendered snare_engine_stop_frame
   snare_engine_active_voices snare_engine_stolen_voices
   snare_engine_enable_event_log snare_engine_event_count snare_engine_read_events
-  snare_midi_export snare_midi_step_tick)
+  snare_midi_export)
 
 if(EMSCRIPTEN)
   # A standalone module with no JavaScript glue: the AudioWorklet, the offline
@@ -73,7 +75,7 @@ endif()
 
 if(SNARE_BUILD_TESTS)
   enable_testing()
-  foreach(suite scheduler voices choke swing kit_mapping midi realtime synth)
+  foreach(suite timeline scheduler pattern_bank accent voices choke midi sound_map realtime synth)
     add_executable(test_${suite} tests/test_${suite}.cpp)
     target_link_libraries(test_${suite} PRIVATE boombapbot_engine)
     target_compile_options(test_${suite} PRIVATE ${SNARE_WARNINGS})

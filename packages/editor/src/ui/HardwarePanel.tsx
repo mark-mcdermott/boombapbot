@@ -2,18 +2,20 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, ty
 import {
   BPM_MAX,
   BPM_MIN,
-  KITS,
+  PANEL,
+  PART_STEPS,
   SOUND_PARAM_LABELS,
-  STEP_COUNT,
-  countHits,
-  findLane,
-  getPanel,
-  panelRoles,
-  rolesOutsidePanel,
+  TRACKS,
+  countSteps,
+  getTrack,
+  isStepOn,
+  rhythmLength,
+  tempoBpm,
   type PanelManifest,
   type PanelRect,
 } from '@boombapbot/contracts';
 import type { AssetManifest } from '../runtime';
+import { editTarget } from '../state/store';
 import { useEditorState, useRuntime } from './context';
 import { Segmented } from './Segmented';
 
@@ -184,7 +186,7 @@ function Knob(props: KnobProps) {
 
 function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | null }) {
   const { store } = useRuntime();
-  const bpm = useEditorState((state) => state.project.bpm);
+  const bpm = useEditorState((state) => Math.round(tempoBpm(state.project.tempo)));
   return (
     <Knob
       panel={panel}
@@ -198,6 +200,7 @@ function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | nul
       step={1}
       // Two pixels per beat per minute.
       perPixel={0.5}
+      valueText={`${bpm} beats per minute`}
       onChange={(value) => store.setBpm(value)}
     />
   );
@@ -208,16 +211,15 @@ type PanelKnob = NonNullable<PanelManifest['knobs']>[number];
 /** A tone, decay, tuning or snappy knob. Its travel reads as 0 to 100. */
 function SoundKnob({ panel, photo, knob }: { panel: PanelManifest; photo: string | null; knob: PanelKnob }) {
   const { store } = useRuntime();
-  const kitId = useEditorState((state) => state.project.kit.id);
-  const position = useEditorState((state) => state.sound[knob.role][knob.param]);
+  const position = useEditorState((state) => state.project.sound.knobs[knob.track][knob.param]);
   const percent = Math.round(position * 100);
   return (
     <Knob
       panel={panel}
       photo={photo}
       geometry={knob}
-      label={`${KITS[kitId].voices[knob.role].label} ${SOUND_PARAM_LABELS[knob.param]}`}
-      testId={`panel-knob-${knob.role}-${knob.param}`}
+      label={`${getTrack(knob.track).label} ${SOUND_PARAM_LABELS[knob.param]}`}
+      testId={`panel-knob-${knob.track}-${knob.param}`}
       value={percent}
       min={0}
       max={100}
@@ -225,7 +227,7 @@ function SoundKnob({ panel, photo, knob }: { panel: PanelManifest; photo: string
       // Its whole travel in 200 pixels.
       perPixel={0.5}
       valueText={`${percent}%`}
-      onChange={(value) => store.setKnob(knob.role, knob.param, value / 100)}
+      onChange={(value) => store.setKnob(knob.track, knob.param, value / 100)}
     />
   );
 }
@@ -233,39 +235,37 @@ function SoundKnob({ panel, photo, knob }: { panel: PanelManifest; photo: string
 export function HardwarePanel() {
   const runtime = useRuntime();
   const { store } = runtime;
-  const kitId = useEditorState((state) => state.project.kit.id);
-  const pattern = useEditorState((state) => state.project.pattern);
-  const selectedRole = useEditorState((state) => state.selectedRole);
+  const target = useEditorState((state) => editTarget(state.project), sameTarget);
+  const rhythm = useEditorState((state) => state.project.rhythms[editTarget(state.project).rhythm]!);
   const playing = useEditorState((state) => state.playing);
   const currentStep = useEditorState((state) => state.currentStep);
   const manifest = useAssetManifest();
   const [fit, setFit] = useState(false);
-  // A photo that fails to load falls back to the drawn panel.
+  // An image that fails to load falls back to the drawn panel.
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const panel = getPanel(kitId);
-  const kit = KITS[kitId];
-  const photoPath = manifest?.faceplates[kitId];
-  const photoUrl = photoPath ? runtime.assetUrl(photoPath) : null;
+  const panel = PANEL;
+  const photoUrl = manifest?.faceplate ? runtime.assetUrl(manifest.faceplate) : null;
   const photo = photoUrl && photoUrl !== failedPhoto ? photoUrl : null;
-  const roles = panelRoles(panel);
-  // A lane chosen in Modern may not exist on this panel; fall back to the
-  // panel's first voice without changing the shared selection.
-  const activeRole = roles.includes(selectedRole) ? selectedRole : roles[0]!;
-  const lane = findLane(pattern, activeRole);
-  const voice = kit.voices[activeRole];
-  const outside = rolesOutsidePanel(panel)
-    .map((role) => ({ role, hits: findLane(pattern, role).steps.filter((v) => v > 0).length }))
-    .filter((entry) => entry.hits > 0);
+  const track = getTrack(target.track);
+  const row = rhythm[target.variation][target.track];
   const select = panel.voiceSelect;
-  const activePosition = select.positions.find((position) => position.role === activeRole);
+  const activePosition = select.positions.find((position) => position.track === target.track);
+  // The sixteen lamps show whichever part of the measure is playing.
+  const lamp = playing && currentStep >= 0 ? currentStep % PART_STEPS : -1;
+  const lampPart = currentStep >= PART_STEPS ? PART_STEPS : 0;
+  const stepOn = (button: number) => isStepOn(row, target.offset + button);
+  const selectTrack = (id: typeof target.track) => {
+    store.selectTrack(id);
+    void runtime.audition(id);
+  };
 
   const focusStep = (step: number) =>
     panelRef.current?.querySelector<HTMLButtonElement>(`[data-panel-step="${step}"]`)?.focus();
 
   return (
-    <section className="sb-hardware" aria-label={`${panel.name} hardware editor`} data-testid="hardware">
+    <section className="sb-hardware" aria-label={`${panel.name} drum machine`} data-testid="hardware">
       <div className="sb-panel-scroll" data-fit={fit}>
         <div
           ref={panelRef}
@@ -299,7 +299,7 @@ export function HardwarePanel() {
                 <span key={i} className="sb-panel-well" style={box(panel, well)} />
               ))}
               <span className="sb-panel-title">{panel.name}</span>
-              <span className="sb-panel-note">Drawn stand-in. This build has no faceplate image for this machine.</span>
+              <span className="sb-panel-note">Drawn stand-in. This build has no faceplate image.</span>
             </>
           )}
 
@@ -311,7 +311,7 @@ export function HardwarePanel() {
 
           <TempoKnob panel={panel} photo={photo} />
           {(panel.knobs ?? []).map((knob) => (
-            <SoundKnob key={`${knob.role}-${knob.param}`} panel={panel} photo={photo} knob={knob} />
+            <SoundKnob key={`${knob.track}-${knob.param}`} panel={panel} photo={photo} knob={knob} />
           ))}
           {!photo ? (
             <span
@@ -342,34 +342,21 @@ export function HardwarePanel() {
           ) : null}
 
           <div className="sb-panel-layer" role="radiogroup" aria-label={select.label || 'Instrument'}>
-            {select.positions.map((position) => {
-              const role = position.role;
-              const checked = role === activeRole;
-              return (
-                <button
-                  key={position.label}
-                  type="button"
-                  role="radio"
-                  className="sb-panel-voice"
-                  style={box(panel, position.hit)}
-                  aria-checked={checked}
-                  aria-label={
-                    role
-                      ? `${position.label}, ${kit.voices[role].label}`
-                      : `${position.label}, not available in this prototype`
-                  }
-                  disabled={!role}
-                  data-testid={role ? `panel-voice-${role}` : undefined}
-                  onClick={() => {
-                    if (!role) return;
-                    store.select(role);
-                    void runtime.audition(role);
-                  }}
-                >
-                  <span className="sb-panel-text">{position.label}</span>
-                </button>
-              );
-            })}
+            {select.positions.map((position) => (
+              <button
+                key={position.track}
+                type="button"
+                role="radio"
+                className="sb-panel-voice"
+                style={box(panel, position.hit)}
+                aria-checked={position.track === target.track}
+                aria-label={`${position.label}, ${getTrack(position.track).label}`}
+                data-testid={`panel-voice-${position.track}`}
+                onClick={() => selectTrack(position.track)}
+              >
+                <span className="sb-panel-text">{position.label}</span>
+              </button>
+            ))}
           </div>
 
           {panel.transport.map((control) => (
@@ -391,9 +378,9 @@ export function HardwarePanel() {
             </button>
           ))}
 
-          <div className="sb-panel-layer" role="group" aria-label={`${voice.label} steps`}>
+          <div className="sb-panel-layer" role="group" aria-label={`${track.label} steps`}>
             {panel.steps.map((step, index) => {
-              const velocity = lane.steps[index] ?? 0;
+              const on = stepOn(index);
               return (
                 <button
                   key={index}
@@ -401,21 +388,19 @@ export function HardwarePanel() {
                   className="sb-panel-step"
                   style={box(panel, step.hit)}
                   data-panel-step={index}
-                  data-on={velocity > 0}
-                  aria-pressed={velocity > 0}
-                  aria-label={`${voice.label}, step ${index + 1}, ${velocity > 0 ? `on, velocity ${velocity}` : 'off'}`}
+                  data-on={on}
+                  aria-pressed={on}
+                  aria-label={`${track.label}, step ${index + 1}, ${on ? 'on' : 'off'}`}
                   onClick={() => {
-                    store.select(activeRole, index);
-                    const next = store.toggleStep(activeRole, index);
-                    if (next > 0 && !store.getState().playing) runtime.auditionIfRunning(activeRole, next);
+                    if (store.toggleStep(index) && !store.getState().playing) runtime.auditionIfRunning(target.track);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === 'ArrowRight') {
                       event.preventDefault();
-                      focusStep((index + 1) % STEP_COUNT);
+                      focusStep((index + 1) % PART_STEPS);
                     } else if (event.key === 'ArrowLeft') {
                       event.preventDefault();
-                      focusStep((index - 1 + STEP_COUNT) % STEP_COUNT);
+                      focusStep((index - 1 + PART_STEPS) % PART_STEPS);
                     }
                   }}
                 >
@@ -426,15 +411,14 @@ export function HardwarePanel() {
           </div>
 
           {panel.steps.map((step, index) => {
-            const velocity = lane.steps[index] ?? 0;
             const [x, y] = step.led;
             return (
               <span
                 key={index}
                 className="sb-panel-led"
                 aria-hidden="true"
-                data-on={velocity > 0}
-                data-now={playing && currentStep === index}
+                data-on={stepOn(index)}
+                data-now={lamp === index && lampPart === target.offset}
                 data-dim={!photo || panel.ledsLitInPhoto}
                 style={circle(panel, x, y, panel.ledRadius)}
               />
@@ -448,39 +432,25 @@ export function HardwarePanel() {
         <Segmented
           label="Instrument"
           className="sb-segmented-fill sb-panel-strip"
-          value={activeRole}
-          onChange={(role) => {
-            store.select(role);
-            void runtime.audition(role);
-          }}
-          options={roles.map((role) => ({
-            value: role,
-            label: kit.voices[role].short,
-            name: kit.voices[role].label,
-            testId: `strip-voice-${role}`,
+          value={target.track}
+          onChange={selectTrack}
+          options={TRACKS.map((entry) => ({
+            value: entry.id,
+            label: entry.short,
+            name: entry.label,
+            testId: `strip-voice-${entry.id}`,
           }))}
         />
         <div className="sb-panel-info">
           <p data-testid="panel-voice">
-            <span className="sb-label">Instrument</span> <strong>{voice.label}</strong> ·{' '}
-            {countHits({ ...pattern, lanes: [lane] })} steps on
+            <span className="sb-label">Instrument</span> <strong>{track.label}</strong> ·{' '}
+            {countSteps(row, rhythmLength(rhythm))} steps on
           </p>
           <button type="button" className="sb-button" aria-pressed={fit} onClick={() => setFit(!fit)}>
             {fit ? 'Zoom in' : 'Fit to screen'}
           </button>
         </div>
       </div>
-
-      {outside.length > 0 ? (
-        <p className="sb-panel-meta" data-testid="panel-outside">
-          This beat also has hits this panel cannot show:{' '}
-          {outside.map((entry) => `${kit.voices[entry.role].label} (${entry.hits})`).join(', ')}. They keep playing
-          and stay in the beat.{' '}
-          <button type="button" className="sb-link" onClick={() => store.setMode('modern')}>
-            Edit them in Modern
-          </button>
-        </p>
-      ) : null}
 
       {photo && panel.faceplate.credit ? (
         <p className="sb-panel-meta" data-testid="panel-credit">
@@ -499,18 +469,20 @@ export function HardwarePanel() {
   );
 }
 
-/** What the current machine's panel does not model yet. Shown in settings. */
+/** What the panel does not model yet. Shown in settings. */
 export function PanelNotes() {
-  const kitId = useEditorState((state) => state.project.kit.id);
-  const panel = getPanel(kitId);
   return (
     <details className="sb-panel-pending" data-testid="panel-pending">
       <summary>Prototype: what still needs checking against the hardware</summary>
       <ul>
-        {panel.pending.map((item) => (
+        {PANEL.pending.map((item) => (
           <li key={item}>{item}</li>
         ))}
       </ul>
     </details>
   );
+}
+
+function sameTarget(a: ReturnType<typeof editTarget>, b: ReturnType<typeof editTarget>): boolean {
+  return a.rhythm === b.rhythm && a.variation === b.variation && a.track === b.track && a.offset === b.offset;
 }

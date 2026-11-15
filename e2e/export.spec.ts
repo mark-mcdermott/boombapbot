@@ -1,32 +1,36 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
-  chooseKit,
+  DRAFT_KEY,
+  LEGACY_FIXTURE,
+  bpmOf,
   downloadBytes,
   exportVia,
   hitCount,
-  lane,
-  openModern,
+  openEditor,
   openSettings,
   parseMidi,
   parseWav,
   project,
-  step,
+  selectTrack,
+  stepButton,
+  stepsOn,
 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
-  await openModern(page);
+  await openEditor(page);
 });
 
-test('exports a one-bar WAV loop with audio in it', async ({ page }) => {
-  const { bpm } = await project(page);
+test('exports a one-measure WAV loop with audio in it', async ({ page }) => {
+  const bpm = bpmOf(await project(page));
   const download = await exportVia(page, 'export-wav');
   expect(download.suggestedFilename()).toBe('starter-beat.wav');
   const wav = parseWav(await downloadBytes(download));
   expect(wav.channels).toBe(2);
   expect(wav.sampleRate).toBe(44100);
   expect(wav.bits).toBe(24);
-  // One bar of 4/4 lasts 240 / bpm seconds, to the frame.
-  expect(wav.frames).toBe(Math.floor((44100 * 240) / bpm + 0.5));
+  // Four beats last 240 / bpm seconds, to the frame.
+  expect(Math.abs(wav.frames - (44100 * 240) / bpm)).toBeLessThanOrEqual(1);
   expect(wav.peak).toBeGreaterThan(0.1);
   expect(wav.peak).toBeLessThanOrEqual(1);
   expect(wav.rms).toBeGreaterThan(0.01);
@@ -45,7 +49,7 @@ test('exports a MIDI file with tempo and drum notes on channel 10', async ({ pag
   expect(midi.format).toBe(1);
   expect(midi.trackCount).toBe(2);
   expect(midi.ppq).toBe(480);
-  expect(midi.tempoMicros).toBe(Math.floor(60_000_000 / snapshot.bpm + 0.5));
+  expect(midi.tempoMicros).toBe(Math.floor(60_000_000 / bpmOf(snapshot) + 0.5));
   expect(midi.trackEnds).toEqual([1920, 1920]);
 
   const noteOns = midi.notes.filter((note) => note.on);
@@ -53,20 +57,24 @@ test('exports a MIDI file with tempo and drum notes on channel 10', async ({ pag
   expect(midi.notes).toHaveLength(hitCount(snapshot) * 2);
   expect(midi.notes.every((note) => note.channel === 10)).toBe(true);
 
-  // Kick is General MIDI note 36. Its ticks are its steps, with the off-beat
-  // sixteenths moved by the swing amount.
-  const swingTicks = Math.floor(((snapshot.swing - 50) / 50) * 120 + 0.5);
-  const expectedKickTicks = lane(snapshot, 'kick')
-    .flatMap((velocity, index) => (velocity > 0 ? [index * 120 + (index % 2 === 1 ? swingTicks : 0)] : []));
-  const kickTicks = noteOns.filter((note) => note.note === 36).map((note) => note.tick);
-  expect(kickTicks).toEqual(expectedKickTicks);
-  const kickVelocities = noteOns.filter((note) => note.note === 36).map((note) => note.velocity);
-  expect(kickVelocities).toEqual(lane(snapshot, 'kick').filter((velocity) => velocity > 0));
+  // The bass drum is General MIDI note 36. Its ticks are its steps, and it is
+  // louder on the steps the accent track marks.
+  const kicks = noteOns.filter((note) => note.note === 36);
+  expect(kicks.map((note) => note.tick)).toEqual(stepsOn(snapshot, 'kick').map((index) => index * 120));
+  const accents = stepsOn(snapshot, 'accent');
+  const loud = Math.max(...kicks.map((note) => note.velocity));
+  const soft = Math.min(...kicks.map((note) => note.velocity));
+  expect(loud).toBeGreaterThan(soft);
+  for (const note of kicks) {
+    expect(note.velocity).toBe(accents.includes(note.tick / 120) ? loud : soft);
+  }
 });
 
 test('exports the project as JSON and imports it back', async ({ page }) => {
-  await step(page, 'cymbal', 0).click();
-  await chooseKit(page, '606');
+  await selectTrack(page, 'cymbal');
+  await stepButton(page, 0).click();
+  await page.getByTestId('panel-knob-kick-tone').focus();
+  await page.keyboard.press('PageUp');
   const saved = await project(page);
 
   const download = await exportVia(page, 'export-project');
@@ -74,41 +82,70 @@ test('exports the project as JSON and imports it back', async ({ page }) => {
   const bytes = await downloadBytes(download);
   const document = JSON.parse(bytes.toString('utf8'));
   expect(document.format).toBe('boombapbot.project');
-  expect(document.schemaVersion).toBe(1);
-  expect(document.pattern).toEqual(saved.pattern);
-  expect(document.kit.id).toBe('606');
+  expect(document.schemaVersion).toBe(2);
+  expect(document.rhythms).toEqual(saved.rhythms);
+  expect(document.rhythms).toHaveLength(16);
+  expect(document.rhythmTracks).toHaveLength(12);
+  expect(document.sound.knobs.kick.tone).toBe(0.7);
 
-  // Change the beat, then import the file to get it back.
+  // Change the machine, then import the file to get it back.
   await openSettings(page);
   await page.getByTestId('clear').click();
   expect(hitCount(await project(page))).toBe(0);
+  await page.keyboard.press('Escape');
+  await page.getByTestId('panel-knob-kick-tone').focus();
+  await page.keyboard.press('Home');
   await page.getByTestId('import-input').setInputFiles({
     name: 'starter-beat.boombapbot.json',
     mimeType: 'application/json',
     buffer: bytes,
   });
-  // Importing closes settings, so the result is in view.
   await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
   await expect(page.getByTestId('notice')).toContainText('Imported');
-  // The beat comes back whole. Its kit is held back, so it plays on the 808.
+  await expect(page.getByTestId('notice')).not.toContainText('earlier version');
+  // Rhythms, knobs and switches all come back; only the time of the change is new.
   const restored = await project(page);
-  expect(restored.pattern).toEqual(saved.pattern);
-  expect(restored.kit.id).toBe('808');
-  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', '808');
-  await expect(page.getByTestId('notice')).toContainText('made on the 606 kit');
+  expect({ ...restored, updatedAt: saved.updatedAt }).toEqual(saved);
+  await expect(page.getByTestId('panel-knob-kick-tone')).toHaveAttribute('aria-valuenow', '70');
+
+  // Undo brings back what was there before the import.
+  await page.keyboard.press('Control+z');
+  expect(hitCount(await project(page))).toBe(0);
+  expect((await project(page)).sound.knobs.kick!.tone).toBe(0);
+});
+
+test('a project file from the earlier version is brought up to date on import', async ({ page }) => {
+  const legacy = readFileSync(LEGACY_FIXTURE);
+  await page.getByTestId('import-input').setInputFiles({
+    name: 'old-beat.boombapbot.json',
+    mimeType: 'application/json',
+    buffer: legacy,
+  });
+  const notice = page.getByTestId('notice');
+  await expect(notice).toHaveAttribute('data-kind', 'info');
+  await expect(notice).toContainText('earlier version');
+  await expect(notice.locator('li')).not.toHaveCount(0);
+  const snapshot = await project(page);
+  expect(snapshot.schemaVersion).toBe(2);
+  expect(hitCount(snapshot)).toBe(22);
+  // Hits that were at accent velocity became steps of the accent track.
+  expect(stepsOn(snapshot, 'accent').length).toBeGreaterThan(0);
 });
 
 test('an invalid import is rejected and the current beat is untouched', async ({ page }) => {
-  await step(page, 'cymbal', 3).click();
+  await selectTrack(page, 'cymbal');
+  await stepButton(page, 3).click();
   const before = await project(page);
-  const storedBefore = await page.evaluate(() => localStorage.getItem('boombapbot.draft.v1'));
+  const storedBefore = await page.evaluate((key) => localStorage.getItem(key), DRAFT_KEY);
+  expect(storedBefore).not.toBeNull();
 
   const invalid = [
     { name: 'notes.txt', buffer: Buffer.from('this is not a project') },
-    { name: 'wrong.json', buffer: Buffer.from(JSON.stringify({ format: 'other', schemaVersion: 1 })) },
+    { name: 'wrong.json', buffer: Buffer.from(JSON.stringify({ format: 'other', schemaVersion: 2 })) },
+    { name: 'future.json', buffer: Buffer.from(JSON.stringify({ format: 'boombapbot.project', schemaVersion: 3 })) },
     {
       name: 'broken.boombapbot.json',
-      buffer: Buffer.from(JSON.stringify({ ...before, format: 'boombapbot.project', schemaVersion: 1, bpm: 9000 })),
+      buffer: Buffer.from(JSON.stringify({ ...JSON.parse(storedBefore!), tempo: { coarse: 900, fine: 0 } })),
     },
   ];
   for (const file of invalid) {
@@ -118,5 +155,5 @@ test('an invalid import is rejected and the current beat is untouched', async ({
     await expect(notice).toContainText(`${file.name} was not imported`);
     expect(await project(page)).toEqual(before);
   }
-  expect(await page.evaluate(() => localStorage.getItem('boombapbot.draft.v1'))).toBe(storedBefore);
+  expect(await page.evaluate((key) => localStorage.getItem(key), DRAFT_KEY)).toBe(storedBefore);
 });

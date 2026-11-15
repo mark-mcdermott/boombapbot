@@ -34,25 +34,6 @@ set(SNARE_BUILD_TESTS OFF CACHE BOOL "Build the CTest suites" FORCE)
 set(SNARE_BUILD_TOOLS OFF CACHE BOOL "Build the boombapbot-render command line tool" FORCE)
 add_subdirectory("${SNARE_REPO_ROOT}/engine" "${CMAKE_CURRENT_BINARY_DIR}/engine")
 
-# ---- Built-in sounds --------------------------------------------------------
-# The 808 demo kit is compiled into the plugin, so it makes sound with no file
-# access at runtime. File names come from packages/contracts/data/kits/808.kit.json.
-set(SNARE_KIT_808_DIR "${SNARE_REPO_ROOT}/assets/kits/808")
-juce_add_binary_data(boombapbot_kit_808
-  HEADER_NAME "Kit808Data.h"
-  NAMESPACE Kit808Data
-  SOURCES
-    "${SNARE_KIT_808_DIR}/kick.wav"
-    "${SNARE_KIT_808_DIR}/snare.wav"
-    "${SNARE_KIT_808_DIR}/closed_hat.wav"
-    "${SNARE_KIT_808_DIR}/open_hat.wav"
-    "${SNARE_KIT_808_DIR}/low_tom.wav"
-    "${SNARE_KIT_808_DIR}/high_tom.wav"
-    "${SNARE_KIT_808_DIR}/clap.wav"
-    "${SNARE_KIT_808_DIR}/cymbal.wav")
-# It is a static library that ends up inside a shared object.
-set_target_properties(boombapbot_kit_808 PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
 # ---- Plugin -----------------------------------------------------------------
 # PLUGIN_MANUFACTURER_CODE and PLUGIN_CODE identify the plugin to hosts and are
 # baked into saved sessions. They must not change once a build has been
@@ -73,12 +54,9 @@ juce_add_plugin(boombapbot_plugin
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
 target_sources(boombapbot_plugin PRIVATE
+  Source/Machine808.h
   Source/PluginProcessor.cpp
   Source/PluginProcessor.h)
-
-# wav_io.h is the engine's tool-side WAV decoder. It is header-only and is used
-# off the audio thread to decode the embedded kit.
-target_include_directories(boombapbot_plugin PRIVATE "${SNARE_REPO_ROOT}/engine/tools")
 
 target_compile_definitions(boombapbot_plugin PUBLIC
   JUCE_WEB_BROWSER=0
@@ -87,7 +65,6 @@ target_compile_definitions(boombapbot_plugin PUBLIC
 
 target_link_libraries(boombapbot_plugin
   PRIVATE
-    boombapbot_kit_808
     boombapbot_engine
     juce::juce_audio_processors
   PUBLIC
@@ -97,8 +74,9 @@ target_link_libraries(boombapbot_plugin
 # ---- Processor self-test ----------------------------------------------------
 # A console program that compiles Source/PluginProcessor.cpp directly and drives
 # the processor without the VST3 wrapper. It is a separate target: it shares the
-# engine and kit libraries with the plugin and changes nothing the plugin builds
-# or links. Run it with: ctest --test-dir build/vst3 --output-on-failure
+# engine library with the plugin and changes nothing the plugin builds or
+# links. It reads the contract files through the engine's tool-side loader, to
+# check the plugin's track table against them. Run it with: ctest --test-dir build/vst3 --output-on-failure
 option(SNARE_VST3_BUILD_SELFTEST "Build the processor self-test and register it with CTest" ON)
 
 if(SNARE_VST3_BUILD_SELFTEST)
@@ -109,6 +87,7 @@ if(SNARE_VST3_BUILD_SELFTEST)
 
   target_sources(boombapbot_plugin_selftest PRIVATE
     Tests/ProcessorSelfTest.cpp
+    Source/Machine808.h
     Source/PluginProcessor.cpp
     Source/PluginProcessor.h)
 
@@ -121,10 +100,10 @@ if(SNARE_VST3_BUILD_SELFTEST)
   target_compile_definitions(boombapbot_plugin_selftest PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    JucePlugin_Name="boombapbot")
+    JucePlugin_Name="boombapbot"
+    SNARE_CONTRACTS_DIR="${SNARE_REPO_ROOT}/packages/contracts")
 
   target_link_libraries(boombapbot_plugin_selftest PRIVATE
-    boombapbot_kit_808
     boombapbot_engine
     juce::juce_audio_processors
     juce::juce_recommended_config_flags

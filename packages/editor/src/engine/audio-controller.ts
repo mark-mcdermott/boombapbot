@@ -1,10 +1,10 @@
-import type { DecodedKit } from './kit-loader';
 import {
   PROCESSOR_NAME,
   type EngineCommand,
   type EngineReport,
   type ProcessorOptions,
 } from './messages';
+import type { EnginePattern, EngineTrack } from './wasm-engine';
 
 export type AudioState = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
 
@@ -18,9 +18,8 @@ export interface AudioStats {
 
 export interface AudioControllerEvents {
   onState(state: AudioState, error: string | null): void;
-  onPosition(step: number, playing: boolean): void;
+  onPosition(step: number, pattern: number, playing: boolean): void;
   onStats(stats: AudioStats): void;
-  onKit(id: string): void;
   /** The worklet has taken the sound last sent for this slot. */
   onSound(slot: number): void;
 }
@@ -138,13 +137,10 @@ export class AudioController {
   private receive(report: EngineReport): void {
     switch (report.type) {
       case 'position':
-        this.events.onPosition(report.step, report.playing);
+        this.events.onPosition(report.step, report.pattern, report.playing);
         break;
       case 'stats':
         this.events.onStats(report);
-        break;
-      case 'kit':
-        this.events.onKit(report.id);
         break;
       case 'sound':
         this.events.onSound(report.slot);
@@ -161,30 +157,30 @@ export class AudioController {
     this.node?.port.postMessage(command, transfer);
   }
 
-  /** Sends a decoded kit. Sample data is copied, then transferred. */
-  setKit(kit: DecodedKit): void {
-    const voices = kit.voices.map((voice) => ({ ...voice, pcm: voice.pcm.slice() }));
-    this.post(
-      { type: 'kit', id: kit.id, voices },
-      voices.map((voice) => voice.pcm.buffer),
-    );
-  }
-
   /** Sends one slot's sound. The buffer is transferred, so pass a copy. */
   setSound(slot: number, pcm: Float32Array, channels: number, sampleRate: number): void {
     this.post({ type: 'sound', slot, pcm, channels, sampleRate }, [pcm.buffer]);
   }
 
-  setPattern(rows: number[][]): void {
-    this.post({ type: 'pattern', rows });
+  setTracks(tracks: EngineTrack[]): void {
+    this.post({ type: 'tracks', tracks });
+  }
+
+  setMix(plain: number, accented: number, master: number): void {
+    this.post({ type: 'mix', plain, accented, master });
+  }
+
+  setPatterns(patterns: Array<{ index: number; pattern: EnginePattern }>): void {
+    if (patterns.length > 0) this.post({ type: 'patterns', patterns });
   }
 
   setTempo(bpm: number): void {
     this.post({ type: 'tempo', bpm });
   }
 
-  setSwing(swing: number): void {
-    this.post({ type: 'swing', swing });
+  /** The pattern to play from the next measure, or from the start when stopped. */
+  cue(pattern: number): void {
+    this.post({ type: 'cue', pattern });
   }
 
   play(): void {
@@ -195,12 +191,8 @@ export class AudioController {
     this.post({ type: 'stop' });
   }
 
-  trigger(role: number, velocity: number): void {
-    this.post({ type: 'trigger', role, velocity });
-  }
-
-  collect(): void {
-    this.post({ type: 'collect' });
+  trigger(track: number, accent: boolean): void {
+    this.post({ type: 'trigger', track, accent });
   }
 
   async dispose(): Promise<void> {

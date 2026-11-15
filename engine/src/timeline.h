@@ -1,5 +1,9 @@
 // The single musical timeline. Playback, offline rendering and MIDI export
 // all derive event positions from these functions, so they cannot disagree.
+//
+// Time is counted in ticks, 24 to the quarter note, so a step at any pre-scale
+// is a whole number of them: 8, 6, 4 or 3 for three, four, six or eight steps
+// to the beat. Positions are integers; only the conversion to frames rounds.
 #pragma once
 
 #include <cmath>
@@ -9,29 +13,38 @@
 
 namespace snare {
 
-inline double clampSwing(double swing) {
-  if (!(swing >= SNARE_SWING_MIN)) return SNARE_SWING_MIN;
-  if (swing > SNARE_SWING_MAX) return SNARE_SWING_MAX;
-  return swing;
-}
-
 inline double clampBpm(double bpm) {
   if (!(bpm >= SNARE_BPM_MIN)) return SNARE_BPM_MIN;
   if (bpm > SNARE_BPM_MAX) return SNARE_BPM_MAX;
   return bpm;
 }
 
-// Time of an absolute step index in sixteenths. Steps are grouped in pairs;
-// swing moves only the second step of each pair, so every pair, and therefore
-// the loop, keeps its length.
-inline double stepTime(std::int64_t stepIndex, double swing) {
-  const double base = static_cast<double>(stepIndex);
-  if ((stepIndex & 1) == 0) return base;
-  return base + (clampSwing(swing) - 50.0) / 50.0;
+// Ticks in one step. 0 for a step size the machine does not have.
+inline int stepTicks(int stepsPerBeat) {
+  switch (stepsPerBeat) {
+    case 3:
+    case 4:
+    case 6:
+    case 8:
+      return SNARE_TICKS_PER_BEAT / stepsPerBeat;
+    default:
+      return 0;
+  }
 }
 
-inline double framesPerStep(double bpm, double sampleRate) {
-  return sampleRate * 60.0 / clampBpm(bpm) / 4.0;
+inline bool validShape(int len1, int len2, int stepsPerBeat) {
+  return len1 >= 1 && len1 <= SNARE_PART_STEPS && len2 >= 0 && len2 <= SNARE_PART_STEPS &&
+         stepTicks(stepsPerBeat) != 0;
+}
+
+// Where the nth step played in a measure is stored: the 1st part uses steps 0
+// to 15 and the 2nd part steps 16 to 31, however long the 1st part is.
+inline int stepPosition(int played, int firstLength) {
+  return played < firstLength ? played : SNARE_PART_STEPS + (played - firstLength);
+}
+
+inline double framesPerTick(double bpm, double sampleRate) {
+  return sampleRate * 60.0 / clampBpm(bpm) / SNARE_TICKS_PER_BEAT;
 }
 
 // Round half up. Used for every time-to-frame conversion.

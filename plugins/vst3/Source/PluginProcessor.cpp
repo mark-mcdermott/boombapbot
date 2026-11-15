@@ -1,91 +1,38 @@
 #include "PluginProcessor.h"
 
-#include "Kit808Data.h"
-
-// The engine's tool-side WAV decoder. The engine builds with
-// -Wno-sign-conversion; JUCE's recommended warning flags turn it back on, so
-// it is silenced for this one header.
-JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wsign-conversion")
-#include "wav_io.h"
-JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+#include "Machine808.h"
 
 #include <array>
 #include <cstdint>
-#include <exception>
-#include <vector>
 
 namespace {
 
-// Engine slot and General MIDI note of each drum role. Mirrors
-// packages/contracts/data/roles.json, which is the source of truth.
-struct RoleSpec {
-  const char* id;
-  int index;
-  int gmNote;
-};
+using snare::plugin::kTracks;
 
-constexpr std::array<RoleSpec, 8> kRoles{{
-    {"kick", 0, 36},
-    {"snare", 1, 38},
-    {"closed_hat", 2, 42},
-    {"open_hat", 3, 46},
-    {"low_tom", 4, 45},
-    {"high_tom", 5, 50},
-    {"clap", 6, 39},
-    {"cymbal", 7, 49},
-}};
-
-// MIDI note number -> role index, or -1 for notes no role listens to.
+// MIDI note number -> engine track, or -1 for notes no track listens to.
 constexpr std::array<std::int8_t, 128> makeNoteMap() {
   std::array<std::int8_t, 128> map{};
   for (auto& entry : map) entry = -1;
-  for (const RoleSpec& role : kRoles) {
-    map[static_cast<std::size_t>(role.gmNote)] = static_cast<std::int8_t>(role.index);
+  for (const snare::plugin::TrackSpec& track : kTracks) {
+    map[static_cast<std::size_t>(track.gmNote)] = static_cast<std::int8_t>(track.track);
   }
   return map;
 }
 
-constexpr std::array<std::int8_t, 128> kNoteToRole = makeNoteMap();
-
-// One voice of the embedded kit.
-struct KitVoiceSpec {
-  int role;
-  const char* data;
-  int size;
-  float gain;
-  float pan;
-  int chokeGroup;
-};
-
-constexpr const char* kKit808Id = "808";
-
-// Mirrors packages/contracts/data/kits/808.kit.json, which is the source of
-// truth for gain, pan and choke group. The role column is the engine slot from
-// roles.json. The two hats share choke group 1.
-std::array<KitVoiceSpec, 8> kit808Voices() {
-  namespace data = Kit808Data;
-  return {{
-      {0, data::kick_wav, data::kick_wavSize, 0.85f, 0.0f, 0},
-      {1, data::snare_wav, data::snare_wavSize, 0.75f, 0.0f, 0},
-      {2, data::closed_hat_wav, data::closed_hat_wavSize, 0.4f, 0.2f, 1},
-      {3, data::open_hat_wav, data::open_hat_wavSize, 0.4f, 0.2f, 1},
-      {4, data::low_tom_wav, data::low_tom_wavSize, 0.7f, -0.3f, 0},
-      {5, data::high_tom_wav, data::high_tom_wavSize, 0.7f, 0.3f, 0},
-      {6, data::clap_wav, data::clap_wavSize, 0.8f, -0.1f, 0},
-      {7, data::cymbal_wav, data::cymbal_wavSize, 0.55f, -0.2f, 0},
-  }};
-}
+constexpr std::array<std::int8_t, 128> kNoteToTrack = makeNoteMap();
 
 const juce::Identifier kStateType{"BoombapbotPluginState"};
 const juce::Identifier kStateSchemaVersion{"schemaVersion"};
-const juce::Identifier kStateKitId{"kitId"};
-constexpr int kCurrentStateSchemaVersion = 1;
+const juce::Identifier kStateMachine{"machine"};
+constexpr const char* kMachineId = "808";
+// Version 1 named a sample kit. There is nothing in it to recall now that the
+// sounds are synthesised, so it loads as the defaults.
+constexpr int kCurrentStateSchemaVersion = 2;
 
 }  // namespace
 
 BoombapbotAudioProcessor::BoombapbotAudioProcessor()
-    : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      kitId_(kKit808Id) {}
+    : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)) {}
 
 // ---- Lifecycle (off the audio thread) ---------------------------------------
 
@@ -98,37 +45,35 @@ void BoombapbotAudioProcessor::prepareToPlay(double sampleRate, int /*samplesPer
   // stays silent rather than failing.
   engine_.reset(snare_engine_create(sampleRate));
   engineSampleRate_ = sampleRate;
-  if (engine_ != nullptr) commitEmbeddedKit(engine_.get());
+  if (engine_ != nullptr) loadMachine(engine_.get());
 }
 
 void BoombapbotAudioProcessor::releaseResources() {
   // The engine is kept so a later prepareToPlay at the same rate is free.
 }
 
-void BoombapbotAudioProcessor::commitEmbeddedKit(SnareEngine* engine) {
-  SnareKit* kit = snare_kit_create();
+// The sounds are synthesised here, at the host's rate, so nothing is read from
+// disk and nothing is resampled. These calls queue engine commands from the
+// control thread; that is safe because the engine is new and processBlock does
+// not run during prepareToPlay.
+void BoombapbotAudioProcessor::loadMachine(SnareEngine* engine) {
+  using namespace snare::plugin;
   double longestSeconds = 0.0;
 
-  for (const KitVoiceSpec& voice : kit808Voices()) {
-    try {
-      const auto* first = reinterpret_cast<const std::uint8_t*>(voice.data);
-      const std::vector<std::uint8_t> bytes(first, first + voice.size);
-      const snare::wav::Audio audio = snare::wav::decode(bytes);
-      const int result =
-          snare_kit_set_voice(kit, voice.role, audio.pcm.data(), audio.frames, audio.channels,
-                              audio.sampleRate, voice.gain, voice.pan, voice.chokeGroup);
-      jassert(result == SNARE_OK);
-      juce::ignoreUnused(result);
-      longestSeconds = juce::jmax(longestSeconds, audio.frames / audio.sampleRate);
-    } catch (const std::exception&) {
-      // A voice that fails to decode is left out; the others still play.
-      jassertfalse;
-    }
+  for (const TrackSpec& track : kTracks) {
+    const SnareSoundParams sound{track.sound, kKnobCentre, kKnobCentre, kKnobCentre, kKnobCentre, 0};
+    int result = snare_engine_synth_sound(engine, &sound);
+    jassert(result == SNARE_OK);
+    result = snare_engine_set_track(engine, track.track, track.sound, track.pan, track.chokeGroup);
+    jassert(result == SNARE_OK);
+    result = snare_engine_set_track_level(engine, track.track, static_cast<double>(track.trim));
+    jassert(result == SNARE_OK);
+    juce::ignoreUnused(result);
+    longestSeconds = juce::jmax(longestSeconds, snare_synth_frames(&sound, engineSampleRate_) / engineSampleRate_);
   }
-
+  snare_engine_set_accent(engine, kPlainGain, kAccentGain);
+  snare_engine_set_master_volume(engine, kMasterVolume);
   tailSeconds_ = longestSeconds;
-  // The engine owns the kit from here and swaps it in at the next buffer.
-  snare_engine_commit_kit(engine, kit);
 }
 
 bool BoombapbotAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const {
@@ -158,8 +103,9 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
   // "MIDI Trigger": every note-on plays one hit. The engine applies queued
   // triggers at the start of the next render call, so the block is split at
   // each note's sample offset: render up to the offset, queue the trigger,
-  // carry on. In this plugin the audio thread is the only caller that queues
-  // engine commands, which keeps the engine's command queue single-producer.
+  // carry on. Once prepareToPlay has returned, the audio thread is the only
+  // caller that queues engine commands, which keeps the engine's command
+  // queue single-producer.
   //
   // Events are read as raw bytes. Building a juce::MidiMessage could allocate
   // for long messages such as SysEx.
@@ -168,8 +114,8 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     if (event.numBytes != 3 || (event.data[0] & 0xf0) != 0x90) continue;
     const int velocity = event.data[2] & 0x7f;
     if (velocity == 0) continue;  // note-on with velocity 0 is a note-off
-    const int role = kNoteToRole[static_cast<std::size_t>(event.data[1] & 0x7f)];
-    if (role < 0) continue;
+    const int track = kNoteToTrack[static_cast<std::size_t>(event.data[1] & 0x7f)];
+    if (track < 0) continue;
 
     const int offset = juce::jlimit(rendered, frames, event.samplePosition);
     if (offset > rendered) {
@@ -177,7 +123,7 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
       rendered = offset;
     }
     // A full queue drops the hit; there is nothing useful to do about it here.
-    snare_engine_trigger(engine, role, velocity);
+    snare_engine_trigger(engine, track, velocity >= snare::plugin::kAccentVelocity ? 1 : 0);
   }
 
   if (frames > rendered) {
@@ -211,30 +157,20 @@ void BoombapbotAudioProcessor::changeProgramName(int /*index*/, const juce::Stri
 
 // ---- State ------------------------------------------------------------------
 
-// A small versioned blob: the schema version and the kit id. Only the 808 kit
-// is built in, so the kit id is all there is to recall.
+// A small versioned blob: the schema version and the machine. The plugin has
+// no parameters yet, so there is nothing else to recall.
 void BoombapbotAudioProcessor::getStateInformation(juce::MemoryBlock& destData) {
   juce::ValueTree state(kStateType);
   state.setProperty(kStateSchemaVersion, kCurrentStateSchemaVersion, nullptr);
-  state.setProperty(kStateKitId, kitId_, nullptr);
+  state.setProperty(kStateMachine, kMachineId, nullptr);
   if (const std::unique_ptr<juce::XmlElement> xml = state.createXml()) {
     copyXmlToBinary(*xml, destData);
   }
 }
 
-void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
-  const std::unique_ptr<juce::XmlElement> xml = getXmlFromBinary(data, sizeInBytes);
-  if (xml == nullptr) return;
-  const juce::ValueTree state = juce::ValueTree::fromXml(*xml);
-  if (!state.hasType(kStateType)) return;
-
-  // State written by a newer schema is ignored rather than guessed at.
-  const int version = state.getProperty(kStateSchemaVersion, 0);
-  if (version < 1 || version > kCurrentStateSchemaVersion) return;
-
-  // An unknown kit id keeps the built-in kit.
-  const juce::String kitId = state.getProperty(kStateKitId, kKit808Id).toString();
-  if (kitId == kKit808Id) kitId_ = kitId;
-}
+// Nothing in a saved state changes how the plugin sounds yet, so whatever a
+// host hands back (ours, an older one, or something else entirely) is left
+// unread rather than guessed at.
+void BoombapbotAudioProcessor::setStateInformation(const void* /*data*/, int /*sizeInBytes*/) {}
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new BoombapbotAudioProcessor(); }

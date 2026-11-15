@@ -1,16 +1,22 @@
 import {
-  KITS,
-  OFFERED_KIT_IDS,
-  ROLE_IDS,
-  getRole,
-  onOfferedKit,
-  type KitId,
+  ROLES,
+  getTrack,
+  isInstrumentId,
+  tempoBpm,
   type Project,
-  type RoleId,
+  type Role,
+  type TrackId,
 } from '@boombapbot/contracts';
 import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
-import { fetchBytes, loadKit, synthesiseKit, type DecodedKit } from './engine/kit-loader';
-import { exportMidi, patternRows, renderLoop, type LoopRender } from './engine/offline';
+import {
+  engineMix,
+  engineTracks,
+  rhythmPatterns,
+  selectedPattern,
+  soundOwner,
+  synthSound,
+} from './engine/machine';
+import { exportMidi, renderLoop, type LoopRender } from './engine/offline';
 import { SnareWasm } from './engine/wasm-engine';
 import { encodeWav, type WavBitDepth } from './engine/wav';
 import {
@@ -31,10 +37,8 @@ import { EditorStore } from './state/store';
 /** Written by scripts/prepare-assets.mjs next to the built site. */
 export interface AssetManifest {
   engine: { worklet: string; wasm: string };
-  /** Folder that holds kits/<id>/<file>.wav. */
-  kits: string;
-  /** Faceplate photos present in this build, by machine. Usually empty. */
-  faceplates: Partial<Record<KitId, string>>;
+  /** The faceplate image in this build, if it has one. */
+  faceplate: string | null;
 }
 
 export interface RuntimeOptions {
@@ -47,8 +51,7 @@ export interface DebugSnapshot {
   audioStatus: string;
   sampleRate: number | null;
   stats: AudioStats | null;
-  engineKit: string | null;
-  /** Single sounds sent to the audio thread after a knob moved, and taken by it. */
+  /** Sounds synthesised and sent to the audio thread, and taken by it. */
   soundsSent: number;
   soundsTaken: number;
   project: Project;
@@ -63,20 +66,17 @@ export class EditorRuntime {
   private readonly baseUrl: string;
   private readonly storage: KeyValueStorage | null;
   private readonly audio: AudioController;
-  private readonly kits = new Map<string, Promise<DecodedKit>>();
   private manifest: Promise<AssetManifest> | null = null;
   private wasmBytes: Promise<ArrayBuffer> | null = null;
   private offlineWasm: Promise<SnareWasm> | null = null;
   private synced: Project | null = null;
-  private engineKit: string | null = null;
   private stats: AudioStats | null = null;
   // One sound per slot may be on its way to the audio thread. A knob that
   // moves again meanwhile marks the slot, and the newest setting follows.
-  private readonly soundsInFlight = new Map<RoleId, { stale: boolean }>();
+  private readonly soundsInFlight = new Map<number, { stale: boolean }>();
   private soundsSent = 0;
   private soundsTaken = 0;
   private unsubscribe: (() => void) | null = null;
-  private collectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: RuntimeOptions) {
     this.baseUrl = options.baseUrl.endsWith('/') ? options.baseUrl : `${options.baseUrl}/`;
@@ -85,41 +85,37 @@ export class EditorRuntime {
     const draft = this.storage ? loadDraft(this.storage) : { status: 'empty' as const };
     this.store = new EditorStore(
       draft.status === 'restored'
-        ? { project: onOfferedKit(draft.project), draftOrigin: 'restored' }
+        ? { project: draft.project, draftOrigin: 'restored' }
         : { draftOrigin: draft.status === 'unreadable' ? 'recovered' : 'new' },
     );
-    if (draft.status === 'restored') {
-      const moved = movedKitNote(draft.project, this.store.getState().project);
-      if (moved) this.store.notify('info', moved);
+    if (draft.status === 'restored' && draft.changes.length > 0) {
+      this.store.notify('info', `Your saved beat came from an earlier version. ${EARLIER_VERSION_NOTE}`, draft.changes);
     }
     if (draft.status === 'unreadable') {
       this.store.notify(
         'error',
-        'Your saved draft could not be read, so a starter beat was loaded. The unreadable draft was kept in this browser.',
+        'Your saved draft could not be read, so the starter rhythms were loaded. The unreadable draft was kept in this browser.',
         draft.errors,
       );
     }
 
     this.audio = new AudioController({
       onState: (state, error) => this.store.setAudioStatus(state, error),
-      onPosition: (step, playing) => {
+      onPosition: (step, pattern, playing) => {
         // Ignore a late "stopped" report that crosses a fresh Play.
-        if (this.store.getState().playing) this.store.setCurrentStep(playing ? step : -1);
+        if (!this.store.getState().playing) return;
+        if (playing) this.store.setPosition(step, pattern);
+        else this.store.setPosition(-1, -1);
       },
       onStats: (stats) => {
         this.stats = stats;
       },
-      onKit: (id) => {
-        this.engineKit = id;
-        if (id === this.store.getState().project.kit.id) this.store.setKitStatus('ready');
-      },
       onSound: (slot) => {
-        const role = ROLE_IDS.find((id) => getRole(id).index === slot);
-        if (!role) return;
         this.soundsTaken += 1;
-        const flight = this.soundsInFlight.get(role);
-        this.soundsInFlight.delete(role);
-        if (flight?.stale) void this.sendSound(role);
+        const flight = this.soundsInFlight.get(slot);
+        this.soundsInFlight.delete(slot);
+        const role = ROLES[slot];
+        if (flight?.stale && role) void this.sendSound(role);
       },
     });
   }
@@ -129,22 +125,15 @@ export class EditorRuntime {
     if (this.unsubscribe) return;
     this.persist(this.store.getState().project);
     let previous = this.store.getState().project;
-    let previousSound = this.store.getState().sound;
     this.unsubscribe = this.store.subscribe(() => {
-      const { project, sound } = this.store.getState();
-      if (sound !== previousSound) {
-        for (const role of ROLE_IDS) {
-          if (sound[role] !== previousSound[role]) void this.sendSound(role);
-        }
-        previousSound = sound;
-      }
+      const { project } = this.store.getState();
       if (project === previous) return;
       previous = project;
       this.persist(project);
       this.syncAudio();
     });
-    // Warm the caches so the first Play is quick. Sounds are fetched or
-    // synthesised once audio starts, when its sample rate is known.
+    // Warm the caches so the first Play is quick. Sounds are synthesised once
+    // audio starts, when its sample rate is known.
     void this.loadManifest().catch(() => undefined);
     void this.loadOfflineWasm().catch(() => undefined);
   }
@@ -152,7 +141,6 @@ export class EditorRuntime {
   detach(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
-    if (this.collectTimer) clearTimeout(this.collectTimer);
     void this.audio.dispose();
   }
 
@@ -212,42 +200,6 @@ export class EditorRuntime {
     return this.offlineWasm;
   }
 
-  /**
-   * A kit ready for an engine running at `sampleRate`, cached for playback
-   * and export. A synthesised kit is built at that rate; a sampled one is
-   * fetched once and resampled by the engine.
-   */
-  kit(id: KitId, sampleRate: number): Promise<DecodedKit> {
-    const manifest = KITS[id];
-    const { sound } = this.store.getState();
-    const built = `${id}@${sampleRate}@`;
-    const key = manifest.synthesised ? `${built}${JSON.stringify(sound)}` : id;
-    let cached = this.kits.get(key);
-    if (!cached) {
-      // A kit built for other knob settings is no use any more.
-      for (const other of this.kits.keys()) {
-        if (manifest.synthesised && other.startsWith(built)) this.kits.delete(other);
-      }
-      cached = (
-        manifest.synthesised
-          ? this.loadOfflineWasm().then((wasm) => synthesiseKit(wasm, manifest, sampleRate, sound))
-          : this.loadManifest().then((assets) => loadKit(manifest, this.url(assets.kits), fetchBytes))
-      ).catch((error: unknown) => {
-        this.kits.delete(key);
-        throw error;
-      });
-      this.kits.set(key, cached);
-    }
-    return cached;
-  }
-
-  /** Prepares the other offered kits in the background so switching is instant. */
-  preloadKits(): void {
-    const sampleRate = this.audio.sampleRate;
-    if (sampleRate === null) return;
-    for (const id of OFFERED_KIT_IDS) void this.kit(id, sampleRate).catch(() => undefined);
-  }
-
   // ---- Audio --------------------------------------------------------------
 
   /** Starts or resumes audio. Call from a user gesture. */
@@ -258,7 +210,6 @@ export class EditorRuntime {
       if (!wasReady) {
         this.synced = null;
         this.syncAudio();
-        this.preloadKits();
       }
       return true;
     } catch (error) {
@@ -273,55 +224,57 @@ export class EditorRuntime {
     const { project } = this.store.getState();
     const previous = this.synced;
     this.synced = project;
+    const { sound } = project;
+    const before = previous?.sound;
 
-    if (!previous || previous.bpm !== project.bpm) this.audio.setTempo(project.bpm);
-    if (!previous || previous.swing !== project.swing) this.audio.setSwing(project.swing);
-    if (!previous || previous.pattern !== project.pattern) {
-      this.audio.setPattern(patternRows(project));
+    if (!previous || tempoBpm(previous.tempo) !== tempoBpm(project.tempo)) {
+      this.audio.setTempo(tempoBpm(project.tempo));
     }
-    if (!previous || previous.kit.id !== project.kit.id) void this.sendKit(project.kit.id);
-  }
-
-  private async sendKit(id: KitId): Promise<void> {
-    this.store.setKitStatus('loading');
-    try {
-      const sampleRate = this.audio.sampleRate;
-      if (sampleRate === null) return;
-      const kit = await this.kit(id, sampleRate);
-      // The user may have switched again while this kit was loading.
-      if (this.store.getState().project.kit.id !== id) return;
-      this.audio.setKit(kit);
-      // Free the replaced kit once its tails have had time to finish.
-      if (this.collectTimer) clearTimeout(this.collectTimer);
-      this.collectTimer = setTimeout(() => this.audio.collect(), 4000);
-    } catch (error) {
-      this.store.setKitStatus('error');
-      this.store.notify('error', describe(error));
+    if (!before || before.levels !== sound.levels || before.alternates !== sound.alternates) {
+      this.audio.setTracks(engineTracks(sound));
+    }
+    if (!before || before.accent !== sound.accent || before.master !== sound.master) {
+      const mix = engineMix(sound);
+      this.audio.setMix(mix.plain, mix.accented, mix.master);
+    }
+    if (!previous || previous.rhythms !== project.rhythms) {
+      this.audio.setPatterns(
+        project.rhythms.flatMap((rhythm, index) =>
+          previous?.rhythms[index] === rhythm ? [] : rhythmPatterns(rhythm, index),
+        ),
+      );
+    }
+    if (!previous || selectedPattern(previous) !== selectedPattern(project)) {
+      this.audio.cue(selectedPattern(project));
+    }
+    for (const role of ROLES) {
+      const owner = soundOwner(role);
+      if (!before || before.knobs[owner] !== sound.knobs[owner]) void this.sendSound(role);
     }
   }
 
   /**
-   * Re-synthesises one voice from its knobs and sends it to the audio thread.
-   * The work happens here, on the main thread, never in the worklet.
+   * Synthesises one sound from the knobs of its column and sends it to the
+   * audio thread. The work happens here, on the main thread, never in the
+   * worklet. One sound per slot is on its way at a time; a knob that moves
+   * again meanwhile is followed once the worklet has taken the last one.
    */
-  private async sendSound(role: RoleId): Promise<void> {
+  private async sendSound(role: Role): Promise<void> {
     const sampleRate = this.audio.sampleRate;
     if (!this.audio.isReady || sampleRate === null) return;
-    if (!KITS[this.store.getState().project.kit.id].synthesised) return;
-    const flight = this.soundsInFlight.get(role);
+    const flight = this.soundsInFlight.get(role.index);
     if (flight) {
       flight.stale = true;
       return;
     }
-    this.soundsInFlight.set(role, { stale: false });
+    this.soundsInFlight.set(role.index, { stale: false });
     try {
       const wasm = await this.loadOfflineWasm();
-      const slot = getRole(role).index;
-      const pcm = wasm.synthesise({ sound: slot, ...this.store.getState().sound[role] }, sampleRate);
-      this.audio.setSound(slot, pcm, 1, sampleRate);
+      const pcm = wasm.synthesise(synthSound(role, this.store.getState().project.sound), sampleRate);
+      this.audio.setSound(role.index, pcm, 1, sampleRate);
       this.soundsSent += 1;
     } catch (error) {
-      this.soundsInFlight.delete(role);
+      this.soundsInFlight.delete(role.index);
       this.store.notify('error', describe(error));
     }
   }
@@ -337,6 +290,7 @@ export class EditorRuntime {
   async play(): Promise<void> {
     if (!(await this.ensureAudio())) return;
     this.store.setPlaying(true);
+    this.audio.cue(selectedPattern(this.store.getState().project));
     this.audio.play();
   }
 
@@ -345,26 +299,25 @@ export class EditorRuntime {
     this.audio.stop();
   }
 
-  /** Plays one hit of a voice. Starts audio if this is the first gesture. */
-  async audition(role: RoleId, velocity = 110): Promise<void> {
-    if (!(await this.ensureAudio())) return;
-    this.audio.trigger(getRole(role).index, velocity);
+  /** Plays one hit of a track. Starts audio if this is the first gesture. */
+  async audition(track: TrackId): Promise<void> {
+    if (!isInstrumentId(track) || !(await this.ensureAudio())) return;
+    this.audio.trigger(getTrack(track).index, false);
   }
 
   /** Plays a hit only if audio is already running; never starts it. */
-  auditionIfRunning(role: RoleId, velocity: number): void {
-    if (this.audio.isReady && this.audio.status === 'running') {
-      this.audio.trigger(getRole(role).index, velocity);
+  auditionIfRunning(track: TrackId): void {
+    if (isInstrumentId(track) && this.audio.isReady && this.audio.status === 'running') {
+      this.audio.trigger(getTrack(track).index, false);
     }
   }
 
   // ---- Import and export ---------------------------------------------------
 
-  /** Renders one loop offline with a separate engine instance. */
+  /** Renders one loop of the selected rhythm offline, with a separate engine instance. */
   async renderLoop(sampleRate: number): Promise<LoopRender> {
     const { project } = this.store.getState();
-    const [wasm, kit] = await Promise.all([this.loadOfflineWasm(), this.kit(project.kit.id, sampleRate)]);
-    return renderLoop(wasm, project, kit, sampleRate);
+    return renderLoop(await this.loadOfflineWasm(), project, selectedPattern(project), sampleRate);
   }
 
   async exportWav(bitDepth: WavBitDepth = 24, sampleRate = 44100): Promise<void> {
@@ -380,7 +333,7 @@ export class EditorRuntime {
   async exportMidi(): Promise<void> {
     try {
       const { project } = this.store.getState();
-      const bytes = exportMidi(await this.loadOfflineWasm(), project);
+      const bytes = exportMidi(await this.loadOfflineWasm(), project, [selectedPattern(project)]);
       downloadBytes(`${exportBaseName(project)}.mid`, bytes, 'audio/midi');
     } catch (error) {
       this.store.notify('error', `The MIDI export failed: ${describe(error)}`);
@@ -399,12 +352,12 @@ export class EditorRuntime {
       this.store.notify('error', `${name} was not imported. Your current beat is unchanged.`, result.errors);
       return false;
     }
-    const project = onOfferedKit(result.project);
-    this.store.replaceProject(project);
-    const moved = movedKitNote(result.project, project);
+    this.store.replaceProject(result.project);
+    const earlier = result.changes.length > 0 ? ` It came from an earlier version. ${EARLIER_VERSION_NOTE}` : '';
     this.store.notify(
       'info',
-      `Imported “${project.name}”. Undo brings back the previous beat.${moved ? ` ${moved}` : ''}`,
+      `Imported “${result.project.name}”. Undo brings back the previous beat.${earlier}`,
+      result.changes,
     );
     return true;
   }
@@ -417,7 +370,6 @@ export class EditorRuntime {
       audioStatus: state.audioStatus,
       sampleRate: this.audio.sampleRate,
       stats: this.stats,
-      engineKit: this.engineKit,
       soundsSent: this.soundsSent,
       soundsTaken: this.soundsTaken,
       project: state.project,
@@ -425,10 +377,12 @@ export class EditorRuntime {
   }
 }
 
-/** What to tell the user when a beat had to move off a kit that is held back. */
-function movedKitNote(from: Project, to: Project): string | null {
-  if (from.kit.id === to.kit.id) return null;
-  return `It was made on the ${from.kit.id} kit, which is held back for now, so it plays on the ${to.kit.id}.`;
+const EARLIER_VERSION_NOTE = 'Its pattern is now Basic Rhythm 1.';
+
+async function fetchBytes(url: string): Promise<ArrayBuffer> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return response.arrayBuffer();
 }
 
 function describe(error: unknown): string {

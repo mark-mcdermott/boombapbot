@@ -43,13 +43,13 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor {
     void operator()(SnareEngine* engine) const { snare_engine_destroy(engine); }
   };
 
-  // Decodes the embedded kit and hands it to `engine`. Control thread only.
-  void commitEmbeddedKit(SnareEngine* engine);
+  // Synthesises the machine's sounds for `engine` and sets up its tracks and
+  // mix. Control thread only, before the engine is rendered.
+  void loadMachine(SnareEngine* engine);
 
   std::unique_ptr<SnareEngine, EngineDeleter> engine_;
   double engineSampleRate_ = 0.0;
   double tailSeconds_ = 0.0;
-  juce::String kitId_;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BoombapbotAudioProcessor)
 };

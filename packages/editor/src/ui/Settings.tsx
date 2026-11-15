@@ -2,15 +2,11 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Menu } from '@base-ui/react/menu';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { OFFERED_KIT_IDS, PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
+import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
 import { useEditorState, useRuntime } from './context';
 import { PanelNotes } from './HardwarePanel';
 import { ChevronIcon, CloseIcon, DownloadIcon, UploadIcon } from './icons';
-import { KitPicker } from './KitPicker';
-import { Segmented } from './Segmented';
 import { PatternActions, StatusBar } from './StatusBar';
-import { Transport } from './Transport';
-import type { EditorMode } from '../state/store';
 
 const NAME_FIELD_ID = 'sb-beat-name';
 
@@ -65,11 +61,11 @@ function ExportMenu() {
           <Menu.Popup className="sb-menu">
             <Menu.Item className="sb-menu-item" data-testid="export-wav" onClick={() => void runtime.exportWav(24)}>
               <span>WAV loop</span>
-              <span className="sb-menu-note">24-bit stereo, one bar</span>
+              <span className="sb-menu-note">24-bit stereo, one measure</span>
             </Menu.Item>
             <Menu.Item className="sb-menu-item" data-testid="export-wav-16" onClick={() => void runtime.exportWav(16)}>
               <span>WAV loop, 16-bit</span>
-              <span className="sb-menu-note">Stereo, one bar</span>
+              <span className="sb-menu-note">Stereo, one measure</span>
             </Menu.Item>
             <Menu.Item className="sb-menu-item" data-testid="export-midi" onClick={() => void runtime.exportMidi()}>
               <span>MIDI file</span>
@@ -102,14 +98,13 @@ function Group({ label, labelFor, children }: { label?: string; labelFor?: strin
 }
 
 interface SettingsProps {
-  /** Where the sheet mounts, so it inherits the editor's theme and kit tint. */
+  /** Where the sheet mounts, so it inherits the editor's theme. */
   container: RefObject<HTMLElement | null>;
 }
 
 /** The cog, and the sheet behind it that holds everything but the machine. */
 export function Settings({ container }: SettingsProps) {
   const runtime = useRuntime();
-  const mode = useEditorState((state) => state.mode);
   const [open, setOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -156,33 +151,7 @@ export function Settings({ container }: SettingsProps) {
               <Group label="Beat name" labelFor={NAME_FIELD_ID}>
                 <NameField />
               </Group>
-              <Group>
-                <Transport />
-              </Group>
-              {/* With one kit on offer there is nothing to choose. */}
-              {OFFERED_KIT_IDS.length > 1 ? (
-                <Group>
-                  <KitPicker />
-                </Group>
-              ) : null}
-              <Group label="Editor">
-                <Segmented<EditorMode>
-                  label="Editor"
-                  className="sb-segmented-fill"
-                  value={mode}
-                  onChange={(value) => runtime.store.setMode(value)}
-                  options={[
-                    { value: 'modern', label: 'Modern', testId: 'mode-modern' },
-                    { value: 'hardware', label: 'Hardware', testId: 'mode-hardware' },
-                  ]}
-                />
-                <p className="sb-hint">
-                  {mode === 'modern'
-                    ? 'A grid of every lane at once, with a velocity lane.'
-                    : 'The machine’s own faceplate, one instrument at a time.'}
-                </p>
-              </Group>
-              <Group label="Pattern">
+              <Group label="Rhythm">
                 <PatternActions />
               </Group>
               <Group label="File">
@@ -199,22 +168,21 @@ export function Settings({ container }: SettingsProps) {
                   <ExportMenu />
                 </div>
               </Group>
-              {mode === 'hardware' ? (
-                <Group>
-                  <PanelNotes />
-                </Group>
-              ) : null}
+              <Group>
+                <PanelNotes />
+              </Group>
               <Group>
                 <StatusBar />
               </Group>
               <Group>
                 <p className="sb-footnote">
-                  Keys: <kbd>Space</kbd> play or stop · arrows move between steps · <kbd>Enter</kbd> toggles a step ·{' '}
-                  <kbd>+</kbd> <kbd>−</kbd> change velocity · <kbd>A</kbd> accent · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
+                  Keys: <kbd>Space</kbd> start or stop · arrows move between steps and turn knobs ·{' '}
+                  <kbd>Enter</kbd> presses a step · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
                 </p>
                 <p className="sb-hint">
-                  v0.1 preview. The drum sounds are synthesised placeholders, not recordings of any hardware. Your
-                  beat is saved only in this browser; export the project file to keep a copy.
+                  v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not
+                  recordings of any hardware. Your beat is saved only in this browser; export the project file to keep
+                  a copy.
                 </p>
               </Group>
             </div>

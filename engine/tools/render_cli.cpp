@@ -2,10 +2,11 @@
 // reference output that the WebAssembly build is compared against.
 //
 //   boombapbot-render --project beat.json --contracts packages/contracts
-//       --assets assets [--kit 909] [--rate 44100] [--bits 24]
+//       [--rhythm 0] [--version a|b] [--rate 44100] [--bits 24]
 //       [--out loop.wav] [--midi beat.mid] [--events events.json]
 //
-// It also writes one synthesised sound as raw little-endian float samples:
+// It renders one measure of one rhythm as a seamless loop. It also writes one
+// synthesised sound as raw little-endian float samples:
 //
 //   boombapbot-render --synth 7 --raw cymbal.f32 [--rate 48000]
 //       [--tune 0.5] [--tone 0.5] [--decay 0.5] [--snappy 0.5]
@@ -47,11 +48,11 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> options;
   for (int i = 1; i + 1 < argc; i += 2) options[argv[i]] = argv[i + 1];
   if (options.count("--synth") && options.count("--raw")) return writeSound(options);
-  if (!options.count("--project") || !options.count("--contracts") || !options.count("--assets")) {
+  if (!options.count("--project") || !options.count("--contracts")) {
     std::fprintf(stderr,
-                 "usage: boombapbot-render --project FILE --contracts DIR --assets DIR\n"
-                 "         [--kit ID] [--rate HZ] [--bits 16|24] [--out FILE.wav]\n"
-                 "         [--midi FILE.mid] [--events FILE.json]\n");
+                 "usage: boombapbot-render --project FILE --contracts DIR [--rhythm N] [--version a|b]\n"
+                 "         [--rate HZ] [--bits 16|24] [--out FILE.wav] [--midi FILE.mid]\n"
+                 "         [--events FILE.json]\n");
     return 2;
   }
 
@@ -59,17 +60,21 @@ int main(int argc, char** argv) {
     const std::string contracts = options["--contracts"];
     const double rate = options.count("--rate") ? std::atof(options["--rate"].c_str()) : 44100.0;
     const int bits = options.count("--bits") ? std::atoi(options["--bits"].c_str()) : 24;
+    const int rhythm = options.count("--rhythm") ? std::atoi(options["--rhythm"].c_str()) : 0;
+    const int version = options.count("--version") && options["--version"] == "b" ? 1 : 0;
+    if (rhythm < 0 || rhythm * 2 >= SNARE_PATTERNS) throw std::runtime_error("no such rhythm");
+    const int index = rhythm * 2 + version;
 
     const snare::io::Roles roles = snare::io::loadRoles(contracts);
-    const snare::io::Project project = snare::io::loadProject(options["--project"], roles);
-    const std::string kitId = options.count("--kit") ? options["--kit"] : project.kitId;
+    const snare::io::Machine machine = snare::io::loadMachine(contracts, roles);
+    const snare::io::Project project = snare::io::loadProject(options["--project"], machine);
 
     SnareEngine* engine = snare_engine_create(rate);
     if (!engine) throw std::runtime_error("unsupported sample rate");
     snare_engine_enable_event_log(engine, 8192);
-    snare_engine_commit_kit(engine, snare::io::loadKit(contracts, options["--assets"], kitId, roles));
-    snare::io::applyProject(engine, project);
-    const snare::io::Rendered loop = snare::io::renderLoop(engine, project.bpm, rate);
+    snare::io::applyProject(engine, machine, project);
+    const snare::io::Rendered loop =
+        snare::io::renderLoop(engine, project.patterns[index], index, project.bpm, rate);
 
     if (options.count("--out")) {
       snare::wav::writeFile(options["--out"],
@@ -85,30 +90,31 @@ int main(int argc, char** argv) {
       out << "[";
       for (std::size_t i = 0; i < events.size(); ++i) {
         out << (i ? "," : "") << "\n  {\"frame\": " << static_cast<long long>(events[i].frame)
-            << ", \"step\": " << events[i].step << ", \"role\": " << events[i].role
-            << ", \"velocity\": " << events[i].velocity << "}";
+            << ", \"step\": " << events[i].step << ", \"track\": " << events[i].track
+            << ", \"accent\": " << events[i].accent << ", \"pattern\": " << events[i].pattern << "}";
       }
       out << "\n]\n";
     }
 
     if (options.count("--midi")) {
-      const int roleCount = static_cast<int>(roles.ids.size());
-      std::vector<std::uint8_t> flat(static_cast<std::size_t>(roleCount) * SNARE_STEPS);
-      for (int role = 0; role < roleCount; ++role) {
-        for (int step = 0; step < SNARE_STEPS; ++step) {
-          flat[static_cast<std::size_t>(role * SNARE_STEPS + step)] = project.velocities[role][step];
-        }
+      // The note of the sound each track is switched to.
+      std::uint8_t notes[SNARE_TRACKS]{};
+      for (int track = 1; track < SNARE_TRACKS; ++track) {
+        notes[track] = roles.gmNotes[static_cast<std::size_t>(snare::io::trackSlot(machine, project, track))];
       }
-      const int size = snare_midi_export(flat.data(), roleCount, roles.gmNotes.data(), project.bpm,
-                                         project.swing, nullptr, 0);
+      const std::uint8_t sequence[1] = {static_cast<std::uint8_t>(index)};
+      const int plain = snare::io::midiVelocity(snare::io::kPlainHit);
+      const int accented = snare::io::midiVelocity(snare::io::accentedHit(project.accent));
+      const int size = snare_midi_export(project.patterns, SNARE_PATTERNS, sequence, 1, notes, plain, accented,
+                                         project.bpm, nullptr, 0);
       std::vector<std::uint8_t> midi(static_cast<std::size_t>(size));
-      snare_midi_export(flat.data(), roleCount, roles.gmNotes.data(), project.bpm, project.swing,
+      snare_midi_export(project.patterns, SNARE_PATTERNS, sequence, 1, notes, plain, accented, project.bpm,
                         midi.data(), size);
       snare::wav::writeFile(options["--midi"], midi);
     }
 
-    std::printf("%s: kit %s, %.2f bpm, swing %.1f, %zu frames at %.0f Hz\n", project.name.c_str(),
-                kitId.c_str(), project.bpm, project.swing, loop.left.size(), rate);
+    std::printf("%s: rhythm %d%s, %.2f bpm, %zu frames at %.0f Hz\n", project.name.c_str(), rhythm + 1,
+                version ? "B" : "A", project.bpm, loop.left.size(), rate);
     snare_engine_destroy(engine);
   } catch (const std::exception& error) {
     std::fprintf(stderr, "boombapbot-render: %s\n", error.what());

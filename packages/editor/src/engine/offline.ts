@@ -1,6 +1,6 @@
-import { ROLES, type Project } from '@boombapbot/contracts';
-import type { DecodedKit } from './kit-loader';
-import { SNARE_STEPS, type EngineEvent, type SnareWasm } from './wasm-engine';
+import { tempoBpm, type Project } from '@boombapbot/contracts';
+import { applyProject, enginePatterns, midiVelocities, trackNotes } from './machine';
+import type { EngineEvent, SnareWasm } from './wasm-engine';
 
 export interface LoopRender {
   left: Float32Array;
@@ -10,69 +10,59 @@ export interface LoopRender {
   events: EngineEvent[];
 }
 
-/** Velocity rows in engine role order. */
-export function patternRows(project: Project): number[][] {
-  return ROLES.map((role) => {
-    const lane = project.pattern.lanes.find((candidate) => candidate.role === role.id);
-    return lane ? lane.steps.slice(0, SNARE_STEPS) : new Array<number>(SNARE_STEPS).fill(0);
-  });
-}
-
 /**
- * Renders one seamless loop with a separate engine instance, using the same
- * scheduler and voices as live playback. Two bars are played and the second
- * is returned, so tails from the end of the bar wrap into its start.
+ * Renders one seamless loop of a pattern with a separate engine instance,
+ * using the same scheduler and voices as live playback. Two measures are
+ * played and the second is returned, so tails from the end of the measure
+ * wrap into its start.
  */
-export function renderLoop(
-  wasm: SnareWasm,
-  project: Project,
-  kit: DecodedKit,
-  sampleRate: number,
-): LoopRender {
+export function renderLoop(wasm: SnareWasm, project: Project, pattern: number, sampleRate: number): LoopRender {
   const blockSize = 1024;
   const engine = wasm.createEngine(sampleRate, blockSize);
   try {
     engine.enableEventLog(1024);
-    engine.loadKit(kit.voices);
-    engine.setTempo(project.bpm);
-    engine.setSwing(project.swing);
-    patternRows(project).forEach((row, role) => engine.setRow(role, row));
-    engine.playLoops(2);
+    applyProject(engine, project);
+    engine.cuePattern(pattern);
+    engine.playMeasures(2);
 
-    const loopFrames = wasm.loopFrames(project.bpm, sampleRate);
-    const left = new Float32Array(loopFrames);
-    const right = new Float32Array(loopFrames);
+    const ticks = wasm.patternTicks(enginePatterns(project.rhythms)[pattern]!);
+    const bpm = tempoBpm(project.tempo);
+    const start = wasm.tickFrame(ticks, bpm, sampleRate);
+    const end = wasm.tickFrame(ticks * 2, bpm, sampleRate);
+    const left = new Float32Array(end - start);
+    const right = new Float32Array(end - start);
     const blockLeft = new Float32Array(blockSize);
     const blockRight = new Float32Array(blockSize);
-    for (let done = 0; done < loopFrames * 2; ) {
-      const count = Math.min(blockSize, loopFrames * 2 - done);
+    for (let done = 0; done < end; ) {
+      const count = Math.min(blockSize, end - done);
       engine.render(blockLeft, blockRight, count);
-      // Keep only the second bar.
-      const from = Math.max(done, loopFrames);
-      if (done + count > loopFrames) {
+      // Keep only the second measure.
+      const from = Math.max(done, start);
+      if (done + count > start) {
         const skip = from - done;
-        left.set(blockLeft.subarray(skip, count), from - loopFrames);
-        right.set(blockRight.subarray(skip, count), from - loopFrames);
+        left.set(blockLeft.subarray(skip, count), from - start);
+        right.set(blockRight.subarray(skip, count), from - start);
       }
       done += count;
     }
 
     const events = engine
       .readEvents()
-      .filter((event) => event.frame >= loopFrames)
-      .map((event) => ({ ...event, frame: event.frame - loopFrames }));
+      .filter((event) => event.frame >= start)
+      .map((event) => ({ ...event, frame: event.frame - start }));
     return { left, right, sampleRate, events };
   } finally {
     engine.destroy();
   }
 }
 
-/** Standard MIDI File for the project's pattern: Type 1, drums on channel 10. */
-export function exportMidi(wasm: SnareWasm, project: Project): Uint8Array {
+/** Standard MIDI File of measures of the project's patterns: Type 1, drums on channel 10. */
+export function exportMidi(wasm: SnareWasm, project: Project, sequence: number[]): Uint8Array {
   return wasm.midiExport(
-    patternRows(project),
-    ROLES.map((role) => role.gmNote),
-    project.bpm,
-    project.swing,
+    enginePatterns(project.rhythms),
+    sequence,
+    trackNotes(project.sound),
+    midiVelocities(project.sound),
+    tempoBpm(project.tempo),
   );
 }

@@ -424,7 +424,7 @@ function draw808(panel) {
     const live = [...liveKnobs].find((knob) => Math.abs(knob.cx - cx) < 0.5 && Math.abs(knob.cy - cy) < 0.5);
     if (!live) return smallKnob(cx, cy, { cap: C.capWhite, deg: restDeg });
     liveKnobs.delete(live);
-    if (live.r !== 22) throw new Error(`the ${live.role} ${live.param} knob must have radius 22`);
+    if (live.r !== 22) throw new Error(`the ${live.track} ${live.param} knob must have radius 22`);
     return smallKnob(cx, cy, { cap: C.capWhite, deg: live.photoDeg, live: true });
   };
   COLUMNS.forEach((column, index) => {
@@ -447,12 +447,12 @@ function draw808(panel) {
   });
   if (liveKnobs.size > 0) {
     const [stray] = liveKnobs;
-    throw new Error(`the ${stray.role} ${stray.param} knob is not where the drawing has a knob`);
+    throw new Error(`the ${stray.track} ${stray.param} knob is not where the drawing has a knob`);
   }
 
   // Model name on its rule, and master volume.
   out.push(line(545, 704, 1688, 704, { stroke: C.orange, 'stroke-width': 2.5 }));
-  out.push(text(1584, 696, panel.kit, { size: 50, fill: C.orange, weight: 400, spacing: 1 }));
+  out.push(text(1584, 696, panel.id, { size: 50, fill: C.orange, weight: 400, spacing: 1 }));
   for (let i = 1; i <= 7; i += 1) {
     const deg = -120 + (i - 1) * 28;
     const [dx, dy] = polar(1768, 688, 50, deg);
@@ -578,7 +578,7 @@ function draw808(panel) {
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ` +
     `font-family="${FONT}">` +
-    el('title', {}, `${panel.kit} panel`) +
+    el('title', {}, `${panel.id} panel`) +
     defs() +
     out.join('') +
     '</svg>\n'

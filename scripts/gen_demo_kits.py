@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Generates the temporary demo drum kits for boombapbot v0.1.
+"""Generates the demo drum kits kept for the 606, 707 and 909.
 
 Every sound is synthesised here from oscillators and a seeded noise source.
-Nothing is sampled from a real instrument or from any recording. The four
-kits are loosely voiced after the character of the 606, 707, 808 and 909 so
-that a kit switch is clearly audible; they are placeholders until licensed
-recordings replace them.
+Nothing is sampled from a real instrument or from any recording. The kits are
+loosely voiced after the character of those machines. The editor does not
+load them at the moment: it is the 808 alone, whose sounds the engine
+synthesises itself (engine/src/synth808.cpp). They stay, with their check, for
+when the other machines come back.
 
 Uses only the Python standard library. Output is 16-bit mono PCM at 44.1 kHz.
 
@@ -283,20 +284,6 @@ def kit_707() -> dict[str, list[float]]:
     }
 
 
-def kit_808() -> dict[str, list[float]]:
-    hat = [263.0, 400.0, 421.0, 474.0, 587.0, 845.0]
-    return {
-        "kick": kick(1.10, 110, 47, 0.03, 0.45, 0.18, 1.2, 8081),
-        "snare": snare(0.30, [(178, 0.07, 0.8), (331, 0.045, 0.5)], 1800, 11000, 0.09, 0.7, 0, 8082),
-        "closed_hat": metal(0.09, hat, 7000, 9000, 1.5, 0.018, 0.0, 8083),
-        "open_hat": metal(0.60, hat, 7000, 9000, 1.5, 0.16, 0.0, 8084),
-        "low_tom": tom(0.60, 140, 96, 0.03, 0.16, 0.08, 0, 8085),
-        "high_tom": tom(0.45, 240, 172, 0.025, 0.12, 0.08, 0, 8086),
-        "clap": clap(0.35, 1100, 1.2, 400, 3, 0.011, 0.07, 8087),
-        "cymbal": metal(1.50, hat, 4000, 7000, 0.7, 0.08, 0.1, 8088, 0.5, 0.45),
-    }
-
-
 def kit_909() -> dict[str, list[float]]:
     hat = [320.0, 492.0, 550.0, 728.0, 912.0, 1210.0]
     return {
@@ -311,7 +298,7 @@ def kit_909() -> dict[str, list[float]]:
     }
 
 
-KITS = {"606": kit_606, "707": kit_707, "808": kit_808, "909": kit_909}
+KITS = {"606": kit_606, "707": kit_707, "909": kit_909}
 
 
 # --------------------------------------------------------------------------

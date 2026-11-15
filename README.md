@@ -3,13 +3,18 @@
 A drums-only beat maker. This is **v0.1**: the web editor, running entirely on
 your machine with no accounts, secrets or external services.
 
-![The page as it opens: the 808 panel playing the starter beat](docs/screenshots/hardware-808.jpg)
+![The page as it opens: the 808 panel playing the starter rhythm](docs/screenshots/hardware-808.jpg)
 
-Open the editor and the page is a drum machine. Press its start button and you
-hear a beat; toggle steps and turn the tempo knob on the faceplate. Everything
-else is behind the cog in the footer: change swing, move to a grid of every
-lane at once, and export the beat as WAV, MIDI or a project file. Reload and
-your beat is still there.
+Open the editor and the page is a drum machine: the 808. Press its start
+button and you hear a rhythm; pick an instrument with the selector, press step
+buttons to write it, and turn the tempo and sound knobs on the faceplate.
+Everything else is behind the cog in the footer: the beat's name, undo, and
+export as WAV, MIDI or a project file. Reload and your beat is still there.
+
+The aim is the whole machine, worked from its operation manual. This build has
+its sounds, its twelve tracks and its accent; pattern memory, the mode
+selector, fill-ins and rhythm tracks are in progress, and
+[what is modelled so far](#the-machine) says exactly where it stands.
 
 The 808 panel above is original artwork, drawn in code by
 [`scripts/draw-faceplates.mjs`](scripts/draw-faceplates.mjs).
@@ -62,46 +67,58 @@ pnpm serve
 
 - **A page that is just the machine.** The mascot and wordmark, the drum
   machine, and a footer with a cog. The cog opens a settings sheet holding
-  the beat name, tempo (40 to 240 BPM), swing (50 to 75%), the choice of
-  editor, undo and redo, a starter beat, a clear action, import and export,
-  and the save and audio status.
-- **Hardware editor (prototype).** What the page opens on: the 808 panel,
-  with step buttons, instrument selector, start/stop and tempo knob on the
-  faceplate. The tone, decay, tuning and snappy knobs of the bass drum,
-  snare, low and high tom, cymbal and open hi-hat turn, and each one
-  re-synthesises its own sound as it moves. See
-  [Hardware mode](#hardware-mode-and-faceplates).
-- **Modern editor.** Chosen in settings, and editing the same beat: eight
-  lanes by 16 steps in 4/4, play and stop, per-step velocity and voice
-  audition pads. Works with mouse, keyboard and touch; on a phone each lane
-  wraps into two rows of eight.
-- **The 808, for now.** The page offers one kit and has no kit picker. Kits
-  and panels for the 606, 707 and 909 are in the repository and still tested,
-  but held back until the 808 is finished;
-  `packages/contracts/data/offered-kits.json` lists what the page offers. All
-  four kits are synthesised placeholders, not recordings of hardware. See
-  [Demo kits](#demo-kits-provenance).
-- **A kit never changes the beat.** Steps belong to stable drum roles (`kick`,
-  `snare`, `closed_hat`, ...). A kit maps roles to samples, so changing kit
-  changes the sound and nothing else. That is why a draft or an imported
-  project made on a held-back kit opens on the 808 with every step intact,
-  and says so. Where a kit has no native voice for a role (the 606 has no
-  clap) the manifest names a stand-in and the lane is marked.
-- **One engine everywhere.** A C++20 sampler and scheduler (`engine/`) with a
-  C ABI: a fixed pool of 64 overlapping voices, hat chokes, deterministic
-  voice stealing, and step times computed from the audio sample clock. The
-  browser runs its WebAssembly build inside an AudioWorklet; export uses a
-  second instance of the same engine. There is no separate JavaScript engine.
-- **Saving.** The draft is saved to this browser on every edit and restored on
-  reload. A draft that fails validation is set aside, not deleted.
+  the beat name, undo and redo, a reset to the starter rhythms, a clear
+  action, import and export, and the save and audio status.
+- **The 808's sounds, synthesised.** All sixteen: bass drum, snare, three
+  toms and three congas, rim shot and claves, hand clap and maracas, cowbell,
+  cymbal, open and closed hi-hat. The engine builds each one from its knob
+  settings, so the tone, decay, tuning and snappy knobs on the faceplate
+  re-synthesise their own sound as they turn. It is a model made by ear,
+  not a recording and not checked against hardware. See
+  [Sounds](#sounds-provenance).
+- **Twelve tracks, steps that are on or off, and an accent.** The instrument
+  selector has its twelve positions: the accent and eleven instruments. A
+  step is on or off; an accented step makes every instrument sounding on it
+  louder. A track has one voice, as on the machine, and the two hi-hats cut
+  each other off.
+- **One engine everywhere.** A C++20 drum machine core (`engine/`) with a C
+  ABI: a bank of 32 one-measure patterns of up to 32 steps at three, four,
+  six or eight steps to the beat, a fixed pool of voices with deterministic
+  stealing, and step times computed from the audio sample clock on a
+  24-ticks-per-beat timeline. The browser runs its WebAssembly build inside
+  an AudioWorklet; export uses a second instance of the same engine. There is
+  no separate JavaScript engine.
+- **Saving.** The project is saved to this browser on every edit and restored
+  on reload. A draft that fails validation is set aside, not deleted. A draft
+  or file from the earlier one-pattern version is brought up to date: its
+  pattern becomes Basic Rhythm 1, and the page says what could not come with
+  it (per-step velocity and swing, which the machine does not have).
 - **Import and export.** Project JSON (validated with Zod; an invalid file is
-  rejected and never replaces the current beat), a one-bar seamless PCM WAV
-  loop (24 or 16-bit stereo, 44.1 kHz), and a Type 1 Standard MIDI File with a
-  tempo track and General MIDI drum notes on channel 10.
+  rejected and never replaces the current beat), a one-measure seamless PCM
+  WAV loop (24 or 16-bit stereo, 44.1 kHz), and a Type 1 Standard MIDI File
+  with a tempo track and General MIDI drum notes on channel 10.
 
 ![Settings open over the 808 panel](docs/screenshots/settings.jpg)
 
-![The Modern editor playing the starter beat](docs/screenshots/modern.png)
+## The machine
+
+What the build models, against the operation manual:
+
+| Part of the machine | State |
+| --- | --- |
+| Sixteen sounds from their tone, decay, tuning and snappy knobs | Modelled by ear |
+| Twelve-position instrument selector, sixteen step buttons and lamps, start/stop | Working |
+| Accent track | Working; its level is fixed until the accent knob is connected |
+| Tempo, 40 to 300 | Working from one knob; the fine knob is not yet separate |
+| Level knobs, master volume, the five voice switches (congas, claves, maracas) | In the engine and the project file; not yet on the panel |
+| 1st and 2nd part, step count, pre-scale, A and B versions, 16 rhythms | In the engine and the project file; the panel writes the 1st part of Basic Rhythm 1 A |
+| Mode selector, clear, tap, intro and fill-in, auto fill-in, A/AB/B switch | Not yet |
+| Rhythm tracks: compose, play, chaining | Stored in the project file; not yet playable |
+| DIN sync, trigger outputs, separate outputs, pedals | Left out: a browser cannot do them |
+
+Settings lists the same gaps under "what still needs checking", and
+[`docs/follow-ups.md`](docs/follow-ups.md) has the order they are being done
+in.
 
 ## Tests
 
@@ -110,69 +127,56 @@ Run in this order; later steps use what earlier ones build.
 | Command | What it checks |
 | --- | --- |
 | `pnpm kits:check` | The committed demo WAVs match their generator script |
-| `pnpm faceplates:check` | The committed faceplate drawings match their generator script, and carry no brand names |
-| `pnpm build:engine` | Builds the native engine and runs CTest: scheduler timing across buffer sizes, ten minutes without drift, voices and stealing, hat chokes, swing and loop length, kit mapping across all four kits, MIDI, every synthesised sound across its knobs, no allocation inside the render call, and the header compiling as C |
+| `pnpm faceplates:check` | The committed faceplate drawing matches its generator script, and carries no brand names |
+| `pnpm build:engine` | Builds the native engine and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, the contract files, no allocation inside the render call, and the header compiling as C |
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
-| `pnpm test:unit` | Vitest against the WASM build: rendering through every kit, native versus WASM output for the loop and for each synthesised sound, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, project schema, import, draft recovery, store |
-| `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet, the engine and all kit samples resolve in the built site, the engine needs no shared memory, and only committed, credited faceplate images are included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, grid, keyboard, touch layout, playback activation, kit switch, reload, downloads, import rejection, hardware mode on all four panels, accessibility scan |
+| `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store |
+| `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine needs no shared memory, no sample files ship, and only the committed faceplate is included |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position and knob, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
 
-### Results on the machine that built this
+### Results
 
-Linux x86-64, 4 cores, GCC 13, Node 22.23.4, Emscripten 6.0.13, Chromium
-headless via Playwright 1.63.
-
-| Step | Result |
-| --- | --- |
-| `pnpm kits:check` | 32 of 32 files match |
-| `pnpm build:engine` | 6 CTest suites, 29 cases, all pass with GCC 13 and Clang 18, and under AddressSanitizer and UndefinedBehaviorSanitizer |
-| `pnpm build:wasm` | 40 KB module, one import, no threads or shared memory |
-| `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 47 of 47 pass |
-| `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 38 of 38 pass |
-| VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on Linux; processor self-test passes 137 of 137 checks |
-
-The same sequence was also run from a fresh clone with a fresh Emscripten
-install, start to finish, and passed. The WASM binary from that run was
-byte-identical to the working build.
-
-### Results on macOS
-
-Run again after the page was reduced to the machine and a settings sheet, on
-macOS 26.6 on Apple silicon with Apple clang 21, Node 22.23.4, Emscripten
-6.0.13 and the same headless Chromium. The VST3 spike was not built here.
+Run on macOS 26.6 on Apple silicon with Apple clang 21, Node 22.23.4,
+Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 
 | Step | Result |
 | --- | --- |
-| `pnpm kits:check` | 32 of 32 files match |
+| `pnpm kits:check` | 24 of 24 files match |
 | `pnpm faceplates:check` | 1 of 1 drawing matches |
-| `pnpm build:engine` | 9 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
-| `pnpm build:wasm` | 40,353-byte module; a clean rebuild was byte-identical |
+| `pnpm build:engine` | 11 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
+| `pnpm build:wasm` | 59,798-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 59 of 59 pass |
+| `pnpm test:unit` | 81 of 81 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 48 pass; 2 kit picker tests are skipped while one kit is offered |
+| `pnpm test:e2e` | 36 of 36 pass |
+| VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
+
+Earlier versions of this build were also run on Linux x86-64 with GCC 13 and
+Clang 18. This version has not been: CI covers both compilers, and has not run
+on it yet.
 
 Two cross-checks worth knowing about:
 
-- **Native versus WASM.** For the shared fixture through all four kits, event
-  frames are identical and audio agrees to within two 24-bit steps. The
-  remaining difference is the last bit of `pow`, `tanh`, `sin` and `cos`
-  between glibc and the WASM libc.
-- **Buffer size.** Output is bit-identical whether rendered one frame at a
-  time or in blocks of 17, 64, 128, 441, 1024 or 4096 frames.
+- **Native versus WASM.** For six rhythms of the shared fixture, at four
+  pre-scales and with a 2nd part, event frames are identical, audio agrees to
+  within two 24-bit steps and the MIDI files are the same byte for byte. Each
+  synthesised sound agrees to within one 24-bit step. The remaining
+  difference is the last bit of `exp`, `tanh`, `sin` and `cos` between the
+  native C library and the WASM one.
+- **Buffer size.** Output is bit-identical whether rendered in one call, one
+  frame at a time, or in blocks of 17, 64, 128, 441, 1024 or 4096 frames.
 
 ### What was not verified
 
-- **Listening.** Nobody has heard this build. Audio was checked numerically:
-  the worklet reports nonzero output, exported WAVs contain audio at the right
-  length, and native and WASM renders agree. How the kits sound, and how the
-  latency feels, needs ears.
+- **Listening.** The owner has heard an earlier build; nobody has listened
+  to this one closely, and nobody has compared it with a real machine. Audio
+  is checked numerically: the worklet reports nonzero output, exported WAVs
+  contain audio at the right length, and native and WASM renders agree. How
+  the sounds, the accent and the knobs feel needs ears.
 - **The GitHub Actions workflow** has not run on GitHub. Every command in it
   was run locally from a fresh clone.
 - **Browsers other than headless Chromium.** Firefox, Safari and iOS have not
@@ -180,9 +184,9 @@ Two cross-checks worth knowing about:
   not on a phone.
 - **Deployment.** The Vercel adapter build was produced locally, never
   deployed.
-- **Hardware behaviour.** The panels are checked against the photos, not
-  against the machines' manuals. Settings lists what is unverified for the
-  panel on screen.
+- **Hardware behaviour.** The panel follows the operation manual, read from
+  a scan. Nothing has been checked against a machine. Settings lists what is
+  not modelled yet.
 - **Device performance.** See the benchmark below; it says nothing about
   phones.
 
@@ -191,78 +195,68 @@ start button.
 
 ### Engine load
 
-`pnpm bench` renders a worst case through the WASM engine: every lane on every
-step at 300 BPM with the longest-tailed kit, in 128-frame blocks, with the
-voice pool full the whole time. On the build machine ten minutes of that
-rendered in 7.7 seconds, about 78 times faster than real time, with output
-bounded and 64 voices sounding. This is a desktop number.
+`pnpm bench` renders a worst case through the WASM engine: every track on
+every step of a 32-step measure of thirty-second notes at 300 BPM, with every
+decay knob fully right, in 128-frame blocks. On the machine above that ran
+about 250 times faster than real time, with the slowest block taking 0.3 ms
+of its 2.67 ms budget and output bounded. A track has one voice, so the pool
+of 64 is never full in normal use. This is a desktop number.
 
-## Demo kits: provenance
+## Sounds: provenance
 
 The 808's sounds are synthesised by the engine itself, in
 [`engine/src/synth808.cpp`](engine/src/synth808.cpp): decaying tuned
 oscillators, filtered noise and six square waves for the metallic voices,
 each built from its knob settings. It is a model made by ear. It has not been
-compared with a real machine, and nothing in it is sampled. The 808 files in
-`assets/kits/` are no longer played.
+compared with a real machine, and nothing in it is sampled. The browser
+synthesises each sound on its main thread at the device's sample rate and
+hands the samples to the audio thread; no sound files ship.
 
-Every sound in `assets/kits/` is generated by
-[`scripts/gen_demo_kits.py`](scripts/gen_demo_kits.py) from oscillators and
-seeded noise, using only the Python standard library. Nothing is sampled from
-a real drum machine or any recording, and there is no third-party material.
-The kits are voiced loosely after the character of the four machines so that
-a kit switch is obvious; they are placeholders until licensed recordings
-replace them. Details and how to replace them:
+`assets/kits/` still holds generated sample kits for the 606, 707 and 909,
+made by [`scripts/gen_demo_kits.py`](scripts/gen_demo_kits.py) from
+oscillators and seeded noise. The editor does not load them at the moment;
+they are kept, with their check, for when those machines come back. Details:
 [`assets/kits/README.md`](assets/kits/README.md).
 
-## Hardware mode and faceplates
+## The faceplate
 
-Hardware mode puts step buttons, lamps, an instrument selector, transport and
-a tempo knob where they are on each machine's faceplate. The layout comes from
-manifests in `packages/contracts/data/panels/`. State, keyboard and
-accessibility do not depend on the picture.
+The panel puts step buttons, lamps, the instrument selector, start/stop and
+the knobs where they are on the machine. The layout comes from the manifest
+in `packages/contracts/data/panels/808.panel.json`. State, keyboard and
+accessibility do not depend on the picture: if the image fails to load, the
+panel is drawn from the same layout.
 
-A faceplate image ships only once it is cleared, and only for a kit the page
-offers, so today the build carries the drawn 808 and nothing else. There are
-two places an image can live:
+A faceplate image ships only once it is cleared. There are two places an
+image can live:
 
 - **`assets/faceplates/`** holds cleared images. They are committed, and each
   has a provenance entry in
   [`assets/faceplates/README.md`](assets/faceplates/README.md). The 808 is
   original artwork drawn by `scripts/draw-faceplates.mjs` from the panel's
-  own layout, so it needs no credit. The 606, 707 and 909 are the owner's
-  edits of Creative Commons photographs with the brand names removed.
+  own layout, so it needs no credit. The folder also keeps the owner's edits
+  of Creative Commons photographs of the 606, 707 and 909, with the brand
+  names removed, for when those machines come back. No build ships them.
 - **`misc/assets/`** holds the owner's unedited originals. It is ignored by
   git. `pnpm dev` uses what it finds there; `pnpm build` never does.
 
-Where a machine has no image, or its image fails to load, the panel is drawn
-from the same layout.
+A photograph would need its author, source and licence shown under it, and
+`check-build` fails a build that ships one without a credit and a provenance
+entry. A drawing avoids the photograph's copyright and credit; it does not
+settle the manufacturer's rights in the look of the machine.
 
-The photographs are Creative Commons works (CC BY-SA 3.0 and CC BY-SA 2.0)
-by Midas Wouters, Speculos and Brandon Daniel. Their licences require credit,
-so the app shows the author, source and licence under any photograph it
-displays, and `check-build` fails a build that ships one without a credit and
-a provenance entry. A drawing avoids the photograph's copyright and credit;
-it does not settle the manufacturer's rights in the look of the machine.
-
-Hardware mode is a prototype. Edits made on a panel and in Modern are the same
-beat. Hits on lanes a panel has no control for are kept, keep playing, and are
-pointed out under the panel. What each panel does not yet model (accent
-tracks, A/B variation, first and second parts, scale, chaining and so on) is
-listed in settings while that panel is showing, and in
-[`docs/follow-ups.md`](docs/follow-ups.md). On a phone, where the faceplate's
-own selector is too small to tap, an instrument strip and a fit-to-screen
-button sit under the panel.
+On a phone, where the faceplate's own selector is too small to tap, an
+instrument strip and a fit-to-screen button sit under the panel, and start
+and the tempo are docked at the bottom of the screen.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
 | `engine/` | C++20 core, C ABI, WASM target, CTest suites, `boombapbot-render` tool |
-| `packages/contracts/` | Zod project schema, drum roles, kit manifests, panel geometry, shared fixture |
+| `packages/contracts/` | Zod project schema, the machine's tracks and sounds, panel geometry, shared fixtures |
 | `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft |
 | `apps/site/` | Astro site; the editor is a client-only island |
-| `assets/kits/` | Generated demo kit WAVs |
+| `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
 | `assets/faceplates/` | Cleared faceplate images, drawn or photographed, and their provenance |
 | `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |
 | `e2e/` | Playwright tests |
@@ -272,22 +266,27 @@ button sit under the panel.
 ## File formats
 
 - **Project JSON** (`.boombapbot.json`, `format: "boombapbot.project"`,
-  `schemaVersion: 1`): one 16-step pattern, tempo, swing, kit ID and version,
-  and eight lanes keyed by role with a velocity per step. This is the v0.1
-  draft and interchange file. It is **not** the future portable `.boombapbot`
-  bundle, which will carry user samples next to a manifest.
-- **WAV**: one bar, rendered as the second of two bars so tails wrap into the
-  start and it loops cleanly. The length is exactly `240 / BPM` seconds.
+  `schemaVersion: 2`): everything the machine remembers. Tempo as the knob's
+  click stop and a fine adjustment; every knob and voice switch; sixteen
+  rhythms, each with a pre-scale, the lengths of its 1st and 2nd part, and an
+  A and a B version of twelve tracks of 32 steps; twelve rhythm tracks; and
+  where the panel's switches stand. Version 1 files (one 16-step pattern with
+  velocities and swing) still open, as Basic Rhythm 1. This is the draft and
+  interchange file. It is **not** the future portable `.boombapbot` bundle.
+- **WAV**: one measure of the selected rhythm, rendered as the second of two
+  so tails wrap into the start and it loops cleanly.
 - **MIDI**: Type 1, 480 PPQ, a tempo track and a drum track on channel 10.
-  Notes are placed with the same timeline function the audio scheduler uses,
-  so swing matches.
+  Notes are placed on the same tick timeline the audio scheduler uses, 20
+  MIDI ticks to an engine tick, so they cannot drift apart. An accented step
+  is written at a higher velocity.
 
 ## VST3 compile spike
 
-`plugins/vst3/` is a small JUCE VST3 instrument that links the same engine and
-plays the built-in 808 demo kit from MIDI notes, placing each hit on its
-sample offset inside the block. It is a separate CMake project and is not part
-of the web build. JUCE 8.0.9 is fetched at configure time, not vendored.
+`plugins/vst3/` is a small JUCE VST3 instrument that links the same engine,
+synthesises the 808's sounds at the host's sample rate and plays them from
+MIDI notes, placing each hit on its sample offset inside the block. It is a
+separate CMake project and is not part of the web build. JUCE 8.0.9 is
+fetched at configure time, not vendored.
 
 ```bash
 cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -301,13 +300,13 @@ cmake --build build/vst3
 ctest --test-dir build/vst3 --output-on-failure
 ```
 
-On Linux this compiles and produces a `.vst3` bundle that exports the VST3
-entry points and contains the engine, and the processor self-test passes. That
-is all it shows. **Windows and macOS builds, scanning in a host, the Steinberg
-validator, transport sync and state recall in a host are all pending** until
-they are run on those systems. JUCE 8 is AGPLv3 or commercial, and a licence
-path has to be chosen before anything built from it is distributed. Details,
-Linux packages and the full not-verified list:
+On macOS this compiles and produces an Apple silicon `.vst3` bundle that
+exports the VST3 entry points and contains the engine, and the processor
+self-test passes. That is all it shows. An earlier version was built the same
+way on Linux; this one has not been. **Scanning in a host, the Steinberg validator, transport sync and
+state recall in a host are all pending**, as is a Windows build. JUCE 8 is
+AGPLv3 or commercial, and a licence path has to be chosen before anything
+built from it is distributed. Details and the full not-verified list:
 [`plugins/vst3/README.md`](plugins/vst3/README.md).
 
 ## Next milestone
@@ -315,17 +314,14 @@ Linux packages and the full not-verified list:
 In the build spec's sequence, v0.1 covers the web half of "prove the platform
 stack" and most of "build one end-to-end beat". Next:
 
-1. Have a person listen to it, on a desktop and a phone, and fix what they
-   hear.
-2. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
+1. Finish the machine: every control on the panel, pattern memory and
+   writing, manual play with intros and fill-ins, then rhythm tracks. The
+   order is in [`docs/follow-ups.md`](docs/follow-ups.md).
+2. Have a person listen to it, on a desktop and a phone, beside a real
+   machine if one can be found, and fix what they hear.
+3. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
    AVAudioEngine and Oboe on mobile, and the VST3 in a real host on Windows
-   and macOS. Prerequisites for each are in
-   [`docs/follow-ups.md`](docs/follow-ups.md).
-3. Replace the demo kits with licensed recordings, recording rights and
-   provenance for them as was done for the faceplates.
-4. Validate one machine's panel workflow against its manual and sign off its
-   control profile, then the other three.
-5. Grow the project document: multiple patterns, arrangement, per-lane mix,
-   and the portable bundle.
+   and macOS.
+4. Bring back the 606, 707 and 909, each with its own sounds and panel.
 
 Cloud sync, accounts, billing, signing and store submission come after that.

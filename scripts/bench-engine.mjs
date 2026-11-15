@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Worst-case load on the WebAssembly engine: every lane hits on every step at
-// the fastest tempo with the longest-tailed kit, rendered in 128-frame blocks
-// as an AudioWorklet would. Reports how much faster than real time it runs.
+// Worst-case load on the WebAssembly engine: every track hits on every step of
+// a 32-step measure of thirty-second notes at the fastest tempo, with every
+// decay knob fully right, rendered in 128-frame blocks as an AudioWorklet
+// would. Reports how much faster than real time it runs.
 //
 //   node scripts/bench-engine.mjs [seconds] [sampleRate]
 //
@@ -25,32 +26,33 @@ for (const entry of WebAssembly.Module.imports(module)) {
 const x = new WebAssembly.Instance(module, imports).exports;
 x._initialize?.();
 
-function readWav(path) {
-  const bytes = readFileSync(path);
-  const frames = bytes.readUInt32LE(40) / 2;
-  const pcm = new Float32Array(frames);
-  for (let i = 0; i < frames; i += 1) pcm[i] = bytes.readInt16LE(44 + i * 2) / 32768;
-  return { pcm, rate: bytes.readUInt32LE(24) };
+const TRACKS = 12;
+const SOUNDS = 16;
+const engine = x.snare_engine_create(sampleRate);
+
+// Every sound at its longest. A sound's number is also its slot.
+const params = x.malloc(24);
+for (let sound = 0; sound < SOUNDS; sound += 1) {
+  const view = new DataView(x.memory.buffer);
+  view.setInt32(params, sound, true);
+  for (const offset of [4, 8, 16]) view.setFloat32(params + offset, 0.5, true);
+  view.setFloat32(params + 12, 1, true);
+  view.setUint32(params + 20, 0, true);
+  if (x.snare_engine_synth_sound(engine, params) !== 0) throw new Error(`sound ${sound} was rejected`);
 }
 
-const roles = JSON.parse(readFileSync(join(root, 'packages/contracts/data/roles.json'), 'utf8')).roles;
-const kit = JSON.parse(readFileSync(join(root, 'packages/contracts/data/kits/808.kit.json'), 'utf8'));
-const engine = x.snare_engine_create(sampleRate);
-const handle = x.snare_kit_create();
-for (const role of roles) {
-  const voice = kit.voices[role.id];
-  const { pcm, rate } = readWav(join(root, 'assets', kit.assetBase, voice.file));
-  const pointer = x.malloc(pcm.length * 4);
-  new Float32Array(x.memory.buffer).set(pcm, pointer / 4);
-  // No choke groups here: chokes free voices, and this run wants the pool full.
-  x.snare_kit_set_voice(handle, role.index, pointer, pcm.length, 1, rate, voice.gain, voice.pan, 0);
-  x.free(pointer);
-}
-x.snare_engine_commit_kit(engine, handle);
+// No choke groups here: chokes free voices, and this run wants the pool busy.
+for (let track = 1; track < TRACKS; track += 1) x.snare_engine_set_track(engine, track, track - 1, 0, 0);
+
+const pattern = x.malloc(52);
+const view = new DataView(x.memory.buffer);
+for (let track = 0; track < TRACKS; track += 1) view.setUint32(pattern + track * 4, 0xffffffff, true);
+view.setUint8(pattern + 48, 16);
+view.setUint8(pattern + 49, 16);
+view.setUint8(pattern + 50, 8);
+view.setUint8(pattern + 51, 0);
+if (x.snare_engine_set_pattern(engine, 0, pattern) !== 0) throw new Error('the pattern was rejected');
 x.snare_engine_set_tempo(engine, 300);
-for (const role of roles) {
-  for (let step = 0; step < 16; step += 1) x.snare_engine_set_step(engine, role.index, step, 127);
-}
 x.snare_engine_play(engine);
 
 const left = x.malloc(block * 4);

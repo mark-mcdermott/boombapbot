@@ -13,7 +13,8 @@
 namespace snare {
 namespace {
 
-constexpr int kTicksPerStep = SNARE_MIDI_PPQ / 4;
+// MIDI ticks in one engine tick. Both divide the quarter note evenly.
+constexpr int kMidiPerTick = SNARE_MIDI_PPQ / SNARE_TICKS_PER_BEAT;
 constexpr int kNoteTicks = SNARE_MIDI_PPQ / 8;  // a thirty-second note
 constexpr std::uint8_t kDrumChannel = 9;        // channel 10
 
@@ -74,48 +75,94 @@ void appendTrack(Writer& file, const Writer& track) {
 }  // namespace
 }  // namespace snare
 
-extern "C" {
+namespace snare {
+namespace {
 
-int32_t snare_midi_step_tick(int step_index, double swing_percent) {
-  return static_cast<int32_t>(snare::roundFrame(
-      snare::stepTime(step_index, swing_percent) * snare::kTicksPerStep));
+struct Signature {
+  std::int32_t tick;
+  std::uint8_t numerator;
+  std::uint8_t denominatorPower;
+};
+
+// A measure's length as a time signature, when it has one: a 12-step measure
+// of eighth-note triplets is 4/4, but seven of those steps are not a meter.
+bool signatureOf(int measureTicks, Signature& out) {
+  const int units[4] = {SNARE_TICKS_PER_BEAT, SNARE_TICKS_PER_BEAT / 2, SNARE_TICKS_PER_BEAT / 4,
+                        SNARE_TICKS_PER_BEAT / 8};
+  for (int i = 0; i < 4; ++i) {
+    if (measureTicks % units[i] == 0 && measureTicks / units[i] <= 255) {
+      out.numerator = static_cast<std::uint8_t>(measureTicks / units[i]);
+      out.denominatorPower = static_cast<std::uint8_t>(2 + i);
+      return true;
+    }
+  }
+  return false;
 }
 
-int32_t snare_midi_export(const uint8_t* velocities, int32_t roles,
-                          const uint8_t* notes, double bpm,
-                          double swing_percent, uint8_t* out,
+std::uint8_t velocityOf(std::int32_t value) {
+  return static_cast<std::uint8_t>(std::min(127, std::max(1, value)));
+}
+
+}  // namespace
+}  // namespace snare
+
+extern "C" {
+
+int32_t snare_midi_export(const SnarePattern* patterns, int32_t pattern_count,
+                          const uint8_t* sequence, int32_t measures,
+                          const uint8_t* track_notes, int32_t plain_velocity,
+                          int32_t accent_velocity, double bpm, uint8_t* out,
                           int32_t capacity) {
   using namespace snare;
-  if (!velocities || !notes || roles <= 0 || roles > SNARE_MAX_ROLES) {
+  if (!patterns || !sequence || !track_notes || pattern_count <= 0 || measures <= 0 || measures > 4096) {
     return SNARE_ERR_BAD_ARGUMENT;
   }
   if (!(bpm > 0.0)) return SNARE_ERR_BAD_ARGUMENT;
   bpm = clampBpm(bpm);
-  const std::int32_t loopTicks = SNARE_STEPS * kTicksPerStep;
 
   std::vector<NoteEvent> events;
-  for (int step = 0; step < SNARE_STEPS; ++step) {
-    const std::int32_t tick = snare_midi_step_tick(step, swing_percent);
-    for (int role = 0; role < roles; ++role) {
-      const std::uint8_t velocity = velocities[role * SNARE_STEPS + step];
-      if (velocity == 0) continue;
-      const std::uint8_t note = notes[role] & 0x7f;
-      const std::uint8_t clamped = velocity > 127 ? 127 : velocity;
-      events.push_back({tick, 1, note, clamped});
-      events.push_back({std::min(tick + kNoteTicks, loopTicks), 0, note, 0});
+  std::vector<Signature> signatures;
+  std::int32_t measureStart = 0;
+  for (int measure = 0; measure < measures; ++measure) {
+    if (sequence[measure] >= pattern_count) return SNARE_ERR_BAD_ARGUMENT;
+    const SnarePattern& pattern = patterns[sequence[measure]];
+    if (!validShape(pattern.len1, pattern.len2, pattern.steps_per_beat)) return SNARE_ERR_BAD_ARGUMENT;
+    const int steps = pattern.len1 + pattern.len2;
+    const int stepLength = stepTicks(pattern.steps_per_beat) * kMidiPerTick;
+    const int measureLength = steps * stepLength;
+
+    Signature signature{measureStart, 0, 0};
+    if (signatureOf(measureLength / kMidiPerTick, signature) &&
+        (signatures.empty() || signatures.back().numerator != signature.numerator ||
+         signatures.back().denominatorPower != signature.denominatorPower)) {
+      signatures.push_back(signature);
     }
+
+    for (int played = 0; played < steps; ++played) {
+      const std::uint32_t bit = 1u << stepPosition(played, pattern.len1);
+      const std::int32_t tick = measureStart + played * stepLength;
+      const std::uint8_t velocity =
+          velocityOf((pattern.rows[0] & bit) != 0 ? accent_velocity : plain_velocity);
+      for (int track = 1; track < SNARE_TRACKS; ++track) {
+        if ((pattern.rows[track] & bit) == 0) continue;
+        const std::uint8_t note = track_notes[track] & 0x7f;
+        events.push_back({tick, 1, note, velocity});
+        events.push_back({tick + std::min(kNoteTicks, stepLength), 0, note, 0});
+      }
+    }
+    measureStart += measureLength;
   }
+  const std::int32_t endTick = measureStart;
   std::stable_sort(events.begin(), events.end(),
                    [](const NoteEvent& a, const NoteEvent& b) {
                      if (a.tick != b.tick) return a.tick < b.tick;
                      return a.on < b.on;
                    });
 
-  // Track 0: tempo map. Its length is one loop so hosts see the right bar.
+  // Track 0: tempo and meter. Its length is the whole piece so hosts see the
+  // right number of bars.
   Writer tempo;
   tempo.metaText(0, 0x03, "boombapbot");
-  const std::uint8_t signature[4] = {4, 2, 24, 8};  // 4/4
-  tempo.meta(0, 0x58, signature, 4);
   const auto microseconds =
       static_cast<std::uint32_t>(std::floor(60000000.0 / bpm + 0.5));
   const std::uint8_t tempoData[3] = {
@@ -123,7 +170,13 @@ int32_t snare_midi_export(const uint8_t* velocities, int32_t roles,
       static_cast<std::uint8_t>(microseconds >> 8),
       static_cast<std::uint8_t>(microseconds)};
   tempo.meta(0, 0x51, tempoData, 3);
-  tempo.meta(static_cast<std::uint32_t>(loopTicks), 0x2f, nullptr, 0);
+  std::int32_t tempoCursor = 0;
+  for (const Signature& signature : signatures) {
+    const std::uint8_t data[4] = {signature.numerator, signature.denominatorPower, 24, 8};
+    tempo.meta(static_cast<std::uint32_t>(signature.tick - tempoCursor), 0x58, data, 4);
+    tempoCursor = signature.tick;
+  }
+  tempo.meta(static_cast<std::uint32_t>(endTick - tempoCursor), 0x2f, nullptr, 0);
 
   // Track 1: drum notes.
   Writer drums;
@@ -136,7 +189,7 @@ int32_t snare_midi_export(const uint8_t* velocities, int32_t roles,
     drums.byte(event.note);
     drums.byte(event.velocity);
   }
-  drums.meta(static_cast<std::uint32_t>(loopTicks - cursor), 0x2f, nullptr, 0);
+  drums.meta(static_cast<std::uint32_t>(endTick - cursor), 0x2f, nullptr, 0);
 
   Writer file;
   file.text("MThd");

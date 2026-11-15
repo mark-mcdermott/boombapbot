@@ -1,12 +1,6 @@
 import { z } from 'zod';
-import panel606 from '../data/panels/606.panel.json';
-import panel707 from '../data/panels/707.panel.json';
 import panel808 from '../data/panels/808.panel.json';
-import panel909 from '../data/panels/909.panel.json';
-import { KIT_IDS, type KitId } from './kit';
-import { SOUND_PARAMS } from './sound';
-import { ROLE_IDS, type RoleId } from './roles';
-import { STEP_COUNT } from './project';
+import { INSTRUMENT_IDS, PART_STEPS, SOUND_PARAMS, TRACK_IDS } from './machine';
 
 /**
  * Hardware panel manifests: control geometry and behaviour notes for the
@@ -31,8 +25,8 @@ const knobSchema = z.object({
 
 const voicePositionSchema = z.object({
   label: z.string().min(1).max(12),
-  /** Missing when the position has no equivalent in this build. */
-  role: z.enum(ROLE_IDS).optional(),
+  /** The track this position selects. */
+  track: z.enum(TRACK_IDS),
   /** Pointer angle for rotary selectors. */
   deg: z.number().optional(),
   hit: rectSchema,
@@ -41,8 +35,7 @@ const voicePositionSchema = z.object({
 export const panelManifestSchema = z.object({
   format: z.literal('boombapbot.panel'),
   schemaVersion: z.literal(1),
-  id: z.enum(KIT_IDS),
-  kit: z.enum(KIT_IDS),
+  id: z.literal('808'),
   name: z.string().min(1).max(40),
   faceplate: z.object({
     /** File name in assets/faceplates, or in misc/assets during development. */
@@ -88,7 +81,7 @@ export const panelManifestSchema = z.object({
   wells: z.array(rectSchema),
   steps: z
     .array(z.object({ hit: rectSchema, button: rectSchema, led: pointSchema }))
-    .length(STEP_COUNT),
+    .length(PART_STEPS),
   ledRadius: z.number().positive(),
   /** True when the photo shows the step lamps lit, so unlit ones need dimming. */
   ledsLitInPhoto: z.boolean(),
@@ -111,7 +104,7 @@ export const panelManifestSchema = z.object({
   knobs: z
     .array(
       knobSchema.extend({
-        role: z.enum(ROLE_IDS),
+        track: z.enum(INSTRUMENT_IDS),
         param: z.enum(SOUND_PARAMS),
         /** Pointer angles with the knob fully left and fully right. */
         minDeg: z.number(),
@@ -123,7 +116,7 @@ export const panelManifestSchema = z.object({
     kind: z.enum(['rotary', 'keys']),
     label: z.string(),
     knob: knobSchema.optional(),
-    positions: z.array(voicePositionSchema).min(1),
+    positions: z.array(voicePositionSchema).length(TRACK_IDS.length),
   }),
   /** Behaviour that still needs checking against the machine's manual. */
   pending: z.array(z.string()),
@@ -133,28 +126,5 @@ export type PanelManifest = z.infer<typeof panelManifestSchema>;
 export type PanelRect = z.infer<typeof rectSchema>;
 export type FaceplateCredit = NonNullable<PanelManifest['faceplate']['credit']>;
 
-export const PANELS: Readonly<Record<KitId, PanelManifest>> = {
-  '606': panelManifestSchema.parse(panel606),
-  '707': panelManifestSchema.parse(panel707),
-  '808': panelManifestSchema.parse(panel808),
-  '909': panelManifestSchema.parse(panel909),
-};
-
-export function getPanel(id: KitId): PanelManifest {
-  return PANELS[id];
-}
-
-/** Roles this panel can select and program. */
-export function panelRoles(panel: PanelManifest): RoleId[] {
-  const roles: RoleId[] = [];
-  for (const position of panel.voiceSelect.positions) {
-    if (position.role && !roles.includes(position.role)) roles.push(position.role);
-  }
-  return roles;
-}
-
-/** Roles a beat may use that this panel has no control for. */
-export function rolesOutsidePanel(panel: PanelManifest): RoleId[] {
-  const onPanel = new Set(panelRoles(panel));
-  return ROLE_IDS.filter((role) => !onPanel.has(role));
-}
+/** The 808's panel. */
+export const PANEL: PanelManifest = panelManifestSchema.parse(panel808);

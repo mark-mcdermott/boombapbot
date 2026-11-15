@@ -4,7 +4,15 @@
 //
 //   ctest --test-dir build/vst3 --output-on-failure
 
+#include "Machine808.h"
 #include "PluginProcessor.h"
+
+// The engine's tool-side loader for the contract files. The engine builds with
+// -Wno-sign-conversion; JUCE's recommended warning flags turn it back on, so
+// it is silenced for this one header.
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE("-Wsign-conversion", "-Wshadow", "-Wfloat-equal", "-Wconversion")
+#include "project_io.h"
+JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
 #include <algorithm>
 #include <array>
@@ -27,23 +35,6 @@ void check(bool passed, const std::string& context, const std::string& what) {
 }
 
 // ---- MIDI -------------------------------------------------------------------
-
-// Notes from packages/contracts/data/roles.json.
-struct MappedNote {
-  const char* role;
-  int note;
-};
-
-constexpr std::array<MappedNote, 8> kMappedNotes{{
-    {"kick", 36},
-    {"snare", 38},
-    {"closed_hat", 42},
-    {"open_hat", 46},
-    {"low_tom", 45},
-    {"high_tom", 50},
-    {"clap", 39},
-    {"cymbal", 49},
-}};
 
 constexpr int kKick = 36;
 constexpr int kSnare = 38;
@@ -181,7 +172,7 @@ std::string text(const char* format, ...) {
   return line;
 }
 
-// A hit counts as audible above this peak. The quietest kit voice is far
+// A hit counts as audible above this peak. The quietest sound is far
 // louder; exact silence is checked separately as exact zeros.
 constexpr float kAudible = 0.001f;
 
@@ -236,14 +227,32 @@ void testTwoNotesInOneBlock(const std::string& context, double rate, int blockSi
 void testMappedNotesSound(const std::string& context, double rate, int blockSize) {
   const int total = framesFor(0.05, rate);
   int channel = 1;
-  for (const MappedNote& mapped : kMappedNotes) {
-    const Stereo audio = renderFresh(rate, blockSize, {noteOn(0, mapped.note, 100, channel)}, total);
+  for (const snare::plugin::TrackSpec& mapped : snare::plugin::kTracks) {
+    const Stereo audio = renderFresh(rate, blockSize, {noteOn(0, mapped.gmNote, 100, channel)}, total);
     const float level = peak(audio, 0, total);
-    check(level > kAudible, context,
-          text("note %d on channel %d (%s) makes sound (peak %.4f)", mapped.note, channel,
-               mapped.role, static_cast<double>(level)));
-    channel = channel % 16 + 3;  // 1, 4, 7, 10, 13, 16, 3, 6
+    check(level > kAudible && level <= 1.0f, context,
+          text("note %d on channel %d (%s) makes sound (peak %.4f)", mapped.gmNote, channel,
+               mapped.id, static_cast<double>(level)));
+    channel = channel % 16 + 3;  // 1, 4, 7, 10, 13, 16, 3, 6, 9, 12, 15
   }
+}
+
+// The machine has two loudnesses: a note is a plain hit or an accented one.
+void testVelocityChoosesAccent(const std::string& context, double rate, int blockSize) {
+  const int total = framesFor(0.05, rate);
+  const auto level = [&](int velocity) {
+    return peak(renderFresh(rate, blockSize, {noteOn(0, kKick, velocity)}, total), 0, total);
+  };
+  const float soft = level(1);
+  const float loud = level(127);
+  check(loud > soft * 1.3f, context,
+        text("velocity 127 is an accented hit, louder than velocity 1 (%.4f against %.4f)",
+             static_cast<double>(loud), static_cast<double>(soft)));
+  check(juce::exactlyEqual(level(snare::plugin::kAccentVelocity - 1), soft) &&
+            juce::exactlyEqual(level(snare::plugin::kAccentVelocity), loud),
+        context,
+        text("the accent starts at velocity %d and nothing else depends on velocity",
+             snare::plugin::kAccentVelocity));
 }
 
 void testIgnoredMessagesAreSilent(const std::string& context, double rate, int blockSize) {
@@ -256,24 +265,25 @@ void testIgnoredMessagesAreSilent(const std::string& context, double rate, int b
         "note-on with velocity 0 for the kick note gives exact silence");
 }
 
-// The hats share a choke group in the 808 kit: a closed hat stops a sounding
-// open hat.
+// The hats share a choke group: a closed hat stops a sounding open hat.
 void testClosedHatChokesOpenHat(const std::string& context, double rate, int blockSize) {
   const int chokeFrame = framesFor(0.05, rate);
   const int settled = chokeFrame + framesFor(0.010, rate);  // well past the choke fade
-  const int lateFrom = framesFor(0.20, rate);  // the closed hat itself has ended by here
-  const int total = framesFor(0.30, rate);
+  const int lateFrom = framesFor(0.25, rate);  // the closed hat itself has ended by here
+  const int total = framesFor(0.35, rate);
 
   const Stereo openOnly = renderFresh(rate, blockSize, {noteOn(0, kOpenHat, 100)}, total);
   const Stereo closedOnly = renderFresh(rate, blockSize, {noteOn(chokeFrame, kClosedHat, 100)}, total);
   const Stereo choked = renderFresh(
       rate, blockSize, {noteOn(0, kOpenHat, 100), noteOn(chokeFrame, kClosedHat, 100)}, total);
 
+  // The closed hat's first sample is zero and the open hat's fade starts from
+  // full level, so the two renders part ways on the frame after the note.
   const int beforeChoke = firstDifference(choked.left, openOnly.left);
-  check(beforeChoke == chokeFrame, context,
-        text("open hat then closed hat at frame %d: identical to the open hat alone until frame %d "
-             "(first difference at %d)",
-             chokeFrame, chokeFrame, beforeChoke));
+  check(beforeChoke == chokeFrame + 1, context,
+        text("open hat then closed hat at frame %d: identical to the open hat alone up to that "
+             "frame (first difference at %d)",
+             chokeFrame, beforeChoke));
 
   const int leftover = std::max(firstDifference(choked.left, closedOnly.left, settled),
                                 firstDifference(choked.right, closedOnly.right, settled));
@@ -285,10 +295,10 @@ void testClosedHatChokesOpenHat(const std::string& context, double rate, int blo
   const float chokedLate = peak(choked, lateFrom, total);
   const float openLate = peak(openOnly, lateFrom, total);
   check(allZero(choked, lateFrom, total), context,
-        text("choked open hat is exact silence from 0.20 s to 0.30 s (peak %.6f)",
+        text("choked open hat is exact silence from 0.25 s to 0.35 s (peak %.6f)",
              static_cast<double>(chokedLate)));
   check(openLate > kAudible, context,
-        text("un-choked open hat is still sounding from 0.20 s to 0.30 s (peak %.4f)",
+        text("un-choked open hat is still sounding from 0.25 s to 0.35 s (peak %.4f)",
              static_cast<double>(openLate)));
 }
 
@@ -321,10 +331,10 @@ juce::MemoryBlock saveState(juce::AudioProcessor& processor) {
   return block;
 }
 
-juce::MemoryBlock stateBlob(const juce::String& type, int schemaVersion, const juce::String& kitId) {
+juce::MemoryBlock stateBlob(const juce::String& type, int schemaVersion, const juce::String& machine) {
   juce::XmlElement xml(type);
   xml.setAttribute("schemaVersion", schemaVersion);
-  xml.setAttribute("kitId", kitId);
+  xml.setAttribute("machine", machine);
   juce::MemoryBlock block;
   juce::AudioProcessor::copyXmlToBinary(xml, block);
   return block;
@@ -340,10 +350,10 @@ void testState() {
 
   const std::unique_ptr<juce::XmlElement> xml =
       juce::AudioProcessor::getXmlFromBinary(saved.getData(), static_cast<int>(saved.getSize()));
-  const bool versioned = xml != nullptr && xml->getIntAttribute("schemaVersion") == 1 &&
-                         xml->getStringAttribute("kitId") == "808";
+  const bool versioned = xml != nullptr && xml->getIntAttribute("schemaVersion") == 2 &&
+                         xml->getStringAttribute("machine") == "808";
   check(versioned, context,
-        text("saved state carries schemaVersion 1 and kitId 808: %s",
+        text("saved state carries schemaVersion 2 and machine 808: %s",
              xml != nullptr
                  ? xml->toString(juce::XmlElement::TextFormat().singleLine().withoutHeader())
                        .toRawUTF8()
@@ -353,33 +363,55 @@ void testState() {
   target->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
   check(saveState(*target) == saved, context, "save -> load -> save is byte-for-byte identical");
 
-  // Each of these must be ignored and leave the saved state as it was.
+  // None of these may change what the plugin saves or how it plays.
   const char garbage[] = "\x01\x02 this is not a state blob \xff\xfe";
-  const juce::MemoryBlock wrongType = stateBlob("SomeOtherPlugin", 1, "808");
-  const juce::MemoryBlock newerSchema = stateBlob("BoombapbotPluginState", 99, "808");
-  const juce::MemoryBlock unknownKit = stateBlob("BoombapbotPluginState", 1, "no-such-kit");
+  const juce::MemoryBlock wrongType = stateBlob("SomeOtherPlugin", 2, "808");
+  const juce::MemoryBlock olderSchema = stateBlob("BoombapbotPluginState", 1, "808");
+  const juce::MemoryBlock otherMachine = stateBlob("BoombapbotPluginState", 2, "no-such-machine");
 
-  struct Rejected {
+  struct Tolerated {
     const char* name;
     const void* data;
     int size;
   };
-  const std::array<Rejected, 5> rejected{{
+  const std::array<Tolerated, 5> tolerated{{
       {"garbage bytes", garbage, static_cast<int>(sizeof(garbage))},
       {"an empty block", garbage, 0},
       {"XML of another type", wrongType.getData(), static_cast<int>(wrongType.getSize())},
-      {"a newer schemaVersion", newerSchema.getData(), static_cast<int>(newerSchema.getSize())},
-      {"an unknown kit id", unknownKit.getData(), static_cast<int>(unknownKit.getSize())},
+      {"a state from schemaVersion 1", olderSchema.getData(), static_cast<int>(olderSchema.getSize())},
+      {"an unknown machine", otherMachine.getData(), static_cast<int>(otherMachine.getSize())},
   }};
-  for (const Rejected& input : rejected) {
+  for (const Tolerated& input : tolerated) {
     target->setStateInformation(input.data, input.size);
     check(saveState(*target) == saved, context,
-          text("%s is ignored: saved state is unchanged", input.name));
+          text("%s leaves the saved state as it was", input.name));
   }
 
   const Stereo audio = render(*target, {noteOn(100, kKick, 100)}, 1024, 512);
   check(firstNonZero(audio.left) == 100, context,
-        "after the rejected loads the processor still plays a kick at frame 100");
+        "after those loads the processor still plays a kick at frame 100");
+}
+
+// The plugin's table of tracks is written out by hand. The contract files the
+// editor and the engine tools read are the source of truth for it.
+void testTracksMatchTheContracts() {
+  const std::string context = "contracts";
+  try {
+    const snare::io::Roles roles = snare::io::loadRoles(SNARE_CONTRACTS_DIR);
+    const snare::io::Machine machine = snare::io::loadMachine(SNARE_CONTRACTS_DIR, roles);
+    check(machine.tracks.size() == snare::plugin::kTracks.size() + 1, context,
+          "the machine has an accent track and one track for each of the plugin's");
+    for (const snare::plugin::TrackSpec& spec : snare::plugin::kTracks) {
+      const snare::io::Track& track = machine.tracks.at(static_cast<std::size_t>(spec.track));
+      const bool same = track.id == spec.id && track.sound == spec.sound &&
+                        roles.gmNotes.at(static_cast<std::size_t>(spec.sound)) == spec.gmNote &&
+                        std::abs(track.trim - static_cast<double>(spec.trim)) < 1e-6 &&
+                        std::abs(track.pan - spec.pan) < 1e-6f && track.chokeGroup == spec.chokeGroup;
+      check(same, context, text("track %d (%s) matches machine-808.json and roles.json", spec.track, spec.id));
+    }
+  } catch (const std::exception& error) {
+    check(false, context, text("the contract files could not be read: %s", error.what()));
+  }
 }
 
 }  // namespace
@@ -394,6 +426,7 @@ int main() {
       testKickAtOffset100(context, rate, blockSize);
       testTwoNotesInOneBlock(context, rate, blockSize);
       testMappedNotesSound(context, rate, blockSize);
+      testVelocityChoosesAccent(context, rate, blockSize);
       testIgnoredMessagesAreSilent(context, rate, blockSize);
       testClosedHatChokesOpenHat(context, rate, blockSize);
     }
@@ -401,6 +434,7 @@ int main() {
   testSampleRateChange();
   testUnsupportedSampleRate();
   testState();
+  testTracksMatchTheContracts();
 
   std::printf("%d checks, %d failed\n", checks, failures);
   return failures == 0 ? 0 : 1;

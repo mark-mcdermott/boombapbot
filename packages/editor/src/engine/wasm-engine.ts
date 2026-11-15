@@ -6,11 +6,13 @@
  * and in Node for tests. Nothing here touches the DOM or the network.
  */
 
-export const SNARE_STEPS = 16;
-export const SNARE_MAX_ROLES = 16;
+export const SNARE_ABI_VERSION = 2;
+const SNARE_TRACKS = 12;
 const ERR_QUEUE_FULL = -1;
 const BYTES_PER_EVENT = 24;
 const BYTES_PER_SOUND_PARAMS = 24;
+const BYTES_PER_PATTERN = 52;
+const PATTERN_LENGTHS_OFFSET = SNARE_TRACKS * 4;
 
 interface EngineExports {
   memory: WebAssembly.Memory;
@@ -18,81 +20,61 @@ interface EngineExports {
   malloc(size: number): number;
   free(pointer: number): void;
   snare_abi_version(): number;
+  snare_step_ticks(stepsPerBeat: number): number;
+  snare_pattern_ticks(pattern: number): number;
+  snare_frames_per_tick(bpm: number, sampleRate: number): number;
+  snare_tick_frame(ticks: number, bpm: number, sampleRate: number): number;
   snare_synth_frames(params: number, sampleRate: number): number;
   snare_synth_render(params: number, sampleRate: number, out: number, capacity: number): number;
-  snare_step_time(step: number, swing: number): number;
-  snare_frames_per_step(bpm: number, sampleRate: number): number;
-  snare_loop_frames(bpm: number, sampleRate: number, steps: number): number;
   snare_sound_create(frames: number, channels: number, sampleRate: number): number;
   snare_sound_data(sound: number): number;
   snare_sound_destroy(sound: number): void;
-  snare_kit_create(): number;
-  snare_kit_destroy(kit: number): void;
-  snare_kit_set_voice(
-    kit: number,
-    role: number,
-    pcm: number,
-    frames: number,
-    channels: number,
-    sampleRate: number,
-    gain: number,
-    pan: number,
-    chokeGroup: number,
-  ): number;
   snare_engine_create(sampleRate: number): number;
   snare_engine_destroy(engine: number): void;
   snare_engine_set_sound(engine: number, slot: number, sound: number): number;
-  snare_engine_commit_kit(engine: number, kit: number): number;
+  snare_engine_synth_sound(engine: number, params: number): number;
   snare_engine_collect(engine: number): number;
   snare_engine_set_tempo(engine: number, bpm: number): number;
-  snare_engine_set_swing(engine: number, swing: number): number;
-  snare_engine_set_master_gain(engine: number, gain: number): number;
-  snare_engine_set_slot(engine: number, slot: number, gain: number, pan: number, chokeGroup: number): number;
-  snare_engine_set_step(engine: number, role: number, step: number, velocity: number): number;
-  snare_engine_set_row(engine: number, role: number, velocities: number): number;
-  snare_engine_clear_pattern(engine: number): number;
+  snare_engine_set_track(engine: number, track: number, slot: number, pan: number, chokeGroup: number): number;
+  snare_engine_set_track_level(engine: number, track: number, gain: number): number;
+  snare_engine_set_accent(engine: number, plainGain: number, accentGain: number): number;
+  snare_engine_set_master_volume(engine: number, volume: number): number;
+  snare_engine_set_pattern(engine: number, index: number, pattern: number): number;
+  snare_engine_set_step(engine: number, pattern: number, track: number, step: number, on: number): number;
+  snare_engine_cue_pattern(engine: number, index: number): number;
   snare_engine_play(engine: number): number;
-  snare_engine_play_loops(engine: number, loops: number): number;
+  snare_engine_play_measures(engine: number, measures: number): number;
   snare_engine_stop(engine: number): number;
-  snare_engine_trigger(engine: number, role: number, velocity: number): number;
+  snare_engine_trigger(engine: number, track: number, accent: number): number;
   snare_engine_render(engine: number, left: number, right: number, frames: number): void;
   snare_engine_is_playing(engine: number): number;
   snare_engine_current_step(engine: number): number;
+  snare_engine_current_pattern(engine: number): number;
+  snare_engine_current_measure(engine: number): number;
   snare_engine_frames_rendered(engine: number): number;
+  snare_engine_stop_frame(engine: number): number;
   snare_engine_active_voices(engine: number): number;
   snare_engine_stolen_voices(engine: number): number;
   snare_engine_enable_event_log(engine: number, capacity: number): number;
   snare_engine_event_count(engine: number): number;
   snare_engine_read_events(engine: number, out: number, max: number): number;
   snare_midi_export(
-    velocities: number,
-    roles: number,
-    notes: number,
+    patterns: number,
+    patternCount: number,
+    sequence: number,
+    measures: number,
+    trackNotes: number,
+    plainVelocity: number,
+    accentVelocity: number,
     bpm: number,
-    swing: number,
     out: number,
     capacity: number,
   ): number;
-  snare_midi_step_tick(step: number, swing: number): number;
-}
-
-/** One voice of a kit, decoded and ready to hand to the engine. */
-export interface EngineVoice {
-  /** Engine role slot. */
-  role: number;
-  /** Interleaved float PCM. */
-  pcm: Float32Array;
-  frames: number;
-  channels: number;
-  sampleRate: number;
-  gain: number;
-  pan: number;
-  chokeGroup: number;
 }
 
 /** One synthesised sound: its number and its knob positions, each 0 to 1. */
 export interface SynthSound {
-  /** Sound number, which is also its role slot. */
+  /** Sound number, which is also its slot. */
   sound: number;
   tune: number;
   tone: number;
@@ -100,12 +82,34 @@ export interface SynthSound {
   snappy: number;
 }
 
+/** One measure, as the engine's pattern bank holds it. */
+export interface EnginePattern {
+  /** A bit mask per track: bit n is step n. Track 0 is the accent. */
+  rows: number[];
+  firstLength: number;
+  secondLength: number;
+  stepsPerBeat: number;
+}
+
+/** How one instrument track sounds: which slot it plays, and where. */
+export interface EngineTrack {
+  /** Engine track, 1 to 11. */
+  track: number;
+  slot: number;
+  pan: number;
+  chokeGroup: number;
+  /** Linear gain from the level knob. */
+  gain: number;
+}
+
 export interface EngineEvent {
   frame: number;
-  /** Pattern step, or -1 for an audition trigger. */
+  /** Step within the measure, or -1 for an audition. */
   step: number;
-  role: number;
-  velocity: number;
+  track: number;
+  accent: boolean;
+  /** Pattern playing, or -1 for an audition. */
+  pattern: number;
 }
 
 function buildImports(module: WebAssembly.Module): WebAssembly.Imports {
@@ -128,7 +132,7 @@ export class SnareWasm {
   constructor(instance: WebAssembly.Instance) {
     this.exports = instance.exports as unknown as EngineExports;
     this.exports._initialize?.();
-    if (this.exports.snare_abi_version() !== 1) {
+    if (this.exports.snare_abi_version() !== SNARE_ABI_VERSION) {
       throw new Error(`unsupported engine ABI ${this.exports.snare_abi_version()}`);
     }
   }
@@ -172,6 +176,27 @@ export class SnareWasm {
     return new WasmEngine(this, sampleRate, blockSize);
   }
 
+  writeSoundParams(pointer: number, settings: SynthSound): void {
+    const view = new DataView(this.exports.memory.buffer);
+    view.setInt32(pointer, settings.sound, true);
+    view.setFloat32(pointer + 4, settings.tune, true);
+    view.setFloat32(pointer + 8, settings.tone, true);
+    view.setFloat32(pointer + 12, settings.decay, true);
+    view.setFloat32(pointer + 16, settings.snappy, true);
+    view.setUint32(pointer + 20, 0, true);
+  }
+
+  writePattern(pointer: number, pattern: EnginePattern): void {
+    const view = new DataView(this.exports.memory.buffer);
+    for (let track = 0; track < SNARE_TRACKS; track += 1) {
+      view.setUint32(pointer + track * 4, pattern.rows[track] ?? 0, true);
+    }
+    view.setUint8(pointer + PATTERN_LENGTHS_OFFSET, pattern.firstLength);
+    view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 1, pattern.secondLength);
+    view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 2, pattern.stepsPerBeat);
+    view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 3, 0);
+  }
+
   /**
    * Synthesises one sound as mono PCM. Deterministic, and never called on the
    * audio thread: the result is handed to an engine like any other sample.
@@ -179,13 +204,7 @@ export class SnareWasm {
   synthesise(settings: SynthSound, sampleRate: number): Float32Array {
     const params = this.alloc(BYTES_PER_SOUND_PARAMS);
     try {
-      const view = new DataView(this.exports.memory.buffer);
-      view.setInt32(params, settings.sound, true);
-      view.setFloat32(params + 4, settings.tune, true);
-      view.setFloat32(params + 8, settings.tone, true);
-      view.setFloat32(params + 12, settings.decay, true);
-      view.setFloat32(params + 16, settings.snappy, true);
-      view.setUint32(params + 20, 0, true);
+      this.writeSoundParams(params, settings);
       const frames = this.exports.snare_synth_frames(params, sampleRate);
       if (frames <= 0) throw new Error(`sound ${settings.sound} could not be synthesised (${frames})`);
       const out = this.alloc(frames * Float32Array.BYTES_PER_ELEMENT);
@@ -201,48 +220,71 @@ export class SnareWasm {
     }
   }
 
-  /** Musical time of a step in sixteenths, using the playback timeline. */
-  stepTime(step: number, swing: number): number {
-    return this.exports.snare_step_time(step, swing);
+  /** Ticks in one measure of a pattern. */
+  patternTicks(pattern: EnginePattern): number {
+    const pointer = this.alloc(BYTES_PER_PATTERN);
+    try {
+      this.writePattern(pointer, pattern);
+      const ticks = this.exports.snare_pattern_ticks(pointer);
+      if (ticks <= 0) throw new Error(`the engine rejected a pattern (${ticks})`);
+      return ticks;
+    } finally {
+      this.exports.free(pointer);
+    }
   }
 
-  /** Frames in one 16-step loop. */
-  loopFrames(bpm: number, sampleRate: number): number {
-    return this.exports.snare_loop_frames(bpm, sampleRate, SNARE_STEPS);
-  }
-
-  midiStepTick(step: number, swing: number): number {
-    return this.exports.snare_midi_step_tick(step, swing);
+  /** Output frame of a tick counted from where playback started. */
+  tickFrame(ticks: number, bpm: number, sampleRate: number): number {
+    return this.exports.snare_tick_frame(ticks, bpm, sampleRate);
   }
 
   /**
-   * Builds a Standard MIDI File. `rows` holds 16 velocities per role, in role
-   * slot order, and `notes` one MIDI note per role.
+   * Builds a Standard MIDI File of `sequence`, which names the pattern played
+   * in each measure. `trackNotes` holds a MIDI note per track.
    */
-  midiExport(rows: ArrayLike<number>[], notes: ArrayLike<number>, bpm: number, swing: number): Uint8Array {
-    const roles = rows.length;
-    const velocities = this.alloc(roles * SNARE_STEPS);
-    const noteTable = this.alloc(roles);
+  midiExport(
+    patterns: EnginePattern[],
+    sequence: number[],
+    trackNotes: number[],
+    velocities: { plain: number; accented: number },
+    bpm: number,
+  ): Uint8Array {
+    const bank = this.alloc(patterns.length * BYTES_PER_PATTERN);
+    const order = this.alloc(sequence.length);
+    const notes = this.alloc(SNARE_TRACKS);
     try {
+      patterns.forEach((pattern, index) => this.writePattern(bank + index * BYTES_PER_PATTERN, pattern));
       const heap = this.heapU8;
-      rows.forEach((row, role) => {
-        for (let step = 0; step < SNARE_STEPS; step += 1) {
-          heap[velocities + role * SNARE_STEPS + step] = row[step] ?? 0;
-        }
-        heap[noteTable + role] = notes[role] ?? 0;
+      sequence.forEach((pattern, measure) => {
+        heap[order + measure] = pattern;
       });
-      const size = this.exports.snare_midi_export(velocities, roles, noteTable, bpm, swing, 0, 0);
+      for (let track = 0; track < SNARE_TRACKS; track += 1) heap[notes + track] = trackNotes[track] ?? 0;
+      const write = (out: number, capacity: number) =>
+        this.exports.snare_midi_export(
+          bank,
+          patterns.length,
+          order,
+          sequence.length,
+          notes,
+          velocities.plain,
+          velocities.accented,
+          bpm,
+          out,
+          capacity,
+        );
+      const size = write(0, 0);
       if (size <= 0) throw new Error(`MIDI export failed (${size})`);
       const out = this.alloc(size);
       try {
-        this.exports.snare_midi_export(velocities, roles, noteTable, bpm, swing, out, size);
+        write(out, size);
         return this.heapU8.slice(out, out + size);
       } finally {
         this.exports.free(out);
       }
     } finally {
-      this.exports.free(velocities);
-      this.exports.free(noteTable);
+      this.exports.free(bank);
+      this.exports.free(order);
+      this.exports.free(notes);
     }
   }
 }
@@ -255,7 +297,8 @@ export class WasmEngine {
   private handle: number;
   private readonly left: number;
   private readonly right: number;
-  private readonly row: number;
+  /** Scratch for one pattern or one set of sound parameters. */
+  private readonly scratch: number;
 
   constructor(wasm: SnareWasm, sampleRate: number, blockSize: number) {
     this.wasm = wasm;
@@ -265,7 +308,7 @@ export class WasmEngine {
     if (this.handle === 0) throw new Error(`engine rejected sample rate ${sampleRate}`);
     this.left = wasm.alloc(blockSize * 4);
     this.right = wasm.alloc(blockSize * 4);
-    this.row = wasm.alloc(SNARE_STEPS);
+    this.scratch = wasm.alloc(Math.max(BYTES_PER_PATTERN, BYTES_PER_SOUND_PARAMS));
   }
 
   private get x(): EngineExports {
@@ -302,85 +345,59 @@ export class WasmEngine {
     }
   }
 
-  setSlot(slot: number, gain: number, pan: number, chokeGroup: number): void {
-    this.send(() => this.x.snare_engine_set_slot(this.handle, slot, gain, pan, chokeGroup));
-  }
-
-  /** Stages a kit and hands it over. It becomes active at the next block. */
-  loadKit(voices: EngineVoice[]): void {
-    const kit = this.x.snare_kit_create();
-    for (const voice of voices) {
-      const bytes = voice.pcm.length * 4;
-      const pointer = this.wasm.alloc(bytes);
-      this.wasm.heapF32.set(voice.pcm, pointer / 4);
-      const result = this.x.snare_kit_set_voice(
-        kit,
-        voice.role,
-        pointer,
-        voice.frames,
-        voice.channels,
-        voice.sampleRate,
-        voice.gain,
-        voice.pan,
-        voice.chokeGroup,
-      );
-      this.x.free(pointer);
-      if (result !== 0) {
-        this.x.snare_kit_destroy(kit);
-        throw new Error(`engine rejected the sample for role ${voice.role} (${result})`);
-      }
-    }
-    this.x.snare_engine_commit_kit(this.handle, kit);
-  }
-
-  /** Frees replaced kits whose tails have ended. Returns how many remain. */
-  collect(): number {
-    return this.x.snare_engine_collect(this.handle);
-  }
-
-  setRow(role: number, velocities: ArrayLike<number>): void {
-    const heap = this.wasm.heapU8;
-    for (let step = 0; step < SNARE_STEPS; step += 1) {
-      heap[this.row + step] = velocities[step] ?? 0;
-    }
-    this.send(() => this.x.snare_engine_set_row(this.handle, role, this.row));
-  }
-
-  setStep(role: number, step: number, velocity: number): void {
-    this.send(() => this.x.snare_engine_set_step(this.handle, role, step, velocity));
-  }
-
-  clearPattern(): void {
-    this.send(() => this.x.snare_engine_clear_pattern(this.handle));
+  /** Synthesises a sound at this engine's rate and gives it to its slot. */
+  synthSound(settings: SynthSound): void {
+    this.wasm.writeSoundParams(this.scratch, settings);
+    const result = this.x.snare_engine_synth_sound(this.handle, this.scratch);
+    if (result !== 0) throw new Error(`sound ${settings.sound} could not be synthesised (${result})`);
   }
 
   setTempo(bpm: number): void {
     this.send(() => this.x.snare_engine_set_tempo(this.handle, bpm));
   }
 
-  setSwing(swing: number): void {
-    this.send(() => this.x.snare_engine_set_swing(this.handle, swing));
+  setTrack(track: EngineTrack): void {
+    this.send(() =>
+      this.x.snare_engine_set_track(this.handle, track.track, track.slot, track.pan, track.chokeGroup),
+    );
+    this.send(() => this.x.snare_engine_set_track_level(this.handle, track.track, track.gain));
   }
 
-  setMasterGain(gain: number): void {
-    this.send(() => this.x.snare_engine_set_master_gain(this.handle, gain));
+  /** Gains of a hit on a plain step and on an accented one. */
+  setAccent(plain: number, accented: number): void {
+    this.send(() => this.x.snare_engine_set_accent(this.handle, plain, accented));
+  }
+
+  setMasterVolume(volume: number): void {
+    this.send(() => this.x.snare_engine_set_master_volume(this.handle, volume));
+  }
+
+  setPattern(index: number, pattern: EnginePattern): void {
+    this.wasm.writePattern(this.scratch, pattern);
+    this.send(() => this.x.snare_engine_set_pattern(this.handle, index, this.scratch));
+  }
+
+  /** The pattern to play from the next measure, or from the start when stopped. */
+  cuePattern(index: number): void {
+    this.send(() => this.x.snare_engine_cue_pattern(this.handle, index));
   }
 
   play(): void {
     this.send(() => this.x.snare_engine_play(this.handle));
   }
 
-  /** Plays `loops` bars and then stops the scheduler. Tails ring on. */
-  playLoops(loops: number): void {
-    this.send(() => this.x.snare_engine_play_loops(this.handle, loops));
+  /** Plays `measures` measures and then stops the scheduler. Tails ring on. */
+  playMeasures(measures: number): void {
+    this.send(() => this.x.snare_engine_play_measures(this.handle, measures));
   }
 
   stop(): void {
     this.send(() => this.x.snare_engine_stop(this.handle));
   }
 
-  trigger(role: number, velocity: number): void {
-    this.send(() => this.x.snare_engine_trigger(this.handle, role, velocity));
+  /** One hit of an instrument track, outside the pattern. */
+  trigger(track: number, accent: boolean): void {
+    this.send(() => this.x.snare_engine_trigger(this.handle, track, accent ? 1 : 0));
   }
 
   /**
@@ -403,9 +420,13 @@ export class WasmEngine {
     return this.x.snare_engine_is_playing(this.handle) !== 0;
   }
 
-  /** Last step that fired, or -1 while stopped. */
+  /** Last step that fired within its measure, or -1 while stopped. */
   get currentStep(): number {
     return this.x.snare_engine_current_step(this.handle);
+  }
+
+  get currentPattern(): number {
+    return this.x.snare_engine_current_pattern(this.handle);
   }
 
   get framesRendered(): number {
@@ -438,8 +459,9 @@ export class WasmEngine {
         events.push({
           frame: view.getFloat64(offset, true),
           step: view.getInt32(offset + 8, true),
-          role: view.getInt32(offset + 12, true),
-          velocity: view.getInt32(offset + 16, true),
+          track: view.getInt32(offset + 12, true),
+          accent: view.getInt32(offset + 16, true) !== 0,
+          pattern: view.getInt32(offset + 20, true),
         });
       }
       return events;
@@ -453,7 +475,7 @@ export class WasmEngine {
     this.x.snare_engine_destroy(this.handle);
     this.x.free(this.left);
     this.x.free(this.right);
-    this.x.free(this.row);
+    this.x.free(this.scratch);
     this.handle = 0;
   }
 }

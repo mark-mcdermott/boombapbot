@@ -1,16 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_VELOCITY, countHits, findLane, serializeProject } from '@boombapbot/contracts';
+import { countHits, isStepOn, serializeProject, tempoBpm } from '@boombapbot/contracts';
 import {
   DRAFT_KEY,
+  LEGACY_DRAFT_KEY,
   UNREADABLE_DRAFT_KEY,
   loadDraft,
   saveDraft,
   type KeyValueStorage,
 } from '../src/state/draft-storage';
 import { exportBaseName, projectFileName, readProjectFile } from '../src/state/project-io';
-import { EditorStore } from '../src/state/store';
-import { fixturePath, loadFixture } from './helpers';
+import { EditorStore, editTarget } from '../src/state/store';
+import { fixturePath, legacyFixturePath, loadFixture } from './helpers';
 
 class MemoryStorage implements KeyValueStorage {
   readonly items = new Map<string, string>();
@@ -31,99 +32,128 @@ function makeStore(): EditorStore {
   let tick = 0;
   return new EditorStore({
     project: loadFixture(),
-    // Each action is a second apart, so nothing coalesces unless a test wants it.
     now: () => new Date(Date.UTC(2026, 0, 1, 0, 0, (tick += 1))),
     newId: () => 'test-id',
   });
 }
 
+function hits(store: EditorStore, rhythm = 0): number {
+  return countHits(store.getState().project.rhythms[rhythm]!, 'a');
+}
+
 describe('editor store', () => {
-  it('toggles steps and edits velocity', () => {
+  it('toggles a step of the selected track with a step button', () => {
     const store = makeStore();
-    expect(store.toggleStep('open_hat', 6)).toBe(DEFAULT_VELOCITY);
-    expect(findLane(store.getState().project.pattern, 'open_hat').steps[6]).toBe(DEFAULT_VELOCITY);
-    store.setVelocity('open_hat', 6, 300);
-    expect(findLane(store.getState().project.pattern, 'open_hat').steps[6]).toBe(127);
-    expect(store.toggleStep('open_hat', 6)).toBe(0);
-    expect(findLane(store.getState().project.pattern, 'open_hat').steps[6]).toBe(0);
+    const row = () => store.getState().project.rhythms[0]!.a.kick;
+    expect(editTarget(store.getState().project)).toEqual({ rhythm: 0, variation: 'a', track: 'kick', offset: 0 });
+    expect(isStepOn(row(), 1)).toBe(false);
+    expect(store.toggleStep(1)).toBe(true);
+    expect(isStepOn(row(), 1)).toBe(true);
+    expect(store.toggleStep(1)).toBe(false);
+    expect(isStepOn(row(), 1)).toBe(false);
   });
 
-  it('keeps rhythm, velocity, tempo and swing across a kit change', () => {
+  it('writes to the track the selector points at, the accent included', () => {
     const store = makeStore();
-    const before = store.getState().project;
-    for (const kit of ['606', '707', '909', '808'] as const) {
-      store.setKit(kit);
-      const after = store.getState().project;
-      expect(after.kit.id).toBe(kit);
-      expect(after.pattern).toBe(before.pattern); // not even copied
-      expect(after.bpm).toBe(before.bpm);
-      expect(after.swing).toBe(before.swing);
-      expect(after.pattern.lanes.map((lane) => lane.id)).toEqual(before.pattern.lanes.map((lane) => lane.id));
-    }
+    store.selectTrack('accent');
+    store.toggleStep(3);
+    store.selectTrack('cowbell');
+    store.toggleStep(5);
+    const { a } = store.getState().project.rhythms[0]!;
+    expect(isStepOn(a.accent, 3)).toBe(true);
+    expect(isStepOn(a.cowbell, 5)).toBe(true);
+    // Selecting a track is not something to undo.
+    store.undo();
+    store.undo();
+    expect(store.getState().canUndo).toBe(false);
+    expect(store.getState().project.panel.selector).toBe(8);
   });
 
-  it('clears the pattern and can undo it', () => {
+  it('leaves every other rhythm alone', () => {
     const store = makeStore();
-    const hits = countHits(store.getState().project.pattern);
+    const before = store.getState().project.rhythms;
+    store.toggleStep(2);
+    const after = store.getState().project.rhythms;
+    expect(after[0]).not.toBe(before[0]);
+    for (let index = 1; index < after.length; index += 1) expect(after[index]).toBe(before[index]);
+    expect(store.getState().project.rhythms[0]!.b).toBe(before[0]!.b);
+  });
+
+  it('clears the selected rhythm and can undo it', () => {
+    const store = makeStore();
+    const before = hits(store);
+    expect(before).toBeGreaterThan(0);
     store.clearPattern();
-    expect(countHits(store.getState().project.pattern)).toBe(0);
-    expect(store.getState().canUndo).toBe(true);
+    expect(hits(store)).toBe(0);
+    expect(hits(store, 1)).toBeGreaterThan(0);
     store.undo();
-    expect(countHits(store.getState().project.pattern)).toBe(hits);
+    expect(hits(store)).toBe(before);
     store.redo();
-    expect(countHits(store.getState().project.pattern)).toBe(0);
-    store.loadStarterBeat();
-    expect(countHits(store.getState().project.pattern)).toBeGreaterThan(10);
-  });
-
-  it('clamps tempo and swing', () => {
-    const store = makeStore();
-    store.setBpm(1000);
-    expect(store.getState().project.bpm).toBe(240);
-    store.setBpm(1);
-    expect(store.getState().project.bpm).toBe(40);
-    store.setSwing(99);
-    expect(store.getState().project.swing).toBe(75);
-    store.setSwing(Number.NaN);
-    expect(store.getState().project.swing).toBe(50);
-  });
-
-  it('collapses a slider drag into one undo step', () => {
-    const start = Date.UTC(2026, 0, 1);
-    let now = start;
-    const store = new EditorStore({ project: loadFixture(), now: () => new Date(now) });
-    for (const bpm of [125, 126, 127, 128]) {
-      now += 50;
-      store.setBpm(bpm);
-    }
-    expect(store.getState().project.bpm).toBe(128);
+    expect(hits(store)).toBe(0);
+    // Clearing an empty rhythm is not a step to undo.
+    store.clearPattern();
     store.undo();
-    expect(store.getState().project.bpm).toBe(124);
+    expect(hits(store)).toBe(before);
     expect(store.getState().canUndo).toBe(false);
   });
 
-  it('turns a sound knob without touching the beat or its undo history', () => {
+  it('puts the starter rhythms back, undoably', () => {
+    const store = makeStore();
+    const before = store.getState().project.rhythms;
+    store.loadStarterRhythms();
+    expect(hits(store, 1)).toBe(0);
+    expect(hits(store)).toBeGreaterThan(0);
+    expect(store.getState().project.rhythmTracks.every((track) => track.length === 0)).toBe(true);
+    store.undo();
+    expect(store.getState().project.rhythms).toEqual(before);
+    expect(store.getState().project.rhythmTracks[0]).toHaveLength(7);
+  });
+
+  it('sets the tempo as a click stop and a fine adjustment, inside the machine\'s range', () => {
+    const store = makeStore();
+    store.setBpm(133);
+    expect(tempoBpm(store.getState().project.tempo)).toBeCloseTo(133, 1);
+    expect(Number.isInteger(store.getState().project.tempo.coarse)).toBe(true);
+    store.setBpm(10);
+    expect(tempoBpm(store.getState().project.tempo)).toBe(40);
+    store.setBpm(1000);
+    expect(tempoBpm(store.getState().project.tempo)).toBe(300);
+    expect(store.getState().canUndo).toBe(false);
+  });
+
+  it('turns a sound knob without touching the rhythms or the undo history', () => {
     const store = makeStore();
     const before = store.getState().project;
-    store.setKnob('kick', 'decay', 0.8);
-    expect(store.getState().sound.kick).toEqual({ tune: 0.5, tone: 0.5, decay: 0.8, snappy: 0.5 });
-    expect(store.getState().sound.snare.decay).toBe(0.5);
-    store.setKnob('kick', 'decay', 4);
-    expect(store.getState().sound.kick.decay).toBe(1);
-    store.setKnob('kick', 'decay', -1);
-    expect(store.getState().sound.kick.decay).toBe(0);
-    expect(store.getState().project).toBe(before);
+    store.setKnob('snare', 'snappy', 0.9);
+    store.setKnob('snare', 'snappy', 4);
+    const after = store.getState().project;
+    expect(after.sound.knobs.snare.snappy).toBe(1);
+    expect(after.sound.knobs.kick).toBe(before.sound.knobs.kick);
+    expect(after.rhythms).toBe(before.rhythms);
     expect(store.getState().canUndo).toBe(false);
   });
 
-  it('shares selection between editors', () => {
+  it('keeps knobs and the tempo where they are when a step is undone', () => {
     const store = makeStore();
-    store.select('snare', 4);
-    store.setMode('hardware');
-    expect(store.getState().selectedRole).toBe('snare');
-    store.toggleStep('snare', 9);
-    store.setMode('modern');
-    expect(findLane(store.getState().project.pattern, 'snare').steps[9]).toBe(DEFAULT_VELOCITY);
+    store.toggleStep(1);
+    store.setKnob('kick', 'decay', 0.2);
+    store.setBpm(90);
+    store.setName('Kept');
+    store.undo();
+    const { project } = store.getState();
+    expect(isStepOn(project.rhythms[0]!.a.kick, 1)).toBe(false);
+    expect(project.sound.knobs.kick.decay).toBe(0.2);
+    expect(tempoBpm(project.tempo)).toBeCloseTo(90, 1);
+    expect(project.name).toBe('Kept');
+  });
+
+  it('tracks where playback is', () => {
+    const store = makeStore();
+    store.setPlaying(true);
+    store.setPosition(17, 4);
+    expect(store.getState()).toMatchObject({ playing: true, currentStep: 17, currentPattern: 4 });
+    store.setPlaying(false);
+    expect(store.getState()).toMatchObject({ playing: false, currentStep: -1, currentPattern: -1 });
   });
 });
 
@@ -132,20 +162,23 @@ describe('local draft', () => {
     const storage = new MemoryStorage();
     expect(loadDraft(storage)).toEqual({ status: 'empty' });
     const store = makeStore();
-    store.toggleStep('clap', 3);
+    store.selectTrack('clap');
+    store.toggleStep(3);
     store.setBpm(131);
-    store.setKit('909');
+    store.setKnob('cymbal', 'tone', 0.25);
     expect(saveDraft(storage, store.getState().project)).toEqual({ ok: true });
 
     const loaded = loadDraft(storage);
     expect(loaded.status).toBe('restored');
     if (loaded.status !== 'restored') return;
     expect(loaded.project).toEqual(store.getState().project);
+    expect(loaded.changes).toEqual([]);
   });
 
   it('sets an unreadable draft aside instead of deleting it', () => {
     const storage = new MemoryStorage();
-    const broken = serializeProject(loadFixture()).replace('"bpm": 124', '"bpm": "fast"');
+    const broken = serializeProject(loadFixture()).replace('"coarse": 13', '"coarse": "fast"');
+    expect(broken).toContain('"fast"');
     storage.items.set(DRAFT_KEY, broken);
     const loaded = loadDraft(storage);
     expect(loaded.status).toBe('unreadable');
@@ -159,6 +192,22 @@ describe('local draft', () => {
     const storage = new MemoryStorage();
     storage.items.set(DRAFT_KEY, serializeProject(loadFixture()).slice(0, 200));
     expect(loadDraft(storage).status).toBe('unreadable');
+  });
+
+  it('reads a draft left by an earlier version once, and says what changed', () => {
+    const storage = new MemoryStorage();
+    storage.items.set(LEGACY_DRAFT_KEY, readFileSync(legacyFixturePath, 'utf8'));
+    const loaded = loadDraft(storage);
+    expect(loaded.status).toBe('restored');
+    if (loaded.status !== 'restored') return;
+    expect(loaded.changes.length).toBeGreaterThan(0);
+    expect(countHits(loaded.project.rhythms[0]!, 'a')).toBe(22);
+    // Once saved in the current format, the old draft is not read again.
+    saveDraft(storage, { ...loaded.project, name: 'Moved on' });
+    const again = loadDraft(storage);
+    expect(again.status === 'restored' && again.project.name).toBe('Moved on');
+    expect(again.status === 'restored' && again.changes).toEqual([]);
+    expect(storage.getItem(LEGACY_DRAFT_KEY)).not.toBeNull();
   });
 
   it('reports a failed save without throwing', () => {
@@ -178,7 +227,13 @@ describe('project import', () => {
   it('rejects an invalid file and leaves the draft untouched', async () => {
     const store = makeStore();
     const before = store.getState().project;
-    for (const contents of ['{ nope', '{"format":"boombapbot.project","schemaVersion":1}', 'RIFF....WAVE']) {
+    for (const contents of [
+      '{ nope',
+      '{"format":"boombapbot.project","schemaVersion":1}',
+      '{"format":"boombapbot.project","schemaVersion":2}',
+      '{"format":"boombapbot.project","schemaVersion":3}',
+      'RIFF....WAVE',
+    ]) {
       const result = await readProjectFile(new Blob([contents]));
       expect(result.ok).toBe(false);
       if (result.ok) store.replaceProject(result.project);
@@ -186,16 +241,26 @@ describe('project import', () => {
     expect(store.getState().project).toBe(before);
   });
 
-  it('replaces the beat on a valid import and can undo it', async () => {
+  it('replaces the whole project on a valid import and can undo it', async () => {
     const store = makeStore();
+    store.setKnob('kick', 'decay', 0.1);
+    store.setName('Mine');
     store.clearPattern();
-    const result = await readProjectFile(new Blob([readFileSync(fixturePath)]));
+    const result = await readProjectFile(new Blob([readFileSync(legacyFixturePath)]));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    expect(result.changes.length).toBeGreaterThan(0);
     store.replaceProject(result.project);
-    expect(countHits(store.getState().project.pattern)).toBe(22);
+    expect(hits(store)).toBe(22);
+    expect(store.getState().project.sound.knobs.kick.decay).toBe(0.5);
+    // Undo brings back the knobs and the name too, not only the rhythms.
     store.undo();
-    expect(countHits(store.getState().project.pattern)).toBe(0);
+    expect(hits(store)).toBe(0);
+    expect(store.getState().project.sound.knobs.kick.decay).toBe(0.1);
+    expect(store.getState().project.name).toBe('Mine');
+    store.redo();
+    expect(hits(store)).toBe(22);
+    expect(store.getState().project.name).toBe(result.project.name);
   });
 
   it('names export files safely', () => {

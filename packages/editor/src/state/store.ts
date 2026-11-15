@@ -1,27 +1,24 @@
 import {
-  DEFAULT_VELOCITY,
-  KITS,
-  ROLE_IDS,
-  clampBpm,
+  PART_STEPS,
+  TRACK_IDS,
   clampKnob,
-  clampSwing,
-  clampVelocity,
-  createEmptyPattern,
+  createEmptyVariation,
   createProject,
-  createStarterPattern,
-  defaultSoundSettings,
-  findLane,
-  type KitId,
-  type Pattern,
+  createStarterRhythms,
+  isStepOn,
+  tempoBpm,
+  tempoFromBpm,
+  withStep,
+  type InstrumentId,
   type Project,
-  type RoleId,
+  type Rhythm,
   type SoundParam,
-  type SoundSettings,
+  type TrackId,
+  type Variation,
 } from '@boombapbot/contracts';
+import { selectedVariation } from '../engine/machine';
 
-export type EditorMode = 'modern' | 'hardware';
 export type AudioStatus = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
-export type KitStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type DraftOrigin = 'new' | 'restored' | 'recovered';
 
 export interface Notice {
@@ -33,19 +30,14 @@ export interface Notice {
 
 export interface EditorState {
   project: Project;
-  /** Where the sound knobs stand. Not part of the saved beat yet. */
-  sound: SoundSettings;
-  mode: EditorMode;
-  /** The lane and step the editing controls act on. Shared by both editors. */
-  selectedRole: RoleId;
-  selectedStep: number;
   /** Whether the user asked for playback. */
   playing: boolean;
-  /** Step the engine last played, or -1. */
+  /** Step the engine last played within its measure, or -1. The 2nd part starts at 16. */
   currentStep: number;
+  /** Pattern the engine is playing, or -1. */
+  currentPattern: number;
   audioStatus: AudioStatus;
   audioError: string | null;
-  kitStatus: KitStatus;
   draftOrigin: DraftOrigin;
   draftState: 'saved' | 'error';
   draftSavedAt: number | null;
@@ -54,11 +46,27 @@ export interface EditorState {
   canRedo: boolean;
 }
 
+/** What the machine remembers, and so what undo brings back. */
+type Memory = Pick<Project, 'rhythms' | 'rhythmTracks'>;
+
+interface Snapshot {
+  memory: Memory;
+  /** Set when the step replaced the whole project, as an import does. */
+  whole?: Project;
+}
+
+/** Where the step buttons write: a version of a rhythm, a track and a part. */
+export interface EditTarget {
+  rhythm: number;
+  variation: Variation;
+  track: TrackId;
+  /** Step of the first button: 0 in the 1st part, 16 in the 2nd. */
+  offset: number;
+}
+
 type Listener = () => void;
 
 const HISTORY_LIMIT = 100;
-/** Continuous gestures (a slider drag) collapse into one undo step. */
-const COALESCE_MS = 700;
 
 export interface StoreOptions {
   project?: Project;
@@ -74,33 +82,26 @@ function defaultId(): string {
   return `beat-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
 }
 
-function withPattern(project: Project, pattern: Pattern): Project {
-  return { ...project, pattern };
+function memoryOf(project: Project): Memory {
+  return { rhythms: project.rhythms, rhythmTracks: project.rhythmTracks };
 }
 
-function mapLane(
-  pattern: Pattern,
-  role: RoleId,
-  change: (steps: number[]) => number[],
-): Pattern {
+export function editTarget(project: Project): EditTarget {
+  const { panel } = project;
   return {
-    ...pattern,
-    lanes: pattern.lanes.map((lane) =>
-      lane.role === role ? { ...lane, steps: change(lane.steps.slice()) } : lane,
-    ),
+    rhythm: panel.basicRhythm,
+    variation: selectedVariation(project),
+    track: TRACK_IDS[panel.selector]!,
+    offset: panel.mode === 'write_second' ? PART_STEPS : 0,
   };
 }
 
-/**
- * Holds the beat and the editing state. Both editors read and write this one
- * store, so switching between them cannot lose or fork the beat.
- */
+/** Holds the project and the editing state. The panel reads and writes this one store. */
 export class EditorStore {
   private state: EditorState;
   private readonly listeners = new Set<Listener>();
-  private undoStack: Project[] = [];
-  private redoStack: Project[] = [];
-  private lastChange: { key: string; at: number } | null = null;
+  private undoStack: Snapshot[] = [];
+  private redoStack: Snapshot[] = [];
   private noticeId = 0;
   private readonly now: () => Date;
   private readonly newId: () => string;
@@ -110,15 +111,11 @@ export class EditorStore {
     this.newId = options.newId ?? defaultId;
     this.state = {
       project: options.project ?? this.starterProject(),
-      sound: defaultSoundSettings(),
-      mode: 'hardware',
-      selectedRole: 'kick',
-      selectedStep: 0,
       playing: false,
       currentStep: -1,
+      currentPattern: -1,
       audioStatus: 'idle',
       audioError: null,
-      kitStatus: 'idle',
       draftOrigin: options.draftOrigin ?? 'new',
       draftState: 'saved',
       draftSavedAt: null,
@@ -129,15 +126,7 @@ export class EditorStore {
   }
 
   starterProject(): Project {
-    return createProject({
-      id: this.newId(),
-      now: this.now(),
-      name: 'Starter beat',
-      kit: '808',
-      bpm: 118,
-      swing: 54,
-      pattern: createStarterPattern(),
-    });
+    return createProject({ id: this.newId(), now: this.now(), name: 'Starter beat', bpm: 118 });
   }
 
   getState = (): EditorState => this.state;
@@ -152,176 +141,145 @@ export class EditorStore {
     for (const listener of this.listeners) listener();
   }
 
-  /** Applies a change to the beat and records it for undo. */
-  private commit(project: Project, coalesceKey?: string): void {
-    if (project === this.state.project) return;
-    const at = this.now().getTime();
-    const coalesce =
-      coalesceKey !== undefined &&
-      this.lastChange?.key === coalesceKey &&
-      at - this.lastChange.at < COALESCE_MS;
-    if (!coalesce) {
-      this.undoStack.push(this.state.project);
-      if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
-    }
+  private stamped(project: Project): Project {
+    return { ...project, updatedAt: this.now().toISOString() };
+  }
+
+  /** Changes a knob, a switch or the name. Not an undo step. */
+  private adjust(project: Project): void {
+    this.set({ project: this.stamped(project) });
+  }
+
+  /** Changes what the machine remembers, and records it for undo. */
+  private commit(project: Project, whole = false): void {
+    const previous = this.state.project;
+    this.undoStack.push({ memory: memoryOf(previous), whole: whole ? previous : undefined });
+    if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack = [];
-    this.lastChange = coalesceKey !== undefined ? { key: coalesceKey, at } : null;
-    this.set({
-      project: { ...project, updatedAt: this.now().toISOString() },
-      canUndo: this.undoStack.length > 0,
-      canRedo: false,
-    });
+    this.set({ project: this.stamped(project), canUndo: true, canRedo: false });
   }
 
-  // ---- Beat edits ---------------------------------------------------------
-
-  /** Turns a step on at the default velocity, or off. Returns the new velocity. */
-  toggleStep(role: RoleId, step: number): number {
-    const current = findLane(this.state.project.pattern, role).steps[step] ?? 0;
-    const next = current > 0 ? 0 : DEFAULT_VELOCITY;
-    this.setVelocity(role, step, next);
-    return next;
-  }
-
-  setVelocity(role: RoleId, step: number, velocity: number, coalesce = false): void {
+  private commitRhythm(index: number, rhythm: Rhythm): void {
     const { project } = this.state;
-    const value = clampVelocity(velocity);
-    if (step < 0 || step >= project.pattern.stepCount) return;
-    if (findLane(project.pattern, role).steps[step] === value) return;
-    const pattern = mapLane(project.pattern, role, (steps) => {
-      steps[step] = value;
-      return steps;
+    this.commit({ ...project, rhythms: project.rhythms.map((old, i) => (i === index ? rhythm : old)) });
+  }
+
+  // ---- Memory edits ---------------------------------------------------------
+
+  /** Presses a step button: toggles that step of the selected track. Returns whether it is now on. */
+  toggleStep(button: number): boolean {
+    const target = editTarget(this.state.project);
+    const step = target.offset + button;
+    const row = this.state.project.rhythms[target.rhythm]![target.variation][target.track];
+    const on = !isStepOn(row, step);
+    this.setStep(target.rhythm, target.variation, target.track, step, on);
+    return on;
+  }
+
+  setStep(rhythmIndex: number, variation: Variation, track: TrackId, step: number, on: boolean): void {
+    const rhythm = this.state.project.rhythms[rhythmIndex];
+    if (!rhythm) return;
+    const row = rhythm[variation][track];
+    const next = withStep(row, step, on);
+    if (next === row) return;
+    this.commitRhythm(rhythmIndex, { ...rhythm, [variation]: { ...rhythm[variation], [track]: next } });
+  }
+
+  /** Wipes the steps of the selected version of the selected rhythm. */
+  clearPattern(): void {
+    const { rhythm: index, variation } = editTarget(this.state.project);
+    const rhythm = this.state.project.rhythms[index]!;
+    const empty = createEmptyVariation();
+    if (TRACK_IDS.every((id) => rhythm[variation][id] === empty[id])) return;
+    this.commitRhythm(index, { ...rhythm, [variation]: empty });
+  }
+
+  /** Puts the starter rhythms back in place of everything the machine remembers. */
+  loadStarterRhythms(): void {
+    const { project } = this.state;
+    this.commit({
+      ...project,
+      rhythms: createStarterRhythms(),
+      rhythmTracks: project.rhythmTracks.map(() => []),
     });
-    this.commit(withPattern(project, pattern), coalesce ? `velocity:${role}:${step}` : undefined);
   }
 
-  setBpm(bpm: number): void {
-    const value = clampBpm(bpm);
-    if (value === this.state.project.bpm) return;
-    this.commit({ ...this.state.project, bpm: value }, 'bpm');
+  /** Replaces the whole project, for example after an import. Undoable. */
+  replaceProject(project: Project): void {
+    this.commit(project, true);
   }
 
-  setSwing(swing: number): void {
-    const value = clampSwing(swing);
-    if (value === this.state.project.swing) return;
-    this.commit({ ...this.state.project, swing: value }, 'swing');
+  undo(): void {
+    this.step(this.undoStack, this.redoStack);
   }
 
-  /** Changes the kit. Steps, velocities, tempo and swing are untouched. */
-  setKit(id: KitId): void {
-    if (id === this.state.project.kit.id) return;
-    this.commit({ ...this.state.project, kit: { id, version: KITS[id].version } });
+  redo(): void {
+    this.step(this.redoStack, this.undoStack);
   }
 
-  /** Turns a sound knob. Positions run from 0 to 1. */
-  setKnob(role: RoleId, param: SoundParam, value: number): void {
-    const position = clampKnob(value);
-    if (position === this.state.sound[role][param]) return;
+  private step(from: Snapshot[], to: Snapshot[]): void {
+    const entry = from.pop();
+    if (!entry) return;
+    const current = this.state.project;
+    to.push({ memory: memoryOf(current), whole: entry.whole ? current : undefined });
     this.set({
-      sound: { ...this.state.sound, [role]: { ...this.state.sound[role], [param]: position } },
+      project: entry.whole ?? this.stamped({ ...current, ...entry.memory }),
+      canUndo: this.undoStack.length > 0,
+      canRedo: this.redoStack.length > 0,
     });
+  }
+
+  // ---- Knobs and switches ---------------------------------------------------
+
+  /** Sets the tempo in beats per minute: the nearest click stop, then the fine knob. */
+  setBpm(bpm: number): void {
+    const { project } = this.state;
+    const tempo = tempoFromBpm(bpm);
+    if (tempoBpm(tempo) === tempoBpm(project.tempo)) return;
+    this.adjust({ ...project, tempo });
+  }
+
+  /** Turns a tone, decay, tuning or snappy knob. Positions run from 0 to 1. */
+  setKnob(track: InstrumentId, param: SoundParam, value: number): void {
+    const { project } = this.state;
+    const position = clampKnob(value);
+    const knobs = project.sound.knobs[track];
+    if (position === knobs[param]) return;
+    this.adjust({
+      ...project,
+      sound: { ...project.sound, knobs: { ...project.sound.knobs, [track]: { ...knobs, [param]: position } } },
+    });
+  }
+
+  /** Turns the instrument selector. */
+  selectTrack(track: TrackId): void {
+    const { project } = this.state;
+    const selector = TRACK_IDS.indexOf(track);
+    if (selector === project.panel.selector) return;
+    this.adjust({ ...project, panel: { ...project.panel, selector } });
   }
 
   setName(name: string): void {
     const value = name.trim().slice(0, 80) || 'Untitled beat';
     if (value === this.state.project.name) return;
-    this.commit({ ...this.state.project, name: value }, 'name');
+    this.adjust({ ...this.state.project, name: value });
   }
 
-  clearPattern(): void {
-    const { project } = this.state;
-    const empty = createEmptyPattern();
-    // Keep the lane and pattern identity; only the steps are cleared.
-    const pattern: Pattern = {
-      ...project.pattern,
-      lanes: project.pattern.lanes.map((lane) => ({
-        ...lane,
-        steps: empty.lanes[0]!.steps.slice(),
-      })),
-    };
-    if (project.pattern.lanes.every((lane) => lane.steps.every((velocity) => velocity === 0))) {
-      return;
-    }
-    this.commit(withPattern(project, pattern));
-  }
-
-  clearLane(role: RoleId): void {
-    const { project } = this.state;
-    if (findLane(project.pattern, role).steps.every((velocity) => velocity === 0)) return;
-    this.commit(withPattern(project, mapLane(project.pattern, role, (steps) => steps.fill(0))));
-  }
-
-  loadStarterBeat(): void {
-    const starter = createStarterPattern();
-    const { project } = this.state;
-    const pattern: Pattern = {
-      ...project.pattern,
-      lanes: project.pattern.lanes.map((lane) => ({
-        ...lane,
-        steps: findLane(starter, lane.role).steps.slice(),
-      })),
-    };
-    this.commit(withPattern(project, pattern));
-  }
-
-  /** Replaces the whole beat, for example after an import. Undoable. */
-  replaceProject(project: Project): void {
-    this.commit(project);
-    if (!ROLE_IDS.includes(this.state.selectedRole)) this.set({ selectedRole: 'kick' });
-  }
-
-  undo(): void {
-    const previous = this.undoStack.pop();
-    if (!previous) return;
-    this.redoStack.push(this.state.project);
-    this.lastChange = null;
-    this.set({
-      project: previous,
-      canUndo: this.undoStack.length > 0,
-      canRedo: true,
-    });
-  }
-
-  redo(): void {
-    const next = this.redoStack.pop();
-    if (!next) return;
-    this.undoStack.push(this.state.project);
-    this.lastChange = null;
-    this.set({
-      project: next,
-      canUndo: true,
-      canRedo: this.redoStack.length > 0,
-    });
-  }
-
-  // ---- Editing state ------------------------------------------------------
-
-  select(role: RoleId, step?: number): void {
-    const selectedStep = step ?? this.state.selectedStep;
-    if (role === this.state.selectedRole && selectedStep === this.state.selectedStep) return;
-    this.set({ selectedRole: role, selectedStep });
-  }
-
-  setMode(mode: EditorMode): void {
-    if (mode !== this.state.mode) this.set({ mode });
-  }
+  // ---- Editing state --------------------------------------------------------
 
   setPlaying(playing: boolean): void {
     if (playing === this.state.playing) return;
-    this.set({ playing, currentStep: playing ? this.state.currentStep : -1 });
+    this.set(playing ? { playing } : { playing, currentStep: -1, currentPattern: -1 });
   }
 
-  setCurrentStep(step: number): void {
-    if (step !== this.state.currentStep) this.set({ currentStep: step });
+  setPosition(step: number, pattern: number): void {
+    if (step === this.state.currentStep && pattern === this.state.currentPattern) return;
+    this.set({ currentStep: step, currentPattern: pattern });
   }
 
   setAudioStatus(audioStatus: AudioStatus, audioError: string | null = null): void {
     if (audioStatus === this.state.audioStatus && audioError === this.state.audioError) return;
     this.set({ audioStatus, audioError });
-  }
-
-  setKitStatus(kitStatus: KitStatus): void {
-    if (kitStatus !== this.state.kitStatus) this.set({ kitStatus });
   }
 
   setDraftSaved(ok: boolean): void {

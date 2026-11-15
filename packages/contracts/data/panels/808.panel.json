@@ -2,7 +2,6 @@
   "format": "boombapbot.panel",
   "schemaVersion": 1,
   "id": "808",
-  "kit": "808",
   "name": "808 panel",
   "faceplate": {
     "file": "808.svg",
@@ -122,15 +121,16 @@
     "photoDeg": -79
   },
   "knobs": [
-    { "role": "kick", "param": "tone", "cx": 667.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "kick", "param": "decay", "cx": 667.25, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "snare", "param": "tone", "cx": 778.75, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "snare", "param": "snappy", "cx": 778.75, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "low_tom", "param": "tune", "cx": 890.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "high_tom", "param": "tune", "cx": 1113.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "cymbal", "param": "tone", "cx": 1559.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "cymbal", "param": "decay", "cx": 1559.25, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
-    { "role": "open_hat", "param": "decay", "cx": 1670.75, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 }
+    { "track": "kick", "param": "tone", "cx": 667.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "kick", "param": "decay", "cx": 667.25, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "snare", "param": "tone", "cx": 778.75, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "snare", "param": "snappy", "cx": 778.75, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "low_tom", "param": "tune", "cx": 890.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "mid_tom", "param": "tune", "cx": 1001.75, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "high_tom", "param": "tune", "cx": 1113.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "cymbal", "param": "tone", "cx": 1559.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "cymbal", "param": "decay", "cx": 1559.25, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "track": "open_hat", "param": "decay", "cx": 1670.75, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 }
   ],
   "voiceSelect": {
     "kind": "rotary",
@@ -144,79 +144,82 @@
     "positions": [
       {
         "label": "AC",
+        "track": "accent",
         "deg": -165,
         "hit": [372, 374, 33, 18]
       },
       {
         "label": "BD",
+        "track": "kick",
         "deg": -135,
-        "hit": [338, 349, 33, 18],
-        "role": "kick"
+        "hit": [338, 349, 33, 18]
       },
       {
         "label": "SD",
+        "track": "snare",
         "deg": -105,
-        "hit": [327, 324, 33, 18],
-        "role": "snare"
+        "hit": [327, 324, 33, 18]
       },
       {
         "label": "LT",
+        "track": "low_tom",
         "deg": -75,
-        "hit": [327, 296, 32, 18],
-        "role": "low_tom"
+        "hit": [327, 296, 32, 18]
       },
       {
         "label": "MT",
+        "track": "mid_tom",
         "deg": -45,
         "hit": [338, 272, 33, 18]
       },
       {
         "label": "HT",
+        "track": "high_tom",
         "deg": -15,
-        "hit": [371, 248, 33, 18],
-        "role": "high_tom"
+        "hit": [371, 248, 33, 18]
       },
       {
         "label": "RS",
+        "track": "rim_shot",
         "deg": 15,
         "hit": [421, 248, 33, 18]
       },
       {
         "label": "CP",
+        "track": "clap",
         "deg": 45,
-        "hit": [456, 272, 35, 18],
-        "role": "clap"
+        "hit": [456, 272, 35, 18]
       },
       {
         "label": "CB",
+        "track": "cowbell",
         "deg": 75,
         "hit": [468, 296, 32, 18]
       },
       {
         "label": "CY",
+        "track": "cymbal",
         "deg": 105,
-        "hit": [468, 324, 32, 18],
-        "role": "cymbal"
+        "hit": [468, 324, 32, 18]
       },
       {
         "label": "OH",
+        "track": "open_hat",
         "deg": 135,
-        "hit": [457, 349, 34, 18],
-        "role": "open_hat"
+        "hit": [457, 349, 34, 18]
       },
       {
         "label": "CH",
+        "track": "closed_hat",
         "deg": 165,
-        "hit": [421, 374, 34, 18],
-        "role": "closed_hat"
+        "hit": [421, 374, 34, 18]
       }
     ]
   },
   "pending": [
-    "Accent (AC) is a separate track on the hardware. This prototype stores velocity per step and leaves the AC position inactive.",
-    "Mid Tom, Rim Shot, Cowbell and the conga, claves and maracas switches have no lane in v0.1.",
+    "The conga, claves and maracas switches are not connected.",
     "First and second part, A, B and AB basic variation, intro and fill-in, auto fill-in, pre-scale and the compose and play modes are not modelled.",
-    "The level knobs are not connected. Tone, decay, tuning and snappy are, for the voices that have a lane; what each does to the sound is a model made by ear.",
+    "The level, accent and master volume knobs are not connected. Tone, decay, tuning and snappy are; what each does to the sound is a model made by ear.",
     "Step lamps show the selected instrument's steps and the running step. The hardware's exact lamp behaviour in each mode is unverified."
   ]
 }

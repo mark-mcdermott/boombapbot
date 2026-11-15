@@ -3,8 +3,8 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { KITS, ROLES, defaultSoundSettings } from '@boombapbot/contracts';
-import { synthesiseKit, type SynthSound } from '../src/engine';
+import { ROLES, createDefaultSound } from '@boombapbot/contracts';
+import { synthSound, type SynthSound } from '../src/engine';
 import { loadWasm, nativeRenderPath, rms } from './helpers';
 
 const wasm = loadWasm();
@@ -62,25 +62,15 @@ describe('synthesised sounds', () => {
     }
   });
 
-  it('builds the 808 kit from them, one sound per role, at the requested rate', () => {
-    for (const rate of [44100, 48000]) {
-      const kit = synthesiseKit(wasm, KITS['808'], rate, defaultSoundSettings());
-      expect(kit.voices.map((voice) => voice.role)).toEqual(ROLES.map((role) => role.index));
-      for (const voice of kit.voices) {
-        expect(voice.sampleRate).toBe(rate);
-        expect(voice.channels).toBe(1);
-        expect(voice.frames).toBe(voice.pcm.length);
-        expect(rms(voice.pcm)).toBeGreaterThan(0.01);
-      }
+  it('has a sound for every role, shaped only by its own column', () => {
+    const sound = createDefaultSound();
+    const longKick = { ...sound, knobs: { ...sound.knobs, kick: { ...sound.knobs.kick, decay: 1 } } };
+    for (const role of ROLES) {
+      const plain = wasm.synthesise(synthSound(role, sound), 44100);
+      expect(rms(plain)).toBeGreaterThan(0.01);
+      const changed = wasm.synthesise(synthSound(role, longKick), 44100);
+      if (role.id === 'kick') expect(changed.length).toBeGreaterThan(plain.length);
+      else expect(changed).toEqual(plain);
     }
-    // A knob changes its own voice and no other.
-    const sound = defaultSoundSettings();
-    sound.kick.decay = 1;
-    const plain = synthesiseKit(wasm, KITS['808'], 44100, defaultSoundSettings());
-    const longKick = synthesiseKit(wasm, KITS['808'], 44100, sound);
-    expect(longKick.voices[0]!.frames).toBeGreaterThan(plain.voices[0]!.frames);
-    expect(longKick.voices[1]!.pcm).toEqual(plain.voices[1]!.pcm);
-    expect(KITS['808'].synthesised).toBe(true);
-    expect(KITS['909'].synthesised).toBeUndefined();
   });
 });

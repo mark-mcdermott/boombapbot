@@ -1,6 +1,7 @@
 // Tiny test harness: named cases, CHECK macros, non-zero exit on failure.
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -55,15 +56,40 @@ inline std::vector<float> constant(int frames, float value) {
   return std::vector<float>(static_cast<std::size_t>(frames), value);
 }
 
-inline void setVoice(SnareKit* kit, int role, const std::vector<float>& pcm, double rate,
-                     float gain = 1.0f, float pan = 0.0f, int choke = 0) {
-  const int result = snare_kit_set_voice(kit, role, pcm.data(), static_cast<int>(pcm.size()), 1,
-                                         rate, gain, pan, choke);
-  if (result != SNARE_OK) {
-    std::printf("  snare_kit_set_voice failed: %d\n", result);
+// Gives a slot a mono sound.
+inline void giveSound(SnareEngine* engine, int slot, const std::vector<float>& pcm, double rate) {
+  SnareSound* sound = snare_sound_create(static_cast<int>(pcm.size()), 1, rate);
+  if (!sound) {
+    std::printf("  snare_sound_create failed\n");
     ++failures();
+    return;
+  }
+  std::copy(pcm.begin(), pcm.end(), snare_sound_data(sound));
+  snare_engine_set_sound(engine, slot, sound);
+}
+
+// An empty pattern of the given shape.
+inline SnarePattern shape(int len1, int len2 = 0, int stepsPerBeat = 4) {
+  SnarePattern pattern{};
+  pattern.len1 = static_cast<std::uint8_t>(len1);
+  pattern.len2 = static_cast<std::uint8_t>(len2);
+  pattern.steps_per_beat = static_cast<std::uint8_t>(stepsPerBeat);
+  return pattern;
+}
+
+// Unity gain everywhere, so sample values pass straight through to the output
+// until the limiter's knee at 0.8.
+inline void makeUnity(SnareEngine* engine) {
+  snare_engine_set_accent(engine, 1.0, 1.0);
+  snare_engine_set_master_volume(engine, 1.0);
+  for (int track = 1; track < SNARE_TRACKS; ++track) {
+    snare_engine_set_track(engine, track, track - 1, 0.0f, 0);
+    snare_engine_set_track_level(engine, track, 1.0);
   }
 }
+
+// The engine applies this before its limiter.
+constexpr double kHeadroom = 0.9;
 
 inline std::vector<SnareEvent> readEvents(const SnareEngine* engine) {
   std::vector<SnareEvent> events(static_cast<std::size_t>(snare_engine_event_count(engine)));

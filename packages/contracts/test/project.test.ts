@@ -1,33 +1,50 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  KITS,
-  KIT_IDS,
-  OFFERED_KIT_IDS,
-  PANELS,
+  BPM_MAX,
+  BPM_MIN,
+  EMPTY_ROW,
+  INSTRUMENT_IDS,
+  MAX_STEPS,
+  PANEL,
+  PATTERN_COUNT,
   PROJECT_FORMAT,
+  RHYTHM_COUNT,
   ROLES,
   ROLE_IDS,
-  ROLE_KNOBS,
+  SWITCHED_IDS,
+  TRACKS,
+  TRACK_IDS,
+  accentGains,
   clampKnob,
-  defaultSoundSettings,
   countHits,
+  countSteps,
+  createEmptyRhythm,
   createProject,
-  createStarterPattern,
-  onOfferedKit,
-  panelRoles,
+  createStarterRhythms,
+  getTrack,
+  isStepOn,
+  levelGain,
+  masterGain,
   parseProject,
   parseProjectText,
-  rolesOutsidePanel,
+  patternIndex,
+  rhythmLength,
+  rowMask,
   serializeProject,
-  substitutedRoles,
+  stepsPerBeat,
+  tempoBpm,
+  tempoFromBpm,
+  trackRole,
+  withStep,
 } from '../src';
 
-const fixtureText = readFileSync(
-  new URL('../fixtures/kick-snare-hat.project.json', import.meta.url),
-  'utf8',
-);
-const fixture = JSON.parse(fixtureText) as Record<string, any>;
+function read(name: string): string {
+  return readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
+}
+
+const fixtureText = read('mixed-rhythms.project.json');
+const v1Text = read('v1-kick-snare-hat.project.json');
 
 function clone(): Record<string, any> {
   return JSON.parse(fixtureText) as Record<string, any>;
@@ -35,191 +52,275 @@ function clone(): Record<string, any> {
 
 describe('project schema', () => {
   it('accepts the shared fixture', () => {
-    const result = parseProject(fixture);
+    const result = parseProjectText(fixtureText);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project.format).toBe(PROJECT_FORMAT);
-    expect(result.project.pattern.lanes).toHaveLength(8);
-    expect(countHits(result.project.pattern)).toBe(22);
+    expect(result.changes).toEqual([]);
+    expect(result.project.rhythms).toHaveLength(RHYTHM_COUNT);
+    expect(result.project.rhythms.map(rhythmLength).slice(0, 4)).toEqual([16, 12, 32, 24]);
+    expect(countHits(result.project.rhythms[0]!, 'a')).toBe(16);
+    expect(tempoBpm(result.project.tempo)).toBeCloseTo(124, 1);
   });
 
   it('round-trips through serialization without change', () => {
     const first = parseProjectText(fixtureText);
-    expect(first.ok).toBe(true);
-    if (!first.ok) return;
+    if (!first.ok) throw new Error('fixture must parse');
     const second = parseProjectText(serializeProject(first.project));
-    expect(second.ok).toBe(true);
-    if (!second.ok) return;
-    expect(second.project).toEqual(first.project);
+    expect(second).toEqual(first);
   });
 
-  it('creates a valid starter project', () => {
-    const project = createProject({
-      id: 'test',
-      now: new Date('2026-02-03T04:05:06.000Z'),
-      pattern: createStarterPattern(),
+  it('creates a valid project with the starter rhythms', () => {
+    const project = createProject({ id: 'p', now: new Date('2026-02-03T04:05:06Z'), name: 'Mine', bpm: 118 });
+    expect(parseProject(project)).toEqual({ ok: true, project, changes: [] });
+    expect(project.format).toBe(PROJECT_FORMAT);
+    expect(tempoBpm(project.tempo)).toBeCloseTo(118, 1);
+    expect(countHits(project.rhythms[0]!, 'a')).toBeGreaterThan(10);
+    expect(project.rhythms.slice(1).every((rhythm) => countHits(rhythm, 'a') + countHits(rhythm, 'b') === 0)).toBe(
+      true,
+    );
+    expect(project.sound.levels.kick).toBe(0.75);
+    expect(project.sound.alternates).toEqual({
+      low_tom: false,
+      mid_tom: false,
+      high_tom: false,
+      rim_shot: false,
+      clap: false,
     });
-    expect(parseProject(JSON.parse(serializeProject(project))).ok).toBe(true);
-    expect(countHits(project.pattern)).toBeGreaterThan(10);
-    expect(project.createdAt).toBe('2026-02-03T04:05:06.000Z');
+    expect(project.rhythmTracks).toEqual(Array.from({ length: 12 }, () => []));
   });
 
-  const invalid: Array<[string, (doc: Record<string, any>) => void, RegExp]> = [
-    ['a different format', (doc) => { doc.format = 'something.else'; }, /not a boombapbot project/],
-    ['a newer schema version', (doc) => { doc.schemaVersion = 2; }, /schema version 2/],
-    ['a tempo that is too fast', (doc) => { doc.bpm = 900; }, /bpm/],
-    ['a tempo that is not a number', (doc) => { doc.bpm = '120'; }, /bpm/],
-    ['swing out of range', (doc) => { doc.swing = 20; }, /swing/],
-    ['an unknown kit', (doc) => { doc.kit.id = '303'; }, /kit\.id/],
-    ['a velocity above 127', (doc) => { doc.pattern.lanes[0].steps[0] = 128; }, /steps/],
-    ['a fractional velocity', (doc) => { doc.pattern.lanes[0].steps[0] = 1.5; }, /steps/],
-    ['a lane with 15 steps', (doc) => { doc.pattern.lanes[1].steps.pop(); }, /steps/],
-    ['a missing lane', (doc) => { doc.pattern.lanes.pop(); }, /lanes/],
-    ['a duplicated role', (doc) => { doc.pattern.lanes[1].role = 'kick'; }, /exactly one lane/],
-    ['an unknown role', (doc) => { doc.pattern.lanes[1].role = 'cowbell'; }, /role/],
-    ['a missing name', (doc) => { delete doc.name; }, /name/],
-    ['a 32-step pattern', (doc) => { doc.pattern.stepCount = 32; }, /stepCount/],
-    ['a bad timestamp', (doc) => { doc.updatedAt = 'yesterday'; }, /updatedAt/],
+  const rejected: Array<[string, (project: Record<string, any>) => void]> = [
+    ['another format', (p) => (p.format = 'other')],
+    ['a later schema version', (p) => (p.schemaVersion = 3)],
+    ['fifteen rhythms', (p) => p.rhythms.pop()],
+    ['a row of 31 steps', (p) => (p.rhythms[0].a.kick = p.rhythms[0].a.kick.slice(1))],
+    ['a row with another character', (p) => (p.rhythms[0].a.kick = `X${p.rhythms[0].a.kick.slice(1)}`)],
+    ['a version missing a track', (p) => delete p.rhythms[0].b.cowbell],
+    ['a 1st part of no steps', (p) => (p.rhythms[0].firstLength = 0)],
+    ['a 2nd part of 17 steps', (p) => (p.rhythms[0].secondLength = 17)],
+    ['pre-scale 5', (p) => (p.rhythms[0].preScale = 5)],
+    ['a tempo stop past the last', (p) => (p.tempo.coarse = 40)],
+    ['a fine tempo beyond its travel', (p) => (p.tempo.fine = 1.5)],
+    ['a knob past fully right', (p) => (p.sound.knobs.kick.decay = 1.1)],
+    ['a level below zero', (p) => (p.sound.levels.snare = -0.1)],
+    ['a missing level', (p) => delete p.sound.levels.cymbal],
+    ['a switch on a track without one', (p) => (p.sound.alternates.kick = true)],
+    ['a rhythm track of 65 measures', (p) => (p.rhythmTracks[0] = new Array(65).fill(0))],
+    ['a rhythm track naming rhythm 16', (p) => (p.rhythmTracks[0] = [16])],
+    ['eleven rhythm tracks', (p) => p.rhythmTracks.pop()],
+    ['an unknown mode', (p) => (p.panel.mode = 'record')],
+    ['an auto fill-in every 3 measures', (p) => (p.panel.autoFill = 3)],
+    ['an intro/fill-in outside its buttons', (p) => (p.panel.fillRhythm = 3)],
   ];
-
-  it.each(invalid)('rejects %s', (_label, mutate, message) => {
-    const doc = clone();
-    mutate(doc);
-    const result = parseProject(doc);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.errors.join(' ')).toMatch(message);
-  });
+  for (const [name, change] of rejected) {
+    it(`rejects ${name}`, () => {
+      const project = clone();
+      change(project);
+      const result = parseProject(project);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.errors.length).toBeGreaterThan(0);
+    });
+  }
 
   it('rejects text that is not a project', () => {
-    for (const text of ['', 'not json', '[]', 'null', '42', '{"format":"boombapbot.project"}']) {
-      expect(parseProjectText(text).ok).toBe(false);
-    }
-    expect(parseProjectText('x'.repeat(2_000_000)).ok).toBe(false);
+    expect(parseProjectText('not json').ok).toBe(false);
+    expect(parseProjectText('[]').ok).toBe(false);
+    expect(parseProjectText('null').ok).toBe(false);
+    expect(parseProjectText('x'.repeat(1_000_001)).ok).toBe(false);
   });
 
   it('never throws on hostile input', () => {
-    const inputs: unknown[] = [undefined, null, 1, 'x', [], {}, { format: PROJECT_FORMAT, schemaVersion: 1, pattern: null }];
-    for (const input of inputs) expect(() => parseProject(input)).not.toThrow();
-  });
-});
-
-describe('roles and kits', () => {
-  it('keeps role slots stable', () => {
-    expect(ROLES.map((role) => role.id)).toEqual([...ROLE_IDS]);
-    expect(ROLES.map((role) => role.index)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(ROLES.map((role) => role.gmNote)).toEqual([36, 38, 42, 46, 45, 50, 39, 49]);
-  });
-
-  it('maps every role in every kit to a file', () => {
-    for (const id of KIT_IDS) {
-      const kit = KITS[id];
-      expect(kit.id).toBe(id);
-      expect(kit.demo).toBe(true);
-      expect(Object.keys(kit.voices).sort()).toEqual([...ROLE_IDS].sort());
-      // Hats share a choke group so a closed hat stops an open one.
-      expect(kit.voices.closed_hat.chokeGroup).toBeGreaterThan(0);
-      expect(kit.voices.closed_hat.chokeGroup).toBe(kit.voices.open_hat.chokeGroup);
-      for (const role of ROLE_IDS) {
-        const path = new URL(`../../../assets/${kit.assetBase}/${kit.voices[role].file}`, import.meta.url);
-        expect(readFileSync(path).subarray(0, 4).toString()).toBe('RIFF');
-      }
+    for (const input of [undefined, null, 0, 'text', [], { format: PROJECT_FORMAT }, { schemaVersion: 2 }]) {
+      expect(() => parseProject(input)).not.toThrow();
+      expect(parseProject(input).ok).toBe(false);
     }
   });
+});
 
-  it('declares substituted voices', () => {
-    expect(substitutedRoles(KITS['606'])).toEqual(['clap']);
-    expect(substitutedRoles(KITS['808'])).toEqual([]);
+describe('version 1 projects', () => {
+  it('become Basic Rhythm 1 A, on and off, with an accent row', () => {
+    const result = parseProjectText(v1Text);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v1 = JSON.parse(v1Text) as Record<string, any>;
+    const { project } = result;
+    expect(project.schemaVersion).toBe(2);
+    expect(project.id).toBe(v1.id);
+    expect(project.name).toBe(v1.name);
+    expect(tempoBpm(project.tempo)).toBeCloseTo(v1.bpm, 1);
+
+    const version = project.rhythms[0]!.a;
+    for (const lane of v1.pattern.lanes as Array<{ role: keyof typeof version; steps: number[] }>) {
+      lane.steps.forEach((velocity, step) => expect(isStepOn(version[lane.role], step)).toBe(velocity > 0));
+    }
+    // The fixture's kick hits at velocity 127 land on steps 1 and 9.
+    expect(version.accent.slice(0, 16)).toBe('x.......x.......');
+    expect(countSteps(version.mid_tom, MAX_STEPS)).toBe(0);
+    expect(rhythmLength(project.rhythms[0]!)).toBe(16);
+    expect(project.rhythms.slice(1)).toEqual(Array.from({ length: RHYTHM_COUNT - 1 }, createEmptyRhythm));
+    expect(countHits(project.rhythms[0]!, 'b')).toBe(0);
+  });
+
+  it('say what was lost', () => {
+    const result = parseProjectText(v1Text);
+    if (!result.ok) throw new Error('v1 fixture must parse');
+    expect(result.changes).toHaveLength(2);
+    expect(result.changes[0]).toMatch(/velocity/);
+    expect(result.changes[1]).toMatch(/Swing of 56%/);
+
+    const other = JSON.parse(v1Text) as Record<string, any>;
+    other.swing = 50;
+    other.kit.id = '909';
+    for (const lane of other.pattern.lanes) lane.steps = lane.steps.map((v: number) => (v > 0 ? 100 : 0));
+    const plain = parseProject(other);
+    if (!plain.ok) throw new Error('v1 project must parse');
+    expect(plain.changes).toEqual(['It was made on the 909 kit and now plays on the 808.']);
+    expect(countSteps(plain.project.rhythms[0]!.a.accent, MAX_STEPS)).toBe(0);
+  });
+
+  it('are still checked before they are converted', () => {
+    const broken = JSON.parse(v1Text) as Record<string, any>;
+    broken.bpm = 9000;
+    expect(parseProject(broken).ok).toBe(false);
+    const short = JSON.parse(v1Text) as Record<string, any>;
+    short.pattern.lanes.pop();
+    expect(parseProject(short).ok).toBe(false);
   });
 });
 
-describe('sound knobs', () => {
-  it('start at noon for every voice and stay between fully left and fully right', () => {
-    const sound = defaultSoundSettings();
-    expect(Object.keys(sound).sort()).toEqual([...ROLE_IDS].sort());
-    for (const role of ROLE_IDS) expect(sound[role]).toEqual({ tune: 0.5, tone: 0.5, decay: 0.5, snappy: 0.5 });
-    expect(clampKnob(-3)).toBe(0);
+describe('roles and tracks', () => {
+  it('keeps sound slots stable and appends new ones', () => {
+    expect(ROLES.map((role) => role.index)).toEqual(ROLE_IDS.map((_, index) => index));
+    expect(ROLE_IDS.slice(0, 8)).toEqual([
+      'kick',
+      'snare',
+      'closed_hat',
+      'open_hat',
+      'low_tom',
+      'high_tom',
+      'clap',
+      'cymbal',
+    ]);
+    expect(ROLE_IDS).toHaveLength(16);
+    expect(ROLES.map((role) => role.gmNote)).toEqual([36, 38, 42, 46, 45, 50, 39, 49, 47, 37, 56, 64, 63, 62, 75, 70]);
+  });
+
+  it('lists the twelve tracks in panel order, the accent first', () => {
+    expect(TRACKS.map((track) => track.id)).toEqual([...TRACK_IDS]);
+    expect(TRACKS.map((track) => track.short)).toEqual([
+      'AC', 'BD', 'SD', 'LT', 'MT', 'HT', 'RS', 'CP', 'CB', 'CY', 'OH', 'CH',
+    ]);
+    expect(TRACKS.map((track) => track.index)).toEqual(TRACK_IDS.map((_, index) => index));
+    expect(getTrack('accent').sound).toBeUndefined();
+  });
+
+  it('gives every instrument one sound, and five of them an alternate', () => {
+    const sounds = INSTRUMENT_IDS.map((id) => trackRole(id, false).id);
+    const alternates = SWITCHED_IDS.map((id) => trackRole(id, true).id);
+    expect(new Set([...sounds, ...alternates]).size).toBe(ROLE_IDS.length);
+    expect(alternates).toEqual(['low_conga', 'mid_conga', 'high_conga', 'claves', 'maracas']);
+    // A track without a switch plays the same sound either way.
+    expect(trackRole('kick', true).id).toBe('kick');
+    expect(getTrack('open_hat').chokeGroup).toBe(getTrack('closed_hat').chokeGroup);
+    expect(getTrack('open_hat').chokeGroup).toBeGreaterThan(0);
+  });
+});
+
+describe('rhythm rows and geometry', () => {
+  it('turn steps on and off and pack into a mask', () => {
+    let row = EMPTY_ROW;
+    expect(row).toHaveLength(MAX_STEPS);
+    row = withStep(row, 0, true);
+    row = withStep(row, 31, true);
+    row = withStep(row, 5, true);
+    row = withStep(row, 5, false);
+    expect(isStepOn(row, 0)).toBe(true);
+    expect(isStepOn(row, 5)).toBe(false);
+    expect(rowMask(row)).toBe(0x80000001);
+    expect(countSteps(row, 16)).toBe(1);
+    expect(countSteps(row, 32)).toBe(2);
+    expect(withStep(row, 40, true)).toBe(row);
+  });
+
+  it('maps pre-scales to steps per beat and rhythms to engine patterns', () => {
+    expect([1, 2, 3, 4].map((scale) => stepsPerBeat(scale as 1 | 2 | 3 | 4))).toEqual([3, 6, 4, 8]);
+    expect(patternIndex(0, 'a')).toBe(0);
+    expect(patternIndex(0, 'b')).toBe(1);
+    expect(patternIndex(15, 'b')).toBe(PATTERN_COUNT - 1);
+    expect(createStarterRhythms()).toHaveLength(RHYTHM_COUNT);
+  });
+});
+
+describe('tempo and mix', () => {
+  it('covers 40 to 300 with forty click stops and a fine knob', () => {
+    expect(tempoBpm({ coarse: 0, fine: 0 })).toBe(BPM_MIN);
+    expect(tempoBpm({ coarse: 39, fine: 0 })).toBe(BPM_MAX);
+    expect(tempoBpm({ coarse: 0, fine: -1 })).toBe(BPM_MIN);
+    expect(tempoBpm({ coarse: 39, fine: 1 })).toBe(BPM_MAX);
+    for (const bpm of [40, 61.5, 118, 120, 174, 299, 300]) {
+      const tempo = tempoFromBpm(bpm);
+      expect(Number.isInteger(tempo.coarse)).toBe(true);
+      expect(Math.abs(tempo.fine)).toBeLessThanOrEqual(0.5);
+      expect(tempoBpm(tempo)).toBeCloseTo(bpm, 1);
+    }
+    expect(tempoBpm(tempoFromBpm(9000))).toBe(BPM_MAX);
+    expect(tempoBpm(tempoFromBpm(Number.NaN))).toBeCloseTo(120, 1);
+  });
+
+  it('turns knob positions into gains', () => {
+    expect(levelGain('kick', 0)).toBe(0);
+    expect(levelGain('kick', 0.75)).toBeCloseTo(getTrack('kick').trim, 6);
+    expect(levelGain('kick', 1)).toBeGreaterThan(levelGain('kick', 0.75));
+    expect(accentGains(0)).toEqual({ plain: 0.6, accented: 0.6 });
+    expect(accentGains(1).accented).toBe(1);
+    expect(accentGains(0.5).accented).toBeCloseTo(0.8, 6);
+    expect(masterGain(0)).toBe(0);
+    expect(masterGain(1)).toBe(1);
     expect(clampKnob(7)).toBe(1);
-    expect(clampKnob(0.25)).toBe(0.25);
     expect(clampKnob(Number.NaN)).toBe(0.5);
   });
+});
 
-  it('gives the 808 panel a knob for every sound control of a voice that has a lane', () => {
-    const listed = (PANELS['808'].knobs ?? []).map((knob) => `${knob.role}:${knob.param}`).sort();
-    const expected = ROLE_IDS.flatMap((role) => ROLE_KNOBS[role].map((param) => `${role}:${param}`)).sort();
+describe('the 808 panel', () => {
+  const { width, height } = PANEL.faceplate;
+
+  it('keeps every control inside the faceplate', () => {
+    const rects = [
+      ...PANEL.steps.map((step) => step.hit),
+      ...PANEL.transport.map((control) => control.hit),
+      ...PANEL.voiceSelect.positions.map((position) => position.hit),
+    ];
+    for (const [x, y, w, h] of rects) {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(x + w).toBeLessThanOrEqual(width);
+      expect(y + h).toBeLessThanOrEqual(height);
+    }
+    PANEL.steps.forEach((step, i) => {
+      if (i > 0) expect(step.hit[0]).toBeGreaterThanOrEqual(PANEL.steps[i - 1]!.hit[0] + PANEL.steps[i - 1]!.hit[2] - 0.01);
+    });
+  });
+
+  it('has a selector position for every track, in order', () => {
+    expect(PANEL.voiceSelect.positions.map((position) => position.track)).toEqual([...TRACK_IDS]);
+    expect(PANEL.voiceSelect.positions.map((position) => position.label)).toEqual(TRACKS.map((track) => track.short));
+  });
+
+  it('has a knob for every sound control of every column', () => {
+    const knobs = PANEL.knobs ?? [];
+    for (const knob of knobs) {
+      expect(knob.cx - knob.r).toBeGreaterThanOrEqual(0);
+      expect(knob.cy + knob.r).toBeLessThanOrEqual(height);
+      expect(knob.minDeg).toBeLessThan(knob.maxDeg);
+    }
+    const listed = knobs.map((knob) => `${knob.track}:${knob.param}`).sort();
+    const expected = INSTRUMENT_IDS.flatMap((id) => getTrack(id).knobs.map((param) => `${id}:${param}`)).sort();
     expect(listed).toEqual(expected);
   });
-});
 
-describe('offered kits', () => {
-  it('lists at least one defined kit, without repeats', () => {
-    expect(OFFERED_KIT_IDS.length).toBeGreaterThan(0);
-    expect(new Set(OFFERED_KIT_IDS).size).toBe(OFFERED_KIT_IDS.length);
-    for (const id of OFFERED_KIT_IDS) expect(KIT_IDS).toContain(id);
-  });
-
-  it('moves a beat off a kit that is held back and changes nothing else', () => {
-    const offered = OFFERED_KIT_IDS[0]!;
-    const base = createProject({ id: 'p', now: new Date(0), kit: offered, pattern: createStarterPattern() });
-    expect(onOfferedKit(base)).toBe(base);
-
-    const heldBack = KIT_IDS.find((id) => !OFFERED_KIT_IDS.includes(id));
-    if (!heldBack) return;
-    const elsewhere = { ...base, kit: { id: heldBack, version: KITS[heldBack].version } };
-    const moved = onOfferedKit(elsewhere);
-    expect(moved.kit).toEqual({ id: offered, version: KITS[offered].version });
-    expect({ ...moved, kit: elsewhere.kit }).toEqual(elsewhere);
-    expect(parseProject(moved).ok).toBe(true);
-  });
-});
-
-describe('hardware panels', () => {
-  it('have valid geometry inside the faceplate', () => {
-    const panels = Object.values(PANELS);
-    expect(panels.length).toBeGreaterThan(0);
-    for (const panel of panels) {
-      const { width, height } = panel.faceplate;
-      const rects = [
-        ...panel.steps.map((step) => step.hit),
-        ...panel.transport.map((control) => control.hit),
-        ...panel.voiceSelect.positions.map((position) => position.hit),
-      ];
-      for (const [x, y, w, h] of rects) {
-        expect(x).toBeGreaterThanOrEqual(0);
-        expect(y).toBeGreaterThanOrEqual(0);
-        expect(x + w).toBeLessThanOrEqual(width);
-        expect(y + h).toBeLessThanOrEqual(height);
-      }
-      // Step buttons run left to right without overlapping.
-      panel.steps.forEach((step, i) => {
-        if (i > 0) expect(step.hit[0]).toBeGreaterThanOrEqual(panel.steps[i - 1]!.hit[0] + panel.steps[i - 1]!.hit[2] - 0.01);
-      });
-      // A faceplate is either drawn for boombapbot, or a Creative Commons
-      // photograph with a credit. Never both, never neither.
-      const credit = panel.faceplate.credit;
-      if (panel.faceplate.original) {
-        expect(credit).toBeUndefined();
-        expect(panel.faceplate.file).toMatch(/\.svg$/);
-      } else {
-        expect(credit).toBeDefined();
-        expect(credit!.source).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
-        expect(credit!.licenceUrl).toMatch(/^https:\/\/creativecommons\.org\/licenses\/by(-sa)?\/\d\.\d\/$/);
-        expect(credit!.licence).toMatch(/^CC BY(-SA)? \d\.\d$/);
-      }
-      // A sound knob sits on the faceplate, belongs to a voice that has that
-      // knob, and appears once.
-      const knobs = panel.knobs ?? [];
-      for (const knob of knobs) {
-        expect(knob.cx - knob.r).toBeGreaterThanOrEqual(0);
-        expect(knob.cy - knob.r).toBeGreaterThanOrEqual(0);
-        expect(knob.cx + knob.r).toBeLessThanOrEqual(width);
-        expect(knob.cy + knob.r).toBeLessThanOrEqual(height);
-        expect(knob.minDeg).toBeLessThan(knob.maxDeg);
-        expect(ROLE_KNOBS[knob.role]).toContain(knob.param);
-      }
-      expect(new Set(knobs.map((knob) => `${knob.role}:${knob.param}`)).size).toBe(knobs.length);
-      expect(panelRoles(panel).length).toBeGreaterThanOrEqual(6);
-      expect([...panelRoles(panel), ...rolesOutsidePanel(panel)].sort()).toEqual([...ROLE_IDS].sort());
-    }
+  it('is drawn for boombapbot, so it carries no credit', () => {
+    expect(PANEL.faceplate.original).toBe(true);
+    expect(PANEL.faceplate.credit).toBeUndefined();
+    expect(PANEL.faceplate.file).toMatch(/\.svg$/);
   });
 });

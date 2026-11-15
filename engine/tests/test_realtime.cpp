@@ -63,18 +63,18 @@ Counted renderCounted(SnareEngine* engine, std::vector<float>& left, std::vector
   return {allocations.load() - allocationsBefore, releases.load() - releasesBefore};
 }
 
-SnareKit* makeKit(float level) {
-  SnareKit* kit = snare_kit_create();
-  for (int role = 0; role < SNARE_MAX_ROLES; ++role) {
-    // Long enough that every hit overlaps the next and the pool overflows.
-    setVoice(kit, role, constant(static_cast<int>(kRate), level), kRate, 0.2f, 0.0f, role < 2 ? 1 : 0);
+// Sounds long enough that every hit is still ringing when the next lands.
+void giveSounds(SnareEngine* engine, float level) {
+  for (int slot = 0; slot < SNARE_SOUNDS; ++slot) {
+    giveSound(engine, slot, constant(static_cast<int>(kRate), level), kRate);
   }
-  return kit;
 }
 
-void fillPattern(SnareEngine* engine) {
-  std::vector<std::uint8_t> row(SNARE_STEPS, 100);
-  for (int role = 0; role < SNARE_MAX_ROLES; ++role) snare_engine_set_row(engine, role, row.data());
+// Every step of every track of every pattern, thirty-two steps long.
+void fillBank(SnareEngine* engine) {
+  SnarePattern pattern = shape(16, 16, 8);
+  for (std::uint32_t& row : pattern.rows) row = 0xffffffffu;
+  for (int index = 0; index < SNARE_PATTERNS; ++index) snare_engine_set_pattern(engine, index, &pattern);
 }
 
 }  // namespace
@@ -90,10 +90,10 @@ SNARE_TEST(the_counters_see_an_allocation_and_its_release) {
   CHECK_EQ(releases.load() - releasesBefore, 1);
 }
 
-SNARE_TEST(render_does_not_allocate_while_playing_and_stealing) {
+SNARE_TEST(render_does_not_allocate_while_playing_the_fullest_pattern) {
   SnareEngine* engine = snare_engine_create(kRate);
-  snare_engine_commit_kit(engine, makeKit(0.1f));
-  fillPattern(engine);
+  giveSounds(engine, 0.1f);
+  fillBank(engine);
   snare_engine_set_tempo(engine, SNARE_BPM_MAX);
   snare_engine_play(engine);
   std::vector<float> left(kBlock), right(kBlock);
@@ -101,34 +101,36 @@ SNARE_TEST(render_does_not_allocate_while_playing_and_stealing) {
   const Counted counted = renderCounted(engine, left, right, 2000);
   CHECK_EQ(counted.allocations, 0);
   CHECK_EQ(counted.releases, 0);
-  CHECK(snare_engine_stolen_voices(engine) > 0);
+  CHECK(snare_engine_current_measure(engine) > 4);
   snare_engine_destroy(engine);
 }
 
 SNARE_TEST(render_does_not_allocate_while_applying_commands) {
   SnareEngine* engine = snare_engine_create(kRate);
-  snare_engine_commit_kit(engine, makeKit(0.1f));
+  giveSounds(engine, 0.1f);
   snare_engine_enable_event_log(engine, 4096);
-  fillPattern(engine);
+  fillBank(engine);
   snare_engine_play(engine);
   std::vector<float> left(kBlock), right(kBlock);
-  std::vector<std::uint8_t> row(SNARE_STEPS, 0);
+  SnarePattern pattern = shape(5, 3, 6);
 
   long allocated = 0;
   long released = 0;
   for (int pass = 0; pass < 400; ++pass) {
     // Every kind of queued command, sent from the control side between buffers.
-    row[static_cast<std::size_t>(pass % SNARE_STEPS)] = static_cast<std::uint8_t>(1 + pass % 127);
-    snare_engine_set_row(engine, pass % SNARE_MAX_ROLES, row.data());
-    snare_engine_set_step(engine, pass % SNARE_MAX_ROLES, pass % SNARE_STEPS, pass % 128);
+    pattern.rows[pass % SNARE_TRACKS] = static_cast<std::uint32_t>(pass) * 2654435761u;
+    snare_engine_set_pattern(engine, pass % SNARE_PATTERNS, &pattern);
+    snare_engine_set_step(engine, pass % SNARE_PATTERNS, pass % SNARE_TRACKS, pass % SNARE_MAX_STEPS, pass & 1);
+    snare_engine_cue_pattern(engine, (pass * 7) % SNARE_PATTERNS);
     snare_engine_set_tempo(engine, 60.0 + pass % 240);
-    snare_engine_set_swing(engine, 50.0 + pass % 25);
-    snare_engine_set_master_gain(engine, 0.3 + (pass % 5) * 0.1);
-    snare_engine_trigger(engine, pass % SNARE_MAX_ROLES, 127);
+    snare_engine_set_track(engine, 1 + pass % 11, pass % SNARE_SOUNDS, 0.0f, pass % 3);
+    snare_engine_set_track_level(engine, 1 + pass % 11, 0.2 + (pass % 5) * 0.1);
+    snare_engine_set_accent(engine, 0.5, 0.5 + (pass % 5) * 0.1);
+    snare_engine_set_master_volume(engine, 0.3 + (pass % 5) * 0.1);
+    snare_engine_trigger(engine, 1 + pass % 11, pass & 1);
     if (pass % 50 == 10) snare_engine_stop(engine);
     if (pass % 50 == 20) snare_engine_play(engine);
-    if (pass % 50 == 30) snare_engine_clear_pattern(engine);
-    if (pass % 50 == 40) fillPattern(engine);
+    if (pass % 50 == 30) snare_engine_play_measures(engine, 2);
     const Counted counted = renderCounted(engine, left, right, 4);
     allocated += counted.allocations;
     released += counted.releases;
@@ -138,33 +140,10 @@ SNARE_TEST(render_does_not_allocate_while_applying_commands) {
   snare_engine_destroy(engine);
 }
 
-SNARE_TEST(render_does_not_allocate_or_free_when_a_kit_is_swapped) {
+SNARE_TEST(render_does_not_allocate_or_free_when_sounds_are_replaced) {
   SnareEngine* engine = snare_engine_create(kRate);
-  snare_engine_commit_kit(engine, makeKit(0.1f));
-  fillPattern(engine);
-  snare_engine_play(engine);
-  std::vector<float> left(kBlock), right(kBlock);
-
-  long allocated = 0;
-  long released = 0;
-  for (int swap = 0; swap < 20; ++swap) {
-    // Building and committing a kit allocates, on the control side only.
-    snare_engine_commit_kit(engine, makeKit(0.05f + 0.01f * static_cast<float>(swap)));
-    const Counted counted = renderCounted(engine, left, right, 200);
-    allocated += counted.allocations;
-    released += counted.releases;
-    // Replaced kits are freed here, never inside render.
-    snare_engine_collect(engine);
-  }
-  CHECK_EQ(allocated, 0);
-  CHECK_EQ(released, 0);
-  snare_engine_destroy(engine);
-}
-
-SNARE_TEST(render_does_not_allocate_or_free_when_single_sounds_are_replaced) {
-  SnareEngine* engine = snare_engine_create(kRate);
-  snare_engine_commit_kit(engine, makeKit(0.1f));
-  fillPattern(engine);
+  giveSounds(engine, 0.1f);
+  fillBank(engine);
   snare_engine_set_tempo(engine, SNARE_BPM_MAX);
   snare_engine_play(engine);
   std::vector<float> left(kBlock), right(kBlock);
@@ -173,17 +152,36 @@ SNARE_TEST(render_does_not_allocate_or_free_when_single_sounds_are_replaced) {
   long released = 0;
   for (int pass = 0; pass < 600; ++pass) {
     // What a knob drag does: one slot gets a new sound, again and again.
-    SnareSound* sound = snare_sound_create(static_cast<int>(kRate / 4), 1, kRate);
-    snare_sound_data(sound)[0] = 0.1f;
-    snare_engine_set_sound(engine, pass % 3, sound);
+    giveSound(engine, pass % 3, constant(static_cast<int>(kRate / 4), 0.1f), kRate);
     if (pass % 7 == 0) snare_engine_set_sound(engine, 5, nullptr);
-    snare_engine_set_slot(engine, pass % SNARE_MAX_ROLES, 0.2f, 0.0f, pass % 2);
+    if (pass % 11 == 0) giveSounds(engine, 0.05f);
     const Counted counted = renderCounted(engine, left, right, 3);
     allocated += counted.allocations;
     released += counted.releases;
   }
   CHECK_EQ(allocated, 0);
   CHECK_EQ(released, 0);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(render_does_not_allocate_when_voices_are_stolen) {
+  SnareEngine* engine = snare_engine_create(kRate);
+  giveSounds(engine, 0.02f);
+  std::vector<float> left(kBlock), right(kBlock);
+  long allocated = 0;
+  long released = 0;
+  for (int pass = 0; pass < 2000; ++pass) {
+    for (int track = 1; track < SNARE_TRACKS; ++track) snare_engine_trigger(engine, track, 0);
+    counting.store(true);
+    snare_engine_render(engine, left.data(), right.data(), 2);
+    counting.store(false);
+  }
+  allocated = allocations.load();
+  released = releases.load();
+  CHECK(snare_engine_stolen_voices(engine) > 0u);
+  // Nothing was counted while armed in this case beyond the self-test above.
+  CHECK_EQ(allocated, 1);
+  CHECK_EQ(released, 1);
   snare_engine_destroy(engine);
 }
 

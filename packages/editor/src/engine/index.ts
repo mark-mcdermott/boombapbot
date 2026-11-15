@@ -1,4 +1,4 @@
 export * from './wasm-engine';
 export * from './wav';
-export * from './kit-loader';
+export * from './machine';
 export * from './offline';

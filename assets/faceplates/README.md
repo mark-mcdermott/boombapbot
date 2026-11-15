@@ -1,7 +1,9 @@
 # Faceplate images
 
 Images in this folder are cleared for distribution. A build ships the one
-each panel manifest names in `faceplate.file`. Each image is listed here with
+the panel manifest names in `faceplate.file`: the editor is the 808 alone at
+the moment, so that is `808.svg`. The 606, 707 and 909 photographs are kept
+for when those machines come back; no build ships them. Each image is listed here with
 where it came from, who made it, its licence and what was changed.
 `scripts/check-build.mjs` fails a build that ships a faceplate without an
 entry here, and without either a credit in its panel manifest or
@@ -47,8 +49,8 @@ git-ignored `misc/assets/` folder and are used for local development only.
   embedded, so there is nobody to credit, and `808.panel.json` sets
   `faceplate.original` in place of a credit.
 - **Where the layout comes from:** the controls the editor makes live (step
-  keys and lamps, instrument selector, start/stop, tempo) are placed from
-  `808.panel.json`. Those coordinates were measured on the photograph below.
+  keys and lamps, instrument selector, start/stop, tempo and the tone, decay,
+  tuning and snappy knobs) are placed from `808.panel.json`. Those coordinates were measured on the photograph below.
   The fixed controls and lettering were placed by eye against the same
   photograph, as a record of where things are on the machine.
 - **Licence of this file:** the owner's own artwork. No licence has been

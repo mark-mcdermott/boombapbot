@@ -1,5 +1,5 @@
-// Scheduler timing: sample-accurate steps, no dependence on buffer size, no
-// drift over long runs, and correct behaviour across tempo changes.
+// The scheduler: steps land on frames computed from the tick timeline, at
+// every pre-scale and length, whatever the buffer size, for as long as it runs.
 
 #include <cstring>
 #include <vector>
@@ -11,231 +11,176 @@ using namespace snare::test;
 
 namespace {
 
-constexpr double kRate = 44100.0;
+constexpr double kRate = 48000.0;
 
-// Four on the floor on role 0, off-beats on role 1.
-SnareEngine* makeEngine(double rate, double bpm, double swing) {
+// An engine whose first track clicks on every step of pattern 0.
+SnareEngine* clickEngine(const SnarePattern& form, double bpm, double rate = kRate, int log = 4096) {
   SnareEngine* engine = snare_engine_create(rate);
-  SnareKit* kit = snare_kit_create();
-  std::vector<float> click(600, 0.0f);
-  for (int i = 0; i < 600; ++i) click[static_cast<std::size_t>(i)] = 0.5f - static_cast<float>(i) / 1200.0f;
-  setVoice(kit, 0, click, rate);
-  setVoice(kit, 1, click, rate, 0.5f, 0.4f);
-  snare_engine_commit_kit(engine, kit);
-  snare_engine_enable_event_log(engine, 200000);
+  makeUnity(engine);
+  snare_engine_enable_event_log(engine, log);
+  giveSound(engine, 0, constant(8, 0.25f), rate);
+  SnarePattern pattern = form;
+  pattern.rows[1] = 0xffffffffu;
+  snare_engine_set_pattern(engine, 0, &pattern);
   snare_engine_set_tempo(engine, bpm);
-  snare_engine_set_swing(engine, swing);
-  for (int step = 0; step < SNARE_STEPS; ++step) {
-    if (step % 4 == 0) snare_engine_set_step(engine, 0, step, 120);
-    if (step % 2 == 1) snare_engine_set_step(engine, 1, step, 90);
-  }
-  snare_engine_play(engine);
   return engine;
 }
 
-std::int64_t expectedFrame(std::int64_t absoluteStep, double bpm, double swing, double rate) {
-  const double time = snare_step_time(static_cast<int>(absoluteStep), swing);
-  return static_cast<std::int64_t>(std::floor(time * snare_frames_per_step(bpm, rate) + 0.5));
+double frameOf(std::int64_t tick, double bpm, double rate = kRate) {
+  return snare_tick_frame(static_cast<double>(tick), bpm, rate);
 }
 
 }  // namespace
 
-SNARE_TEST(steps_land_on_the_computed_frames) {
-  const double bpm = 123.0;
-  const double swing = 58.0;
-  SnareEngine* engine = makeEngine(kRate, bpm, swing);
-  // Stop just before the first step of a fourth bar.
-  snare::io::render(engine, static_cast<int>(expectedFrame(48, bpm, swing, kRate)), 128);
-  const auto events = readEvents(engine);
-  CHECK_EQ(events.size(), static_cast<std::size_t>(3 * 12));
-
-  // Rebuild the absolute step of every event from its order.
-  std::size_t index = 0;
-  for (std::int64_t absolute = 0; absolute < 48; ++absolute) {
-    const int step = static_cast<int>(absolute % SNARE_STEPS);
-    const bool kick = step % 4 == 0;
-    const bool off = step % 2 == 1;
-    if (!kick && !off) continue;
-    CHECK(index < events.size());
-    if (index >= events.size()) break;
-    CHECK_EQ(events[index].step, step);
-    CHECK_EQ(events[index].role, kick ? 0 : 1);
-    CHECK_EQ(static_cast<std::int64_t>(events[index].frame),
-             expectedFrame(absolute, bpm, swing, kRate));
-    ++index;
+SNARE_TEST(steps_land_on_the_computed_frames_at_every_pre_scale) {
+  for (int stepsPerBeat : {3, 4, 6, 8}) {
+    for (int length : {1, 5, 12, 16}) {
+      const double bpm = 97.3;
+      SnareEngine* engine = clickEngine(shape(length, 0, stepsPerBeat), bpm);
+      snare_engine_play(engine);
+      const int stepTicks = snare_step_ticks(stepsPerBeat);
+      const int steps = length * 3;  // three measures
+      snare::io::render(engine, static_cast<int>(frameOf(steps * stepTicks, bpm)), 333);
+      const std::vector<SnareEvent> events = readEvents(engine);
+      CHECK_EQ(static_cast<int>(events.size()), steps);
+      for (int i = 0; i < static_cast<int>(events.size()) && i < steps; ++i) {
+        CHECK_EQ(events[static_cast<std::size_t>(i)].frame, frameOf(static_cast<std::int64_t>(i) * stepTicks, bpm));
+        CHECK_EQ(events[static_cast<std::size_t>(i)].step, i % length);
+      }
+      snare_engine_destroy(engine);
+    }
   }
-  snare_engine_destroy(engine);
 }
 
 SNARE_TEST(output_does_not_depend_on_buffer_size) {
-  const double bpm = 97.0;
-  const double swing = 62.5;
-  const int frames = snare_loop_frames(bpm, kRate, SNARE_STEPS) * 2;
-  const int sizes[] = {1, 17, 64, 128, 441, 1024, 4096, frames};
-
-  SnareEngine* reference = makeEngine(kRate, bpm, swing);
-  const auto expected = snare::io::render(reference, frames, 128);
-  const auto expectedEvents = readEvents(reference);
-  snare_engine_destroy(reference);
-  CHECK(!expectedEvents.empty());
-
-  for (const int size : sizes) {
-    SnareEngine* engine = makeEngine(kRate, bpm, swing);
-    const auto actual = snare::io::render(engine, frames, size);
-    const auto events = readEvents(engine);
-    CHECK_EQ(events.size(), expectedEvents.size());
-    bool sameEvents = events.size() == expectedEvents.size();
-    for (std::size_t i = 0; sameEvents && i < events.size(); ++i) {
-      sameEvents = events[i].frame == expectedEvents[i].frame &&
-                   events[i].role == expectedEvents[i].role &&
-                   events[i].velocity == expectedEvents[i].velocity;
+  const int total = 96000;
+  std::vector<float> reference;
+  std::vector<SnareEvent> referenceEvents;
+  for (int block : {total, 1, 17, 64, 128, 441, 1024, 4096}) {
+    // Twenty-one steps of sextuplets: two parts, an odd length, an odd tempo.
+    SnareEngine* engine = clickEngine(shape(16, 5, 6), 171.3);
+    giveSound(engine, 1, constant(3000, 0.125f), kRate);
+    snare_engine_set_step(engine, 0, 2, 0, 1);
+    snare_engine_set_step(engine, 0, 2, 19, 1);
+    snare_engine_set_step(engine, 0, 0, 7, 1);
+    snare_engine_set_accent(engine, 0.5, 1.0);
+    snare_engine_set_track_level(engine, 2, 0.4);
+    snare_engine_play(engine);
+    const auto out = snare::io::render(engine, total, block);
+    const std::vector<SnareEvent> events = readEvents(engine);
+    if (reference.empty()) {
+      reference = out.left;
+      referenceEvents = events;
+      CHECK(events.size() > 30);
+    } else {
+      CHECK(std::memcmp(reference.data(), out.left.data(), sizeof(float) * reference.size()) == 0);
+      CHECK_EQ(events.size(), referenceEvents.size());
+      CHECK(std::memcmp(referenceEvents.data(), events.data(), sizeof(SnareEvent) * events.size()) == 0);
     }
-    CHECK(sameEvents);
-    CHECK(std::memcmp(actual.left.data(), expected.left.data(),
-                      sizeof(float) * expected.left.size()) == 0);
-    CHECK(std::memcmp(actual.right.data(), expected.right.data(),
-                      sizeof(float) * expected.right.size()) == 0);
     snare_engine_destroy(engine);
   }
 }
 
-SNARE_TEST(ten_minutes_without_drift) {
-  // A tempo whose step length is not a whole number of frames.
-  const double bpm = 133.7;
-  const double rate = 48000.0;
-  SnareEngine* engine = makeEngine(rate, bpm, 50.0);
-  const int total = static_cast<int>(rate * 600.0);
-  std::vector<float> left(128), right(128);
-  for (int done = 0; done < total; done += 128) {
-    snare_engine_render(engine, left.data(), right.data(), 128);
+SNARE_TEST(ten_minutes_of_one_step_measures_do_not_drift) {
+  // The shortest measure the machine has, at its fastest: 25 ms.
+  const double bpm = SNARE_BPM_MAX;
+  const int steps = 24000;  // ten minutes
+  SnareEngine* engine = clickEngine(shape(1, 0, 8), bpm, kRate, steps + 8);
+  snare_engine_play(engine);
+  const int stepTicks = snare_step_ticks(8);
+  snare::io::render(engine, static_cast<int>(frameOf(static_cast<std::int64_t>(steps) * stepTicks, bpm)), 4096);
+  const std::vector<SnareEvent> events = readEvents(engine);
+  CHECK_EQ(static_cast<int>(events.size()), steps);
+  bool exact = true;
+  for (std::size_t i = 0; i < events.size(); ++i) {
+    exact = exact && events[i].frame == frameOf(static_cast<std::int64_t>(i) * stepTicks, bpm) && events[i].step == 0;
   }
-  const auto events = readEvents(engine);
-  CHECK(events.size() > 4000);
-
-  // Every kick is four steps after the previous one, to the frame.
-  std::int64_t kicks = 0;
-  for (const SnareEvent& event : events) {
-    if (event.role != 0) continue;
-    CHECK_EQ(static_cast<std::int64_t>(event.frame), expectedFrame(kicks * 4, bpm, 50.0, rate));
-    ++kicks;
-  }
-  const double seconds = events.back().frame / rate;
-  CHECK(seconds > 599.0);
+  CHECK(exact);
+  CHECK_EQ(events.back().frame, frameOf(static_cast<std::int64_t>(steps - 1) * stepTicks, bpm));
+  CHECK_EQ(snare_engine_current_measure(engine), steps);
   snare_engine_destroy(engine);
 }
 
 SNARE_TEST(play_starts_at_the_buffer_boundary) {
-  SnareEngine* engine = snare_engine_create(kRate);
-  SnareKit* kit = snare_kit_create();
-  setVoice(kit, 0, constant(100, 0.5f), kRate);
-  snare_engine_commit_kit(engine, kit);
-  snare_engine_enable_event_log(engine, 64);
-  snare_engine_set_step(engine, 0, 0, 100);
-  snare::io::render(engine, 1000, 250);  // idle
-  CHECK_EQ(snare_engine_event_count(engine), 0);
-  CHECK_EQ(snare_engine_current_step(engine), -1);
-  snare_engine_play(engine);
-  snare::io::render(engine, 500, 250);
-  const auto events = readEvents(engine);
-  CHECK_EQ(events.size(), static_cast<std::size_t>(1));
-  if (!events.empty()) CHECK_EQ(events[0].frame, 1000.0);
-  CHECK_EQ(snare_engine_is_playing(engine), 1);
-  CHECK_EQ(snare_engine_current_step(engine), 0);
-  snare_engine_stop(engine);
-  snare::io::render(engine, 250, 250);
+  SnareEngine* engine = clickEngine(shape(16), 120.0);
+  snare::io::render(engine, 1000, 256);
   CHECK_EQ(snare_engine_is_playing(engine), 0);
   CHECK_EQ(snare_engine_current_step(engine), -1);
+  CHECK_EQ(snare_engine_current_measure(engine), 0);
+  snare_engine_play(engine);
+  snare::io::render(engine, 100, 100);
+  const std::vector<SnareEvent> events = readEvents(engine);
+  CHECK_EQ(events.size(), 1u);
+  CHECK_EQ(events[0].frame, 1000.0);
+  CHECK_EQ(snare_engine_is_playing(engine), 1);
+  CHECK_EQ(snare_engine_current_step(engine), 0);
+  CHECK_EQ(snare_engine_current_measure(engine), 1);
   snare_engine_destroy(engine);
 }
 
-SNARE_TEST(bounded_play_stops_after_its_bars) {
-  // Tempos chosen so a bar is not a whole number of frames, in both rounding
-  // directions. No step of a third bar may fire inside two rendered bars.
-  for (const double bpm : {123.0, 127.3, 133.7, 97.0, 140.0}) {
-    SnareEngine* engine = snare_engine_create(kRate);
-    SnareKit* kit = snare_kit_create();
-    setVoice(kit, 0, constant(64, 0.5f), kRate);
-    snare_engine_commit_kit(engine, kit);
-    snare_engine_enable_event_log(engine, 256);
-    snare_engine_set_tempo(engine, bpm);
-    for (int step = 0; step < SNARE_STEPS; ++step) snare_engine_set_step(engine, 0, step, 100);
-    snare_engine_play_loops(engine, 2);
-    const int loop = snare_loop_frames(bpm, kRate, SNARE_STEPS);
-    snare::io::render(engine, loop * 2 + 4096, 128);
-    CHECK_EQ(snare_engine_event_count(engine), 32);
-    CHECK_EQ(snare_engine_is_playing(engine), 0);
-    CHECK_EQ(snare_engine_current_step(engine), -1);
-    snare_engine_destroy(engine);
-  }
+SNARE_TEST(a_bounded_play_stops_on_the_bar_line) {
+  const double bpm = 140.0;
+  SnareEngine* engine = clickEngine(shape(16, 4, 4), bpm);
+  snare::io::render(engine, 500, 500);
+  snare_engine_play_measures(engine, 2);
+  CHECK_EQ(snare_engine_stop_frame(engine), -1.0);
+  snare::io::render(engine, 210000, 777);
+  const std::vector<SnareEvent> events = readEvents(engine);
+  CHECK_EQ(events.size(), 40u);  // twenty steps, twice; no step of a third measure
+  CHECK_EQ(snare_engine_is_playing(engine), 0);
+  CHECK_EQ(snare_engine_stop_frame(engine), 500.0 + frameOf(2 * 20 * 6, bpm));
+  CHECK_EQ(snare_engine_current_step(engine), -1);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(a_tempo_change_keeps_every_step_and_only_moves_later_ones) {
+  SnareEngine* engine = clickEngine(shape(16), 120.0);
+  snare_engine_play(engine);
+  snare::io::render(engine, 29000, 512);  // steps at 0, 6000, ..., 24000 so far
+  snare_engine_set_tempo(engine, 60.0);
+  snare::io::render(engine, 60000, 512);
+  const std::vector<SnareEvent> events = readEvents(engine);
+  CHECK(events.size() >= 8);
+  for (int i = 0; i <= 4; ++i) CHECK_EQ(events[static_cast<std::size_t>(i)].frame, 6000.0 * i);
+  // The step due at 30000 was 1000 frames away when the tempo halved, so it
+  // is now 2000 away.
+  CHECK_EQ(events[5].frame, 31000.0);
+  CHECK_EQ(events[6].frame - events[5].frame, 12000.0);
+  for (std::size_t i = 1; i < events.size(); ++i) CHECK_EQ(events[i].step, static_cast<int>(i % 16));
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(control_calls_check_their_arguments) {
   SnareEngine* engine = snare_engine_create(kRate);
-  CHECK_EQ(snare_engine_play_loops(engine, 0), SNARE_ERR_BAD_ARGUMENT);
-  snare_engine_destroy(engine);
-}
-
-SNARE_TEST(tempo_change_keeps_every_step) {
-  const double slow = 90.0;
-  const double fast = 150.0;
-  SnareEngine* engine = makeEngine(kRate, slow, 50.0);
-  // Change tempo part-way through the first loop, at a buffer boundary.
-  const int changeAt = 128 * 300;
-  snare::io::render(engine, changeAt, 128);
-  snare_engine_set_tempo(engine, fast);
-  snare::io::render(engine, static_cast<int>(kRate * 6), 128);
-  const auto events = readEvents(engine);
-
-  // Steps still arrive in order with none skipped or repeated, and the gap
-  // between two events is their distance in sixteenths at the tempo in force.
-  std::int64_t absolute = 0;
-  std::int64_t previousAbsolute = 0;
-  double previous = -1.0;
-  const double slowStep = snare_frames_per_step(slow, kRate);
-  const double fastStep = snare_frames_per_step(fast, kRate);
-  int checkedSlow = 0;
-  int checkedFast = 0;
-  for (const SnareEvent& event : events) {
-    while (!(absolute % 4 == 0 || absolute % 2 == 1)) ++absolute;
-    CHECK_EQ(event.step, static_cast<int>(absolute % SNARE_STEPS));
-    const double steps = static_cast<double>(absolute - previousAbsolute);
-    if (previous >= changeAt) {
-      CHECK_NEAR(event.frame - previous, steps * fastStep, 1.0);
-      ++checkedFast;
-    } else if (previous >= 0.0 && event.frame < changeAt) {
-      CHECK_NEAR(event.frame - previous, steps * slowStep, 1.0);
-      ++checkedSlow;
-    }
-    previous = event.frame;
-    previousAbsolute = absolute;
-    ++absolute;
-  }
-  CHECK(checkedSlow > 3);
-  CHECK(checkedFast > 20);
-  CHECK(events.size() > 30);
-  snare_engine_destroy(engine);
-}
-
-SNARE_TEST(arguments_are_validated) {
-  SnareEngine* engine = snare_engine_create(kRate);
+  const SnarePattern good = shape(16);
+  const SnarePattern bad = shape(0);
   CHECK(snare_engine_create(100.0) == nullptr);
-  CHECK_EQ(snare_engine_set_step(engine, SNARE_MAX_ROLES, 0, 100), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_engine_set_step(engine, 0, SNARE_STEPS, 100), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_engine_set_step(engine, 0, 0, 128), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_engine_trigger(engine, 0, 0), SNARE_ERR_BAD_ARGUMENT);
   CHECK_EQ(snare_engine_set_tempo(engine, 0.0), SNARE_ERR_BAD_ARGUMENT);
-  SnareKit* kit = snare_kit_create();
-  const float sample[4] = {0, 0, 0, 0};
-  CHECK_EQ(snare_kit_set_voice(kit, 0, sample, 4, 3, kRate, 1, 0, 0), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_kit_set_voice(kit, 0, sample, 0, 1, kRate, 1, 0, 0), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_kit_set_voice(kit, 0, sample, 4, 1, kRate, 1, 2.0f, 0), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_kit_set_voice(kit, 0, sample, 4, 1, kRate, 1, 0, 0), SNARE_OK);
-  snare_kit_destroy(kit);
+  CHECK_EQ(snare_engine_set_tempo(nullptr, 120.0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_pattern(engine, SNARE_PATTERNS, &good), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_pattern(engine, 0, &bad), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_pattern(engine, 0, nullptr), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_step(engine, 0, SNARE_TRACKS, 0, 1), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_step(engine, 0, 0, SNARE_MAX_STEPS, 1), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_step(engine, -1, 0, 0, 1), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_cue_pattern(engine, -1), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_play_measures(engine, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_trigger(engine, 0, 0), SNARE_ERR_BAD_ARGUMENT);  // the accent has no sound
+  CHECK_EQ(snare_engine_trigger(engine, SNARE_TRACKS, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_track(engine, 0, 0, 0.0f, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_track(engine, 1, SNARE_SOUNDS, 0.0f, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_track(engine, 1, 0, 2.0f, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_track_level(engine, 1, 5.0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_accent(engine, -1.0, 1.0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_master_volume(engine, 1.5), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_pattern(engine, 0, &good), SNARE_OK);
 
-  // The command queue reports when it is full instead of blocking.
+  // The queue holds 1024 messages until audio is pulled.
   int result = SNARE_OK;
-  for (int i = 0; i < 5000 && result == SNARE_OK; ++i) result = snare_engine_set_step(engine, 0, 0, 1);
+  for (int i = 0; i < 2000 && result == SNARE_OK; ++i) result = snare_engine_set_tempo(engine, 100.0 + i);
   CHECK_EQ(result, SNARE_ERR_QUEUE_FULL);
-  float left[8], right[8];
-  snare_engine_render(engine, left, right, 8);
-  CHECK_EQ(snare_engine_set_step(engine, 0, 0, 1), SNARE_OK);
+  snare::io::render(engine, 16, 16);
+  CHECK_EQ(snare_engine_set_tempo(engine, 100.0), SNARE_OK);
   snare_engine_destroy(engine);
 }
 

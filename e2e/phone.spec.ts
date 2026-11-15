@@ -1,38 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { chooseMode, debug, lane, openEditor, project, step } from './helpers';
+import { bpmOf, debug, openEditor, project, stepsOn } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await openEditor(page);
 });
 
-test('the grid fits a phone and has touch-sized steps', async ({ page }) => {
-  await chooseMode(page, 'modern');
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
-
-  const box = (await step(page, 'kick', 0).boundingBox())!;
-  expect(box.width).toBeGreaterThanOrEqual(36);
-  expect(box.height).toBeGreaterThanOrEqual(40);
-
-  // Each lane wraps into two rows of eight.
-  const first = (await step(page, 'kick', 0).boundingBox())!;
-  const eighth = (await step(page, 'kick', 7).boundingBox())!;
-  const ninth = (await step(page, 'kick', 8).boundingBox())!;
-  expect(eighth.y).toBe(first.y);
-  expect(ninth.y).toBeGreaterThan(first.y);
-  expect(ninth.x).toBe(first.x);
-});
-
-test('tapping toggles steps and the docked Play starts audio', async ({ page }) => {
-  await chooseMode(page, 'modern');
-  await step(page, 'open_hat', 3).tap();
-  await expect(step(page, 'open_hat', 3)).toHaveAttribute('aria-pressed', 'true');
-  expect(lane(await project(page), 'open_hat')[3]).toBe(100);
-
+test('the docked start button starts audio, beside the tempo', async ({ page }) => {
   const dock = page.getByTestId('dock-play');
   await expect(dock).toBeVisible();
+  expect((await dock.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByTestId('dock-bpm')).toHaveText(String(Math.round(bpmOf(await project(page)))));
   await dock.tap();
   await expect(page.getByTestId('editor')).toHaveAttribute('data-audio', 'running');
   await expect.poll(async () => (await debug(page)).stats?.peakEver ?? 0).toBeGreaterThan(0.01);
@@ -45,20 +22,12 @@ test('settings is reachable by touch', async ({ page }) => {
   expect(Math.min(cog.width, cog.height)).toBeGreaterThanOrEqual(44);
   await page.getByTestId('settings').tap();
   await expect(page.getByTestId('settings-sheet')).toBeVisible();
-  const mode = (await page.getByTestId('mode-modern').boundingBox())!;
-  expect(mode.height).toBeGreaterThanOrEqual(34);
+  for (const id of ['undo', 'clear', 'import', 'export-menu']) {
+    expect((await page.getByTestId(id).boundingBox())!.height).toBeGreaterThanOrEqual(40);
+  }
 });
 
-test('kit buttons are reachable by touch', async ({ page }) => {
-  await page.getByTestId('settings').tap();
-  test.skip((await page.getByTestId('kit-909').count()) === 0, 'the page offers one kit, so it has no picker');
-  await page.getByTestId('kit-909').tap();
-  await expect(page.getByTestId('editor')).toHaveAttribute('data-kit', '909');
-  const box = (await page.getByTestId('kit-909').boundingBox())!;
-  expect(box.height).toBeGreaterThanOrEqual(44);
-});
-
-test('the hardware panel stays usable on a phone', async ({ page }) => {
+test('the machine stays usable on a phone', async ({ page }) => {
   const panel = page.getByTestId('panel');
   await expect(panel).toBeVisible();
 
@@ -72,12 +41,17 @@ test('the hardware panel stays usable on a phone', async ({ page }) => {
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // The instrument strip is the touch-sized way to pick a voice.
+  // The instrument strip is the touch-sized way to pick a track: the accent
+  // and all eleven instruments.
+  await expect(page.locator('[data-testid^="strip-voice-"]')).toHaveCount(12);
   const strip = page.getByTestId('strip-voice-snare');
   expect((await strip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await strip.tap();
+  await expect(page.getByTestId('panel-voice')).toContainText('Snare Drum');
+  await expect(page.getByTestId('panel-voice')).toContainText('2 steps on');
   await first.tap();
-  expect(lane(await project(page), 'snare')[0]).toBe(100);
+  expect(stepsOn(await project(page), 'snare')).toEqual([0, 4, 12]);
+  await expect(page.getByTestId('panel-voice')).toContainText('3 steps on');
 
   // Fit shows the whole faceplate at once.
   await page.getByRole('button', { name: 'Fit to screen' }).tap();
