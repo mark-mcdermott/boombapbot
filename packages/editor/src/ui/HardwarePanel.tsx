@@ -3,6 +3,7 @@ import {
   BPM_MAX,
   BPM_MIN,
   KITS,
+  SOUND_PARAM_LABELS,
   STEP_COUNT,
   countHits,
   findLane,
@@ -92,56 +93,74 @@ function knobLighting(panel: PanelManifest, photo: string | null): 'fixed' | und
   return photo && panel.faceplate.original ? 'fixed' : undefined;
 }
 
-function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | null }) {
-  const { store } = useRuntime();
-  const bpm = useEditorState((state) => state.project.bpm);
-  const drag = useRef<{ y: number; bpm: number } | null>(null);
-  const { tempo } = panel;
-  const deg = tempo.minDeg + ((bpm - BPM_MIN) / (BPM_MAX - BPM_MIN)) * (tempo.maxDeg - tempo.minDeg);
+interface KnobProps {
+  panel: PanelManifest;
+  photo: string | null;
+  geometry: { cx: number; cy: number; r: number; photoDeg: number; minDeg: number; maxDeg: number };
+  label: string;
+  testId: string;
+  value: number;
+  min: number;
+  max: number;
+  /** Change for one arrow key. Page Up and Page Down move ten times as far. */
+  step: number;
+  /** Change for each pixel dragged upwards. */
+  perPixel: number;
+  valueText?: string;
+  onChange(value: number): void;
+}
+
+/** A knob on the faceplate: drag up and down, or use the arrow keys. */
+function Knob(props: KnobProps) {
+  const { panel, photo, geometry, value, min, max, step, onChange } = props;
+  const drag = useRef<{ y: number; value: number } | null>(null);
+  const turn = (value - min) / (max - min);
+  const deg = geometry.minDeg + turn * (geometry.maxDeg - geometry.minDeg);
+  const set = (next: number) => onChange(Math.min(max, Math.max(min, next)));
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const steps: Record<string, number> = {
-      ArrowUp: 1,
-      ArrowRight: 1,
-      ArrowDown: -1,
-      ArrowLeft: -1,
-      PageUp: 10,
-      PageDown: -10,
+      ArrowUp: step,
+      ArrowRight: step,
+      ArrowDown: -step,
+      ArrowLeft: -step,
+      PageUp: step * 10,
+      PageDown: -step * 10,
     };
     const change = steps[event.key];
     if (change !== undefined) {
       event.preventDefault();
-      store.setBpm(bpm + change);
+      set(value + change);
     } else if (event.key === 'Home') {
       event.preventDefault();
-      store.setBpm(BPM_MIN);
+      set(min);
     } else if (event.key === 'End') {
       event.preventDefault();
-      store.setBpm(BPM_MAX);
+      set(max);
     }
   };
 
   return (
     <div
       className="sb-panel-knob"
-      style={circle(panel, tempo.cx, tempo.cy, tempo.r)}
+      style={circle(panel, geometry.cx, geometry.cy, geometry.r)}
       role="slider"
       tabIndex={0}
-      data-testid="panel-tempo"
+      data-testid={props.testId}
       data-lighting={knobLighting(panel, photo)}
-      aria-label={`${tempo.label || 'Tempo'} in beats per minute`}
-      aria-valuemin={BPM_MIN}
-      aria-valuemax={BPM_MAX}
-      aria-valuenow={bpm}
+      aria-label={props.label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={props.valueText}
       onKeyDown={onKeyDown}
       onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
-        drag.current = { y: event.clientY, bpm };
+        drag.current = { y: event.clientY, value };
         event.currentTarget.setPointerCapture(event.pointerId);
       }}
       onPointerMove={(event) => {
         if (!drag.current) return;
-        // Drag up to speed up: two pixels per beat per minute.
-        store.setBpm(drag.current.bpm + (drag.current.y - event.clientY) / 2);
+        set(drag.current.value + (drag.current.y - event.clientY) * props.perPixel);
       }}
       onPointerUp={() => {
         drag.current = null;
@@ -150,8 +169,64 @@ function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | nul
         drag.current = null;
       }}
     >
-      <KnobFace panel={panel} photo={photo} cx={tempo.cx} cy={tempo.cy} r={tempo.r} photoDeg={tempo.photoDeg} deg={deg} />
+      <KnobFace
+        panel={panel}
+        photo={photo}
+        cx={geometry.cx}
+        cy={geometry.cy}
+        r={geometry.r}
+        photoDeg={geometry.photoDeg}
+        deg={deg}
+      />
     </div>
+  );
+}
+
+function TempoKnob({ panel, photo }: { panel: PanelManifest; photo: string | null }) {
+  const { store } = useRuntime();
+  const bpm = useEditorState((state) => state.project.bpm);
+  return (
+    <Knob
+      panel={panel}
+      photo={photo}
+      geometry={panel.tempo}
+      label={`${panel.tempo.label || 'Tempo'} in beats per minute`}
+      testId="panel-tempo"
+      value={bpm}
+      min={BPM_MIN}
+      max={BPM_MAX}
+      step={1}
+      // Two pixels per beat per minute.
+      perPixel={0.5}
+      onChange={(value) => store.setBpm(value)}
+    />
+  );
+}
+
+type PanelKnob = NonNullable<PanelManifest['knobs']>[number];
+
+/** A tone, decay, tuning or snappy knob. Its travel reads as 0 to 100. */
+function SoundKnob({ panel, photo, knob }: { panel: PanelManifest; photo: string | null; knob: PanelKnob }) {
+  const { store } = useRuntime();
+  const kitId = useEditorState((state) => state.project.kit.id);
+  const position = useEditorState((state) => state.sound[knob.role][knob.param]);
+  const percent = Math.round(position * 100);
+  return (
+    <Knob
+      panel={panel}
+      photo={photo}
+      geometry={knob}
+      label={`${KITS[kitId].voices[knob.role].label} ${SOUND_PARAM_LABELS[knob.param]}`}
+      testId={`panel-knob-${knob.role}-${knob.param}`}
+      value={percent}
+      min={0}
+      max={100}
+      step={2}
+      // Its whole travel in 200 pixels.
+      perPixel={0.5}
+      valueText={`${percent}%`}
+      onChange={(value) => store.setKnob(knob.role, knob.param, value / 100)}
+    />
   );
 }
 
@@ -235,6 +310,9 @@ export function HardwarePanel() {
             : null}
 
           <TempoKnob panel={panel} photo={photo} />
+          {(panel.knobs ?? []).map((knob) => (
+            <SoundKnob key={`${knob.role}-${knob.param}`} panel={panel} photo={photo} knob={knob} />
+          ))}
           {!photo ? (
             <span
               className="sb-panel-caption"

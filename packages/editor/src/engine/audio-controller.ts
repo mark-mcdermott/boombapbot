@@ -21,6 +21,8 @@ export interface AudioControllerEvents {
   onPosition(step: number, playing: boolean): void;
   onStats(stats: AudioStats): void;
   onKit(id: string): void;
+  /** The worklet has taken the sound last sent for this slot. */
+  onSound(slot: number): void;
 }
 
 export interface EngineAssets {
@@ -144,6 +146,9 @@ export class AudioController {
       case 'kit':
         this.events.onKit(report.id);
         break;
+      case 'sound':
+        this.events.onSound(report.slot);
+        break;
       case 'error':
         this.setState('error', report.message);
         break;
@@ -163,6 +168,11 @@ export class AudioController {
       { type: 'kit', id: kit.id, voices },
       voices.map((voice) => voice.pcm.buffer),
     );
+  }
+
+  /** Sends one slot's sound. The buffer is transferred, so pass a copy. */
+  setSound(slot: number, pcm: Float32Array, channels: number, sampleRate: number): void {
+    this.post({ type: 'sound', slot, pcm, channels, sampleRate }, [pcm.buffer]);
   }
 
   setPattern(rows: number[][]): void {

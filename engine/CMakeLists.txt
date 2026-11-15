@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(boombapbot_engine VERSION 0.1.0 LANGUAGES CXX)
+project(boombapbot_engine VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ endif()
 option(SNARE_BUILD_TESTS "Build the CTest suites" ON)
 option(SNARE_BUILD_TOOLS "Build the boombapbot-render command line tool" ON)
 
-set(SNARE_SOURCES src/engine.cpp src/midi.cpp)
+set(SNARE_SOURCES src/engine.cpp src/midi.cpp src/synth808.cpp)
 set(SNARE_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
 # No fused multiply-add, so native and WebAssembly builds do the same
 # arithmetic and render the same samples.
@@ -21,9 +21,11 @@ set(SNARE_FLOAT_FLAGS -ffp-contract=off)
 set(SNARE_WASM_EXPORTS
   malloc free
   snare_abi_version snare_step_time snare_frames_per_step snare_loop_frames
+  snare_synth_frames snare_synth_render
+  snare_sound_create snare_sound_data snare_sound_destroy
   snare_kit_create snare_kit_destroy snare_kit_set_voice
-  snare_engine_create snare_engine_destroy snare_engine_commit_kit snare_engine_collect
-  snare_engine_set_tempo snare_engine_set_swing snare_engine_set_master_gain
+  snare_engine_create snare_engine_destroy snare_engine_set_sound snare_engine_commit_kit snare_engine_collect
+  snare_engine_set_tempo snare_engine_set_swing snare_engine_set_master_gain snare_engine_set_slot
   snare_engine_set_step snare_engine_set_row snare_engine_clear_pattern
   snare_engine_play snare_engine_play_loops snare_engine_stop snare_engine_trigger snare_engine_render
   snare_engine_is_playing snare_engine_current_step snare_engine_frames_rendered
@@ -35,6 +37,8 @@ if(EMSCRIPTEN)
   # A standalone module with no JavaScript glue: the AudioWorklet, the offline
   # exporter and the Node tests all instantiate the same .wasm directly. No
   # threads or shared memory, so no cross-origin isolation is required.
+  # Memory starts large enough for a full set of sounds and the ones a knob
+  # drag replaces, so it does not have to grow on the audio thread.
   list(TRANSFORM SNARE_WASM_EXPORTS PREPEND "_" OUTPUT_VARIABLE SNARE_EXPORT_SYMBOLS)
   list(JOIN SNARE_EXPORT_SYMBOLS "," SNARE_EXPORT_LIST)
   add_executable(boombapbot-engine ${SNARE_SOURCES})
@@ -44,7 +48,7 @@ if(EMSCRIPTEN)
     -O3 --no-entry -fno-exceptions
     -sSTANDALONE_WASM=1
     -sALLOW_MEMORY_GROWTH=1
-    -sINITIAL_MEMORY=16777216
+    -sINITIAL_MEMORY=33554432
     -sSTACK_SIZE=262144
     -sEXPORTED_FUNCTIONS=${SNARE_EXPORT_LIST})
   set_target_properties(boombapbot-engine PROPERTIES SUFFIX ".wasm")
@@ -69,11 +73,18 @@ endif()
 
 if(SNARE_BUILD_TESTS)
   enable_testing()
-  foreach(suite scheduler voices choke swing kit_mapping midi)
+  foreach(suite scheduler voices choke swing kit_mapping midi realtime synth)
     add_executable(test_${suite} tests/test_${suite}.cpp)
     target_link_libraries(test_${suite} PRIVATE boombapbot_engine)
     target_compile_options(test_${suite} PRIVATE ${SNARE_WARNINGS})
     target_compile_definitions(test_${suite} PRIVATE ${SNARE_PATH_DEFINITIONS})
     add_test(NAME engine.${suite} COMMAND test_${suite})
   endforeach()
+
+  # Compiled as C, to prove engine.h is a C header and pin its struct layouts.
+  add_executable(test_abi tests/test_abi.c)
+  set_target_properties(test_abi PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON LINKER_LANGUAGE CXX)
+  target_link_libraries(test_abi PRIVATE boombapbot_engine)
+  target_compile_options(test_abi PRIVATE ${SNARE_WARNINGS})
+  add_test(NAME engine.abi COMMAND test_abi)
 endif()

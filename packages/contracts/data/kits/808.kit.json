@@ -5,7 +5,8 @@
   "version": "0.1.0-demo.1",
   "name": "808 demo",
   "demo": true,
-  "description": "Long boomy kick and metallic hats. Synthesised placeholder, not sampled from hardware.",
+  "synthesised": true,
+  "description": "Long boomy kick and metallic hats. Synthesised by the engine, not sampled from hardware.",
   "assetBase": "kits/808",
   "sampleRate": 44100,
   "voices": {

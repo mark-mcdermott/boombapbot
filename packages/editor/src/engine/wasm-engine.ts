@@ -10,6 +10,7 @@ export const SNARE_STEPS = 16;
 export const SNARE_MAX_ROLES = 16;
 const ERR_QUEUE_FULL = -1;
 const BYTES_PER_EVENT = 24;
+const BYTES_PER_SOUND_PARAMS = 24;
 
 interface EngineExports {
   memory: WebAssembly.Memory;
@@ -17,9 +18,14 @@ interface EngineExports {
   malloc(size: number): number;
   free(pointer: number): void;
   snare_abi_version(): number;
+  snare_synth_frames(params: number, sampleRate: number): number;
+  snare_synth_render(params: number, sampleRate: number, out: number, capacity: number): number;
   snare_step_time(step: number, swing: number): number;
   snare_frames_per_step(bpm: number, sampleRate: number): number;
   snare_loop_frames(bpm: number, sampleRate: number, steps: number): number;
+  snare_sound_create(frames: number, channels: number, sampleRate: number): number;
+  snare_sound_data(sound: number): number;
+  snare_sound_destroy(sound: number): void;
   snare_kit_create(): number;
   snare_kit_destroy(kit: number): void;
   snare_kit_set_voice(
@@ -35,11 +41,13 @@ interface EngineExports {
   ): number;
   snare_engine_create(sampleRate: number): number;
   snare_engine_destroy(engine: number): void;
+  snare_engine_set_sound(engine: number, slot: number, sound: number): number;
   snare_engine_commit_kit(engine: number, kit: number): number;
   snare_engine_collect(engine: number): number;
   snare_engine_set_tempo(engine: number, bpm: number): number;
   snare_engine_set_swing(engine: number, swing: number): number;
   snare_engine_set_master_gain(engine: number, gain: number): number;
+  snare_engine_set_slot(engine: number, slot: number, gain: number, pan: number, chokeGroup: number): number;
   snare_engine_set_step(engine: number, role: number, step: number, velocity: number): number;
   snare_engine_set_row(engine: number, role: number, velocities: number): number;
   snare_engine_clear_pattern(engine: number): number;
@@ -80,6 +88,16 @@ export interface EngineVoice {
   gain: number;
   pan: number;
   chokeGroup: number;
+}
+
+/** One synthesised sound: its number and its knob positions, each 0 to 1. */
+export interface SynthSound {
+  /** Sound number, which is also its role slot. */
+  sound: number;
+  tune: number;
+  tone: number;
+  decay: number;
+  snappy: number;
 }
 
 export interface EngineEvent {
@@ -152,6 +170,35 @@ export class SnareWasm {
 
   createEngine(sampleRate: number, blockSize = 1024): WasmEngine {
     return new WasmEngine(this, sampleRate, blockSize);
+  }
+
+  /**
+   * Synthesises one sound as mono PCM. Deterministic, and never called on the
+   * audio thread: the result is handed to an engine like any other sample.
+   */
+  synthesise(settings: SynthSound, sampleRate: number): Float32Array {
+    const params = this.alloc(BYTES_PER_SOUND_PARAMS);
+    try {
+      const view = new DataView(this.exports.memory.buffer);
+      view.setInt32(params, settings.sound, true);
+      view.setFloat32(params + 4, settings.tune, true);
+      view.setFloat32(params + 8, settings.tone, true);
+      view.setFloat32(params + 12, settings.decay, true);
+      view.setFloat32(params + 16, settings.snappy, true);
+      view.setUint32(params + 20, 0, true);
+      const frames = this.exports.snare_synth_frames(params, sampleRate);
+      if (frames <= 0) throw new Error(`sound ${settings.sound} could not be synthesised (${frames})`);
+      const out = this.alloc(frames * Float32Array.BYTES_PER_ELEMENT);
+      try {
+        const written = this.exports.snare_synth_render(params, sampleRate, out, frames);
+        if (written !== frames) throw new Error(`sound ${settings.sound} could not be synthesised (${written})`);
+        return this.heapF32.slice(out >> 2, (out >> 2) + frames);
+      } finally {
+        this.exports.free(out);
+      }
+    } finally {
+      this.exports.free(params);
+    }
   }
 
   /** Musical time of a step in sixteenths, using the playback timeline. */
@@ -238,6 +285,25 @@ export class WasmEngine {
       result = call();
     }
     if (result !== 0) throw new Error(`engine rejected a control message (${result})`);
+  }
+
+  /**
+   * Gives one slot a new sound from the next block. The samples are copied
+   * once, straight into the buffer the engine will play.
+   */
+  setSound(slot: number, pcm: Float32Array, channels: number, sampleRate: number): void {
+    const sound = this.x.snare_sound_create(pcm.length / channels, channels, sampleRate);
+    if (sound === 0) throw new Error(`engine rejected a sound for slot ${slot}`);
+    this.wasm.heapF32.set(pcm, this.x.snare_sound_data(sound) >> 2);
+    const result = this.x.snare_engine_set_sound(this.handle, slot, sound);
+    if (result !== 0) {
+      this.x.snare_sound_destroy(sound);
+      throw new Error(`engine rejected a sound for slot ${slot} (${result})`);
+    }
+  }
+
+  setSlot(slot: number, gain: number, pan: number, chokeGroup: number): void {
+    this.send(() => this.x.snare_engine_set_slot(this.handle, slot, gain, pan, chokeGroup));
   }
 
   /** Stages a kit and hands it over. It becomes active at the next block. */

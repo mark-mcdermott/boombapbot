@@ -8,6 +8,9 @@ import {
   PROJECT_FORMAT,
   ROLES,
   ROLE_IDS,
+  ROLE_KNOBS,
+  clampKnob,
+  defaultSoundSettings,
   countHits,
   createProject,
   createStarterPattern,
@@ -130,6 +133,24 @@ describe('roles and kits', () => {
   });
 });
 
+describe('sound knobs', () => {
+  it('start at noon for every voice and stay between fully left and fully right', () => {
+    const sound = defaultSoundSettings();
+    expect(Object.keys(sound).sort()).toEqual([...ROLE_IDS].sort());
+    for (const role of ROLE_IDS) expect(sound[role]).toEqual({ tune: 0.5, tone: 0.5, decay: 0.5, snappy: 0.5 });
+    expect(clampKnob(-3)).toBe(0);
+    expect(clampKnob(7)).toBe(1);
+    expect(clampKnob(0.25)).toBe(0.25);
+    expect(clampKnob(Number.NaN)).toBe(0.5);
+  });
+
+  it('gives the 808 panel a knob for every sound control of a voice that has a lane', () => {
+    const listed = (PANELS['808'].knobs ?? []).map((knob) => `${knob.role}:${knob.param}`).sort();
+    const expected = ROLE_IDS.flatMap((role) => ROLE_KNOBS[role].map((param) => `${role}:${param}`)).sort();
+    expect(listed).toEqual(expected);
+  });
+});
+
 describe('offered kits', () => {
   it('lists at least one defined kit, without repeats', () => {
     expect(OFFERED_KIT_IDS.length).toBeGreaterThan(0);
@@ -185,6 +206,18 @@ describe('hardware panels', () => {
         expect(credit!.licenceUrl).toMatch(/^https:\/\/creativecommons\.org\/licenses\/by(-sa)?\/\d\.\d\/$/);
         expect(credit!.licence).toMatch(/^CC BY(-SA)? \d\.\d$/);
       }
+      // A sound knob sits on the faceplate, belongs to a voice that has that
+      // knob, and appears once.
+      const knobs = panel.knobs ?? [];
+      for (const knob of knobs) {
+        expect(knob.cx - knob.r).toBeGreaterThanOrEqual(0);
+        expect(knob.cy - knob.r).toBeGreaterThanOrEqual(0);
+        expect(knob.cx + knob.r).toBeLessThanOrEqual(width);
+        expect(knob.cy + knob.r).toBeLessThanOrEqual(height);
+        expect(knob.minDeg).toBeLessThan(knob.maxDeg);
+        expect(ROLE_KNOBS[knob.role]).toContain(knob.param);
+      }
+      expect(new Set(knobs.map((knob) => `${knob.role}:${knob.param}`)).size).toBe(knobs.length);
       expect(panelRoles(panel).length).toBeGreaterThanOrEqual(6);
       expect([...panelRoles(panel), ...rolesOutsidePanel(panel)].sort()).toEqual([...ROLE_IDS].sort());
     }

@@ -5,10 +5,11 @@
 // are placed from the machine's panel manifest, so the artwork and the hit
 // areas cannot drift apart.
 //
-// The editor turns a knob by rotating a round crop of this image, so the two
-// knobs it turns (tempo, instrument selector) are shaded evenly here and the
-// editor lays a fixed light over them. Every other knob never moves and is
-// lit in the drawing itself, with the same light.
+// The editor turns a knob by rotating a round crop of this image, so the
+// knobs it turns (tempo, instrument selector and the sound knobs the manifest
+// lists) are shaded evenly here and the editor lays a fixed light over them.
+// Every other knob never moves and is lit in the drawing itself, with the
+// same light.
 //
 //   node scripts/draw-faceplates.mjs           write assets/faceplates/*.svg
 //   node scripts/draw-faceplates.mjs --check   fail if a committed file differs
@@ -208,8 +209,11 @@ function pointer(cx, cy, r, deg) {
   return line(x1, y1, x2, y2, { stroke: C.orange, 'stroke-width': Math.max(3, r * 0.075), 'stroke-linecap': 'round' });
 }
 
-/** A small knob with a coloured cap inside a tick ring. */
-function smallKnob(cx, cy, { cap, deg, marker = false }) {
+/**
+ * A small knob with a coloured cap inside a tick ring. One the editor turns
+ * (`live`) is left unlit, because the editor lights it.
+ */
+function smallKnob(cx, cy, { cap, deg, marker = false, live = false }) {
   const ticks = [];
   for (let i = 0; i <= 10; i += 1) {
     const angle = -150 + i * 30;
@@ -227,7 +231,7 @@ function smallKnob(cx, cy, { cap, deg, marker = false }) {
     knobBody(cx, cy, 22, 26),
     circle(cx, cy, 13, { fill: cap, stroke: '#000', 'stroke-opacity': 0.35, 'stroke-width': 1 }),
     line(qx, qy, px, py, { stroke: C.plateInk, 'stroke-width': 3.2, 'stroke-linecap': 'round' }),
-    lit(cx, cy, 22),
+    live ? '' : lit(cx, cy, 22),
   ]);
 }
 
@@ -413,18 +417,27 @@ function draw808(panel) {
   out.push(text(380, 728, 'SLOW', { size: 9.5, fill: C.label }));
   out.push(text(456, 728, 'FAST', { size: 9.5, fill: C.label }));
 
-  // Instrument columns.
+  // Instrument columns. A sound knob the manifest lists is one the editor
+  // turns: it is drawn at its rest angle, where the manifest says it is.
+  const liveKnobs = new Set(panel.knobs ?? []);
+  const soundKnob = (cx, cy, restDeg) => {
+    const live = [...liveKnobs].find((knob) => Math.abs(knob.cx - cx) < 0.5 && Math.abs(knob.cy - cy) < 0.5);
+    if (!live) return smallKnob(cx, cy, { cap: C.capWhite, deg: restDeg });
+    liveKnobs.delete(live);
+    if (live.r !== 22) throw new Error(`the ${live.role} ${live.param} knob must have radius 22`);
+    return smallKnob(cx, cy, { cap: C.capWhite, deg: live.photoDeg, live: true });
+  };
   COLUMNS.forEach((column, index) => {
     const cx = columnCentre(index);
     out.push(text(cx, 229, 'LEVEL', { size: 13, fill: C.label, spacing: 0.5 }));
     out.push(smallKnob(cx, 268, { cap: C.capOrange, deg: 96 + ((index * 37) % 50), marker: true }));
     if (column.mid) {
       out.push(text(cx, 350, column.mid, { size: 13, fill: C.label, spacing: 0.5 }));
-      out.push(smallKnob(cx, 389, { cap: C.capWhite, deg: -20 + ((index * 53) % 70) }));
+      out.push(soundKnob(cx, 389, -20 + ((index * 53) % 70)));
     }
     if (column.low) {
       out.push(text(cx, 470, column.low, { size: 13, fill: C.label, spacing: 0.5 }));
-      out.push(smallKnob(cx, 509, { cap: C.capWhite, deg: -40 + ((index * 71) % 90) }));
+      out.push(soundKnob(cx, 509, -40 + ((index * 71) % 90)));
     }
     if (column.alt) {
       out.push(plate(cx, 482, column.alt));
@@ -432,6 +445,10 @@ function draw808(panel) {
     }
     out.push(plate(cx, 578, column.plate));
   });
+  if (liveKnobs.size > 0) {
+    const [stray] = liveKnobs;
+    throw new Error(`the ${stray.role} ${stray.param} knob is not where the drawing has a knob`);
+  }
 
   // Model name on its rule, and master volume.
   out.push(line(545, 704, 1688, 704, { stroke: C.orange, 'stroke-width': 2.5 }));

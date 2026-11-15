@@ -69,6 +69,20 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - The functions the WASM build exports are listed in `engine/CMakeLists.txt`
   (`SNARE_WASM_EXPORTS`). Add new C ABI functions there, and to
   `packages/editor/src/engine/wasm-engine.ts`.
+- `test_realtime` counts heap calls inside `snare_engine_render` and
+  `test_abi.c` pins struct layouts; a unit test compares the header, the
+  export list and the TypeScript bridge. Keep all three passing.
+- `engine/src/synth808.cpp` builds the 808's sounds from knob settings. Do
+  its arithmetic in double, use the C library's maths for coefficients only,
+  and keep its own noise generator: that is what holds native and WASM to
+  one 24-bit step per sound. Never synthesise on the audio thread; render
+  the sound elsewhere and hand over PCM.
+- Each sound slot holds its own sound (`snare_engine_set_sound`); the kit
+  calls are a layer over that. A replaced sound is freed on the control
+  thread by `snare_engine_collect`, never in render. When a sound knob
+  moves, `EditorRuntime.sendSound` re-synthesises that one voice on the main
+  thread and posts it; one sound per slot is in flight at a time and the
+  newest setting follows when the worklet acknowledges.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.

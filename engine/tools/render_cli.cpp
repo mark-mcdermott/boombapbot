@@ -4,6 +4,11 @@
 //   boombapbot-render --project beat.json --contracts packages/contracts
 //       --assets assets [--kit 909] [--rate 44100] [--bits 24]
 //       [--out loop.wav] [--midi beat.mid] [--events events.json]
+//
+// It also writes one synthesised sound as raw little-endian float samples:
+//
+//   boombapbot-render --synth 7 --raw cymbal.f32 [--rate 48000]
+//       [--tune 0.5] [--tone 0.5] [--decay 0.5] [--snappy 0.5]
 
 #include <cstdio>
 #include <cstdlib>
@@ -14,9 +19,34 @@
 
 #include "project_io.h"
 
+namespace {
+
+int writeSound(std::map<std::string, std::string>& options) {
+  const auto knob = [&options](const char* name) {
+    return options.count(name) ? static_cast<float>(std::atof(options[name].c_str())) : 0.5f;
+  };
+  const double rate = options.count("--rate") ? std::atof(options["--rate"].c_str()) : 44100.0;
+  const SnareSoundParams params{std::atoi(options["--synth"].c_str()), knob("--tune"), knob("--tone"),
+                                knob("--decay"), knob("--snappy"), 0};
+  const int frames = snare_synth_frames(&params, rate);
+  if (frames <= 0) {
+    std::fprintf(stderr, "boombapbot-render: sound %d cannot be synthesised at %.0f Hz\n", params.sound, rate);
+    return 1;
+  }
+  std::vector<float> pcm(static_cast<std::size_t>(frames));
+  snare_synth_render(&params, rate, pcm.data(), frames);
+  std::ofstream out(options["--raw"], std::ios::binary);
+  out.write(reinterpret_cast<const char*>(pcm.data()),
+            static_cast<std::streamsize>(pcm.size() * sizeof(float)));
+  return out ? 0 : 1;
+}
+
+}  // namespace
+
 int main(int argc, char** argv) {
   std::map<std::string, std::string> options;
   for (int i = 1; i + 1 < argc; i += 2) options[argv[i]] = argv[i + 1];
+  if (options.count("--synth") && options.count("--raw")) return writeSound(options);
   if (!options.count("--project") || !options.count("--contracts") || !options.count("--assets")) {
     std::fprintf(stderr,
                  "usage: boombapbot-render --project FILE --contracts DIR --assets DIR\n"

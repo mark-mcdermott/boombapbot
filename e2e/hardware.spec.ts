@@ -81,6 +81,55 @@ test('the panel runs the transport and sets tempo', async ({ page }) => {
   await expect(knob).toHaveAttribute('aria-valuenow', String(bpm + 11));
 });
 
+test('a sound knob changes its own voice, in exports and while playing', async ({ page }) => {
+  await chooseKit(page, '808');
+  const decay = page.getByTestId('panel-knob-kick-decay');
+  await expect(decay).toHaveAccessibleName('Bass Drum decay');
+  await expect(decay).toHaveAttribute('aria-valuenow', '50');
+  const before = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+
+  // Keyboard: arrows, pages and the ends of its travel.
+  await decay.focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(decay).toHaveAttribute('aria-valuenow', '52');
+  await page.keyboard.press('PageDown');
+  await expect(decay).toHaveAttribute('aria-valuenow', '32');
+  await page.keyboard.press('End');
+  await expect(decay).toHaveAttribute('aria-valuenow', '100');
+  await expect(decay).toHaveAttribute('aria-valuetext', '100%');
+
+  // A longer bass drum puts more energy into the same beat, on the same steps.
+  const after = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  expect(after.events).toEqual(before.events);
+  expect(after.rms).toBeGreaterThan(before.rms * 1.1);
+
+  // Dragging up turns it clockwise: half a unit per pixel.
+  const tone = page.getByTestId('panel-knob-snare-tone');
+  const box = (await tone.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 60, { steps: 6 });
+  await page.mouse.up();
+  await expect(tone).toHaveAttribute('aria-valuenow', '80');
+
+  // While the beat runs, a turned knob sends that one sound to the engine.
+  await page.getByTestId('panel-toggle').click();
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-audio', 'running');
+  const taken = (await debug(page)).soundsTaken;
+  const snappy = page.getByTestId('panel-knob-snare-snappy');
+  await snappy.focus();
+  for (let press = 0; press < 5; press += 1) await page.keyboard.press('ArrowUp');
+  await expect.poll(async () => (await debug(page)).soundsTaken).toBeGreaterThan(taken);
+  await expect
+    .poll(async () => {
+      const snapshot = await debug(page);
+      return snapshot.soundsSent - snapshot.soundsTaken;
+    })
+    .toBe(0);
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
+  await expect(page.getByTestId('notice')).toHaveCount(0);
+});
+
 test('panel steps can be walked with the arrow keys', async ({ page }) => {
   const steps = page.getByTestId('panel').locator('[data-panel-step]');
   await steps.nth(0).focus();

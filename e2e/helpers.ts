@@ -14,6 +14,8 @@ export interface DebugSnapshot {
   sampleRate: number | null;
   stats: { frames: number; peak: number; peakEver: number; voices: number; stolen: number } | null;
   engineKit: string | null;
+  soundsSent: number;
+  soundsTaken: number;
   project: ProjectSnapshot;
 }
 

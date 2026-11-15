@@ -38,6 +38,8 @@ export const kitManifestSchema = z.object({
   name: z.string().min(1).max(40),
   /** Demo kits are synthesised placeholders, not recordings of hardware. */
   demo: z.boolean(),
+  /** True when the engine synthesises this kit's sounds; its files are unused. */
+  synthesised: z.boolean().optional(),
   description: z.string().max(300),
   /** Folder under the asset root that holds this kit's files. */
   assetBase: z.string().regex(/^[a-z0-9/_-]+$/),

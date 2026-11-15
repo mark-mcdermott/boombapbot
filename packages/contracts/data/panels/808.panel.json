@@ -121,6 +121,17 @@
     "maxDeg": 150,
     "photoDeg": -79
   },
+  "knobs": [
+    { "role": "kick", "param": "tone", "cx": 667.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "kick", "param": "decay", "cx": 667.25, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "snare", "param": "tone", "cx": 778.75, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "snare", "param": "snappy", "cx": 778.75, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "low_tom", "param": "tune", "cx": 890.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "high_tom", "param": "tune", "cx": 1113.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "cymbal", "param": "tone", "cx": 1559.25, "cy": 389, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "cymbal", "param": "decay", "cx": 1559.25, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 },
+    { "role": "open_hat", "param": "decay", "cx": 1670.75, "cy": 509, "r": 22, "photoDeg": 0, "minDeg": -150, "maxDeg": 150 }
+  ],
   "voiceSelect": {
     "kind": "rotary",
     "label": "INSTRUMENT SELECT",
@@ -205,7 +216,7 @@
     "Accent (AC) is a separate track on the hardware. This prototype stores velocity per step and leaves the AC position inactive.",
     "Mid Tom, Rim Shot, Cowbell and the conga, claves and maracas switches have no lane in v0.1.",
     "First and second part, A, B and AB basic variation, intro and fill-in, auto fill-in, pre-scale and the compose and play modes are not modelled.",
-    "The level, tone, decay, tuning and snappy knobs are not connected.",
+    "The level knobs are not connected. Tone, decay, tuning and snappy are, for the voices that have a lane; what each does to the sound is a model made by ear.",
     "Step lamps show the selected instrument's steps and the running step. The hardware's exact lamp behaviour in each mode is unverified."
   ]
 }

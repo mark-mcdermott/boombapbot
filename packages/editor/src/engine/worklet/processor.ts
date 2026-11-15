@@ -55,6 +55,10 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
           engine.collect();
           this.report({ type: 'kit', id: command.id });
           break;
+        case 'sound':
+          engine.setSound(command.slot, command.pcm, command.channels, command.sampleRate);
+          this.report({ type: 'sound', slot: command.slot });
+          break;
         case 'pattern':
           command.rows.forEach((row, role) => engine.setRow(role, row));
           break;

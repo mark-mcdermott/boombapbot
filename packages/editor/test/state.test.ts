@@ -102,6 +102,20 @@ describe('editor store', () => {
     expect(store.getState().canUndo).toBe(false);
   });
 
+  it('turns a sound knob without touching the beat or its undo history', () => {
+    const store = makeStore();
+    const before = store.getState().project;
+    store.setKnob('kick', 'decay', 0.8);
+    expect(store.getState().sound.kick).toEqual({ tune: 0.5, tone: 0.5, decay: 0.8, snappy: 0.5 });
+    expect(store.getState().sound.snare.decay).toBe(0.5);
+    store.setKnob('kick', 'decay', 4);
+    expect(store.getState().sound.kick.decay).toBe(1);
+    store.setKnob('kick', 'decay', -1);
+    expect(store.getState().sound.kick.decay).toBe(0);
+    expect(store.getState().project).toBe(before);
+    expect(store.getState().canUndo).toBe(false);
+  });
+
   it('shares selection between editors', () => {
     const store = makeStore();
     store.select('snare', 4);

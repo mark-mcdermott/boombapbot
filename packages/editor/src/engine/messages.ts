@@ -3,6 +3,8 @@ import type { EngineVoice } from './wasm-engine';
 /** Main thread to worklet. */
 export type EngineCommand =
   | { type: 'kit'; id: string; voices: EngineVoice[] }
+  /** One slot's samples, mono or interleaved stereo. Acknowledged by slot. */
+  | { type: 'sound'; slot: number; pcm: Float32Array; channels: number; sampleRate: number }
   | { type: 'pattern'; rows: number[][] }
   | { type: 'tempo'; bpm: number }
   | { type: 'swing'; swing: number }
@@ -16,6 +18,7 @@ export type EngineReport =
   | { type: 'ready'; sampleRate: number }
   | { type: 'error'; message: string }
   | { type: 'kit'; id: string }
+  | { type: 'sound'; slot: number }
   | { type: 'position'; step: number; playing: boolean }
   | {
       type: 'stats';

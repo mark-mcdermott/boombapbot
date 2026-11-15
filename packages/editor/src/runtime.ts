@@ -1,6 +1,7 @@
 import {
   KITS,
   OFFERED_KIT_IDS,
+  ROLE_IDS,
   getRole,
   onOfferedKit,
   type KitId,
@@ -8,7 +9,7 @@ import {
   type RoleId,
 } from '@boombapbot/contracts';
 import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
-import { fetchBytes, loadKit, type DecodedKit } from './engine/kit-loader';
+import { fetchBytes, loadKit, synthesiseKit, type DecodedKit } from './engine/kit-loader';
 import { exportMidi, patternRows, renderLoop, type LoopRender } from './engine/offline';
 import { SnareWasm } from './engine/wasm-engine';
 import { encodeWav, type WavBitDepth } from './engine/wav';
@@ -47,6 +48,9 @@ export interface DebugSnapshot {
   sampleRate: number | null;
   stats: AudioStats | null;
   engineKit: string | null;
+  /** Single sounds sent to the audio thread after a knob moved, and taken by it. */
+  soundsSent: number;
+  soundsTaken: number;
   project: Project;
 }
 
@@ -59,13 +63,18 @@ export class EditorRuntime {
   private readonly baseUrl: string;
   private readonly storage: KeyValueStorage | null;
   private readonly audio: AudioController;
-  private readonly kits = new Map<KitId, Promise<DecodedKit>>();
+  private readonly kits = new Map<string, Promise<DecodedKit>>();
   private manifest: Promise<AssetManifest> | null = null;
   private wasmBytes: Promise<ArrayBuffer> | null = null;
   private offlineWasm: Promise<SnareWasm> | null = null;
   private synced: Project | null = null;
   private engineKit: string | null = null;
   private stats: AudioStats | null = null;
+  // One sound per slot may be on its way to the audio thread. A knob that
+  // moves again meanwhile marks the slot, and the newest setting follows.
+  private readonly soundsInFlight = new Map<RoleId, { stale: boolean }>();
+  private soundsSent = 0;
+  private soundsTaken = 0;
   private unsubscribe: (() => void) | null = null;
   private collectTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -104,6 +113,14 @@ export class EditorRuntime {
         this.engineKit = id;
         if (id === this.store.getState().project.kit.id) this.store.setKitStatus('ready');
       },
+      onSound: (slot) => {
+        const role = ROLE_IDS.find((id) => getRole(id).index === slot);
+        if (!role) return;
+        this.soundsTaken += 1;
+        const flight = this.soundsInFlight.get(role);
+        this.soundsInFlight.delete(role);
+        if (flight?.stale) void this.sendSound(role);
+      },
     });
   }
 
@@ -112,16 +129,24 @@ export class EditorRuntime {
     if (this.unsubscribe) return;
     this.persist(this.store.getState().project);
     let previous = this.store.getState().project;
+    let previousSound = this.store.getState().sound;
     this.unsubscribe = this.store.subscribe(() => {
-      const { project } = this.store.getState();
+      const { project, sound } = this.store.getState();
+      if (sound !== previousSound) {
+        for (const role of ROLE_IDS) {
+          if (sound[role] !== previousSound[role]) void this.sendSound(role);
+        }
+        previousSound = sound;
+      }
       if (project === previous) return;
       previous = project;
       this.persist(project);
       this.syncAudio();
     });
-    // Warm the caches so the first Play and the first kit switch are quick.
+    // Warm the caches so the first Play is quick. Sounds are fetched or
+    // synthesised once audio starts, when its sample rate is known.
     void this.loadManifest().catch(() => undefined);
-    void this.kit(this.store.getState().project.kit.id).catch(() => undefined);
+    void this.loadOfflineWasm().catch(() => undefined);
   }
 
   detach(): void {
@@ -187,24 +212,40 @@ export class EditorRuntime {
     return this.offlineWasm;
   }
 
-  /** Decoded kit, fetched once and cached for playback and export. */
-  kit(id: KitId): Promise<DecodedKit> {
-    let cached = this.kits.get(id);
+  /**
+   * A kit ready for an engine running at `sampleRate`, cached for playback
+   * and export. A synthesised kit is built at that rate; a sampled one is
+   * fetched once and resampled by the engine.
+   */
+  kit(id: KitId, sampleRate: number): Promise<DecodedKit> {
+    const manifest = KITS[id];
+    const { sound } = this.store.getState();
+    const built = `${id}@${sampleRate}@`;
+    const key = manifest.synthesised ? `${built}${JSON.stringify(sound)}` : id;
+    let cached = this.kits.get(key);
     if (!cached) {
-      cached = this.loadManifest()
-        .then((manifest) => loadKit(KITS[id], this.url(manifest.kits), fetchBytes))
-        .catch((error: unknown) => {
-          this.kits.delete(id);
-          throw error;
-        });
-      this.kits.set(id, cached);
+      // A kit built for other knob settings is no use any more.
+      for (const other of this.kits.keys()) {
+        if (manifest.synthesised && other.startsWith(built)) this.kits.delete(other);
+      }
+      cached = (
+        manifest.synthesised
+          ? this.loadOfflineWasm().then((wasm) => synthesiseKit(wasm, manifest, sampleRate, sound))
+          : this.loadManifest().then((assets) => loadKit(manifest, this.url(assets.kits), fetchBytes))
+      ).catch((error: unknown) => {
+        this.kits.delete(key);
+        throw error;
+      });
+      this.kits.set(key, cached);
     }
     return cached;
   }
 
-  /** Fetches the other offered kits in the background so switching is instant. */
+  /** Prepares the other offered kits in the background so switching is instant. */
   preloadKits(): void {
-    for (const id of OFFERED_KIT_IDS) void this.kit(id).catch(() => undefined);
+    const sampleRate = this.audio.sampleRate;
+    if (sampleRate === null) return;
+    for (const id of OFFERED_KIT_IDS) void this.kit(id, sampleRate).catch(() => undefined);
   }
 
   // ---- Audio --------------------------------------------------------------
@@ -244,7 +285,9 @@ export class EditorRuntime {
   private async sendKit(id: KitId): Promise<void> {
     this.store.setKitStatus('loading');
     try {
-      const kit = await this.kit(id);
+      const sampleRate = this.audio.sampleRate;
+      if (sampleRate === null) return;
+      const kit = await this.kit(id, sampleRate);
       // The user may have switched again while this kit was loading.
       if (this.store.getState().project.kit.id !== id) return;
       this.audio.setKit(kit);
@@ -253,6 +296,32 @@ export class EditorRuntime {
       this.collectTimer = setTimeout(() => this.audio.collect(), 4000);
     } catch (error) {
       this.store.setKitStatus('error');
+      this.store.notify('error', describe(error));
+    }
+  }
+
+  /**
+   * Re-synthesises one voice from its knobs and sends it to the audio thread.
+   * The work happens here, on the main thread, never in the worklet.
+   */
+  private async sendSound(role: RoleId): Promise<void> {
+    const sampleRate = this.audio.sampleRate;
+    if (!this.audio.isReady || sampleRate === null) return;
+    if (!KITS[this.store.getState().project.kit.id].synthesised) return;
+    const flight = this.soundsInFlight.get(role);
+    if (flight) {
+      flight.stale = true;
+      return;
+    }
+    this.soundsInFlight.set(role, { stale: false });
+    try {
+      const wasm = await this.loadOfflineWasm();
+      const slot = getRole(role).index;
+      const pcm = wasm.synthesise({ sound: slot, ...this.store.getState().sound[role] }, sampleRate);
+      this.audio.setSound(slot, pcm, 1, sampleRate);
+      this.soundsSent += 1;
+    } catch (error) {
+      this.soundsInFlight.delete(role);
       this.store.notify('error', describe(error));
     }
   }
@@ -294,7 +363,7 @@ export class EditorRuntime {
   /** Renders one loop offline with a separate engine instance. */
   async renderLoop(sampleRate: number): Promise<LoopRender> {
     const { project } = this.store.getState();
-    const [wasm, kit] = await Promise.all([this.loadOfflineWasm(), this.kit(project.kit.id)]);
+    const [wasm, kit] = await Promise.all([this.loadOfflineWasm(), this.kit(project.kit.id, sampleRate)]);
     return renderLoop(wasm, project, kit, sampleRate);
   }
 
@@ -349,6 +418,8 @@ export class EditorRuntime {
       sampleRate: this.audio.sampleRate,
       stats: this.stats,
       engineKit: this.engineKit,
+      soundsSent: this.soundsSent,
+      soundsTaken: this.soundsTaken,
       project: state.project,
     };
   }

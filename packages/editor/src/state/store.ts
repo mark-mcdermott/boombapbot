@@ -3,16 +3,20 @@ import {
   KITS,
   ROLE_IDS,
   clampBpm,
+  clampKnob,
   clampSwing,
   clampVelocity,
   createEmptyPattern,
   createProject,
   createStarterPattern,
+  defaultSoundSettings,
   findLane,
   type KitId,
   type Pattern,
   type Project,
   type RoleId,
+  type SoundParam,
+  type SoundSettings,
 } from '@boombapbot/contracts';
 
 export type EditorMode = 'modern' | 'hardware';
@@ -29,6 +33,8 @@ export interface Notice {
 
 export interface EditorState {
   project: Project;
+  /** Where the sound knobs stand. Not part of the saved beat yet. */
+  sound: SoundSettings;
   mode: EditorMode;
   /** The lane and step the editing controls act on. Shared by both editors. */
   selectedRole: RoleId;
@@ -104,6 +110,7 @@ export class EditorStore {
     this.newId = options.newId ?? defaultId;
     this.state = {
       project: options.project ?? this.starterProject(),
+      sound: defaultSoundSettings(),
       mode: 'hardware',
       selectedRole: 'kick',
       selectedStep: 0,
@@ -204,6 +211,15 @@ export class EditorStore {
   setKit(id: KitId): void {
     if (id === this.state.project.kit.id) return;
     this.commit({ ...this.state.project, kit: { id, version: KITS[id].version } });
+  }
+
+  /** Turns a sound knob. Positions run from 0 to 1. */
+  setKnob(role: RoleId, param: SoundParam, value: number): void {
+    const position = clampKnob(value);
+    if (position === this.state.sound[role][param]) return;
+    this.set({
+      sound: { ...this.state.sound, [role]: { ...this.state.sound[role], [param]: position } },
+    });
   }
 
   setName(name: string): void {

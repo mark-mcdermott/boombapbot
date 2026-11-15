@@ -4,6 +4,7 @@ import panel707 from '../data/panels/707.panel.json';
 import panel808 from '../data/panels/808.panel.json';
 import panel909 from '../data/panels/909.panel.json';
 import { KIT_IDS, type KitId } from './kit';
+import { SOUND_PARAMS } from './sound';
 import { ROLE_IDS, type RoleId } from './roles';
 import { STEP_COUNT } from './project';
 
@@ -106,6 +107,18 @@ export const panelManifestSchema = z.object({
     minDeg: z.number(),
     maxDeg: z.number(),
   }),
+  /** Sound knobs the editor turns. A knob not listed here is only drawn. */
+  knobs: z
+    .array(
+      knobSchema.extend({
+        role: z.enum(ROLE_IDS),
+        param: z.enum(SOUND_PARAMS),
+        /** Pointer angles with the knob fully left and fully right. */
+        minDeg: z.number(),
+        maxDeg: z.number(),
+      }),
+    )
+    .optional(),
   voiceSelect: z.object({
     kind: z.enum(['rotary', 'keys']),
     label: z.string(),

@@ -21,7 +21,9 @@ namespace {
 constexpr int kMaxRoles = SNARE_MAX_ROLES;
 constexpr int kSteps = SNARE_STEPS;
 constexpr int kCommandCapacity = 1024;
-constexpr int kRetiredCapacity = 32;
+// Replaced sounds waiting for the control thread to free them. A knob drag
+// replaces one sound at a time, so this is sized for a long drag.
+constexpr int kRetiredCapacity = 256;
 
 // A choked voice fades over this long instead of stopping dead.
 constexpr double kChokeSeconds = 0.004;
@@ -34,23 +36,31 @@ constexpr double kPi = 3.14159265358979323846;
 
 }  // namespace
 
-struct KitVoice {
+}  // namespace snare
+
+// One sound's samples. It is built on a control thread, handed to an engine
+// slot, and freed on the control thread once no voice is still reading it.
+struct SnareSound {
   std::vector<float> pcm;  // interleaved
   int frames = 0;
   int channels = 0;
   double sampleRate = 0.0;
-  float gain = 1.0f;
-  float pan = 0.0f;
-  int chokeGroup = 0;
-  bool present = false;
+  // Voices still reading these samples. Written by the audio thread.
+  std::atomic<int> liveVoices{0};
 };
 
-}  // namespace snare
-
+// A set of sounds prepared together. Committing it fills every slot at once.
 struct SnareKit {
-  snare::KitVoice voices[SNARE_MAX_ROLES];
-  // Voices still reading this kit's samples. Written by the audio thread.
-  std::atomic<int> liveVoices{0};
+  struct Entry {
+    SnareSound* sound = nullptr;
+    float gain = 1.0f;
+    float pan = 0.0f;
+    int chokeGroup = 0;
+  };
+  Entry entries[SNARE_MAX_ROLES];
+  ~SnareKit() {
+    for (Entry& entry : entries) delete entry.sound;
+  }
 };
 
 namespace snare {
@@ -60,6 +70,7 @@ enum class CommandType : std::int32_t {
   SetTempo,
   SetSwing,
   SetMasterGain,
+  SetSlot,
   SetStep,
   SetRow,
   ClearPattern,
@@ -74,13 +85,21 @@ struct Command {
   std::int32_t b = 0;
   std::int32_t c = 0;
   double value = 0.0;
+  double value2 = 0.0;
   std::uint8_t row[kSteps]{};
+};
+
+// What a sound slot plays, and how. Audio thread only.
+struct Slot {
+  SnareSound* sound = nullptr;
+  float gain = 1.0f;
+  float pan = 0.0f;
+  int chokeGroup = 0;
 };
 
 struct Voice {
   bool active = false;
-  SnareKit* kit = nullptr;
-  const KitVoice* source = nullptr;
+  SnareSound* sound = nullptr;
   double position = 0.0;   // in source frames
   double increment = 1.0;  // source frames per output frame
   float gainLeft = 0.0f;
@@ -120,8 +139,12 @@ struct SnareEngine {
   // ---- shared ------------------------------------------------------------
   const double sampleRate;
   snare::SpscQueue<snare::Command, snare::kCommandCapacity> commands;
-  std::atomic<SnareKit*> pendingKit{nullptr};
-  snare::SpscQueue<SnareKit*, snare::kRetiredCapacity> retired;
+  // A sound staged for each slot, and which slots have one or are to be
+  // emptied. The audio thread takes them at the next buffer boundary.
+  std::atomic<SnareSound*> pendingSound[SNARE_MAX_ROLES]{};
+  std::atomic<std::uint32_t> stagedSlots{0};
+  std::atomic<std::uint32_t> clearedSlots{0};
+  snare::SpscQueue<SnareSound*, snare::kRetiredCapacity> retired;
 
   std::atomic<int> playingFlag{0};
   std::atomic<int> currentStep{-1};
@@ -130,10 +153,10 @@ struct SnareEngine {
   std::atomic<std::uint32_t> stolenVoices{0};
 
   // ---- control thread ----------------------------------------------------
-  std::vector<SnareKit*> draining;  // replaced kits that still have tails
+  std::vector<SnareSound*> draining;  // replaced sounds that still have tails
 
   // ---- audio thread ------------------------------------------------------
-  SnareKit* kit = nullptr;
+  snare::Slot slots[SNARE_MAX_ROLES];
   std::uint8_t pattern[SNARE_MAX_ROLES][SNARE_STEPS]{};
   snare::Voice voices[SNARE_MAX_VOICES];
   std::uint64_t voiceCounter = 0;
@@ -193,9 +216,38 @@ struct SnareEngine {
   void releaseVoice(snare::Voice& voice) {
     if (!voice.active) return;
     voice.active = false;
-    if (voice.kit) voice.kit->liveVoices.fetch_sub(1, std::memory_order_release);
-    voice.kit = nullptr;
-    voice.source = nullptr;
+    if (voice.sound) voice.sound->liveVoices.fetch_sub(1, std::memory_order_release);
+    voice.sound = nullptr;
+  }
+
+  // Takes staged sounds at the buffer boundary. A replaced sound goes to the
+  // control thread to be freed once its tails end; if that hand-off queue is
+  // full the slot waits for snare_engine_collect. Nothing is freed here.
+  void takeStagedSounds() {
+    if (stagedSlots.load(std::memory_order_acquire) == 0 &&
+        clearedSlots.load(std::memory_order_acquire) == 0) {
+      return;
+    }
+    const std::uint32_t staged = stagedSlots.exchange(0, std::memory_order_acq_rel);
+    const std::uint32_t cleared = clearedSlots.exchange(0, std::memory_order_acq_rel);
+    std::uint32_t waiting = 0;
+    for (int index = 0; index < snare::kMaxRoles; ++index) {
+      const std::uint32_t bit = 1u << index;
+      if (((staged | cleared) & bit) == 0) continue;
+      snare::Slot& slot = slots[index];
+      if (slot.sound && retired.full()) {
+        waiting |= bit;
+        continue;
+      }
+      SnareSound* incoming = pendingSound[index].exchange(nullptr, std::memory_order_acq_rel);
+      if (!incoming && (cleared & bit) == 0) continue;
+      if (slot.sound) retired.push(slot.sound);
+      slot.sound = incoming;
+    }
+    if (waiting != 0) {
+      stagedSlots.fetch_or(waiting & staged, std::memory_order_release);
+      clearedSlots.fetch_or(waiting & cleared, std::memory_order_release);
+    }
   }
 
   // Picks a free voice, or steals one: a voice that is already fading first,
@@ -232,14 +284,15 @@ struct SnareEngine {
   }
 
   void startVoice(int role, int velocity) {
-    if (!kit || role < 0 || role >= snare::kMaxRoles) return;
-    const snare::KitVoice& source = kit->voices[role];
-    if (!source.present || source.frames <= 0) return;
+    if (role < 0 || role >= snare::kMaxRoles) return;
+    const snare::Slot& slot = slots[role];
+    SnareSound* sound = slot.sound;
+    if (!sound || sound->frames <= 0) return;
     velocity = std::clamp(velocity, 1, 127);
 
-    if (source.chokeGroup != 0) {
+    if (slot.chokeGroup != 0) {
       for (auto& voice : voices) {
-        if (voice.active && voice.chokeGroup == source.chokeGroup &&
+        if (voice.active && voice.chokeGroup == slot.chokeGroup &&
             voice.envelopeStep == 0.0f) {
           voice.envelopeStep = chokeStep;
         }
@@ -247,23 +300,22 @@ struct SnareEngine {
     }
 
     snare::Voice& voice = allocateVoice();
-    const double angle = (static_cast<double>(source.pan) + 1.0) * snare::kPi / 4.0;
-    const float amplitude = source.gain * velocityGain[velocity];
+    const double angle = (static_cast<double>(slot.pan) + 1.0) * snare::kPi / 4.0;
+    const float amplitude = slot.gain * velocityGain[velocity];
     voice.active = true;
-    voice.kit = kit;
-    voice.source = &source;
+    voice.sound = sound;
     voice.position = 0.0;
-    voice.increment = source.sampleRate / sampleRate;
+    voice.increment = sound->sampleRate / sampleRate;
     // Centre is unity on both sides; the edges keep constant power.
     voice.gainLeft = amplitude * static_cast<float>(std::cos(angle) * std::sqrt(2.0));
     voice.gainRight = amplitude * static_cast<float>(std::sin(angle) * std::sqrt(2.0));
     voice.envelope = 1.0f;
     voice.envelopeStep = 0.0f;
-    voice.chokeGroup = source.chokeGroup;
+    voice.chokeGroup = slot.chokeGroup;
     voice.order = ++voiceCounter;
     voice.lastLeft = 0.0f;
     voice.lastRight = 0.0f;
-    kit->liveVoices.fetch_add(1, std::memory_order_relaxed);
+    sound->liveVoices.fetch_add(1, std::memory_order_relaxed);
   }
 
   void fireStep(std::int64_t at) {
@@ -297,6 +349,11 @@ struct SnareEngine {
       case CommandType::SetMasterGain:
         masterGain = static_cast<float>(std::clamp(command.value, 0.0, 2.0));
         break;
+      case CommandType::SetSlot:
+        slots[command.a].gain = static_cast<float>(command.value);
+        slots[command.a].pan = static_cast<float>(command.value2);
+        slots[command.a].chokeGroup = command.b;
+        break;
       case CommandType::SetStep:
         pattern[command.a][command.b] = static_cast<std::uint8_t>(command.c);
         break;
@@ -328,7 +385,7 @@ struct SnareEngine {
   void renderVoices(float* left, float* right, int from, int to) {
     for (auto& voice : voices) {
       if (!voice.active) continue;
-      const snare::KitVoice& source = *voice.source;
+      const SnareSound& source = *voice.sound;
       const float* pcm = source.pcm.data();
       const int frames = source.frames;
       const bool stereo = source.channels == 2;
@@ -394,17 +451,9 @@ struct SnareEngine {
   }
 
   void render(float* left, float* right, int frames) {
-    // Swap in a staged kit at the buffer boundary. The old kit goes to the
-    // control thread to be freed once its tails end. If that hand-off queue is
-    // full the swap waits for snare_engine_collect; nothing is freed here.
-    if (!kit || !retired.full()) {
-      if (SnareKit* incoming = pendingKit.exchange(nullptr, std::memory_order_acq_rel)) {
-        if (kit) retired.push(kit);
-        kit = incoming;
-      }
-    }
+    takeStagedSounds();
 
-    // Commands queued after a kit was committed see that kit.
+    // Commands queued after a sound was staged see that sound.
     snare::Command command;
     while (commands.pop(command)) apply(command);
 
@@ -472,6 +521,55 @@ int32_t snare_loop_frames(double bpm, double sample_rate, int steps) {
       snare::roundFrame(snare::framesPerStep(bpm, sample_rate) * steps));
 }
 
+namespace {
+
+bool validSoundShape(int32_t frames, int32_t channels, double sample_rate) {
+  return (channels == 1 || channels == 2) && frames >= 0 && frames <= snare::kMaxSampleFrames &&
+         sample_rate >= 8000.0 && sample_rate <= 192000.0;
+}
+
+bool validSlotSettings(float gain, float pan, int32_t choke_group) {
+  return gain >= 0.0f && gain <= 4.0f && pan >= -1.0f && pan <= 1.0f && choke_group >= 0;
+}
+
+void stageSound(SnareEngine* engine, int32_t slot, SnareSound* sound) {
+  const std::uint32_t bit = 1u << slot;
+  // A sound that was staged but never picked up is replaced before it sounds.
+  delete engine->pendingSound[slot].exchange(sound, std::memory_order_acq_rel);
+  if (sound) {
+    engine->clearedSlots.fetch_and(~bit, std::memory_order_release);
+    engine->stagedSlots.fetch_or(bit, std::memory_order_release);
+  } else {
+    engine->clearedSlots.fetch_or(bit, std::memory_order_release);
+  }
+}
+
+int32_t queueSlot(SnareEngine* engine, int32_t slot, float gain, float pan, int32_t choke_group) {
+  snare::Command command;
+  command.type = snare::CommandType::SetSlot;
+  command.a = slot;
+  command.b = choke_group;
+  command.value = static_cast<double>(gain);
+  command.value2 = static_cast<double>(pan);
+  return engine->enqueue(command);
+}
+
+}  // namespace
+
+SnareSound* snare_sound_create(int32_t frames, int32_t channels, double sample_rate) {
+  if (!validSoundShape(frames, channels, sample_rate)) return nullptr;
+  auto* sound = new SnareSound();
+  sound->pcm.assign(static_cast<std::size_t>(frames) * channels, 0.0f);
+  sound->frames = frames;
+  sound->channels = channels;
+  sound->sampleRate = sample_rate;
+  return sound;
+}
+
+float* snare_sound_data(SnareSound* sound) { return sound ? sound->pcm.data() : nullptr; }
+
+void snare_sound_destroy(SnareSound* sound) { delete sound; }
+
 SnareKit* snare_kit_create(void) { return new SnareKit(); }
 
 void snare_kit_destroy(SnareKit* kit) { delete kit; }
@@ -482,23 +580,15 @@ int32_t snare_kit_set_voice(SnareKit* kit, int32_t role, const float* pcm,
                             int32_t choke_group) {
   if (!kit || !pcm) return SNARE_ERR_BAD_ARGUMENT;
   if (role < 0 || role >= SNARE_MAX_ROLES) return SNARE_ERR_BAD_ARGUMENT;
-  if (channels != 1 && channels != 2) return SNARE_ERR_BAD_ARGUMENT;
-  if (frames <= 0) return SNARE_ERR_BAD_ARGUMENT;
   if (frames > snare::kMaxSampleFrames) return SNARE_ERR_TOO_LARGE;
-  if (!(sample_rate >= 8000.0 && sample_rate <= 192000.0)) return SNARE_ERR_BAD_ARGUMENT;
-  if (!(gain >= 0.0f && gain <= 4.0f)) return SNARE_ERR_BAD_ARGUMENT;
-  if (!(pan >= -1.0f && pan <= 1.0f)) return SNARE_ERR_BAD_ARGUMENT;
-  if (choke_group < 0) return SNARE_ERR_BAD_ARGUMENT;
+  if (frames <= 0 || !validSoundShape(frames, channels, sample_rate)) return SNARE_ERR_BAD_ARGUMENT;
+  if (!validSlotSettings(gain, pan, choke_group)) return SNARE_ERR_BAD_ARGUMENT;
 
-  snare::KitVoice& voice = kit->voices[role];
-  voice.pcm.assign(pcm, pcm + static_cast<std::size_t>(frames) * channels);
-  voice.frames = frames;
-  voice.channels = channels;
-  voice.sampleRate = sample_rate;
-  voice.gain = gain;
-  voice.pan = pan;
-  voice.chokeGroup = choke_group;
-  voice.present = true;
+  SnareSound* sound = snare_sound_create(frames, channels, sample_rate);
+  std::copy(pcm, pcm + static_cast<std::size_t>(frames) * channels, sound->pcm.begin());
+  SnareKit::Entry& entry = kit->entries[role];
+  delete entry.sound;
+  entry = {sound, gain, pan, choke_group};
   return SNARE_OK;
 }
 
@@ -509,25 +599,50 @@ SnareEngine* snare_engine_create(double sample_rate) {
 
 void snare_engine_destroy(SnareEngine* engine) {
   if (!engine) return;
-  SnareKit* retiredKit = nullptr;
-  while (engine->retired.pop(retiredKit)) delete retiredKit;
-  for (SnareKit* kit : engine->draining) delete kit;
-  delete engine->pendingKit.exchange(nullptr);
-  delete engine->kit;
+  SnareSound* retiredSound = nullptr;
+  while (engine->retired.pop(retiredSound)) delete retiredSound;
+  for (SnareSound* sound : engine->draining) delete sound;
+  for (auto& pending : engine->pendingSound) delete pending.exchange(nullptr);
+  for (snare::Slot& slot : engine->slots) delete slot.sound;
   delete engine;
+}
+
+int32_t snare_engine_set_sound(SnareEngine* engine, int32_t slot, SnareSound* sound) {
+  if (!engine || slot < 0 || slot >= SNARE_MAX_ROLES) return SNARE_ERR_BAD_ARGUMENT;
+  stageSound(engine, slot, sound);
+  // Each new sound retires one, so free what has finished ringing as we go.
+  snare_engine_collect(engine);
+  return SNARE_OK;
+}
+
+int32_t snare_engine_set_slot(SnareEngine* engine, int32_t slot, float gain, float pan,
+                              int32_t choke_group) {
+  if (!engine || slot < 0 || slot >= SNARE_MAX_ROLES || !validSlotSettings(gain, pan, choke_group)) {
+    return SNARE_ERR_BAD_ARGUMENT;
+  }
+  return queueSlot(engine, slot, gain, pan, choke_group);
 }
 
 int32_t snare_engine_commit_kit(SnareEngine* engine, SnareKit* kit) {
   if (!engine || !kit) return SNARE_ERR_BAD_ARGUMENT;
-  // A kit that was staged but never picked up is replaced before it sounds.
-  delete engine->pendingKit.exchange(kit, std::memory_order_acq_rel);
-  return SNARE_OK;
+  int32_t result = SNARE_OK;
+  for (int32_t slot = 0; slot < SNARE_MAX_ROLES; ++slot) {
+    SnareKit::Entry& entry = kit->entries[slot];
+    stageSound(engine, slot, entry.sound);
+    if (entry.sound) {
+      const int32_t queued = queueSlot(engine, slot, entry.gain, entry.pan, entry.chokeGroup);
+      if (queued != SNARE_OK) result = queued;
+    }
+    entry.sound = nullptr;
+  }
+  delete kit;
+  return result;
 }
 
 int32_t snare_engine_collect(SnareEngine* engine) {
   if (!engine) return 0;
-  SnareKit* retiredKit = nullptr;
-  while (engine->retired.pop(retiredKit)) engine->draining.push_back(retiredKit);
+  SnareSound* retiredSound = nullptr;
+  while (engine->retired.pop(retiredSound)) engine->draining.push_back(retiredSound);
   auto& draining = engine->draining;
   for (auto it = draining.begin(); it != draining.end();) {
     if ((*it)->liveVoices.load(std::memory_order_acquire) == 0) {
