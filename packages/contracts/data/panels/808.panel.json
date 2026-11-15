@@ -65,6 +65,23 @@
     {"track": "rim_shot", "hit": [1174.75, 482, 100, 88], "slot": [1213.75, 523, 22, 46]},
     {"track": "clap", "hit": [1286.25, 482, 100, 88], "slot": [1325.25, 523, 22, 46]}
   ],
+  "modeSelect": {
+    "knob": {"cx": 228, "cy": 320, "r": 40, "photoDeg": -52},
+    "positions": [
+      {"mode": "pattern_clear", "label": "Pattern clear", "deg": -90, "hit": [186, 373, 116, 28]},
+      {"mode": "write_first", "label": "1st part", "deg": -52, "hit": [150, 248, 42, 32]},
+      {"mode": "write_second", "label": "2nd part", "deg": -14, "hit": [195, 232, 42, 32]},
+      {"mode": "manual_play", "label": "Manual play", "deg": 24, "hit": [255, 236, 64, 34]},
+      {"mode": "play", "label": "Play", "deg": 62, "hit": [270, 271, 40, 18]},
+      {"mode": "compose", "label": "Compose", "deg": 100, "hit": [282, 291, 40, 26]}
+    ]
+  },
+  "clear": {"hit": [212, 407, 44, 44]},
+  "tap": {"hit": [1725, 945, 78, 76]},
+  "preScale": {"hit": [412, 806, 60, 84], "slot": [424, 812, 22, 72]},
+  "basicVariation": {"hit": [225, 808, 98, 66], "slot": [233, 813, 82, 26]},
+  "fillVariation": {"hit": [1725, 809, 76, 60], "slot": [1735, 814, 56, 26]},
+  "lamps": {"firstPart": [435, 951], "secondPart": [435, 1004], "variationA": [246, 887], "variationB": [302, 887], "radius": 5.5},
   "voiceSelect": {
     "kind": "rotary",
     "label": "INSTRUMENT SELECT",
@@ -85,8 +102,9 @@
     ]
   },
   "pending": [
-    "First and second part, A, B and AB basic variation, intro and fill-in, auto fill-in, pre-scale and the compose and play modes are not modelled.",
+    "The AB position plays and writes version A; alternating A and B, intros and fill-ins, auto fill-in and the first-beat rule are not modelled. Play and compose behave like manual play.",
+    "CLEAR is a latch here: press it, then a step button, to set the last step. On the machine it is held down. Whether CLEAR also resets a rhythm's pre-scale is unverified; here it does not.",
     "What each knob does to the sound, and how far the level, accent and volume knobs reach, is a model made by ear.",
-    "Step lamps show the selected instrument's steps and the running step. The hardware's exact lamp behaviour in each mode is unverified."
+    "The lamps follow the manual's description of each mode. What the hardware shows in the cases the manual leaves out is unverified."
   ]
 }

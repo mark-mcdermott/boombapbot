@@ -7,14 +7,15 @@ your machine with no accounts, secrets or external services.
 
 Open the editor and the page is a drum machine: the 808. Press its start
 button and you hear a rhythm; pick an instrument with the selector, press step
-buttons to write it, and work the knobs and voice switches on the faceplate.
+buttons to write it, and work the knobs and switches on the faceplate. The
+mode selector turns the same sixteen buttons into the choice of rhythm.
 Everything else is behind the cog in the footer: the beat's name, undo, and
 export as WAV, MIDI or a project file. Reload and your beat is still there.
 
 The aim is the whole machine, worked from its operation manual. This build has
-its sounds, its twelve tracks, its accent and every knob and voice switch;
-pattern memory, the mode selector, fill-ins and rhythm tracks are in
-progress, and
+its sounds, its twelve tracks, its accent, every knob and voice switch, and
+its pattern memory with the write modes; manual play with fill-ins, and
+rhythm tracks, are in progress, and
 [what is modelled so far](#the-machine) says exactly where it stands.
 
 The 808 panel above is original artwork, drawn in code by
@@ -78,6 +79,12 @@ pnpm serve
   put a conga, the claves or the maracas in place of a tom, the rim shot or
   the clap. It is a model made by ear, not a recording and not checked
   against hardware. See [Sounds](#sounds-provenance).
+- **Thirty-two patterns to write.** The sixteen step buttons choose twelve
+  Basic Rhythms and four Intro/Fill-ins, each with an A and a B version. A
+  rhythm has a 1st and a 2nd part of up to sixteen steps each, and a
+  pre-scale of three, four, six or eight steps to the beat. They are written
+  as the manual describes: the mode selector, CLEAR, the pre-scale switch and
+  the step buttons, or TAP in time with the rhythm.
 - **Twelve tracks, steps that are on or off, and an accent.** The instrument
   selector has its twelve positions: the accent and eleven instruments. A
   step is on or off; an accented step makes every instrument sounding on it
@@ -115,8 +122,12 @@ What the build models, against the operation manual:
 | Tempo, 40 to 300: a knob with 40 click stops, and a fine knob | Working |
 | Eleven level knobs and master volume | Working; how far each reaches is a guess |
 | The five voice switches (congas, claves, maracas) | Working |
-| 1st and 2nd part, step count, pre-scale, A and B versions, 16 rhythms | In the engine and the project file; the panel writes the 1st part of Basic Rhythm 1 A |
-| Mode selector, clear, tap, intro and fill-in, auto fill-in, A/AB/B switch | Not yet |
+| Sixteen rhythms, each with an A and a B version, chosen with the step buttons | Working |
+| Pattern clear, and the 1st and 2nd part write modes | Working |
+| CLEAR: wipe a rhythm, store the pre-scale, set the last step of a part | Working; CLEAR is a latch here, not a button to hold |
+| Pre-scale switch: 3, 6, 4 or 8 steps to the beat | Working |
+| TAP: write the selected instrument in time | Working, to the nearest step as the page sees it |
+| Manual play: the AB position, intro and fill-in, auto fill-in, the first-beat rule | Not yet; manual play loops the selected Basic Rhythm |
 | Rhythm tracks: compose, play, chaining | Stored in the project file; not yet playable |
 | DIN sync, trigger outputs, separate outputs, pedals | Left out: a browser cannot do them |
 
@@ -137,7 +148,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine needs no shared memory, no sample files ship, and only the committed faceplate is included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position and knob, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -154,9 +165,9 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | `pnpm build:engine` | 11 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
 | `pnpm build:wasm` | 59,843-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 85 of 85 pass |
+| `pnpm test:unit` | 98 of 98 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 39 of 39 pass |
+| `pnpm test:e2e` | 45 of 45 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
 
 Earlier versions of this build were also run on Linux x86-64 with GCC 13 and

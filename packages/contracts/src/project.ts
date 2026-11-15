@@ -88,6 +88,8 @@ export const panelSchema = z.object({
   autoFill: z.union([z.literal(0), z.literal(16), z.literal(12), z.literal(8), z.literal(4), z.literal(2)]),
   /** Where the pre-scale switch stands. A rhythm keeps its own once stored. */
   preScale: preScaleSchema,
+  /** Which of the two selected rhythms the write modes work on. */
+  writeTarget: z.enum(['basic', 'fill']).default('basic'),
 });
 
 export const projectSchema = z.object({
@@ -219,6 +221,7 @@ export function createDefaultPanel(): PanelState {
     fillVariation: 'a',
     autoFill: 0,
     preScale: DEFAULT_PRE_SCALE,
+    writeTarget: 'basic',
   };
 }
 
@@ -278,6 +281,53 @@ export function withKnob(sound: SoundSettings, track: TrackId, param: KnobParam,
   if (track === 'accent') return { ...sound, accent: position };
   if (param === 'level') return { ...sound, levels: { ...sound.levels, [track]: position } };
   return { ...sound, knobs: { ...sound.knobs, [track]: { ...sound.knobs[track], [param]: position } } };
+}
+
+/** Modes in which the step buttons write steps, and the part each writes. */
+export function writePart(mode: Mode): 0 | 1 | null {
+  return mode === 'write_first' ? 0 : mode === 'write_second' ? 1 : null;
+}
+
+/** The rhythm and version the panel is on: what the write modes edit and CLEAR clears. */
+export function panelTarget(panel: PanelState): { rhythm: number; variation: Variation } {
+  if (panel.writeTarget === 'fill') return { rhythm: panel.fillRhythm, variation: panel.fillVariation };
+  return { rhythm: panel.basicRhythm, variation: panel.basicVariation === 'b' ? 'b' : 'a' };
+}
+
+/** The versions CLEAR wipes: both when the rhythm's variation switch stands on AB. */
+export function clearedVersions(panel: PanelState): Variation[] {
+  if (panel.writeTarget === 'basic' && panel.basicVariation === 'ab') return ['a', 'b'];
+  return [panelTarget(panel).variation];
+}
+
+/**
+ * A rhythm after CLEAR: the given versions emptied, and its parts back to
+ * sixteen steps and none. The lengths belong to both versions.
+ */
+export function clearRhythm(rhythm: Rhythm, versions: readonly Variation[]): Rhythm {
+  const cleared = { ...rhythm, firstLength: PART_STEPS, secondLength: 0 };
+  for (const version of versions) cleared[version] = createEmptyVariation();
+  return cleared;
+}
+
+/** A rhythm with the last step of one of its parts set. Steps count from 1. */
+export function withPartLength(rhythm: Rhythm, part: 0 | 1, steps: number): Rhythm {
+  const length = Math.min(PART_STEPS, Math.max(1, Math.round(steps)));
+  return part === 0 ? { ...rhythm, firstLength: length } : { ...rhythm, secondLength: length };
+}
+
+/** The step played after `step`. The 2nd part's steps start at 16. */
+export function nextStep(rhythm: Rhythm, step: number): number {
+  if (step < PART_STEPS) {
+    if (step + 1 < rhythm.firstLength) return step + 1;
+    return rhythm.secondLength > 0 ? PART_STEPS : 0;
+  }
+  return step + 1 - PART_STEPS < rhythm.secondLength ? step + 1 : 0;
+}
+
+/** The step a tap belongs to: the one sounding, or the next once that one is more than half over. */
+export function tappedStep(rhythm: Rhythm, step: number, fraction: number): number {
+  return fraction > 0.5 ? nextStep(rhythm, step) : step;
 }
 
 /** Steps a rhythm plays in one measure. */

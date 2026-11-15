@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import panel808 from '../data/panels/808.panel.json';
 import { KNOB_PARAMS, PART_STEPS, SWITCHED_IDS, TRACK_IDS, getTrack } from './machine';
+import { MODES } from './project';
 
 /**
  * Hardware panel manifests: control geometry and behaviour notes for the
@@ -125,6 +126,29 @@ export const panelManifestSchema = z.object({
       }),
     )
     .length(SWITCHED_IDS.length),
+  /** The mode selector: a dial with a label for each of its six positions. */
+  modeSelect: z.object({
+    knob: knobSchema,
+    positions: z
+      .array(z.object({ mode: z.enum(MODES), label: z.string().min(1).max(20), deg: z.number(), hit: rectSchema }))
+      .length(MODES.length),
+  }),
+  /** The CLEAR button under the mode selector, and TAP beside the step buttons. */
+  clear: z.object({ hit: rectSchema }),
+  tap: z.object({ hit: rectSchema }),
+  /** The pre-scale switch: four positions, 1 at the top. */
+  preScale: z.object({ hit: rectSchema, slot: rectSchema }),
+  /** The variation levers: A, AB and B for the basic rhythms, A and B for intros and fill-ins. */
+  basicVariation: z.object({ hit: rectSchema, slot: rectSchema }),
+  fillVariation: z.object({ hit: rectSchema, slot: rectSchema }),
+  /** Lamps beside the step buttons and under the basic variation lever. */
+  lamps: z.object({
+    firstPart: pointSchema,
+    secondPart: pointSchema,
+    variationA: pointSchema,
+    variationB: pointSchema,
+    radius: z.number().positive(),
+  }),
   voiceSelect: z.object({
     kind: z.enum(['rotary', 'keys']),
     label: z.string(),
@@ -153,6 +177,9 @@ function loadPanel(): PanelManifest {
   }
   if (SWITCHED_IDS.some((id) => !panel.switches.some((entry) => entry.track === id))) {
     throw new Error('808.panel.json must list a switch for every alternate sound');
+  }
+  if (MODES.some((mode, index) => panel.modeSelect.positions[index]!.mode !== mode)) {
+    throw new Error('808.panel.json must list the mode selector positions in order');
   }
   return panel;
 }

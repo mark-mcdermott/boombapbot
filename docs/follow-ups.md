@@ -10,18 +10,15 @@ The engine and the project file already hold the pattern bank, 1st and 2nd
 parts, pre-scale, accent, levels, voice switches and rhythm tracks. What is
 left, in the order it is being done:
 
-1. **Pattern memory and writing.** The mode selector, the 16 rhythm buttons
-   with their A and B versions, clear, setting the last step with clear held,
-   pre-scale, 1st and 2nd part, and tap write.
-2. **Manual play.** Rhythm selection that waits for the bar line (and the
+1. **Manual play.** Rhythm selection that waits for the bar line (and the
    first-beat rule), the A/AB/B switch, intro and fill-in by tap, and auto
    fill-in every 2 to 16 measures. The engine takes over every decision made
    at a bar line, in a `sequencer.h` beside `timeline.h`, and reports a log of
    the measures it played. Until then `snare_engine_cue_pattern` switches
    pattern at the bar line and nothing more.
-3. **Rhythm tracks.** Compose, play and edit, twelve tracks of 64 measures
+2. **Rhythm tracks.** Compose, play and edit, twelve tracks of 64 measures
    chained up to 768, and export of a whole track.
-4. **Starter rhythms**, screenshots and a last pass over these documents.
+3. **Starter rhythms**, screenshots and a last pass over these documents.
 
 Left out for good, because a browser cannot do them: DIN sync, trigger
 outputs, separate instrument outputs, pedal jacks and memory protection.
@@ -30,6 +27,14 @@ Not settled by any of that:
 
 - **How it sounds.** `engine/src/synth808.cpp` is a model made by ear. It
   needs a listen beside a real machine, voice by voice and knob by knob.
+- **CLEAR as a latch.** On the machine CLEAR is held while a step button is
+  pressed. A mouse has one pointer, so here CLEAR stays down until a step is
+  pressed, or until it or Escape is pressed. Whether CLEAR also resets a
+  rhythm's stored pre-scale is not in the manual; here it does not.
+- **TAP timing.** A tap lands on the step the page last heard about, or the
+  next once that step is half over. The page learns of steps a little after
+  the engine plays them and before they are heard, so a tap can land a step
+  out at fast tempos. Placing it in the engine would be exact.
 - **Lamp behaviour.** The manual describes the lamps in each mode in words.
   What they do on the hardware in the corner cases is unverified.
 - **The level model.** How far the level and accent knobs reach, and the taper

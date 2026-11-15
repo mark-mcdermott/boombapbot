@@ -118,6 +118,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   as a convenience.
 - The engine's pattern for a rhythm is `rhythm * 2`, plus one for its B
   version (`patternIndex`).
+- The step buttons do three jobs: steps in the two write modes, the last step
+  of a part while CLEAR is down, and the choice of rhythm in every other
+  mode. `EditorStore.pressStep` is the one place that decides which.
+  `panelTarget` (contracts) says which rhythm and version the panel is on.
 - Undo covers what the machine remembers (`rhythms`, `rhythmTracks`) and a
   whole-project import. Knobs, switches, tempo and the name are not undo
   steps.

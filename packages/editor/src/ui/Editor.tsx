@@ -73,6 +73,8 @@ function EditorBody({ runtime }: { runtime: EditorRuntime }) {
       } else if (command && event.key.toLowerCase() === 'y' && !isTextEntry(event.target)) {
         event.preventDefault();
         runtime.store.redo();
+      } else if (event.key === 'Escape') {
+        runtime.store.releaseClear();
       } else if (event.key === ' ' && !command && !isTextEntry(event.target) && !isActivatable(event.target)) {
         // Space plays and stops, except where it already activates a control.
         event.preventDefault();

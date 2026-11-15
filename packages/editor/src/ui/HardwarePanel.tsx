@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import {
+  BASIC_RHYTHMS,
   KNOB_PARAM_LABELS,
+  MODES,
   PANEL,
   PART_STEPS,
   TEMPO_STOPS,
@@ -12,15 +14,26 @@ import {
   knobPosition,
   rhythmLength,
   tempoBpm,
+  writePart,
+  type Mode,
   type PanelKnob,
   type PanelManifest,
-  type PanelRect,
   type PanelSwitch,
 } from '@boombapbot/contracts';
 import { trackLabel } from '../engine/machine';
 import type { AssetManifest } from '../runtime';
 import { editTarget } from '../state/store';
 import { useEditorState, useRuntime } from './context';
+import {
+  ClearButton,
+  ModeSelector,
+  PreScaleSwitch,
+  StatusLamps,
+  TapButton,
+  VariationSwitches,
+  rhythmName,
+} from './PanelControls';
+import { KnobFace, PassiveKnob, box, circle, knobLighting } from './panelGeometry';
 import { Segmented } from './Segmented';
 
 function useAssetManifest(): AssetManifest | null {
@@ -39,64 +52,6 @@ function useAssetManifest(): AssetManifest | null {
     };
   }, [runtime]);
   return manifest;
-}
-
-/** Positions a faceplate rectangle as percentages, so it scales with the image. */
-function box(panel: PanelManifest, [x, y, w, h]: PanelRect): CSSProperties {
-  const { width, height } = panel.faceplate;
-  return {
-    left: `${(x / width) * 100}%`,
-    top: `${(y / height) * 100}%`,
-    width: `${(w / width) * 100}%`,
-    height: `${(h / height) * 100}%`,
-  };
-}
-
-function circle(panel: PanelManifest, cx: number, cy: number, r: number): CSSProperties {
-  return box(panel, [cx - r, cy - r, r * 2, r * 2]);
-}
-
-/**
- * A knob cut from the faceplate photo: a round window onto the photo that
- * turns about the knob's centre. Without a photo it is drawn instead.
- */
-function KnobFace(props: {
-  panel: PanelManifest;
-  photo: string | null;
-  cx: number;
-  cy: number;
-  r: number;
-  photoDeg: number;
-  deg: number;
-}) {
-  const { panel, photo, cx, cy, r } = props;
-  const { width, height } = panel.faceplate;
-  if (!photo) {
-    return (
-      <span className="sb-knob-drawn" style={{ transform: `rotate(${props.deg}deg)` }}>
-        <span className="sb-knob-pointer" />
-      </span>
-    );
-  }
-  return (
-    <span
-      className="sb-knob-photo"
-      style={{
-        backgroundImage: `url("${photo}")`,
-        backgroundSize: `${(width / (2 * r)) * 100}% auto`,
-        backgroundPosition: `${((cx - r) / (width - 2 * r)) * 100}% ${((cy - r) / (height - 2 * r)) * 100}%`,
-        transform: `rotate(${props.deg - props.photoDeg}deg)`,
-      }}
-    />
-  );
-}
-
-/**
- * Artwork drawn for boombapbot shades its knobs evenly, so the light on them
- * can stay put while they turn. A photograph carries its own light.
- */
-function knobLighting(panel: PanelManifest, photo: string | null): 'fixed' | undefined {
-  return photo && panel.faceplate.original ? 'fixed' : undefined;
 }
 
 interface KnobProps {
@@ -330,6 +285,10 @@ export function HardwarePanel() {
   const rhythm = useEditorState((state) => state.project.rhythms[editTarget(state.project).rhythm]!);
   const playing = useEditorState((state) => state.playing);
   const currentStep = useEditorState((state) => state.currentStep);
+  const mode = useEditorState((state) => state.project.panel.mode);
+  const basicRhythm = useEditorState((state) => state.project.panel.basicRhythm);
+  const fillRhythm = useEditorState((state) => state.project.panel.fillRhythm);
+  const clearArmed = useEditorState((state) => state.clearArmed);
   const manifest = useAssetManifest();
   const [fit, setFit] = useState(false);
   // An image that fails to load falls back to the drawn panel.
@@ -343,10 +302,21 @@ export function HardwarePanel() {
   const row = rhythm[target.variation][target.track];
   const select = panel.voiceSelect;
   const activePosition = select.positions.find((position) => position.track === target.track);
-  // The sixteen lamps show whichever part of the measure is playing.
+  // In a write mode the buttons are steps of the selected track. In every
+  // other mode they choose a rhythm, and their lamps show the choice.
+  const writing = writePart(mode) !== null;
   const lamp = playing && currentStep >= 0 ? currentStep % PART_STEPS : -1;
   const lampPart = currentStep >= PART_STEPS ? PART_STEPS : 0;
-  const stepOn = (button: number) => isStepOn(row, target.offset + button);
+  const chosen = (button: number) =>
+    mode === 'pattern_clear' ? button === target.rhythm : button === basicRhythm || button === fillRhythm;
+  const lit = (button: number) => (writing ? isStepOn(row, target.offset + button) : chosen(button));
+  // The lamp runs across the part being written, or across any part while choosing rhythms.
+  const running = (button: number) => lamp === button && (!writing || lampPart === target.offset);
+  const stepLabel = (button: number) => {
+    if (!writing) return `${rhythmName(button)}${chosen(button) ? ', selected' : ''}`;
+    if (clearArmed) return `Make step ${button + 1} the last step`;
+    return `${trackName}, step ${button + 1}, ${lit(button) ? 'on' : 'off'}`;
+  };
   const selectTrack = (id: typeof target.track) => {
     store.selectTrack(id);
     void runtime.audition(id);
@@ -419,23 +389,14 @@ export function HardwarePanel() {
           ) : null}
 
           {select.knob ? (
-            <span
-              className="sb-panel-knob sb-panel-knob-passive"
-              data-lighting={knobLighting(panel, photo)}
-              style={circle(panel, select.knob.cx, select.knob.cy, select.knob.r)}
-              aria-hidden="true"
-            >
-              <KnobFace
-                panel={panel}
-                photo={photo}
-                cx={select.knob.cx}
-                cy={select.knob.cy}
-                r={select.knob.r}
-                photoDeg={select.knob.photoDeg}
-                deg={activePosition?.deg ?? 0}
-              />
-            </span>
+            <PassiveKnob panel={panel} photo={photo} knob={select.knob} deg={activePosition?.deg ?? 0} />
           ) : null}
+          <ModeSelector panel={panel} photo={photo} />
+          <ClearButton panel={panel} />
+          <PreScaleSwitch panel={panel} />
+          <VariationSwitches panel={panel} />
+          <StatusLamps panel={panel} dim={!photo || panel.ledsLitInPhoto} />
+          <TapButton panel={panel} />
 
           <div className="sb-panel-layer" role="radiogroup" aria-label={select.label || 'Instrument'}>
             {select.positions.map((position) => (
@@ -474,36 +435,40 @@ export function HardwarePanel() {
             </button>
           ))}
 
-          <div className="sb-panel-layer" role="group" aria-label={`${trackName} steps`}>
-            {panel.steps.map((step, index) => {
-              const on = stepOn(index);
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  className="sb-panel-step"
-                  style={box(panel, step.hit)}
-                  data-panel-step={index}
-                  data-on={on}
-                  aria-pressed={on}
-                  aria-label={`${trackName}, step ${index + 1}, ${on ? 'on' : 'off'}`}
-                  onClick={() => {
-                    if (store.toggleStep(index) && !store.getState().playing) runtime.auditionIfRunning(target.track);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'ArrowRight') {
-                      event.preventDefault();
-                      focusStep((index + 1) % PART_STEPS);
-                    } else if (event.key === 'ArrowLeft') {
-                      event.preventDefault();
-                      focusStep((index - 1 + PART_STEPS) % PART_STEPS);
-                    }
-                  }}
-                >
-                  <span className="sb-panel-text">{index + 1}</span>
-                </button>
-              );
-            })}
+          <div
+            className="sb-panel-layer"
+            role="group"
+            aria-label={writing ? `${trackName} steps` : 'Rhythms'}
+          >
+            {panel.steps.map((step, index) => (
+              <button
+                key={index}
+                type="button"
+                className="sb-panel-step"
+                style={box(panel, step.hit)}
+                data-panel-step={index}
+                data-on={lit(index)}
+                aria-pressed={lit(index)}
+                aria-label={stepLabel(index)}
+                onClick={() => {
+                  const press = store.pressStep(index);
+                  if (press.kind === 'step' && press.on && !store.getState().playing) {
+                    runtime.auditionIfRunning(target.track);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    focusStep((index + 1) % PART_STEPS);
+                  } else if (event.key === 'ArrowLeft') {
+                    event.preventDefault();
+                    focusStep((index - 1 + PART_STEPS) % PART_STEPS);
+                  }
+                }}
+              >
+                <span className="sb-panel-text">{index < BASIC_RHYTHMS ? index + 1 : index + 1 - BASIC_RHYTHMS}</span>
+              </button>
+            ))}
           </div>
 
           {panel.steps.map((step, index) => {
@@ -513,8 +478,11 @@ export function HardwarePanel() {
                 key={index}
                 className="sb-panel-led"
                 aria-hidden="true"
-                data-on={stepOn(index)}
-                data-now={lamp === index && lampPart === target.offset}
+                data-panel-lamp={index}
+                data-on={lit(index)}
+                data-now={running(index)}
+                // The Basic Rhythm that will play flashes while the machine waits.
+                data-flash={mode === 'manual_play' && !playing && index === basicRhythm}
                 data-dim={!photo || panel.ledsLitInPhoto}
                 style={circle(panel, x, y, panel.ledRadius)}
               />
@@ -537,14 +505,50 @@ export function HardwarePanel() {
             testId: `strip-voice-${entry.id}`,
           }))}
         />
+        <Segmented<Mode>
+          label="Mode"
+          className="sb-segmented-fill sb-panel-strip"
+          value={mode}
+          onChange={(next) => store.setMode(next)}
+          options={MODES.map((entry, index) => ({
+            value: entry,
+            label: MODE_SHORT[index]!,
+            name: panel.modeSelect.positions[index]!.label,
+            testId: `strip-mode-${entry}`,
+          }))}
+        />
         <div className="sb-panel-info">
           <p data-testid="panel-voice">
-            <span className="sb-label">Instrument</span> <strong>{trackName}</strong> ·{' '}
-            {countSteps(row, rhythmLength(rhythm))} steps on
+            {writing ? (
+              <>
+                <span className="sb-label">Instrument</span> <strong>{trackName}</strong> ·{' '}
+                {countSteps(row, rhythmLength(rhythm))} steps on
+              </>
+            ) : (
+              <>
+                <span className="sb-label">Rhythm</span> <strong>{rhythmName(target.rhythm)}</strong>, version{' '}
+                {target.variation.toUpperCase()}
+              </>
+            )}
           </p>
-          <button type="button" className="sb-button" aria-pressed={fit} onClick={() => setFit(!fit)}>
-            {fit ? 'Zoom in' : 'Fit to screen'}
-          </button>
+          <div className="sb-panel-buttons">
+            <button
+              type="button"
+              className="sb-button"
+              data-testid="strip-clear"
+              aria-pressed={writing ? clearArmed : undefined}
+              disabled={!writing && mode !== 'pattern_clear'}
+              onClick={() => store.pressClear()}
+            >
+              Clear
+            </button>
+            <button type="button" className="sb-button" data-testid="strip-tap" onPointerDown={() => runtime.tap()}>
+              Tap
+            </button>
+            <button type="button" className="sb-button" aria-pressed={fit} onClick={() => setFit(!fit)}>
+              {fit ? 'Zoom in' : 'Fit to screen'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -578,6 +582,9 @@ export function PanelNotes() {
     </details>
   );
 }
+
+/** The modes as the phone strip names them, in selector order. */
+const MODE_SHORT = ['P. clear', '1st', '2nd', 'Manual', 'Play', 'Comp'];
 
 function sameTarget(a: ReturnType<typeof editTarget>, b: ReturnType<typeof editTarget>): boolean {
   return a.rhythm === b.rhythm && a.variation === b.variation && a.track === b.track && a.offset === b.offset;

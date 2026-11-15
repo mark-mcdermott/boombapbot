@@ -17,8 +17,11 @@ import {
   TRACK_IDS,
   accentGains,
   clampKnob,
+  clearRhythm,
+  clearedVersions,
   countHits,
   countSteps,
+  createDefaultPanel,
   createDefaultSound,
   createEmptyRhythm,
   createProject,
@@ -28,6 +31,8 @@ import {
   knobPosition,
   levelGain,
   masterGain,
+  nextStep,
+  panelTarget,
   parseProject,
   parseProjectText,
   patternIndex,
@@ -35,11 +40,14 @@ import {
   rowMask,
   serializeProject,
   stepsPerBeat,
+  tappedStep,
   tempoBpm,
   tempoFromBpm,
   trackRole,
   withKnob,
+  withPartLength,
   withStep,
+  writePart,
 } from '../src';
 
 function read(name: string): string {
@@ -361,5 +369,81 @@ describe('knobs', () => {
     expect(turned.knobs.kick).toBe(sound.knobs.kick);
     expect(turned.master).toBe(sound.master);
     expect(sound.accent).toBe(0.75);
+  });
+});
+
+describe('writing rhythms', () => {
+  const written = (): ReturnType<typeof createEmptyRhythm> => {
+    const rhythm = createEmptyRhythm();
+    return {
+      ...rhythm,
+      preScale: 4,
+      firstLength: 12,
+      secondLength: 5,
+      a: { ...rhythm.a, kick: withStep(rhythm.a.kick, 0, true) },
+      b: { ...rhythm.b, snare: withStep(rhythm.b.snare, 20, true) },
+    };
+  };
+
+  it('knows which modes write, and which part', () => {
+    expect(writePart('write_first')).toBe(0);
+    expect(writePart('write_second')).toBe(1);
+    for (const mode of ['pattern_clear', 'manual_play', 'play', 'compose'] as const) expect(writePart(mode)).toBeNull();
+  });
+
+  it('puts the panel on a Basic Rhythm or an Intro/Fill-in, each with its own variation switch', () => {
+    const panel = { ...createDefaultPanel(), basicRhythm: 4, fillRhythm: 14, fillVariation: 'b' as const };
+    expect(panelTarget(panel)).toEqual({ rhythm: 4, variation: 'a' });
+    expect(panelTarget({ ...panel, basicVariation: 'b' })).toEqual({ rhythm: 4, variation: 'b' });
+    expect(panelTarget({ ...panel, basicVariation: 'ab' })).toEqual({ rhythm: 4, variation: 'a' });
+    expect(panelTarget({ ...panel, writeTarget: 'fill' })).toEqual({ rhythm: 14, variation: 'b' });
+    expect(clearedVersions(panel)).toEqual(['a']);
+    expect(clearedVersions({ ...panel, basicVariation: 'ab' })).toEqual(['a', 'b']);
+    expect(clearedVersions({ ...panel, basicVariation: 'ab', writeTarget: 'fill' })).toEqual(['b']);
+  });
+
+  it('clears the versions asked for and resets the lengths, keeping the pre-scale', () => {
+    const rhythm = written();
+    const one = clearRhythm(rhythm, ['a']);
+    expect(one).toMatchObject({ preScale: 4, firstLength: 16, secondLength: 0 });
+    expect(countHits(one, 'a')).toBe(0);
+    expect(one.b).toBe(rhythm.b);
+    const both = clearRhythm(rhythm, ['a', 'b']);
+    expect(both.a).toEqual(createEmptyRhythm().a);
+    expect(both.b).toEqual(createEmptyRhythm().b);
+    expect(rhythm.firstLength).toBe(12);
+  });
+
+  it('sets the last step of either part, inside one to sixteen', () => {
+    const rhythm = written();
+    expect(withPartLength(rhythm, 0, 7)).toMatchObject({ firstLength: 7, secondLength: 5 });
+    expect(withPartLength(rhythm, 1, 16)).toMatchObject({ firstLength: 12, secondLength: 16 });
+    expect(withPartLength(rhythm, 0, 0).firstLength).toBe(1);
+    expect(withPartLength(rhythm, 1, 40).secondLength).toBe(16);
+  });
+
+  it('walks a measure through the 1st part and then the 2nd', () => {
+    const rhythm = written();
+    const walk = [0];
+    for (let i = 0; i < 17; i += 1) walk.push(nextStep(rhythm, walk[walk.length - 1]!));
+    expect(walk).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 16, 17, 18, 19, 20, 0]);
+    expect(nextStep({ ...rhythm, secondLength: 0 }, 11)).toBe(0);
+    expect(nextStep({ ...rhythm, firstLength: 1, secondLength: 0 }, 0)).toBe(0);
+  });
+
+  it('places a tap on the step sounding, or the next once it is half over', () => {
+    const rhythm = written();
+    expect(tappedStep(rhythm, 3, 0.1)).toBe(3);
+    expect(tappedStep(rhythm, 3, 0.5)).toBe(3);
+    expect(tappedStep(rhythm, 3, 0.8)).toBe(4);
+    expect(tappedStep(rhythm, 11, 0.9)).toBe(16);
+    expect(tappedStep(rhythm, 20, 0.9)).toBe(0);
+  });
+
+  it('gives an older panel a write target', () => {
+    const project = createProject({ id: 'p', now: new Date(0) });
+    const { writeTarget: _dropped, ...panel } = project.panel;
+    const result = parseProject({ ...project, panel });
+    expect(result.ok && result.project.panel.writeTarget).toBe('basic');
   });
 });

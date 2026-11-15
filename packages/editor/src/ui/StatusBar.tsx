@@ -32,7 +32,7 @@ export function PatternActions() {
         className="sb-button sb-button-danger"
         data-testid="clear"
         disabled={hits === 0}
-        onClick={() => store.clearPattern()}
+        onClick={() => store.clearRhythm()}
       >
         Clear rhythm
       </button>

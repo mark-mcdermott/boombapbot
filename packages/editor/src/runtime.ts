@@ -2,7 +2,10 @@ import {
   ROLES,
   getTrack,
   isInstrumentId,
+  stepsPerBeat,
+  tappedStep,
   tempoBpm,
+  writePart,
   type Project,
   type Role,
   type TrackId,
@@ -32,7 +35,7 @@ import {
   projectFileName,
   readProjectFile,
 } from './state/project-io';
-import { EditorStore } from './state/store';
+import { EditorStore, editTarget } from './state/store';
 
 /** Written by scripts/prepare-assets.mjs next to the built site. */
 export interface AssetManifest {
@@ -74,6 +77,8 @@ export class EditorRuntime {
   // One sound per slot may be on its way to the audio thread. A knob that
   // moves again meanwhile marks the slot, and the newest setting follows.
   private readonly soundsInFlight = new Map<number, { stale: boolean }>();
+  /** When the step now sounding was reported, for placing a tap. */
+  private stepStartedAt = 0;
   private soundsSent = 0;
   private soundsTaken = 0;
   private unsubscribe: (() => void) | null = null;
@@ -104,8 +109,12 @@ export class EditorRuntime {
       onPosition: (step, pattern, playing) => {
         // Ignore a late "stopped" report that crosses a fresh Play.
         if (!this.store.getState().playing) return;
-        if (playing) this.store.setPosition(step, pattern);
-        else this.store.setPosition(-1, -1);
+        if (!playing) {
+          this.store.setPosition(-1, -1);
+          return;
+        }
+        if (step !== this.store.getState().currentStep) this.stepStartedAt = performance.now();
+        this.store.setPosition(step, pattern);
       },
       onStats: (stats) => {
         this.stats = stats;
@@ -297,6 +306,27 @@ export class EditorRuntime {
   stop(): void {
     this.store.setPlaying(false);
     this.audio.stop();
+  }
+
+  /**
+   * TAP. While a rhythm runs in a write mode it writes the selected track on
+   * the step that is sounding, or on the next one once that step is more than
+   * half over. Stopped, it plays the selected instrument.
+   */
+  tap(): void {
+    const { project, playing, currentStep } = this.store.getState();
+    if (writePart(project.panel.mode) === null) return;
+    const target = editTarget(project);
+    if (!playing || currentStep < 0) {
+      void this.audition(target.track);
+      return;
+    }
+    const rhythm = project.rhythms[target.rhythm]!;
+    const stepMs = 60_000 / tempoBpm(project.tempo) / stepsPerBeat(rhythm.preScale);
+    const step = tappedStep(rhythm, currentStep, (performance.now() - this.stepStartedAt) / stepMs);
+    this.store.tapStep(step);
+    // A tap on the step already sounding would otherwise be silent until the next measure.
+    if (step === currentStep) this.auditionIfRunning(target.track);
   }
 
   /** Plays one hit of a track. Starts audio if this is the first gesture. */

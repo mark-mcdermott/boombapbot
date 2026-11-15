@@ -44,7 +44,16 @@ export interface ProjectSnapshot {
   };
   rhythms: RhythmSnapshot[];
   rhythmTracks: number[][];
-  panel: { selector: number; basicRhythm: number; basicVariation: string };
+  panel: {
+    mode: string;
+    selector: number;
+    basicRhythm: number;
+    fillRhythm: number;
+    basicVariation: string;
+    fillVariation: string;
+    preScale: number;
+    writeTarget: string;
+  };
 }
 
 export interface DebugSnapshot {

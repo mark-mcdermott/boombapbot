@@ -8,8 +8,8 @@
 // The editor turns a knob by rotating a round crop of this image, so the
 // knobs it turns are shaded evenly here and the editor lays a fixed light
 // over them. A knob that never moves is lit in the drawing itself, with the
-// same light. The editor draws a live switch's lever, so only its slot is
-// drawn here.
+// same light. The editor draws a live switch's lever and lights the lamps,
+// so only a switch's slot is drawn here, and every lamp is drawn unlit.
 //
 //   node scripts/draw-faceplates.mjs           write assets/faceplates/*.svg
 //   node scripts/draw-faceplates.mjs --check   fail if a committed file differs
@@ -172,7 +172,6 @@ function defs() {
     gradient('knobShadow', [[0, '#000', 0.6], [0.72, '#000', 0.5], [1, '#000', 0]], { cx: 0.5, cy: 0.5, r: 0.5 }),
     gradient('cream', [[0, '#fbf6dc'], [1, '#e2d9ad']], vertical),
     gradient('well', [[0, '#96938d'], [1, '#85827c']], vertical),
-    gradient('lever', [[0, '#f4f4f2'], [1, '#8f8f8d']], vertical),
   ]);
 }
 
@@ -268,15 +267,10 @@ function liveDial(knob, ribs) {
 /** The slot of a slide switch. The editor draws the lever in it. */
 const switchSlot = ([x, y, w, h]) => rect(x, y, w, h, { rx: 3, fill: '#0b0c0e' });
 
-/** A lever switch in a rounded slot, thrown fully to the left. */
-function leverSwitch(cx, cy, width) {
-  const tip = cx - width / 2 + 15;
-  return group({}, [
-    rect(cx - width / 2, cy - 13, width, 26, { rx: 13, fill: '#0b0c0e' }),
-    line(cx, cy, tip, cy + 1, { stroke: '#6f7073', 'stroke-width': 6, 'stroke-linecap': 'round' }),
-    circle(tip, cy + 1, 9, { fill: 'url(#lever)' }),
-  ]);
-}
+/** The rounded slot of a lever switch. The editor draws the lever in it. */
+const leverSlot = ([x, y, w, h]) => rect(x, y, w, h, { rx: h / 2, fill: '#0b0c0e' });
+
+const lamp = ([x, y], r) => circle(x, y, r, { fill: C.ledOff });
 
 function note(x, y, { flag }) {
   return group({ fill: C.wellInk, stroke: C.wellInk }, [
@@ -350,11 +344,12 @@ function draw808(panel) {
   out.push(text(304, 283, 'PLAY', { size: 11, fill: C.orange, anchor: 'end' }));
   out.push(text(316, 301, 'COM-', { size: 10, fill: C.orange, anchor: 'end' }));
   out.push(text(316, 312, 'POSE', { size: 10, fill: C.orange, anchor: 'end' }));
-  for (const deg of [-52, -14, 24, 62]) {
-    const [x, y] = polar(228, 320, 47, deg);
+  const mode = panel.modeSelect;
+  for (const position of mode.positions) {
+    const [x, y] = polar(mode.knob.cx, mode.knob.cy, 47, position.deg);
     out.push(circle(x, y, 2, { fill: C.label }));
   }
-  out.push(dial(228, 320, 39, -52));
+  out.push(liveDial(mode.knob, 35));
   out.push(rect(190, 377, 108, 20, thin));
   out.push(text(244, 392, 'PATTERN CLEAR', { size: 11.5, fill: C.cream, maxWidth: 100 }));
   out.push(text(196, 414, 'STEP', { size: 10.5, fill: C.cream }));
@@ -363,9 +358,11 @@ function draw808(panel) {
   out.push(text(196, 452, 'SCALE', { size: 10.5, fill: C.cream }));
   out.push(text(274, 414, 'TRACK', { size: 10.5, fill: C.orange }));
   out.push(text(274, 426, 'CLEAR', { size: 10.5, fill: C.orange }));
-  out.push(circle(234, 431, 14, { fill: '#000', opacity: 0.4 }));
-  out.push(circle(234, 429, 13, { fill: '#d5362b' }));
-  out.push(circle(231, 425, 5, { fill: '#ef6a5f', opacity: 0.7 }));
+  const [clearX, clearY, clearSize] = panel.clear.hit;
+  const clear = [clearX + clearSize / 2, clearY + clearSize / 2];
+  out.push(circle(clear[0], clear[1] + 2, 14, { fill: '#000', opacity: 0.4 }));
+  out.push(circle(clear[0], clear[1], 13, { fill: '#d5362b' }));
+  out.push(circle(clear[0] - 3, clear[1] - 4, 5, { fill: '#ef6a5f', opacity: 0.7 }));
 
   // Instrument selector. The editor turns the knob and lights the label.
   const select = panel.voiceSelect;
@@ -488,11 +485,11 @@ function draw808(panel) {
 
   // Basic variation and start/stop.
   out.push(text(273, 803, 'BASIC-VARIATION', { size: 11.5, fill: C.wellInk, maxWidth: 124 }));
-  out.push(leverSwitch(274, 826, 82));
+  out.push(leverSlot(panel.basicVariation.slot));
   [['A', 245], ['AB', 274], ['B', 303]].forEach(([label, x]) => out.push(text(x, 866, label, { size: 11.5, fill: C.wellInk })));
   out.push(rect(233, 876, 82, 22, { rx: 3, fill: C.recess }));
-  out.push(circle(246, 887, 5.5, { fill: C.ledOff }));
-  out.push(circle(302, 887, 5.5, { fill: C.ledOff }));
+  out.push(lamp(panel.lamps.variationA, panel.lamps.radius));
+  out.push(lamp(panel.lamps.variationB, panel.lamps.radius));
   out.push(line(168, 913, 377, 913, { stroke: C.wellInk, 'stroke-width': 1.5 }));
   for (const control of panel.transport) {
     const [x, y, w, h] = control.hit;
@@ -507,8 +504,7 @@ function draw808(panel) {
 
   // Pre-scale selector and its four rows of note values.
   out.push(text(436, 801, 'PRE-SCALE', { size: 11.5, fill: C.label, maxWidth: 80 }));
-  out.push(rect(424, 812, 22, 72, { rx: 3, fill: '#08090a' }));
-  out.push(rect(427, 842, 16, 24, { rx: 2, fill: '#2f3035' }));
+  out.push(switchSlot(panel.preScale.slot));
   const rows = [
     { y: 783, group: 3, every: 1, flag: true },
     { y: 815, group: 6, every: 2, flag: true },
@@ -548,9 +544,9 @@ function draw808(panel) {
   // Step keys. Lamps are drawn unlit; the editor lights them.
   out.push(path(`M392 908 H483 V903 L497 919 L483 935 V930 H392 Z`, { fill: C.well }));
   out.push(text(437, 925, 'STEP NO', { size: 13, fill: C.wellInk, maxWidth: 80 }));
-  out.push(circle(435, 951, 4.5, { fill: C.ledOff }));
+  out.push(lamp(panel.lamps.firstPart, panel.lamps.radius - 1));
   out.push(text(436, 975, '1st PART', { size: 11.5, fill: C.label }));
-  out.push(circle(435, 1004, 4.5, { fill: C.ledOff }));
+  out.push(lamp(panel.lamps.secondPart, panel.lamps.radius - 1));
   out.push(text(436, 1030, '2nd PART', { size: 11.5, fill: C.label }));
   steps.forEach((step, index) => {
     const [x, y, w, h] = step.button;
@@ -572,17 +568,18 @@ function draw808(panel) {
 
   // Intro and fill-in, right.
   out.push(text(1763, 803, 'I/F-VARIATION', { size: 11.5, fill: C.wellInk, maxWidth: 112 }));
-  out.push(leverSwitch(1763, 827, 56));
+  out.push(leverSlot(panel.fillVariation.slot));
   out.push(text(1748, 862, 'A', { size: 11.5, fill: C.wellInk }));
   out.push(text(1778, 862, 'B', { size: 11.5, fill: C.wellInk }));
   out.push(line(1697, 878, 1830, 878, { stroke: C.wellInk, 'stroke-width': 1.5 }));
   out.push(text(1763, 909, 'INTRO SET', { size: 11.5, fill: C.wellInk }));
   out.push(line(1712, 915, 1814, 915, { stroke: C.wellInk, 'stroke-width': 1 }));
   out.push(text(1763, 931, 'FILL IN TRIGGER', { size: 11.5, fill: C.wellInk, maxWidth: 118 }));
-  out.push(rect(1722, 943, 84, 84, { rx: 5, fill: C.recess }));
-  out.push(rect(1725, 945, 78, 76, { rx: 5, fill: 'url(#cream)' }));
-  out.push(rect(1732, 952, 64, 62, { rx: 3, fill: 'none', stroke: '#c9bd86', 'stroke-width': 1.5 }));
-  out.push(text(1764, 989, 'TAP', { size: 15, fill: '#6b5a24', spacing: 0.5 }));
+  const [tapX, tapY, tapW, tapH] = panel.tap.hit;
+  out.push(rect(tapX - 3, tapY - 2, tapW + 6, tapH + 8, { rx: 5, fill: C.recess }));
+  out.push(rect(tapX, tapY, tapW, tapH, { rx: 5, fill: 'url(#cream)' }));
+  out.push(rect(tapX + 7, tapY + 7, tapW - 14, tapH - 14, { rx: 3, fill: 'none', stroke: '#c9bd86', 'stroke-width': 1.5 }));
+  out.push(text(tapX + tapW / 2, tapY + tapH / 2 + 6, 'TAP', { size: 15, fill: '#6b5a24', spacing: 0.5 }));
   out.push(path('M1827 1050 H1699 V1045 L1683 1061 L1699 1077 V1072 H1827 Z', { fill: C.wellInk }));
   out.push(text(1763, 1066, 'INTRO/FILL IN', { size: 14, fill: C.well, maxWidth: 118 }));
 

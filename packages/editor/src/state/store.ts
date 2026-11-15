@@ -1,16 +1,24 @@
 import {
+  BASIC_RHYTHMS,
   PART_STEPS,
   TEMPO_STOPS,
   TRACK_IDS,
   clampKnob,
-  createEmptyVariation,
+  clearRhythm,
+  clearedVersions,
   createProject,
   createStarterRhythms,
   isStepOn,
   knobPosition,
+  panelTarget,
   withKnob,
+  withPartLength,
   withStep,
+  writePart,
   type KnobParam,
+  type Mode,
+  type PanelState,
+  type PreScale,
   type Project,
   type Rhythm,
   type SwitchedId,
@@ -18,7 +26,6 @@ import {
   type TrackId,
   type Variation,
 } from '@boombapbot/contracts';
-import { selectedVariation } from '../engine/machine';
 
 export type AudioStatus = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
 export type DraftOrigin = 'new' | 'restored' | 'recovered';
@@ -38,6 +45,8 @@ export interface EditorState {
   currentStep: number;
   /** Pattern the engine is playing, or -1. */
   currentPattern: number;
+  /** CLEAR is down in a write mode: the next step button sets the part's last step. */
+  clearArmed: boolean;
   audioStatus: AudioStatus;
   audioError: string | null;
   draftOrigin: DraftOrigin;
@@ -56,6 +65,9 @@ interface Snapshot {
   /** Set when the step replaced the whole project, as an import does. */
   whole?: Project;
 }
+
+/** What pressing a step button did. */
+export type StepPress = { kind: 'step'; on: boolean } | { kind: 'length' } | { kind: 'rhythm' };
 
 /** Where the step buttons write: a version of a rhythm, a track and a part. */
 export interface EditTarget {
@@ -91,11 +103,14 @@ function memoryOf(project: Project): Memory {
 export function editTarget(project: Project): EditTarget {
   const { panel } = project;
   return {
-    rhythm: panel.basicRhythm,
-    variation: selectedVariation(project),
+    ...panelTarget(panel),
     track: TRACK_IDS[panel.selector]!,
-    offset: panel.mode === 'write_second' ? PART_STEPS : 0,
+    offset: writePart(panel.mode) === 1 ? PART_STEPS : 0,
   };
+}
+
+function sameRhythm(a: Rhythm, b: Rhythm): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Holds the project and the editing state. The panel reads and writes this one store. */
@@ -116,6 +131,7 @@ export class EditorStore {
       playing: false,
       currentStep: -1,
       currentPattern: -1,
+      clearArmed: false,
       audioStatus: 'idle',
       audioError: null,
       draftOrigin: options.draftOrigin ?? 'new',
@@ -152,6 +168,13 @@ export class EditorStore {
     this.set({ project: this.stamped(project) });
   }
 
+  private adjustPanel(change: Partial<PanelState>): void {
+    const { project } = this.state;
+    const panel = { ...project.panel, ...change };
+    if ((Object.keys(change) as Array<keyof PanelState>).every((key) => panel[key] === project.panel[key])) return;
+    this.adjust({ ...project, panel });
+  }
+
   /** Changes what the machine remembers, and records it for undo. */
   private commit(project: Project, whole = false): void {
     const previous = this.state.project;
@@ -163,37 +186,77 @@ export class EditorStore {
 
   private commitRhythm(index: number, rhythm: Rhythm): void {
     const { project } = this.state;
+    if (sameRhythm(rhythm, project.rhythms[index]!)) return;
     this.commit({ ...project, rhythms: project.rhythms.map((old, i) => (i === index ? rhythm : old)) });
   }
 
   // ---- Memory edits ---------------------------------------------------------
 
-  /** Presses a step button: toggles that step of the selected track. Returns whether it is now on. */
-  toggleStep(button: number): boolean {
-    const target = editTarget(this.state.project);
+  /**
+   * Presses a step button. In a write mode it toggles that step of the
+   * selected track, or sets the part's last step while CLEAR is down. In every
+   * other mode it selects a rhythm: 1 to 12 are Basic Rhythms, 13 to 16
+   * Intro/Fill-ins.
+   */
+  pressStep(button: number): StepPress {
+    const { project, clearArmed } = this.state;
+    const part = writePart(project.panel.mode);
+    if (part === null) {
+      this.selectRhythm(button);
+      return { kind: 'rhythm' };
+    }
+    const target = editTarget(project);
+    const rhythm = project.rhythms[target.rhythm]!;
+    if (clearArmed) {
+      this.set({ clearArmed: false });
+      this.commitRhythm(target.rhythm, withPartLength(rhythm, part, button + 1));
+      return { kind: 'length' };
+    }
     const step = target.offset + button;
-    const row = this.state.project.rhythms[target.rhythm]![target.variation][target.track];
-    const on = !isStepOn(row, step);
+    const on = !isStepOn(rhythm[target.variation][target.track], step);
     this.setStep(target.rhythm, target.variation, target.track, step, on);
-    return on;
+    return { kind: 'step', on };
+  }
+
+  /** Writes the selected track at a step of the rhythm the panel is on, as TAP does. */
+  tapStep(step: number): void {
+    const target = editTarget(this.state.project);
+    this.setStep(target.rhythm, target.variation, target.track, step, true);
   }
 
   setStep(rhythmIndex: number, variation: Variation, track: TrackId, step: number, on: boolean): void {
     const rhythm = this.state.project.rhythms[rhythmIndex];
     if (!rhythm) return;
     const row = rhythm[variation][track];
-    const next = withStep(row, step, on);
-    if (next === row) return;
-    this.commitRhythm(rhythmIndex, { ...rhythm, [variation]: { ...rhythm[variation], [track]: next } });
+    this.commitRhythm(rhythmIndex, { ...rhythm, [variation]: { ...rhythm[variation], [track]: withStep(row, step, on) } });
   }
 
-  /** Wipes the steps of the selected version of the selected rhythm. */
-  clearPattern(): void {
-    const { rhythm: index, variation } = editTarget(this.state.project);
-    const rhythm = this.state.project.rhythms[index]!;
-    const empty = createEmptyVariation();
-    if (TRACK_IDS.every((id) => rhythm[variation][id] === empty[id])) return;
-    this.commitRhythm(index, { ...rhythm, [variation]: empty });
+  /**
+   * Presses CLEAR. In pattern clear it wipes the rhythm the panel is on. In a
+   * write mode it stores the pre-scale switch in that rhythm and stays down,
+   * so the next step button sets the last step; pressed again, it comes up.
+   */
+  pressClear(): void {
+    const { project, clearArmed } = this.state;
+    const { mode } = project.panel;
+    if (mode === 'pattern_clear') {
+      this.clearRhythm();
+    } else if (writePart(mode) !== null) {
+      const { rhythm: index } = panelTarget(project.panel);
+      this.set({ clearArmed: !clearArmed });
+      if (!clearArmed) this.commitRhythm(index, { ...project.rhythms[index]!, preScale: project.panel.preScale });
+    }
+  }
+
+  releaseClear(): void {
+    if (this.state.clearArmed) this.set({ clearArmed: false });
+  }
+
+  /** Wipes the rhythm the panel is on: both versions when its variation switch is on AB. */
+  clearRhythm(): void {
+    const { panel, rhythms } = this.state.project;
+    const { rhythm: index } = panelTarget(panel);
+    this.commitRhythm(index, clearRhythm(rhythms[index]!, clearedVersions(panel)));
   }
 
   /** Puts the starter rhythms back in place of everything the machine remembers. */
@@ -266,12 +329,38 @@ export class EditorStore {
     });
   }
 
+  /** Turns the mode selector. */
+  setMode(mode: Mode): void {
+    this.releaseClear();
+    this.adjustPanel({ mode });
+  }
+
+  /** Selects a rhythm with its step button: the last one pressed is the one the write modes work on. */
+  selectRhythm(button: number): void {
+    if (button < 0 || button >= PART_STEPS) return;
+    this.adjustPanel(
+      button < BASIC_RHYTHMS
+        ? { basicRhythm: button, writeTarget: 'basic' }
+        : { fillRhythm: button, writeTarget: 'fill' },
+    );
+  }
+
+  /** Moves the pre-scale switch. A rhythm takes it when CLEAR is pressed in a write mode. */
+  setPreScale(preScale: PreScale): void {
+    this.adjustPanel({ preScale });
+  }
+
+  setBasicVariation(basicVariation: PanelState['basicVariation']): void {
+    this.adjustPanel({ basicVariation });
+  }
+
+  setFillVariation(fillVariation: Variation): void {
+    this.adjustPanel({ fillVariation });
+  }
+
   /** Turns the instrument selector. */
   selectTrack(track: TrackId): void {
-    const { project } = this.state;
-    const selector = TRACK_IDS.indexOf(track);
-    if (selector === project.panel.selector) return;
-    this.adjust({ ...project, panel: { ...project.panel, selector } });
+    this.adjustPanel({ selector: TRACK_IDS.indexOf(track) });
   }
 
   setName(name: string): void {

@@ -653,9 +653,59 @@
   box-shadow: 0 0 1cqw 0.25cqw var(--panel-led);
 }
 
+/* The rhythm that will play flashes while the machine waits for start. */
+.sb-panel-led[data-flash='true'] {
+  animation: sb-lamp-flash 0.6s steps(1, end) infinite;
+}
+
+@keyframes sb-lamp-flash {
+  50% {
+    opacity: 0.25;
+  }
+}
+
 .sb-panel-led[data-now='true'] {
   background: radial-gradient(circle at 50% 50%, #fff 0%, #ffd9b0 60%, var(--panel-led) 100%);
   box-shadow: 0 0 1.4cqw 0.5cqw #ffd9b0;
+}
+
+/* A switch with fixed positions: press where it should go. */
+.sb-panel-switch[role='slider'] {
+  border-radius: 0.5cqw;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* CLEAR sits over its red button. Held down, it glows until a step is pressed. */
+.sb-panel-clear {
+  border-radius: 50% !important;
+}
+
+.sb-panel-clear:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.sb-panel-clear[aria-pressed='true'] {
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow:
+    0 0 0 0.2cqw #ffd9b0,
+    0 0 1.4cqw 0.3cqw var(--panel-led);
+}
+
+/* A lever thrown along a rounded slot: a stem and the ball at its end. */
+.sb-panel-stem {
+  border-radius: 999px;
+  background: #6f7073;
+  pointer-events: none;
+  transition: left 90ms ease-out, width 90ms ease-out;
+}
+
+.sb-panel-ball {
+  border-radius: 50%;
+  background: linear-gradient(#f4f4f2, #8f8f8d);
+  box-shadow: 0 0.08cqw 0.2cqw rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  transition: left 90ms ease-out;
 }
 
 /* The lever of a slide switch. The faceplate has its slot; this moves in it. */
@@ -842,6 +892,12 @@
   gap: 10px;
 }
 
+.sb-panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .sb-panel-info p {
   margin: 0;
 }
@@ -943,5 +999,6 @@
 @media (prefers-reduced-motion: reduce) {
   .sb-app * {
     transition: none !important;
+    animation: none !important;
   }
 }

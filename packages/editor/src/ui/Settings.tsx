@@ -176,8 +176,8 @@ export function Settings({ container }: SettingsProps) {
               </Group>
               <Group>
                 <p className="sb-footnote">
-                  Keys: <kbd>Space</kbd> start or stop · arrows move between steps and turn knobs ·{' '}
-                  <kbd>Enter</kbd> presses a step · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
+                  Keys: <kbd>Space</kbd> start or stop · arrows move between steps and turn knobs and switches ·{' '}
+                  <kbd>Enter</kbd> presses a step · <kbd>Esc</kbd> lets CLEAR up · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
                 </p>
                 <p className="sb-hint">
                   v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not

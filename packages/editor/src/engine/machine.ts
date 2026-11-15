@@ -8,6 +8,7 @@ import {
   isSwitched,
   levelGain,
   masterGain,
+  panelTarget,
   patternIndex,
   rowMask,
   stepsPerBeat,
@@ -105,14 +106,10 @@ export function enginePatterns(rhythms: Rhythm[]): EnginePattern[] {
   return bank;
 }
 
-/** The version of the selected Basic Rhythm that the step buttons show. */
-export function selectedVariation(project: Project): Variation {
-  return project.panel.basicVariation === 'b' ? 'b' : 'a';
-}
-
-/** The pattern the selected Basic Rhythm plays. */
+/** The pattern of the rhythm and version the panel is on. */
 export function selectedPattern(project: Project): number {
-  return patternIndex(project.panel.basicRhythm, selectedVariation(project));
+  const { rhythm, variation } = panelTarget(project.panel);
+  return patternIndex(rhythm, variation);
 }
 
 /** MIDI note of each track, for the sounds its switches select. The accent has none. */

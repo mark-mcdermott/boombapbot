@@ -8,6 +8,7 @@ import {
   faceplateIsCredited,
   hitCount,
   openEditor,
+  openSettings,
   project,
   selectTrack,
   stepButton,
@@ -109,13 +110,13 @@ test('the panel runs the transport and sets tempo', async ({ page }) => {
 
 test('the lamps show the steps that are on and follow the running step', async ({ page }) => {
   const panel = page.getByTestId('panel');
-  const lamps = panel.locator('.sb-panel-led');
+  const lamps = panel.locator('[data-panel-lamp]');
   await expect(lamps).toHaveCount(16);
   const kick = stepsOn(await project(page), 'kick');
   for (let index = 0; index < 16; index += 1) {
     await expect(lamps.nth(index)).toHaveAttribute('data-on', String(kick.includes(index)));
   }
-  await expect(panel.locator('.sb-panel-led[data-now="true"]')).toHaveCount(0);
+  await expect(panel.locator('[data-panel-lamp][data-now="true"]')).toHaveCount(0);
 
   await page.getByTestId('panel-toggle').click();
   const seen = new Set<number>();
@@ -132,7 +133,7 @@ test('the lamps show the steps that are on and follow the running step', async (
     )
     .toBeGreaterThanOrEqual(6);
   await page.getByTestId('panel-toggle').click();
-  await expect(panel.locator('.sb-panel-led[data-now="true"]')).toHaveCount(0);
+  await expect(panel.locator('[data-panel-lamp][data-now="true"]')).toHaveCount(0);
 });
 
 test('a sound knob changes its own voice, in exports and while playing', async ({ page }) => {
@@ -374,4 +375,220 @@ test('a faceplate image that fails to load falls back to the drawn panel', async
   await stepButton(page, 3).click();
   await expect(stepButton(page, 3)).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key) !== null, DRAFT_KEY)).toBe(true);
+});
+
+test('the mode selector turns the step buttons from steps into rhythm choices', async ({ page }) => {
+  const panel = page.getByTestId('panel');
+  await expect(panel.getByRole('radiogroup', { name: 'Mode' }).getByRole('radio')).toHaveCount(6);
+  await expect(page.getByTestId('panel-mode-write_first')).toHaveAttribute('aria-checked', 'true');
+  await expect(stepButton(page, 0)).toHaveAccessibleName('Bass Drum, step 1, on');
+  await expect(page.getByTestId('lamp-first-part')).toHaveAttribute('data-on', 'true');
+  await expect(page.getByTestId('lamp-second-part')).toHaveAttribute('data-on', 'false');
+
+  // In manual play the buttons choose rhythms: twelve basic, four intro and fill-in.
+  await page.getByTestId('panel-mode-manual_play').click();
+  expect((await project(page)).panel.mode).toBe('manual_play');
+  await expect(stepButton(page, 0)).toHaveAccessibleName('Basic Rhythm 1, selected');
+  await expect(stepButton(page, 12)).toHaveAccessibleName('Intro/Fill-in 1, selected');
+  await expect(stepButton(page, 5)).toHaveAccessibleName('Basic Rhythm 6');
+  const lamps = panel.locator('[data-panel-lamp]');
+  await expect(lamps.nth(0)).toHaveAttribute('data-flash', 'true');
+  await expect(lamps.nth(12)).toHaveAttribute('data-on', 'true');
+  await expect(lamps.nth(12)).toHaveAttribute('data-flash', 'false');
+  await expect(page.getByTestId('lamp-first-part')).toHaveAttribute('data-on', 'false');
+
+  const before = await project(page);
+  await stepButton(page, 5).click();
+  const after = await project(page);
+  expect(after.panel.basicRhythm).toBe(5);
+  expect(after.rhythms).toEqual(before.rhythms);
+  await expect(lamps.nth(5)).toHaveAttribute('data-flash', 'true');
+  await expect(lamps.nth(0)).toHaveAttribute('data-on', 'false');
+
+  // Back in a write mode, the buttons are the steps of the rhythm just chosen: an empty one.
+  await page.getByTestId('panel-mode-write_first').click();
+  await expect(stepButton(page, 0)).toHaveAccessibleName('Bass Drum, step 1, off');
+  await stepButton(page, 0).click();
+  expect(stepsOn(await project(page), 'kick', 5)).toEqual([0]);
+  expect(hitCount(await project(page), 0)).toBe(hitCount(before, 0));
+});
+
+test('CLEAR wipes the selected rhythm in pattern clear', async ({ page }) => {
+  const clear = page.getByTestId('panel-clear');
+  await expect(clear).toHaveAccessibleName(/store the pre-scale/);
+  await page.getByTestId('panel-mode-manual_play').click();
+  await expect(clear).toBeDisabled();
+  await page.getByTestId('panel-mode-pattern_clear').click();
+  await expect(clear).toHaveAccessibleName('Clear the selected rhythm');
+  // Only the selected rhythm's lamp is lit, and it does not flash.
+  const lamps = page.getByTestId('panel').locator('[data-panel-lamp]');
+  await expect(lamps.nth(0)).toHaveAttribute('data-on', 'true');
+  await expect(lamps.nth(0)).toHaveAttribute('data-flash', 'false');
+  await expect(lamps.nth(12)).toHaveAttribute('data-on', 'false');
+
+  expect(hitCount(await project(page))).toBeGreaterThan(0);
+  await clear.click();
+  const cleared = await project(page);
+  expect(hitCount(cleared)).toBe(0);
+  expect(stepsOn(cleared, 'accent')).toEqual([]);
+  expect(cleared.rhythms[0]).toMatchObject({ firstLength: 16, secondLength: 0 });
+  await page.keyboard.press('Control+z');
+  expect(hitCount(await project(page))).toBeGreaterThan(0);
+});
+
+test('pre-scale and the last step are set with CLEAR and a step button', async ({ page }) => {
+  const clear = page.getByTestId('panel-clear');
+  const preScale = page.getByTestId('panel-pre-scale');
+  await expect(preScale).toHaveAttribute('aria-valuetext', '3: 4 steps to the beat');
+  const lever = page.getByTestId('panel').locator('.sb-panel-lever').last();
+  const third = (await lever.boundingBox())!;
+
+  // Move the switch to 1 with the keyboard: three steps to the beat.
+  await preScale.focus();
+  await page.keyboard.press('Home');
+  await expect(preScale).toHaveAttribute('aria-valuetext', '1: 3 steps to the beat');
+  await expect.poll(async () => (await lever.boundingBox())!.y).toBeLessThan(third.y - 5);
+  // The rhythm keeps its own pre-scale until CLEAR stores the switch.
+  expect((await project(page)).rhythms[0]!.preScale).toBe(3);
+  const fourBeats = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+
+  await clear.click();
+  await expect(clear).toHaveAttribute('aria-pressed', 'true');
+  expect((await project(page)).rhythms[0]!.preScale).toBe(1);
+  await expect(stepButton(page, 11)).toHaveAccessibleName('Make step 12 the last step');
+  await stepButton(page, 11).click();
+  await expect(clear).toHaveAttribute('aria-pressed', 'false');
+  const rhythm = (await project(page)).rhythms[0]!;
+  expect(rhythm).toMatchObject({ preScale: 1, firstLength: 12, secondLength: 0 });
+  // Setting the length wrote no step.
+  expect(stepsOn(await project(page), 'kick')).not.toContain(11);
+
+  // Twelve steps of three to the beat are four beats again, with only the first twelve steps played.
+  const triplets = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  expect(triplets.frames).toBe(fourBeats.frames);
+  expect(Math.max(...triplets.events.map((event) => event.step))).toBeLessThan(12);
+  expect(triplets.events.length).toBeLessThan(fourBeats.events.length);
+  await openSettings(page);
+  await expect(page.getByTestId('hit-count')).toContainText('in 12 steps');
+  await page.keyboard.press('Escape');
+
+  // Escape lets CLEAR up again without setting anything.
+  await clear.click();
+  await expect(clear).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(clear).toHaveAttribute('aria-pressed', 'false');
+  expect((await project(page)).rhythms[0]!.firstLength).toBe(12);
+
+  // Clicking the switch where position 4 is selects eight steps to the beat.
+  const box = (await preScale.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.9);
+  await expect(preScale).toHaveAttribute('aria-valuenow', '3');
+  expect((await project(page)).panel.preScale).toBe(4);
+});
+
+test('the 2nd part adds steps after the 1st, written from the same sixteen buttons', async ({ page }) => {
+  await page.getByTestId('panel-mode-write_second').click();
+  await expect(page.getByTestId('lamp-second-part')).toHaveAttribute('data-on', 'true');
+  // Until it is given a length the 2nd part has no steps.
+  expect((await project(page)).rhythms[0]!.secondLength).toBe(0);
+  await page.getByTestId('panel-clear').click();
+  await stepButton(page, 3).click();
+  expect((await project(page)).rhythms[0]).toMatchObject({ firstLength: 16, secondLength: 4 });
+
+  await selectTrack(page, 'cowbell');
+  await stepButton(page, 0).click();
+  await stepButton(page, 3).click();
+  await expect(stepButton(page, 3)).toHaveAttribute('aria-pressed', 'true');
+  expect(stepsOn(await project(page), 'cowbell')).toEqual([16, 19]);
+
+  // Twenty steps of four to the beat are five beats, and the cowbell plays in the fifth.
+  const render = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  const bpm = bpmOf(await project(page));
+  expect(Math.abs(render.frames - (44100 * 300) / bpm)).toBeLessThanOrEqual(1);
+  expect(render.events.filter((event) => event.track === 8).map((event) => event.step)).toEqual([16, 19]);
+
+  // The 1st part's buttons still show the 1st part.
+  await page.getByTestId('panel-mode-write_first').click();
+  await expect(stepButton(page, 3)).toHaveAttribute('aria-pressed', 'false');
+
+  // Running, the lamps run only while the part being written plays.
+  await page.getByTestId('panel-mode-write_second').click();
+  await page.getByTestId('panel-toggle').click();
+  const seen = new Set<number>();
+  await expect
+    .poll(
+      async () => {
+        const now = await page
+          .getByTestId('panel')
+          .locator('[data-panel-lamp]')
+          .evaluateAll((nodes) => nodes.findIndex((node) => node.getAttribute('data-now') === 'true'));
+        seen.add(now);
+        return seen.has(-1) && seen.size >= 3;
+      },
+      { intervals: [30], timeout: 15_000 },
+    )
+    .toBe(true);
+  expect([...seen].every((index) => index < 4)).toBe(true);
+});
+
+test('each rhythm has an A and a B version, chosen with the variation lever', async ({ page }) => {
+  const lever = page.getByTestId('panel-basic-variation');
+  await expect(lever).toHaveAttribute('aria-valuetext', 'A');
+  await expect(page.getByTestId('lamp-variation-a')).toHaveAttribute('data-on', 'true');
+  const a = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  expect(a.events.every((event) => event.pattern === 0)).toBe(true);
+
+  await lever.focus();
+  await page.keyboard.press('End');
+  await expect(lever).toHaveAttribute('aria-valuetext', 'B');
+  await expect(page.getByTestId('lamp-variation-b')).toHaveAttribute('data-on', 'true');
+  await expect(page.getByTestId('lamp-variation-a')).toHaveAttribute('data-on', 'false');
+  // The starter's B version is empty, so the buttons are dark and it writes separately.
+  await expect(stepButton(page, 0)).toHaveAttribute('aria-pressed', 'false');
+  await stepButton(page, 2).click();
+  const snapshot = await project(page);
+  expect(snapshot.rhythms[0]!.b.kick[2]).toBe('x');
+  expect(stepsOn(snapshot, 'kick')).not.toContain(2);
+  const b = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  expect(b.events.map((event) => [event.pattern, event.step])).toEqual([[1, 2]]);
+
+  // An Intro/Fill-in has its own lever, with two positions.
+  await page.getByTestId('panel-mode-pattern_clear').click();
+  await stepButton(page, 13).click();
+  const fill = page.getByTestId('panel-fill-variation');
+  await fill.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(fill).toHaveAttribute('aria-valuetext', 'B');
+  await page.getByTestId('panel-mode-write_first').click();
+  await stepButton(page, 7).click();
+  expect((await project(page)).rhythms[13]!.b.kick[7]).toBe('x');
+});
+
+test('TAP writes the selected instrument while the rhythm runs', async ({ page }) => {
+  await selectTrack(page, 'cowbell');
+  expect(stepsOn(await project(page), 'cowbell')).toEqual([]);
+  // Stopped, TAP only plays the instrument.
+  await page.getByTestId('panel-tap').click();
+  expect(stepsOn(await project(page), 'cowbell')).toEqual([]);
+
+  await page.getByTestId('panel-toggle').click();
+  await expect.poll(async () => (await debug(page)).stats?.frames ?? 0).toBeGreaterThan(5_000);
+  await page.getByTestId('panel-tap').click();
+  await expect.poll(async () => stepsOn(await project(page), 'cowbell').length).toBe(1);
+  const [step] = stepsOn(await project(page), 'cowbell');
+  expect(step).toBeGreaterThanOrEqual(0);
+  expect(step).toBeLessThan(16);
+  await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
+
+  // The keyboard works the button too, and a tapped step can be undone.
+  await page.getByTestId('panel-tap').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Control+z');
+  expect(stepsOn(await project(page), 'cowbell').length).toBeLessThanOrEqual(1);
+
+  // Outside the write modes TAP writes nothing.
+  await page.getByTestId('panel-mode-manual_play').click();
+  const before = (await project(page)).rhythms;
+  await page.getByTestId('panel-tap').click();
+  expect((await project(page)).rhythms).toEqual(before);
 });
