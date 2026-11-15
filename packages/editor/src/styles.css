@@ -138,10 +138,10 @@ a.sb-machine:hover {
   filter: saturate(0.4);
 }
 
-/* The lockup is about 5.93 times as wide as the mascot is tall, so on a
+/* The lockup is about 6.04 times as wide as the mascot is tall, so on a
    narrow screen its height follows the width left between the gutters. */
 .sb-brand {
-  --brand-height: min(105px, calc((100vw - 2 * var(--gutter)) / 6.05));
+  --brand-height: min(105px, calc((100vw - 2 * var(--gutter)) / 6.16));
   /* The lockup's cream, chosen by the owner: the wordmark's fill and the
      hairline around the mascot. */
   --brand-cream: #fbefe2;
@@ -455,9 +455,10 @@ a.sb-machine:hover {
 
 .sb-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px 16px;
   margin-top: auto;
   color: var(--color-dim);
   font-size: 14px;
@@ -493,11 +494,15 @@ a.sb-machine:hover {
   text-decoration-color: var(--accent);
 }
 
+/* On a narrow screen the icons drop under the credit, still at the right. */
 .sb-footer-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   margin-right: -10px;
+  margin-left: auto;
 }
 
 /* An icon in the footer: a link to a page, or the button for a modal. */

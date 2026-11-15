@@ -59,9 +59,16 @@ no API routes, database or secrets, so all three need the same groundwork.
   still run against. The owner wants sign-up and log-in in a modal; links in
   email still need a page to land on. What an account is for has to be
   decided first: there is no cloud sync yet.
-- **Upgrades.** The owner's idea is a small one-off or yearly payment for
-  extras. The price and the extras are undecided. It needs Stripe and
-  accounts.
+- **Upgrades.** Decided by the owner: a flat one-time 5 dollars unlocks every
+  paid extra. Ordinary effects (distortion, a flanger and the like) are to be
+  free; the stranger ones (delay, compression and the like) come with the
+  upgrade, and paid accounts may get a place to show their beats. None of it
+  exists: the engine has no effects at all yet, and the payment needs Stripe
+  and accounts. Which effects fall on which side is still loose.
+- **Policies.** The Policies page describes the site as it is today: no
+  accounts, nothing collected, nothing for sale. It was drafted from how the
+  site behaves and is not legal advice. It has to be rewritten, and read by
+  someone qualified, before accounts or payments open.
 - **The shop.** diamondheart already has the flow: products in code, a React
   cart, Stripe Checkout, then a Stripe webhook that creates and confirms the
   Printful order. It needs products to exist in Printful, and the Printful

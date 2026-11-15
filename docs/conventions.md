@@ -180,9 +180,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   A control the machine has belongs on its faceplate. Anything else about the
   machine lives in the settings modal behind the footer's cog
   (`packages/editor/src/ui/Settings.tsx`).
-- `Header` (brand and `MachineNav`) and `Footer` (About, Docs, upgrade, cart,
-  settings, account) are shared. `SitePage` wraps a page of words in them;
-  About and Docs are Astro pages in `apps/site/src/pages` that use it. Every
+- `Header` (brand and `MachineNav`) and `Footer` (About, Docs, policies,
+  upgrade, cart, settings, account) are shared. `SitePage` wraps a page of words in them;
+  About, Docs and Policies are Astro pages in `apps/site/src/pages` that use
+  it. Keep Policies true to what the site does; it must be rewritten before
+  accounts or payments open. Every
   footer modal goes through `ui/Modal.tsx`.
 - Upgrades, the cart and accounts have no backend. Their modals say so and
   offer no form. Do not add a form, a price or a feature list until the real

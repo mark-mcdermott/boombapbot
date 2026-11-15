@@ -1,8 +1,8 @@
-import { BookOpen, CircleUserRound, Heart, Info, ShoppingCart, Sparkles } from 'lucide-react';
+import { BookOpen, CircleUserRound, Heart, Info, Scale, ShoppingCart, Sparkles } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
 import { Modal } from './Modal';
 
-export type SitePageId = 'about' | 'docs';
+export type SitePageId = 'about' | 'docs' | 'policies';
 
 interface FooterProps {
   /** Base URL the site is served from, ending in a slash. */
@@ -15,7 +15,7 @@ interface FooterProps {
   settings?: ReactNode;
 }
 
-/** The row under every page: who made it, then about, docs, upgrade, cart, settings and account. */
+/** The row under every page: who made it, then about, docs, policies, upgrade, cart, settings and account. */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {
   const link = (page: SitePageId, label: string, icon: ReactNode) => (
     <a
@@ -39,10 +39,13 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
       <nav className="sb-footer-actions" aria-label="Site">
         {link('about', 'About', <Info />)}
         {link('docs', 'Docs', <BookOpen />)}
+        {link('policies', 'Policies', <Scale />)}
         <Modal label="Upgrade" title="Upgrade" testId="upgrade" icon={<Sparkles />} container={container}>
           <p className="sb-modal-text">
-            Upgrades are not open yet. Everything on the machine today is free to use, and stays that way.
+            A one-time upgrade is planned: extra effects beyond the free ones, and a place to show your beats. It
+            is not open yet, and nothing can be bought here for now.
           </p>
+          <p className="sb-modal-text">Everything on the machine today is free to use, and stays that way.</p>
         </Modal>
         <Modal label="Cart" title="Cart" testId="cart" icon={<ShoppingCart />} container={container}>
           <p className="sb-modal-text">The shop is not open yet, so there is nothing to put in a cart.</p>

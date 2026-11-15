@@ -127,14 +127,15 @@ test.describe('the page around the machine', () => {
     expect(nav.x).toBeGreaterThan(brand.x + brand.width);
   });
 
-  test('the footer has about, docs, upgrade, cart, settings and account, in that order', async ({ page }) => {
+  test('the footer has about, docs, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
     await openEditor(page);
-    const ids = ['nav-about', 'nav-docs', 'upgrade', 'cart', 'settings', 'account'];
+    const ids = ['nav-about', 'nav-docs', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
     const xs: number[] = [];
     for (const id of ids) xs.push((await page.getByTestId(id).boundingBox())!.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-docs')).toHaveAccessibleName('Docs');
+    await expect(page.getByTestId('nav-policies')).toHaveAccessibleName('Policies');
     await expect(page.getByTestId('upgrade')).toHaveAccessibleName('Upgrade');
     await expect(page.getByTestId('cart')).toHaveAccessibleName('Cart');
     await expect(page.getByTestId('account')).toHaveAccessibleName('Account');
@@ -178,6 +179,7 @@ test.describe('the page around the machine', () => {
   for (const [id, heading] of [
     ['about', 'About boombapbot'],
     ['docs', 'How to use the 808'],
+    ['policies', 'Policies'],
   ] as const) {
     test(`the ${id} page is a page of its own with the same header and footer`, async ({ page }) => {
       await openEditor(page);
