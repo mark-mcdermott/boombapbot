@@ -14,7 +14,7 @@ import {
 } from '@boombapbot/contracts';
 import type { EditorRuntime } from '../runtime';
 import { useEditorState, useRuntime } from './context';
-import { PassiveKnob, box, circle } from './panelGeometry';
+import { DialHandle, PassiveKnob, box, circle, nearestPosition, pointerAngle } from './panelGeometry';
 
 interface ControlProps {
   panel: PanelManifest;
@@ -30,6 +30,35 @@ export function clears(mode: Mode): boolean {
   return mode === 'pattern_clear' || mode === 'compose' || writePart(mode) !== null;
 }
 
+/** The power switch. Off, the machine is dark and silent and nothing else on it answers. */
+export function PowerSwitch({ panel }: ControlProps) {
+  const runtime = useRuntime();
+  const on = useEditorState((state) => state.power);
+  const [x, y, width, height] = panel.power.rocker;
+  return (
+    <>
+      <button
+        type="button"
+        role="switch"
+        className="sb-panel-switch sb-panel-power"
+        style={box(panel, panel.power.hit)}
+        data-testid="panel-power"
+        aria-checked={on}
+        aria-label="Power"
+        onClick={() => runtime.setPower(!on)}
+      >
+        <span className="sb-panel-text">Power</span>
+      </button>
+      {/* The half of the rocker that stands proud: the top when it is on. */}
+      <span
+        className="sb-panel-rocker"
+        aria-hidden="true"
+        style={box(panel, [x, on ? y : y + height / 2, width, height / 2])}
+      />
+    </>
+  );
+}
+
 /** The mode selector: a label to press for each position, and the dial that follows. */
 export function ModeSelector({ panel, photo }: ControlProps & { photo: string | null }) {
   const { store } = useRuntime();
@@ -39,6 +68,13 @@ export function ModeSelector({ panel, photo }: ControlProps & { photo: string | 
   return (
     <>
       <PassiveKnob panel={panel} photo={photo} knob={knob} deg={active?.deg ?? 0} />
+      <DialHandle
+        panel={panel}
+        knob={knob}
+        degs={positions.map((position) => position.deg)}
+        testId="panel-dial-mode"
+        onPick={(index) => store.setMode(positions[index]!.mode)}
+      />
       <div className="sb-panel-layer" role="radiogroup" aria-label="Mode">
         {positions.map((position) => (
           <button
@@ -189,11 +225,6 @@ function PositionSwitch(props: PositionSwitchProps) {
 
 const AUTO_FILL_TEXT = AUTO_FILLS.map((every) => (every === 0 ? 'Manual' : `Every ${every} measures`));
 
-/** How far apart two pointer angles are, in degrees. */
-function angleBetween(a: number, b: number): number {
-  return Math.abs(((a - b + 540) % 360) - 180);
-}
-
 /**
  * The auto fill-in selector. Press or drag around the dial and it turns to
  * the nearest position; the arrow keys step through them.
@@ -206,13 +237,9 @@ export function AutoFillSelector({ panel, photo }: ControlProps & { photo: strin
   const move = (next: number) => store.setAutoFill(AUTO_FILLS[Math.min(last, Math.max(0, next))]!);
 
   const turnTo = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
     const [x, y, width, height] = hit;
-    const dx = event.clientX - (rect.left + ((knob.cx - x) / width) * rect.width);
-    const dy = event.clientY - (rect.top + ((knob.cy - y) / height) * rect.height);
-    // 0 degrees is straight up and angles grow clockwise, as on the faceplate.
-    const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
-    move(degs.reduce((best, candidate, i) => (angleBetween(candidate, deg) < angleBetween(degs[best]!, deg) ? i : best), 0));
+    const deg = pointerAngle(event, [(knob.cx - x) / width, (knob.cy - y) / height]);
+    if (deg !== null) move(nearestPosition(degs, deg));
   };
 
   return (

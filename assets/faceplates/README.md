@@ -52,7 +52,8 @@ git-ignored `misc/assets/` folder and are used for local development only.
   keys and lamps, instrument selector, start/stop, the tempo and fine knobs,
   every knob of the instrument columns, master volume and the voice
   switches) are placed from `808.panel.json`. A live switch is drawn as its
-  slot only; the editor draws the lever. Those coordinates were measured on the photograph below.
+  slot only; the editor draws the lever, and the raised half of the power
+  rocker. Those coordinates were measured on the photograph below.
   The fixed controls and lettering were placed by eye against the same
   photograph, as a record of where things are on the machine.
 - **Licence of this file:** the owner's own artwork. No licence has been

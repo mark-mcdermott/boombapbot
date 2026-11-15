@@ -1,34 +1,21 @@
 ---
 import { BoombapbotEditor } from '@boombapbot/editor';
-import '../styles/global.css';
+import Base from '../layouts/Base.astro';
 
 const base = import.meta.env.BASE_URL;
-const title = 'boombapbot · make a beat';
-const description =
-  'A drums-only beat maker. Build a 16-step beat on a drum machine, save it in your browser, and export WAV, MIDI or a project file.';
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0e0d0c" />
-    <meta name="description" content={description} />
-    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
-    <title>{title}</title>
-  </head>
-  <body>
-    <main class="min-h-dvh">
-      <h1 class="sb-visually-hidden">boombapbot beat editor</h1>
-      <BoombapbotEditor client:only="react" baseUrl={base}>
-        <p slot="fallback" class="mx-auto max-w-[1180px] px-5 py-10 text-dim">Loading the editor…</p>
-      </BoombapbotEditor>
-      <noscript>
-        <p class="mx-auto max-w-[1180px] px-5 py-10 text-dim">
-          boombapbot needs JavaScript and Web Audio to run.
-        </p>
-      </noscript>
-    </main>
-  </body>
-</html>
+<Base
+  title="boombapbot · make a beat"
+  description="A drum machine in your browser. Write rhythms on its sixteen step buttons, play them by hand or string them into a track, and export WAV, MIDI or a project file."
+>
+  <main class="min-h-dvh">
+    <h1 class="sb-visually-hidden">boombapbot drum machine</h1>
+    <BoombapbotEditor client:only="react" baseUrl={base}>
+      <p slot="fallback" class="mx-auto max-w-[1180px] px-5 py-10 text-dim">Loading the machine…</p>
+    </BoombapbotEditor>
+    <noscript>
+      <p class="mx-auto max-w-[1180px] px-5 py-10 text-dim">boombapbot needs JavaScript and Web Audio to run.</p>
+    </noscript>
+  </main>
+</Base>

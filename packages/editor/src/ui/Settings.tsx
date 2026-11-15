@@ -1,11 +1,11 @@
-import { Dialog } from '@base-ui/react/dialog';
 import { Menu } from '@base-ui/react/menu';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
 import { useEditorState, useRuntime } from './context';
 import { PanelNotes } from './HardwarePanel';
-import { ChevronIcon, CloseIcon, DownloadIcon, UploadIcon } from './icons';
+import { ChevronIcon, DownloadIcon, UploadIcon } from './icons';
+import { Modal } from './Modal';
 import { PatternActions, StatusBar } from './StatusBar';
 
 const NAME_FIELD_ID = 'sb-beat-name';
@@ -37,7 +37,7 @@ function NameField() {
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur();
         if (event.key === 'Escape') {
-          // Drop the edit, and keep the key from also closing the sheet.
+          // Drop the edit, and keep the key from also closing the modal.
           event.stopPropagation();
           reverting.current = true;
           event.currentTarget.blur();
@@ -84,7 +84,7 @@ function ExportMenu() {
 
 function Group({ label, labelFor, children }: { label?: string; labelFor?: string; children: ReactNode }) {
   return (
-    <div className="sb-sheet-group">
+    <div className="sb-modal-group">
       {label && labelFor ? (
         <label className="sb-label" htmlFor={labelFor}>
           {label}
@@ -98,11 +98,11 @@ function Group({ label, labelFor, children }: { label?: string; labelFor?: strin
 }
 
 interface SettingsProps {
-  /** Where the sheet mounts, so it inherits the editor's theme. */
+  /** Where the modal mounts, so it inherits the editor's theme. */
   container: RefObject<HTMLElement | null>;
 }
 
-/** The cog, and the sheet behind it that holds everything but the machine. */
+/** The cog, and the modal behind it that holds everything but the machine. */
 export function Settings({ container }: SettingsProps) {
   const runtime = useRuntime();
   const [open, setOpen] = useState(false);
@@ -128,67 +128,54 @@ export function Settings({ container }: SettingsProps) {
           void runtime.importProject(file, file.name);
         }}
       />
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Trigger className="sb-cog" data-testid="settings" aria-label="Settings">
-          <SettingsIcon />
-        </Dialog.Trigger>
-        <Dialog.Portal container={container}>
-          <Dialog.Backdrop className="sb-sheet-backdrop" />
-          {/* Closed with the keyboard, focus goes back to the cog. Closed with a
-              pointer it is left alone, so Space plays instead of reopening this. */}
-          <Dialog.Popup
-            className="sb-sheet"
-            data-testid="settings-sheet"
-            finalFocus={(closeType) => closeType === 'keyboard'}
-          >
-            <div className="sb-sheet-head">
-              <Dialog.Title className="sb-sheet-title">Settings</Dialog.Title>
-              <Dialog.Close className="sb-icon-button" data-testid="settings-close" aria-label="Close settings">
-                <CloseIcon />
-              </Dialog.Close>
-            </div>
-            <div className="sb-sheet-body">
-              <Group label="Beat name" labelFor={NAME_FIELD_ID}>
-                <NameField />
-              </Group>
-              <Group label="Rhythm">
-                <PatternActions />
-              </Group>
-              <Group label="File">
-                <div className="sb-actions">
-                  <button
-                    type="button"
-                    className="sb-button"
-                    data-testid="import"
-                    onClick={() => fileInput.current?.click()}
-                  >
-                    <UploadIcon />
-                    <span>Import</span>
-                  </button>
-                  <ExportMenu />
-                </div>
-              </Group>
-              <Group>
-                <PanelNotes />
-              </Group>
-              <Group>
-                <StatusBar />
-              </Group>
-              <Group>
-                <p className="sb-footnote">
-                  Keys: <kbd>Space</kbd> start or stop · arrows move between steps and turn knobs and switches ·{' '}
-                  <kbd>Enter</kbd> presses a step · <kbd>Esc</kbd> lets CLEAR up · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
-                </p>
-                <p className="sb-hint">
-                  v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not
-                  recordings of any hardware. Your beat is saved only in this browser; export the project file to keep
-                  a copy.
-                </p>
-              </Group>
-            </div>
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <Modal
+        label="Settings"
+        title="Settings"
+        testId="settings"
+        className="sb-cog"
+        icon={<SettingsIcon />}
+        container={container}
+        open={open}
+        onOpenChange={setOpen}
+      >
+        <Group label="Beat name" labelFor={NAME_FIELD_ID}>
+          <NameField />
+        </Group>
+        <Group label="Rhythm">
+          <PatternActions />
+        </Group>
+        <Group label="File">
+          <div className="sb-actions">
+            <button
+              type="button"
+              className="sb-button"
+              data-testid="import"
+              onClick={() => fileInput.current?.click()}
+            >
+              <UploadIcon />
+              <span>Import</span>
+            </button>
+            <ExportMenu />
+          </div>
+        </Group>
+        <Group>
+          <PanelNotes />
+        </Group>
+        <Group>
+          <StatusBar />
+        </Group>
+        <Group>
+          <p className="sb-footnote">
+            Keys: <kbd>Space</kbd> start or stop · arrows move between steps and turn knobs and switches ·{' '}
+            <kbd>Enter</kbd> presses a step · <kbd>Esc</kbd> lets CLEAR up · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
+          </p>
+          <p className="sb-hint">
+            v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not
+            recordings of any hardware. Your beat is saved only in this browser; export the project file to keep
+            a copy.
+          </p>
+        </Group>
+      </Modal>
     </>
   );
 }

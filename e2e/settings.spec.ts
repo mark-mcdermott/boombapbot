@@ -37,7 +37,7 @@ test('the cog opens settings, and Escape hands focus back to it', async ({ page 
   const cog = page.getByTestId('settings');
   await expect(cog).toHaveAccessibleName('Settings');
   await cog.click();
-  const sheet = page.getByTestId('settings-sheet');
+  const sheet = page.getByTestId('settings-modal');
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole('heading', { name: 'Settings' })).toBeVisible();
   for (const id of BURIED) await expect(page.getByTestId(id)).toBeVisible();
@@ -57,10 +57,10 @@ test('the cog opens settings, and Escape hands focus back to it', async ({ page 
 test('Space plays the beat after settings is closed with the mouse', async ({ page }) => {
   await openSettings(page);
   await page.getByTestId('settings-close').click();
-  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+  await expect(page.getByTestId('settings-modal')).toHaveCount(0);
   await page.keyboard.press('Space');
   await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
-  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+  await expect(page.getByTestId('settings-modal')).toHaveCount(0);
 });
 
 test('Escape in the beat name reverts it without closing settings', async ({ page }) => {
@@ -71,7 +71,7 @@ test('Escape in the beat name reverts it without closing settings', async ({ pag
   await name.press('Escape');
   await expect(name).toHaveValue(before);
   expect((await project(page)).name).toBe(before);
-  await expect(page.getByTestId('settings-sheet')).toBeVisible();
+  await expect(page.getByTestId('settings-modal')).toBeVisible();
 });
 
 test('settings list what the panel does not model yet', async ({ page }) => {

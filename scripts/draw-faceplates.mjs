@@ -283,9 +283,10 @@ function draw808(panel) {
 
   // Power switch.
   out.push(text(221, 86, 'POWER', { size: 14, fill: C.label, spacing: 0.6 }));
-  out.push(rect(188, 118, 72, 54, { rx: 4, fill: '#08090a' }));
-  out.push(rect(193, 123, 62, 44, { rx: 3, fill: '#1b1c20' }));
-  out.push(rect(193, 123, 62, 20, { rx: 3, fill: '#2a2b30' }));
+  // The editor draws which half of the rocker is pressed.
+  const [rockerX, rockerY, rockerW, rockerH] = panel.power.rocker;
+  out.push(rect(rockerX - 5, rockerY - 5, rockerW + 10, rockerH + 10, { rx: 4, fill: '#08090a' }));
+  out.push(rect(rockerX, rockerY, rockerW, rockerH, { rx: 3, fill: '#1b1c20' }));
   out.push(rect(266, 127, 9, 5, { fill: C.label }));
   out.push(text(280, 135, 'ON', { size: 12, fill: C.label, anchor: 'start' }));
   out.push(rect(266, 160, 9, 5, { fill: 'none', stroke: C.label, 'stroke-width': 1.2 }));

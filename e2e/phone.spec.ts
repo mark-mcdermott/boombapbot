@@ -21,9 +21,10 @@ test('settings is reachable by touch', async ({ page }) => {
   const cog = (await page.getByTestId('settings').boundingBox())!;
   expect(Math.min(cog.width, cog.height)).toBeGreaterThanOrEqual(44);
   await page.getByTestId('settings').tap();
-  await expect(page.getByTestId('settings-sheet')).toBeVisible();
+  await expect(page.getByTestId('settings-modal')).toBeVisible();
+  // The modal grows the last little way as it opens, so wait for it to settle.
   for (const id of ['undo', 'clear', 'import', 'export-menu']) {
-    expect((await page.getByTestId(id).boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    await expect.poll(async () => (await page.getByTestId(id).boundingBox())!.height).toBeGreaterThanOrEqual(40);
   }
 });
 

@@ -256,7 +256,7 @@ test('the level, accent and master volume knobs set the mix', async ({ page }) =
 test('a voice switch gives its column the alternate sound', async ({ page }) => {
   const render = () => page.evaluate(() => window.__boombapbot!.renderLoop(44100));
   const panel = page.getByTestId('panel');
-  await expect(panel.getByRole('switch')).toHaveCount(5);
+  await expect(panel.locator('[data-testid^="panel-switch-"]')).toHaveCount(5);
   const conga = page.getByTestId('panel-switch-low_tom');
   await expect(conga).toHaveAccessibleName('Low Conga in place of Low Tom');
   await expect(conga).toHaveAttribute('aria-checked', 'false');

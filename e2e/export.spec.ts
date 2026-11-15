@@ -112,7 +112,7 @@ test('exports the project as JSON and imports it back', async ({ page }) => {
     mimeType: 'application/json',
     buffer: bytes,
   });
-  await expect(page.getByTestId('settings-sheet')).toHaveCount(0);
+  await expect(page.getByTestId('settings-modal')).toHaveCount(0);
   await expect(page.getByTestId('notice')).toContainText('Imported');
   await expect(page.getByTestId('notice')).not.toContainText('earlier version');
   // Rhythms, knobs and switches all come back; only the time of the change is new.

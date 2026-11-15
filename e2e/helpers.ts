@@ -73,7 +73,7 @@ export async function openEditor(page: Page): Promise<void> {
 
 /** Opens the settings sheet behind the cog, unless it is open already. */
 export async function openSettings(page: Page): Promise<void> {
-  const sheet = page.getByTestId('settings-sheet');
+  const sheet = page.getByTestId('settings-modal');
   if (await sheet.isVisible()) return;
   await page.getByTestId('settings').click();
   await expect(sheet).toBeVisible();
@@ -81,7 +81,7 @@ export async function openSettings(page: Page): Promise<void> {
 
 /** Closes the settings sheet and waits until the machine is reachable again. */
 export async function closeSettings(page: Page): Promise<void> {
-  const sheet = page.getByTestId('settings-sheet');
+  const sheet = page.getByTestId('settings-modal');
   if (!(await sheet.isVisible())) return;
   await page.getByTestId('settings-close').click();
   await expect(sheet).toHaveCount(0);
