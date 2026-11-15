@@ -27,6 +27,7 @@ import {
   createProject,
   createStarterRhythms,
   getTrack,
+  isPlayMode,
   isStepOn,
   knobPosition,
   levelGain,
@@ -397,6 +398,14 @@ describe('writing rhythms', () => {
     expect(panelTarget({ ...panel, basicVariation: 'b' })).toEqual({ rhythm: 4, variation: 'b' });
     expect(panelTarget({ ...panel, basicVariation: 'ab' })).toEqual({ rhythm: 4, variation: 'a' });
     expect(panelTarget({ ...panel, writeTarget: 'fill' })).toEqual({ rhythm: 14, variation: 'b' });
+    // On AB the version is the one playing, when it is this rhythm that plays.
+    const ab = { ...panel, basicVariation: 'ab' as const };
+    expect(panelTarget(ab, patternIndex(4, 'b'))).toEqual({ rhythm: 4, variation: 'b' });
+    expect(panelTarget(ab, patternIndex(4, 'a'))).toEqual({ rhythm: 4, variation: 'a' });
+    expect(panelTarget(ab, patternIndex(5, 'b'))).toEqual({ rhythm: 4, variation: 'a' });
+    expect(panelTarget({ ...panel, basicVariation: 'a' }, patternIndex(4, 'b'))).toEqual({ rhythm: 4, variation: 'a' });
+    expect(isPlayMode('manual_play') && isPlayMode('play') && isPlayMode('compose')).toBe(true);
+    expect(isPlayMode('write_first') || isPlayMode('write_second') || isPlayMode('pattern_clear')).toBe(false);
     expect(clearedVersions(panel)).toEqual(['a']);
     expect(clearedVersions({ ...panel, basicVariation: 'ab' })).toEqual(['a', 'b']);
     expect(clearedVersions({ ...panel, basicVariation: 'ab', writeTarget: 'fill' })).toEqual(['b']);

@@ -13,9 +13,9 @@ Everything else is behind the cog in the footer: the beat's name, undo, and
 export as WAV, MIDI or a project file. Reload and your beat is still there.
 
 The aim is the whole machine, worked from its operation manual. This build has
-its sounds, its twelve tracks, its accent, every knob and voice switch, and
-its pattern memory with the write modes; manual play with fill-ins, and
-rhythm tracks, are in progress, and
+its sounds, its twelve tracks, its accent, every knob and voice switch, its
+pattern memory with the write modes, and manual play with intros and
+fill-ins; rhythm tracks are what is left, and
 [what is modelled so far](#the-machine) says exactly where it stands.
 
 The 808 panel above is original artwork, drawn in code by
@@ -85,6 +85,13 @@ pnpm serve
   pre-scale of three, four, six or eight steps to the beat. They are written
   as the manual describes: the mode selector, CLEAR, the pre-scale switch and
   the step buttons, or TAP in time with the rhythm.
+- **Manual play.** Choose a Basic Rhythm and it flashes; start, and it
+  plays. Choose another and it takes over at the bar line, or on the second
+  beat if you chose it during the first. The variation lever plays version A,
+  version B or the two in turn. TAP makes the selected Intro/Fill-in the
+  intro, or drops it in after the measure that is running, once; the auto
+  fill-in selector does that every 2, 4, 8, 12 or 16 measures. All of it is
+  decided inside the engine at the bar line, on the audio clock.
 - **Twelve tracks, steps that are on or off, and an accent.** The instrument
   selector has its twelve positions: the accent and eleven instruments. A
   step is on or off; an accented step makes every instrument sounding on it
@@ -93,9 +100,9 @@ pnpm serve
   voice, as on the machine, and the two hi-hats cut each other off.
 - **One engine everywhere.** A C++20 drum machine core (`engine/`) with a C
   ABI: a bank of 32 one-measure patterns of up to 32 steps at three, four,
-  six or eight steps to the beat, a fixed pool of voices with deterministic
-  stealing, and step times computed from the audio sample clock on a
-  24-ticks-per-beat timeline. The browser runs its WebAssembly build inside
+  six or eight steps to the beat, a sequencer that picks the pattern for each
+  measure, a fixed pool of voices with deterministic stealing, and step times
+  computed from the audio sample clock on a 24-ticks-per-beat timeline. The browser runs its WebAssembly build inside
   an AudioWorklet; export uses a second instance of the same engine. There is
   no separate JavaScript engine.
 - **Saving.** The project is saved to this browser on every edit and restored
@@ -127,8 +134,10 @@ What the build models, against the operation manual:
 | CLEAR: wipe a rhythm, store the pre-scale, set the last step of a part | Working; CLEAR is a latch here, not a button to hold |
 | Pre-scale switch: 3, 6, 4 or 8 steps to the beat | Working |
 | TAP: write the selected instrument in time | Working, to the nearest step as the page sees it |
-| Manual play: the AB position, intro and fill-in, auto fill-in, the first-beat rule | Not yet; manual play loops the selected Basic Rhythm |
-| Rhythm tracks: compose, play, chaining | Stored in the project file; not yet playable |
+| Manual play: a rhythm chosen while another plays takes over at the bar line, or on the second beat if chosen during the first | Working |
+| A, AB and B: the AB position plays the two versions in turn | Working, in the write modes too |
+| Intro and fill-in with TAP, and the auto fill-in selector (every 2, 4, 8, 12 or 16 measures) | Working |
+| Rhythm tracks: compose, play, chaining | Stored in the project file; not yet playable. The play and compose positions behave like manual play |
 | DIN sync, trigger outputs, separate outputs, pedals | Left out: a browser cannot do them |
 
 Settings lists the same gaps under "what still needs checking", and
@@ -143,12 +152,12 @@ Run in this order; later steps use what earlier ones build.
 | --- | --- |
 | `pnpm kits:check` | The committed demo WAVs match their generator script |
 | `pnpm faceplates:check` | The committed faceplate drawing matches its generator script, and carries no brand names |
-| `pnpm build:engine` | Builds the native engine and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, the contract files, no allocation inside the render call, and the header compiling as C |
+| `pnpm build:engine` | Builds the native engine and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, the contract files, no allocation inside the render call, and the header compiling as C |
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine needs no shared memory, no sample files ship, and only the committed faceplate is included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -162,12 +171,12 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | --- | --- |
 | `pnpm kits:check` | 24 of 24 files match |
 | `pnpm faceplates:check` | 1 of 1 drawing matches |
-| `pnpm build:engine` | 11 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
-| `pnpm build:wasm` | 59,843-byte module, one import, no threads or shared memory |
+| `pnpm build:engine` | 12 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
+| `pnpm build:wasm` | 61,456-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 98 of 98 pass |
+| `pnpm test:unit` | 103 of 103 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 45 of 45 pass |
+| `pnpm test:e2e` | 49 of 49 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
 
 Earlier versions of this build were also run on Linux x86-64 with GCC 13 and

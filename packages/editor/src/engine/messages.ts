@@ -1,4 +1,4 @@
-import type { EnginePattern, EngineTrack } from './wasm-engine';
+import type { EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
 
 /** Main thread to worklet. */
 export type EngineCommand =
@@ -8,7 +8,8 @@ export type EngineCommand =
   | { type: 'mix'; plain: number; accented: number; master: number }
   | { type: 'patterns'; patterns: Array<{ index: number; pattern: EnginePattern }> }
   | { type: 'tempo'; bpm: number }
-  | { type: 'cue'; pattern: number }
+  | { type: 'panel'; panel: EnginePanel }
+  | { type: 'fill'; armed: boolean }
   | { type: 'play' }
   | { type: 'stop' }
   | { type: 'trigger'; track: number; accent: boolean };
@@ -19,6 +20,8 @@ export type EngineReport =
   | { type: 'error'; message: string }
   | { type: 'sound'; slot: number }
   | { type: 'position'; step: number; pattern: number; playing: boolean }
+  /** Measures begun since the last report, oldest first. None is ever skipped. */
+  | { type: 'measures'; measures: EngineMeasure[] }
   | {
       type: 'stats';
       /** Frames rendered since the processor started. */

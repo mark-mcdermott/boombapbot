@@ -4,7 +4,7 @@ import {
   type EngineReport,
   type ProcessorOptions,
 } from './messages';
-import type { EnginePattern, EngineTrack } from './wasm-engine';
+import type { EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
 
 export type AudioState = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
 
@@ -20,6 +20,8 @@ export interface AudioControllerEvents {
   onState(state: AudioState, error: string | null): void;
   onPosition(step: number, pattern: number, playing: boolean): void;
   onStats(stats: AudioStats): void;
+  /** Measures the engine began, in order and without gaps. */
+  onMeasures(measures: EngineMeasure[]): void;
   /** The worklet has taken the sound last sent for this slot. */
   onSound(slot: number): void;
 }
@@ -142,6 +144,9 @@ export class AudioController {
       case 'stats':
         this.events.onStats(report);
         break;
+      case 'measures':
+        this.events.onMeasures(report.measures);
+        break;
       case 'sound':
         this.events.onSound(report.slot);
         break;
@@ -178,9 +183,14 @@ export class AudioController {
     this.post({ type: 'tempo', bpm });
   }
 
-  /** The pattern to play from the next measure, or from the start when stopped. */
-  cue(pattern: number): void {
-    this.post({ type: 'cue', pattern });
+  /** What the panel asks the engine to play. A change is read at the next bar line. */
+  setPanel(panel: EnginePanel): void {
+    this.post({ type: 'panel', panel });
+  }
+
+  /** TAP in manual play: the intro/fill-in plays once. */
+  armFill(armed: boolean): void {
+    this.post({ type: 'fill', armed });
   }
 
   play(): void {

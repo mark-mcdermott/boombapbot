@@ -2,6 +2,7 @@ import {
   ROLES,
   getTrack,
   isInstrumentId,
+  isPlayMode,
   stepsPerBeat,
   tappedStep,
   tempoBpm,
@@ -13,6 +14,7 @@ import {
 import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
 import {
   engineMix,
+  enginePanel,
   engineTracks,
   rhythmPatterns,
   selectedPattern,
@@ -20,7 +22,7 @@ import {
   synthSound,
 } from './engine/machine';
 import { exportMidi, renderLoop, type LoopRender } from './engine/offline';
-import { SnareWasm } from './engine/wasm-engine';
+import { SnareWasm, type EnginePanel } from './engine/wasm-engine';
 import { encodeWav, type WavBitDepth } from './engine/wav';
 import {
   browserStorage,
@@ -79,6 +81,8 @@ export class EditorRuntime {
   private readonly soundsInFlight = new Map<number, { stale: boolean }>();
   /** When the step now sounding was reported, for placing a tap. */
   private stepStartedAt = 0;
+  /** What the engine was last told about the intro/fill-in. */
+  private fillSent = false;
   private soundsSent = 0;
   private soundsTaken = 0;
   private unsubscribe: (() => void) | null = null;
@@ -119,6 +123,13 @@ export class EditorRuntime {
       onStats: (stats) => {
         this.stats = stats;
       },
+      onMeasures: (measures) => {
+        // The engine lets an armed intro or fill-in go as it starts to play.
+        if (measures.some((measure) => measure.kind !== 'basic')) {
+          this.fillSent = false;
+          this.store.setFillArmed(false);
+        }
+      },
       onSound: (slot) => {
         this.soundsTaken += 1;
         const flight = this.soundsInFlight.get(slot);
@@ -135,7 +146,8 @@ export class EditorRuntime {
     this.persist(this.store.getState().project);
     let previous = this.store.getState().project;
     this.unsubscribe = this.store.subscribe(() => {
-      const { project } = this.store.getState();
+      const { project, fillArmed } = this.store.getState();
+      if (fillArmed !== this.fillSent) this.sendFill(fillArmed);
       if (project === previous) return;
       previous = project;
       this.persist(project);
@@ -253,8 +265,8 @@ export class EditorRuntime {
         ),
       );
     }
-    if (!previous || selectedPattern(previous) !== selectedPattern(project)) {
-      this.audio.cue(selectedPattern(project));
+    if (!previous || !samePanel(enginePanel(previous), enginePanel(project))) {
+      this.audio.setPanel(enginePanel(project));
     }
     for (const role of ROLES) {
       const owner = soundOwner(role);
@@ -299,7 +311,8 @@ export class EditorRuntime {
   async play(): Promise<void> {
     if (!(await this.ensureAudio())) return;
     this.store.setPlaying(true);
-    this.audio.cue(selectedPattern(this.store.getState().project));
+    // A fill-in armed before audio was running is the intro.
+    this.sendFill(this.store.getState().fillArmed);
     this.audio.play();
   }
 
@@ -308,15 +321,28 @@ export class EditorRuntime {
     this.audio.stop();
   }
 
+  private sendFill(armed: boolean): void {
+    this.fillSent = armed;
+    this.audio.armFill(armed);
+  }
+
   /**
-   * TAP. While a rhythm runs in a write mode it writes the selected track on
-   * the step that is sounding, or on the next one once that step is more than
+   * TAP. In a play mode it gives the intro/fill-in priority: it plays once,
+   * as the intro or after the measure that is running. Pressed again before
+   * then, it takes that back.
+   *
+   * While a rhythm runs in a write mode it writes the selected track on the
+   * step that is sounding, or on the next one once that step is more than
    * half over. Stopped, it plays the selected instrument.
    */
   tap(): void {
-    const { project, playing, currentStep } = this.store.getState();
+    const { project, playing, currentStep, currentPattern, fillArmed } = this.store.getState();
+    if (isPlayMode(project.panel.mode)) {
+      this.store.setFillArmed(!fillArmed);
+      return;
+    }
     if (writePart(project.panel.mode) === null) return;
-    const target = editTarget(project);
+    const target = editTarget(project, currentPattern);
     if (!playing || currentStep < 0) {
       void this.audition(target.track);
       return;
@@ -408,6 +434,10 @@ export class EditorRuntime {
 }
 
 const EARLIER_VERSION_NOTE = 'Its pattern is now Basic Rhythm 1.';
+
+function samePanel(a: EnginePanel, b: EnginePanel): boolean {
+  return (Object.keys(a) as Array<keyof EnginePanel>).every((key) => a[key] === b[key]);
+}
 
 async function fetchBytes(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);

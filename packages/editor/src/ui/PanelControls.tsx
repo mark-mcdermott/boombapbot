@@ -1,7 +1,9 @@
-import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
+import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import {
+  AUTO_FILLS,
   BASIC_RHYTHMS,
   PRE_SCALES,
+  isPlayMode,
   panelTarget,
   stepsPerBeat,
   writePart,
@@ -9,6 +11,7 @@ import {
   type PanelRect,
   type PreScale,
 } from '@boombapbot/contracts';
+import type { EditorRuntime } from '../runtime';
 import { useEditorState, useRuntime } from './context';
 import { PassiveKnob, box, circle } from './panelGeometry';
 
@@ -81,21 +84,34 @@ export function ClearButton({ panel }: ControlProps) {
   );
 }
 
-/** TAP writes the selected instrument where the rhythm is now. It acts on the press, not the release. */
+/** TAP has to be in time, so it acts as the pointer goes down. Only the keyboard arrives as a click. */
+export function tapHandlers(runtime: EditorRuntime) {
+  return {
+    onPointerDown: () => runtime.tap(),
+    onClick: (event: MouseEvent) => {
+      if (event.detail === 0) runtime.tap();
+    },
+  };
+}
+
+/**
+ * TAP. In a write mode it writes the selected instrument where the rhythm is
+ * now; in a play mode it sets the intro or triggers the fill-in. It acts on
+ * the press, not the release.
+ */
 export function TapButton({ panel }: ControlProps) {
   const runtime = useRuntime();
+  const playMode = useEditorState((state) => isPlayMode(state.project.panel.mode));
+  const armed = useEditorState((state) => state.fillArmed);
   return (
     <button
       type="button"
       className="sb-panel-transport"
       style={box(panel, panel.tap.hit)}
       data-testid="panel-tap"
-      aria-label="Tap"
-      onPointerDown={() => runtime.tap()}
-      onClick={(event) => {
-        // A click with no pointer behind it came from the keyboard.
-        if (event.detail === 0) runtime.tap();
-      }}
+      aria-label={playMode ? 'Tap: play the intro or fill-in next' : 'Tap: write the selected instrument now'}
+      aria-pressed={playMode ? armed : undefined}
+      {...tapHandlers(runtime)}
     >
       <span className="sb-panel-text">Tap</span>
     </button>
@@ -151,6 +167,68 @@ function PositionSwitch(props: PositionSwitchProps) {
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
     />
+  );
+}
+
+const AUTO_FILL_TEXT = AUTO_FILLS.map((every) => (every === 0 ? 'Manual' : `Every ${every} measures`));
+
+/** How far apart two pointer angles are, in degrees. */
+function angleBetween(a: number, b: number): number {
+  return Math.abs(((a - b + 540) % 360) - 180);
+}
+
+/**
+ * The auto fill-in selector. Press or drag around the dial and it turns to
+ * the nearest position; the arrow keys step through them.
+ */
+export function AutoFillSelector({ panel, photo }: ControlProps & { photo: string | null }) {
+  const { store } = useRuntime();
+  const index = useEditorState((state) => AUTO_FILLS.indexOf(state.project.panel.autoFill));
+  const { knob, hit, degs } = panel.autoFill;
+  const last = AUTO_FILLS.length - 1;
+  const move = (next: number) => store.setAutoFill(AUTO_FILLS[Math.min(last, Math.max(0, next))]!);
+
+  const turnTo = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const [x, y, width, height] = hit;
+    const dx = event.clientX - (rect.left + ((knob.cx - x) / width) * rect.width);
+    const dy = event.clientY - (rect.top + ((knob.cy - y) / height) * rect.height);
+    // 0 degrees is straight up and angles grow clockwise, as on the faceplate.
+    const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    move(degs.reduce((best, candidate, i) => (angleBetween(candidate, deg) < angleBetween(degs[best]!, deg) ? i : best), 0));
+  };
+
+  return (
+    <>
+      <PassiveKnob panel={panel} photo={photo} knob={knob} deg={degs[index] ?? 0} />
+      <div
+        className="sb-panel-switch"
+        style={box(panel, hit)}
+        role="slider"
+        tabIndex={0}
+        data-testid="panel-auto-fill"
+        aria-label="Auto fill-in"
+        aria-valuemin={0}
+        aria-valuemax={last}
+        aria-valuenow={index}
+        aria-valuetext={AUTO_FILL_TEXT[index]}
+        onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+          const target = { ArrowRight: index + 1, ArrowUp: index + 1, ArrowLeft: index - 1, ArrowDown: index - 1, Home: 0, End: last }[
+            event.key
+          ];
+          if (target === undefined) return;
+          event.preventDefault();
+          move(target);
+        }}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          turnTo(event);
+        }}
+        onPointerMove={(event) => {
+          if (event.buttons !== 0) turnTo(event);
+        }}
+      />
+    </>
   );
 }
 
@@ -255,7 +333,7 @@ export function StatusLamps({ panel, dim }: ControlProps & { dim: boolean }) {
   const secondPlaying = useEditorState((state) => state.currentStep >= 16);
   const patternB = useEditorState((state) => state.currentPattern % 2 === 1);
   const part = useEditorState((state) => writePart(state.project.panel.mode));
-  const variation = useEditorState((state) => panelTarget(state.project.panel).variation);
+  const variation = useEditorState((state) => panelTarget(state.project.panel, state.currentPattern).variation);
   const second = playing ? secondPlaying : part === 1;
   const first = playing ? !secondPlaying : part === 0;
   const b = playing ? patternB : variation === 'b';

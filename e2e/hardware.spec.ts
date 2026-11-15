@@ -592,3 +592,113 @@ test('TAP writes the selected instrument while the rhythm runs', async ({ page }
   await page.getByTestId('panel-tap').click();
   expect((await project(page)).rhythms).toEqual(before);
 });
+
+test.describe('manual play', () => {
+  /** Patterns of the measures the engine has begun, as the page heard about them. */
+  const playedPatterns = async (page: import('@playwright/test').Page) => {
+    const seen: number[] = [];
+    return {
+      async poll() {
+        const pattern = await page.evaluate(() => window.__boombapbot!.playing().pattern);
+        if (pattern >= 0 && seen[seen.length - 1] !== pattern) seen.push(pattern);
+        return seen;
+      },
+    };
+  };
+
+  test.beforeEach(async ({ page }) => {
+    // Fast, so several measures pass in a second or two.
+    await page.getByTestId('panel-tempo').focus();
+    await page.keyboard.press('End');
+    await page.getByTestId('panel-mode-manual_play').click();
+  });
+
+  test('the AB position plays the A and B versions in turn', async ({ page }) => {
+    const lever = page.getByTestId('panel-basic-variation');
+    await lever.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(lever).toHaveAttribute('aria-valuetext', 'A then B');
+    await page.getByTestId('panel-toggle').click();
+    const played = await playedPatterns(page);
+    await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(4);
+    const seen = await played.poll();
+    // It begins with A and never plays one version twice running.
+    expect(seen[0]).toBe(0);
+    expect(seen.slice(0, 4)).toEqual([0, 1, 0, 1]);
+    // The version lamps follow what is playing.
+    await expect
+      .poll(async () => page.getByTestId('lamp-variation-b').getAttribute('data-on'), { intervals: [20] })
+      .toBe('true');
+    await expect
+      .poll(async () => page.getByTestId('lamp-variation-a').getAttribute('data-on'), { intervals: [20] })
+      .toBe('true');
+  });
+
+  test('TAP sets an intro before start and a fill-in while running', async ({ page }) => {
+    const tap = page.getByTestId('panel-tap');
+    const lamps = page.getByTestId('panel').locator('[data-panel-lamp]');
+    await expect(tap).toHaveAccessibleName('Tap: play the intro or fill-in next');
+    await expect(tap).toHaveAttribute('aria-pressed', 'false');
+    // The Basic Rhythm has priority and flashes; the Intro/Fill-in is lit.
+    await expect(lamps.nth(0)).toHaveAttribute('data-flash', 'true');
+    await expect(lamps.nth(12)).toHaveAttribute('data-flash', 'false');
+
+    await tap.click();
+    await expect(tap).toHaveAttribute('aria-pressed', 'true');
+    await expect(lamps.nth(12)).toHaveAttribute('data-flash', 'true');
+    await expect(lamps.nth(0)).toHaveAttribute('data-flash', 'false');
+    await expect(lamps.nth(0)).toHaveAttribute('data-on', 'true');
+    // Pressed again it gives priority back.
+    await tap.click();
+    await expect(tap).toHaveAttribute('aria-pressed', 'false');
+    await tap.click();
+
+    const played = await playedPatterns(page);
+    await page.getByTestId('panel-toggle').click();
+    await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(2);
+    // The intro, Intro/Fill-in 1 version A, played once and handed over to Basic Rhythm 1.
+    expect((await played.poll()).slice(0, 2)).toEqual([24, 0]);
+    await expect(tap).toHaveAttribute('aria-pressed', 'false');
+
+    // While it runs, TAP queues the fill-in for the next bar line, once.
+    await tap.click();
+    await expect.poll(async () => (await played.poll()).slice(2, 4), { intervals: [20] }).toEqual([24, 0]);
+    await expect(tap).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
+  });
+
+  test('the auto fill-in selector plays the fill-in every so many measures', async ({ page }) => {
+    const selector = page.getByTestId('panel-auto-fill');
+    await expect(selector).toHaveAttribute('aria-valuetext', 'Manual');
+    await selector.focus();
+    await page.keyboard.press('End');
+    await expect(selector).toHaveAttribute('aria-valuetext', 'Every 2 measures');
+    expect((await project(page)).panel.autoFill).toBe(2);
+
+    const played = await playedPatterns(page);
+    await page.getByTestId('panel-toggle').click();
+    await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(4);
+    expect((await played.poll()).slice(0, 4)).toEqual([0, 24, 0, 24]);
+
+    // Pressing beside a number on the dial turns it there.
+    await page.getByTestId('panel-toggle').click();
+    const box = (await selector.boundingBox())!;
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.08);
+    const picked = (await project(page)).panel.autoFill;
+    expect([12, 8]).toContain(picked);
+    await page.mouse.click(box.x + box.width * 0.06, box.y + box.height * 0.63);
+    expect((await project(page)).panel.autoFill).toBe(0);
+  });
+
+  test('a rhythm chosen while another plays takes over, and the write modes then edit it', async ({ page }) => {
+    const played = await playedPatterns(page);
+    await page.getByTestId('panel-toggle').click();
+    await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(1);
+    await stepButton(page, 4).click();
+    expect((await project(page)).panel.basicRhythm).toBe(4);
+    await expect.poll(async () => (await played.poll()).includes(8), { intervals: [20] }).toBe(true);
+    await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
+    // Nothing was written by choosing it.
+    expect(hitCount(await project(page), 4)).toBe(0);
+  });
+});

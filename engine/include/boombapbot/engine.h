@@ -37,6 +37,8 @@ extern "C" {
 #define SNARE_PART_STEPS 16
 #define SNARE_MAX_STEPS 32
 #define SNARE_PATTERNS 32
+/* A rhythm is one step button: its A version is pattern 2r, its B 2r + 1. */
+#define SNARE_RHYTHMS 16
 #define SNARE_MAX_VOICES 64
 /* The timeline counts in ticks. Every step length is a whole number of them. */
 #define SNARE_TICKS_PER_BEAT 24
@@ -72,6 +74,33 @@ typedef struct SnareEvent {
   int32_t accent;  /* 1 when the hit was accented */
   int32_t pattern; /* pattern playing, or -1 for an audition */
 } SnareEvent;
+
+/* Where a variation switch stands. An intro/fill-in has no AB position. */
+enum { SNARE_VARIATION_A = 0, SNARE_VARIATION_AB = 1, SNARE_VARIATION_B = 2 };
+
+/* What the panel's switches ask for. The engine reads it at every bar line. */
+typedef struct SnarePanel {
+  uint8_t rhythm;          /* the rhythm that plays */
+  uint8_t variation;       /* SNARE_VARIATION_*: AB alternates A and B */
+  uint8_t fill_rhythm;     /* played once when armed or due */
+  uint8_t fill_variation;  /* SNARE_VARIATION_A or SNARE_VARIATION_B */
+  uint8_t auto_fill;       /* a fill-in every this many measures; 0 for none */
+  uint8_t first_beat_rule; /* 1: a rhythm chosen during the first beat of a
+                              measure takes over on the second */
+  uint8_t reserved[2];
+} SnarePanel;
+
+enum { SNARE_MEASURE_BASIC = 0, SNARE_MEASURE_FILL = 1, SNARE_MEASURE_INTRO = 2 };
+
+/* A measure the engine began, as recorded by the measure log. A rhythm that
+ * takes over on the second beat is logged again under the same ordinal. */
+typedef struct SnareMeasure {
+  double frame;    /* absolute output frame of its first step */
+  int32_t ordinal; /* 1 for the first measure after play */
+  int32_t pattern;
+  int32_t kind;    /* SNARE_MEASURE_* */
+  int32_t reserved;
+} SnareMeasure;
 
 uint32_t snare_abi_version(void);
 
@@ -184,9 +213,16 @@ int32_t snare_engine_set_step(SnareEngine* engine, int32_t pattern,
 
 /* ---- Queued control messages: playing ------------------------------------ */
 
-/* The pattern to play from the next measure, or from the start when stopped.
- * With nothing cued the pattern playing repeats. */
+/* Loops one pattern: it plays from the next measure, or from the start when
+ * stopped. This replaces whatever the panel asked for. */
 int32_t snare_engine_cue_pattern(SnareEngine* engine, int32_t index);
+/* Plays what the panel asks for, measure by measure: its rhythm in the A or B
+ * version or the two in turn, with an intro or fill-in when one is armed or
+ * due. A change is read at the next bar line. This replaces a cued pattern. */
+int32_t snare_engine_set_panel(SnareEngine* engine, const SnarePanel* panel);
+/* TAP. Armed, the panel's intro/fill-in plays once: as the intro when
+ * stopped, otherwise at the next bar line. It is disarmed as it starts. */
+int32_t snare_engine_arm_fill(SnareEngine* engine, int32_t armed);
 /* Starts from the first step at the next buffer boundary. */
 int32_t snare_engine_play(SnareEngine* engine);
 /* Like play, but the scheduler stops itself after `measures` measures. Tails
@@ -225,6 +261,13 @@ int32_t snare_engine_enable_event_log(SnareEngine* engine, int32_t capacity);
 int32_t snare_engine_event_count(const SnareEngine* engine);
 int32_t snare_engine_read_events(const SnareEngine* engine, SnareEvent* out,
                                  int32_t max_events);
+
+/* ---- Measure log (control thread) ------------------------------------------ */
+
+/* Takes the measures begun since the last call, oldest first, and returns how
+ * many were written. The log holds 255; more than that unread are dropped. */
+int32_t snare_engine_read_measures(SnareEngine* engine, SnareMeasure* out,
+                                   int32_t max_measures);
 
 /* ---- Standard MIDI File export ------------------------------------------ */
 

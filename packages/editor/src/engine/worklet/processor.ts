@@ -68,8 +68,11 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
         case 'tempo':
           engine.setTempo(command.bpm);
           break;
-        case 'cue':
-          engine.cuePattern(command.pattern);
+        case 'panel':
+          engine.setPanel(command.panel);
+          break;
+        case 'fill':
+          engine.armFill(command.armed);
           break;
         case 'play':
           engine.play();
@@ -103,6 +106,9 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
       if (b > peak) peak = b;
     }
     this.peak = peak;
+
+    const measures = engine.takeMeasures();
+    if (measures) this.report({ type: 'measures', measures });
 
     const step = engine.currentStep;
     const pattern = engine.currentPattern;

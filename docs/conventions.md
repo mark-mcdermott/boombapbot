@@ -35,7 +35,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `pnpm test:e2e` tests the production build, so run `pnpm build` first.
   It needs `pnpm exec playwright install chromium` once on a new machine.
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
-  `pattern_bank`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
+  `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
   `realtime`, `synth`).
 - One Vitest file: `pnpm exec vitest run packages/editor/test/engine.test.ts`.
 - One Playwright file: `pnpm exec playwright test e2e/hardware.spec.ts`.
@@ -101,9 +101,14 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   and are mirrored in `engine/tools/project_io.h` and
   `plugins/vst3/Source/Machine808.h`. Track level and master volume are
   smoothed per sample, in a way that does not depend on buffer size.
-- The engine, not TypeScript, decides what plays at a bar line. Today that is
-  only `snare_engine_cue_pattern`; variations, fill-ins and rhythm tracks go
-  into the engine too, not into timers on the main thread.
+- The engine, not TypeScript, decides what plays at a bar line.
+  `engine/src/sequencer.h` is pure and holds those rules: A, AB and B, intro,
+  tapped and automatic fill-ins. `engine/machine.ts` (`enginePanel`) only
+  tells the engine where the panel's switches stand. Rhythm tracks go into
+  the engine too, not into timers on the main thread.
+- The page learns what played from the measure log, which the worklet drains
+  after every render and never skips. A measure whose rhythm changed on its
+  second beat is reported twice under one ordinal.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.

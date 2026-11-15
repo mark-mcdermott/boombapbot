@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 
+#include "sequencer.h"
 #include "boombapbot/engine.h"
 #include "spsc_queue.h"
 #include "timeline.h"
@@ -24,6 +25,7 @@ constexpr int kCommandCapacity = 1024;
 // Replaced sounds waiting for the control thread to free them. A knob drag
 // replaces one sound at a time, so this is sized for a long drag.
 constexpr int kRetiredCapacity = 256;
+constexpr int kMeasureLogCapacity = 255;
 
 // A choked voice fades over this long instead of stopping dead.
 constexpr double kChokeSeconds = 0.004;
@@ -69,6 +71,8 @@ enum class CommandType : std::int32_t {
   SetPattern,
   SetStep,
   CuePattern,
+  SetPanel,
+  ArmFill,
   Play,
   Stop,
   Trigger
@@ -82,6 +86,7 @@ struct Command {
   double value = 0.0;
   double value2 = 0.0;
   SnarePattern pattern{};
+  SnarePanel panel{};
 };
 
 // How an instrument track plays. Audio thread only.
@@ -156,6 +161,7 @@ struct SnareEngine {
   std::atomic<std::uint32_t> stagedSlots{0};
   std::atomic<std::uint32_t> clearedSlots{0};
   snare::SpscQueue<SnareSound*, snare::kRetiredCapacity> retired;
+  snare::SpscQueue<SnareMeasure, snare::kMeasureLogCapacity> measureLog;
 
   std::atomic<int> playingFlag{0};
   std::atomic<int> currentStep{-1};
@@ -192,7 +198,12 @@ struct SnareEngine {
   std::int64_t anchorFrame = 0;  // frame where anchorTick applies
   double anchorTick = 0.0;       // position there; whole unless the tempo changed
   int pattern = 0;               // pattern playing
-  int cued = -1;                 // pattern to play from the next measure
+  int cued = -1;                 // pattern to loop from the next measure
+  bool followPanel = false;      // the panel, not a cued pattern, says what plays
+  SnarePanel panel{};
+  snare::Sequencer sequencer;
+  int measureKind = SNARE_MEASURE_BASIC;
+  bool takeoverDue = false;      // a rhythm chosen in the first beat waits for the second
   std::int64_t measureTick = 0;  // where the measure playing began
   int measureFirst = SNARE_PART_STEPS;  // steps in its 1st part, its length and
   int measureSteps = SNARE_PART_STEPS;  // its step size, all fixed for the
@@ -237,16 +248,59 @@ struct SnareEngine {
     measureStepTicks = snare::stepTicks(shape.steps_per_beat);
   }
 
+  std::int64_t measureTicks() const { return static_cast<std::int64_t>(measureSteps) * measureStepTicks; }
+
+  // The measure log is for the control thread; a full one drops the entry.
+  void logMeasure() {
+    measureLog.push(SnareMeasure{static_cast<double>(tickToFrame(measureTick)), static_cast<std::int32_t>(measures),
+                                 pattern, measureKind, 0});
+    currentPattern.store(pattern, std::memory_order_relaxed);
+  }
+
   void beginMeasure() {
-    if (cued >= 0) {
+    measureKind = SNARE_MEASURE_BASIC;
+    if (followPanel) {
+      const snare::MeasureChoice choice = sequencer.next(panel);
+      pattern = choice.pattern;
+      measureKind = choice.kind;
+    } else if (cued >= 0) {
       pattern = cued;
       cued = -1;
     }
+    takeoverDue = false;
     latchShape();
     nextStep = 0;
     ++measures;
-    currentPattern.store(pattern, std::memory_order_relaxed);
     currentMeasure.store(static_cast<int>(measures), std::memory_order_relaxed);
+    logMeasure();
+  }
+
+  // Whether the frame now being rendered is inside the first beat of the measure playing.
+  bool inFirstBeat() const {
+    if (!playing || tickFrames <= 0.0) return false;
+    const double tick = anchorTick + static_cast<double>(frame - anchorFrame) / tickFrames;
+    return tick - static_cast<double>(measureTick) < SNARE_TICKS_PER_BEAT;
+  }
+
+  // The second beat of a measure whose rhythm was changed during the first:
+  // the new rhythm carries on from its own second beat. A rhythm no longer
+  // than a beat has no second beat, so it waits for the bar line.
+  void takeOver() {
+    takeoverDue = false;
+    const int incoming = sequencer.takeover(panel);
+    const SnarePattern& shape = bank[incoming];
+    const int ticks = (shape.len1 + shape.len2) * snare::stepTicks(shape.steps_per_beat);
+    if (incoming == pattern || ticks <= SNARE_TICKS_PER_BEAT) return;
+    pattern = incoming;
+    latchShape();
+    nextStep = SNARE_TICKS_PER_BEAT / measureStepTicks;
+    logMeasure();
+    scheduleNextEvent();
+  }
+
+  bool takeoverNow() const {
+    return takeoverDue && static_cast<std::int64_t>(nextStep) * measureStepTicks >= SNARE_TICKS_PER_BEAT &&
+           measureTicks() > SNARE_TICKS_PER_BEAT;
   }
 
   void halt(std::int64_t at, bool bounded) {
@@ -393,7 +447,7 @@ struct SnareEngine {
       halt(std::min(at, nextEventFrame), true);
       return;
     }
-    measureTick += static_cast<std::int64_t>(measureSteps) * measureStepTicks;
+    measureTick += measureTicks();
     beginMeasure();
     scheduleNextEvent();
   }
@@ -441,7 +495,28 @@ struct SnareEngine {
         row = command.value != 0.0 ? (row | bit) : (row & ~bit);
         break;
       }
+      case CommandType::SetPanel:
+        // A new rhythm chosen while the first beat of a basic measure plays
+        // starts on the second beat. Anything else waits for the bar line.
+        if (followPanel && command.panel.rhythm != panel.rhythm) {
+          takeoverDue = command.panel.first_beat_rule != 0 && measureKind == SNARE_MEASURE_BASIC &&
+                        (takeoverDue || inFirstBeat());
+        }
+        panel = command.panel;
+        followPanel = true;
+        cued = -1;
+        if (!playing) {
+          pattern = snare::patternOf(panel.rhythm, panel.variation == SNARE_VARIATION_B ? 1 : 0);
+          latchShape();
+          currentPattern.store(pattern, std::memory_order_relaxed);
+        }
+        break;
+      case CommandType::ArmFill:
+        sequencer.armFill(command.a != 0);
+        break;
       case CommandType::CuePattern:
+        followPanel = false;
+        takeoverDue = false;
         cued = command.a;
         if (!playing) {
           pattern = cued;
@@ -458,6 +533,7 @@ struct SnareEngine {
         measures = 0;
         measureLimit = command.a;
         stopFrame.store(-1.0, std::memory_order_relaxed);
+        sequencer.start();
         beginMeasure();
         scheduleNextEvent();
         break;
@@ -581,7 +657,9 @@ struct SnareEngine {
       if (playing) {
         const std::int64_t now = frame + offset;
         while (playing && nextEventFrame <= now) {
-          if (nextStep >= measureSteps) {
+          if (takeoverNow()) {
+            takeOver();
+          } else if (nextStep >= measureSteps) {
             endMeasure(now);
           } else {
             fireStep(now);
@@ -809,6 +887,22 @@ int32_t snare_engine_cue_pattern(SnareEngine* engine, int32_t index) {
   return engine->enqueue(command);
 }
 
+int32_t snare_engine_set_panel(SnareEngine* engine, const SnarePanel* panel) {
+  if (!engine || !panel || !snare::validPanel(*panel)) return SNARE_ERR_BAD_ARGUMENT;
+  snare::Command command;
+  command.type = snare::CommandType::SetPanel;
+  command.panel = *panel;
+  return engine->enqueue(command);
+}
+
+int32_t snare_engine_arm_fill(SnareEngine* engine, int32_t armed) {
+  if (!engine) return SNARE_ERR_BAD_ARGUMENT;
+  snare::Command command;
+  command.type = snare::CommandType::ArmFill;
+  command.a = armed != 0 ? 1 : 0;
+  return engine->enqueue(command);
+}
+
 int32_t snare_engine_play(SnareEngine* engine) {
   if (!engine) return SNARE_ERR_BAD_ARGUMENT;
   snare::Command command;
@@ -876,6 +970,13 @@ int32_t snare_engine_active_voices(const SnareEngine* engine) {
 
 uint32_t snare_engine_stolen_voices(const SnareEngine* engine) {
   return engine ? engine->stolenVoices.load(std::memory_order_relaxed) : 0;
+}
+
+int32_t snare_engine_read_measures(SnareEngine* engine, SnareMeasure* out, int32_t max_measures) {
+  if (!engine || !out || max_measures <= 0) return 0;
+  int32_t count = 0;
+  while (count < max_measures && engine->measureLog.pop(out[count])) ++count;
+  return count;
 }
 
 int32_t snare_engine_enable_event_log(SnareEngine* engine, int32_t capacity) {

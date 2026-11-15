@@ -52,6 +52,7 @@ export interface ProjectSnapshot {
     basicVariation: string;
     fillVariation: string;
     preScale: number;
+    autoFill: number;
     writeTarget: string;
   };
 }
@@ -246,6 +247,7 @@ declare global {
   interface Window {
     __boombapbot?: {
       debug(): unknown;
+      playing(): { step: number; pattern: number };
       renderLoop(sampleRate?: number): Promise<{
         frames: number;
         sampleRate: number;

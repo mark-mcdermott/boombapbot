@@ -8,6 +8,7 @@ import {
   clearedVersions,
   createProject,
   createStarterRhythms,
+  isPlayMode,
   isStepOn,
   knobPosition,
   panelTarget,
@@ -15,6 +16,7 @@ import {
   withPartLength,
   withStep,
   writePart,
+  type AutoFill,
   type KnobParam,
   type Mode,
   type PanelState,
@@ -47,6 +49,8 @@ export interface EditorState {
   currentPattern: number;
   /** CLEAR is down in a write mode: the next step button sets the part's last step. */
   clearArmed: boolean;
+  /** TAP was pressed in a play mode: the intro/fill-in plays next, once. */
+  fillArmed: boolean;
   audioStatus: AudioStatus;
   audioError: string | null;
   draftOrigin: DraftOrigin;
@@ -100,10 +104,10 @@ function memoryOf(project: Project): Memory {
   return { rhythms: project.rhythms, rhythmTracks: project.rhythmTracks };
 }
 
-export function editTarget(project: Project): EditTarget {
+export function editTarget(project: Project, playingPattern = -1): EditTarget {
   const { panel } = project;
   return {
-    ...panelTarget(panel),
+    ...panelTarget(panel, playingPattern),
     track: TRACK_IDS[panel.selector]!,
     offset: writePart(panel.mode) === 1 ? PART_STEPS : 0,
   };
@@ -132,6 +136,7 @@ export class EditorStore {
       currentStep: -1,
       currentPattern: -1,
       clearArmed: false,
+      fillArmed: false,
       audioStatus: 'idle',
       audioError: null,
       draftOrigin: options.draftOrigin ?? 'new',
@@ -199,13 +204,13 @@ export class EditorStore {
    * Intro/Fill-ins.
    */
   pressStep(button: number): StepPress {
-    const { project, clearArmed } = this.state;
+    const { project, clearArmed, currentPattern } = this.state;
     const part = writePart(project.panel.mode);
     if (part === null) {
       this.selectRhythm(button);
       return { kind: 'rhythm' };
     }
-    const target = editTarget(project);
+    const target = editTarget(project, currentPattern);
     const rhythm = project.rhythms[target.rhythm]!;
     if (clearArmed) {
       this.set({ clearArmed: false });
@@ -220,7 +225,7 @@ export class EditorStore {
 
   /** Writes the selected track at a step of the rhythm the panel is on, as TAP does. */
   tapStep(step: number): void {
-    const target = editTarget(this.state.project);
+    const target = editTarget(this.state.project, this.state.currentPattern);
     this.setStep(target.rhythm, target.variation, target.track, step, true);
   }
 
@@ -332,7 +337,18 @@ export class EditorStore {
   /** Turns the mode selector. */
   setMode(mode: Mode): void {
     this.releaseClear();
+    // An intro or fill-in waiting to play belongs to the play modes.
+    if (!isPlayMode(mode)) this.setFillArmed(false);
     this.adjustPanel({ mode });
+  }
+
+  /** Turns the auto fill-in selector: a fill-in every so many measures, or 0 for none. */
+  setAutoFill(autoFill: AutoFill): void {
+    this.adjustPanel({ autoFill });
+  }
+
+  setFillArmed(fillArmed: boolean): void {
+    if (fillArmed !== this.state.fillArmed) this.set({ fillArmed });
   }
 
   /** Selects a rhythm with its step button: the last one pressed is the one the write modes work on. */

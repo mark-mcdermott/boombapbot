@@ -12,6 +12,10 @@ const ERR_QUEUE_FULL = -1;
 const BYTES_PER_EVENT = 24;
 const BYTES_PER_SOUND_PARAMS = 24;
 const BYTES_PER_PATTERN = 52;
+const BYTES_PER_PANEL = 8;
+const BYTES_PER_MEASURE = 24;
+/** Measures read from the log at a time. A render call rarely begins more than one. */
+const MEASURE_BATCH = 16;
 const PATTERN_LENGTHS_OFFSET = SNARE_TRACKS * 4;
 
 interface EngineExports {
@@ -42,6 +46,8 @@ interface EngineExports {
   snare_engine_set_pattern(engine: number, index: number, pattern: number): number;
   snare_engine_set_step(engine: number, pattern: number, track: number, step: number, on: number): number;
   snare_engine_cue_pattern(engine: number, index: number): number;
+  snare_engine_set_panel(engine: number, panel: number): number;
+  snare_engine_arm_fill(engine: number, armed: number): number;
   snare_engine_play(engine: number): number;
   snare_engine_play_measures(engine: number, measures: number): number;
   snare_engine_stop(engine: number): number;
@@ -58,6 +64,7 @@ interface EngineExports {
   snare_engine_enable_event_log(engine: number, capacity: number): number;
   snare_engine_event_count(engine: number): number;
   snare_engine_read_events(engine: number, out: number, max: number): number;
+  snare_engine_read_measures(engine: number, out: number, max: number): number;
   snare_midi_export(
     patterns: number,
     patternCount: number,
@@ -100,6 +107,35 @@ export interface EngineTrack {
   chokeGroup: number;
   /** Linear gain from the level knob. */
   gain: number;
+}
+
+/** Where a variation switch stands, as the engine numbers the positions. */
+export const VARIATION = { a: 0, ab: 1, b: 2 } as const;
+
+/** What the panel's switches ask the engine to play, measure by measure. */
+export interface EnginePanel {
+  /** The rhythm that plays, 0 to 15. */
+  rhythm: number;
+  variation: keyof typeof VARIATION;
+  /** The intro/fill-in played once when armed or due. */
+  fillRhythm: number;
+  fillVariation: 'a' | 'b';
+  /** A fill-in every this many measures; 0 for none. */
+  autoFill: number;
+  /** A rhythm chosen during the first beat of a measure takes over on the second. */
+  firstBeatRule: boolean;
+}
+
+export type MeasureKind = 'basic' | 'fill' | 'intro';
+const MEASURE_KINDS: MeasureKind[] = ['basic', 'fill', 'intro'];
+
+/** A measure the engine began. One that changes rhythm on its second beat is reported twice. */
+export interface EngineMeasure {
+  frame: number;
+  /** 1 for the first measure after play. */
+  ordinal: number;
+  pattern: number;
+  kind: MeasureKind;
 }
 
 export interface EngineEvent {
@@ -299,6 +335,7 @@ export class WasmEngine {
   private readonly right: number;
   /** Scratch for one pattern or one set of sound parameters. */
   private readonly scratch: number;
+  private readonly measures: number;
 
   constructor(wasm: SnareWasm, sampleRate: number, blockSize: number) {
     this.wasm = wasm;
@@ -308,7 +345,8 @@ export class WasmEngine {
     if (this.handle === 0) throw new Error(`engine rejected sample rate ${sampleRate}`);
     this.left = wasm.alloc(blockSize * 4);
     this.right = wasm.alloc(blockSize * 4);
-    this.scratch = wasm.alloc(Math.max(BYTES_PER_PATTERN, BYTES_PER_SOUND_PARAMS));
+    this.scratch = wasm.alloc(Math.max(BYTES_PER_PATTERN, BYTES_PER_SOUND_PARAMS, BYTES_PER_PANEL));
+    this.measures = wasm.alloc(BYTES_PER_MEASURE * MEASURE_BATCH);
   }
 
   private get x(): EngineExports {
@@ -377,9 +415,47 @@ export class WasmEngine {
     this.send(() => this.x.snare_engine_set_pattern(this.handle, index, this.scratch));
   }
 
-  /** The pattern to play from the next measure, or from the start when stopped. */
+  /** Loops one pattern, from the next measure or from the start when stopped. */
   cuePattern(index: number): void {
     this.send(() => this.x.snare_engine_cue_pattern(this.handle, index));
+  }
+
+  /** Plays what the panel asks for, measure by measure. A change is read at the next bar line. */
+  setPanel(panel: EnginePanel): void {
+    const view = new DataView(this.x.memory.buffer);
+    view.setUint8(this.scratch, panel.rhythm);
+    view.setUint8(this.scratch + 1, VARIATION[panel.variation]);
+    view.setUint8(this.scratch + 2, panel.fillRhythm);
+    view.setUint8(this.scratch + 3, VARIATION[panel.fillVariation]);
+    view.setUint8(this.scratch + 4, panel.autoFill);
+    view.setUint8(this.scratch + 5, panel.firstBeatRule ? 1 : 0);
+    view.setUint16(this.scratch + 6, 0, true);
+    this.send(() => this.x.snare_engine_set_panel(this.handle, this.scratch));
+  }
+
+  /** TAP: the panel's intro/fill-in plays once, as the intro or at the next bar line. */
+  armFill(armed: boolean): void {
+    this.send(() => this.x.snare_engine_arm_fill(this.handle, armed ? 1 : 0));
+  }
+
+  /** Takes the measures begun since the last call. Returns null when there are none, without allocating. */
+  takeMeasures(): EngineMeasure[] | null {
+    let taken: EngineMeasure[] | null = null;
+    for (;;) {
+      const count = this.x.snare_engine_read_measures(this.handle, this.measures, MEASURE_BATCH);
+      if (count === 0) return taken;
+      const view = new DataView(this.x.memory.buffer, this.measures, count * BYTES_PER_MEASURE);
+      taken ??= [];
+      for (let i = 0; i < count; i += 1) {
+        const offset = i * BYTES_PER_MEASURE;
+        taken.push({
+          frame: view.getFloat64(offset, true),
+          ordinal: view.getInt32(offset + 8, true),
+          pattern: view.getInt32(offset + 12, true),
+          kind: MEASURE_KINDS[view.getInt32(offset + 16, true)] ?? 'basic',
+        });
+      }
+    }
   }
 
   play(): void {
@@ -476,6 +552,7 @@ export class WasmEngine {
     this.x.free(this.left);
     this.x.free(this.right);
     this.x.free(this.scratch);
+    this.x.free(this.measures);
     this.handle = 0;
   }
 }

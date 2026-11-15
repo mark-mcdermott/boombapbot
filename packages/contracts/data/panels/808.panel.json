@@ -76,6 +76,7 @@
       {"mode": "compose", "label": "Compose", "deg": 100, "hit": [282, 291, 40, 26]}
     ]
   },
+  "autoFill": {"knob": {"cx": 410, "cy": 466, "r": 39, "photoDeg": -92}, "hit": [330, 394, 160, 116], "degs": [-92, -55, -18, 18, 55, 92]},
   "clear": {"hit": [212, 407, 44, 44]},
   "tap": {"hit": [1725, 945, 78, 76]},
   "preScale": {"hit": [412, 806, 60, 84], "slot": [424, 812, 22, 72]},
@@ -102,8 +103,9 @@
     ]
   },
   "pending": [
-    "The AB position plays and writes version A; alternating A and B, intros and fill-ins, auto fill-in and the first-beat rule are not modelled. Play and compose behave like manual play.",
     "CLEAR is a latch here: press it, then a step button, to set the last step. On the machine it is held down. Whether CLEAR also resets a rhythm's pre-scale is unverified; here it does not.",
+    "Whether a tapped fill-in counts as a measure of the automatic fill-in, and whether the first-beat rule applies outside manual play, is not in the manual. Here a tapped fill-in counts and the rule is manual play's alone.",
+    "Play and compose behave like manual play: rhythm tracks are not modelled yet.",
     "What each knob does to the sound, and how far the level, accent and volume knobs reach, is a model made by ear.",
     "The lamps follow the manual's description of each mode. What the hardware shows in the cases the manual leaves out is unverified."
   ]

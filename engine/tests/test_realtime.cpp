@@ -128,6 +128,16 @@ SNARE_TEST(render_does_not_allocate_while_applying_commands) {
     snare_engine_set_accent(engine, 0.5, 0.5 + (pass % 5) * 0.1);
     snare_engine_set_master_volume(engine, 0.3 + (pass % 5) * 0.1);
     snare_engine_trigger(engine, 1 + pass % 11, pass & 1);
+    if (pass % 3 == 0) {
+      SnarePanel panel{};
+      panel.rhythm = static_cast<std::uint8_t>(pass % SNARE_RHYTHMS);
+      panel.variation = static_cast<std::uint8_t>(pass % 3);
+      panel.fill_rhythm = static_cast<std::uint8_t>(12 + pass % 4);
+      panel.auto_fill = static_cast<std::uint8_t>(pass % 5);
+      panel.first_beat_rule = 1;
+      snare_engine_set_panel(engine, &panel);
+      snare_engine_arm_fill(engine, pass & 1);
+    }
     if (pass % 50 == 10) snare_engine_stop(engine);
     if (pass % 50 == 20) snare_engine_play(engine);
     if (pass % 50 == 30) snare_engine_play_measures(engine, 2);

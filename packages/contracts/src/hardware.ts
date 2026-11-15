@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import panel808 from '../data/panels/808.panel.json';
 import { KNOB_PARAMS, PART_STEPS, SWITCHED_IDS, TRACK_IDS, getTrack } from './machine';
-import { MODES } from './project';
+import { AUTO_FILLS, MODES } from './project';
 
 /**
  * Hardware panel manifests: control geometry and behaviour notes for the
@@ -132,6 +132,13 @@ export const panelManifestSchema = z.object({
     positions: z
       .array(z.object({ mode: z.enum(MODES), label: z.string().min(1).max(20), deg: z.number(), hit: rectSchema }))
       .length(MODES.length),
+  }),
+  /** The auto fill-in selector: a dial that is turned by pressing around it. */
+  autoFill: z.object({
+    knob: knobSchema,
+    hit: rectSchema,
+    /** Pointer angle for each position, in the order of AUTO_FILLS. */
+    degs: z.array(z.number()).length(AUTO_FILLS.length),
   }),
   /** The CLEAR button under the mode selector, and TAP beside the step buttons. */
   clear: z.object({ hit: rectSchema }),

@@ -17,6 +17,7 @@ import {
   clampKnob,
   TRACK_IDS,
   countSteps,
+  patternIndex,
   tempoFromBpm,
   type InstrumentId,
   type KnobParam,
@@ -288,10 +289,22 @@ export function writePart(mode: Mode): 0 | 1 | null {
   return mode === 'write_first' ? 0 : mode === 'write_second' ? 1 : null;
 }
 
-/** The rhythm and version the panel is on: what the write modes edit and CLEAR clears. */
-export function panelTarget(panel: PanelState): { rhythm: number; variation: Variation } {
+/** Modes in which the step buttons choose rhythms and the machine plays them in turn. */
+export function isPlayMode(mode: Mode): boolean {
+  return mode === 'manual_play' || mode === 'play' || mode === 'compose';
+}
+
+/**
+ * The rhythm and version the panel is on: what the write modes edit and CLEAR
+ * clears. With the variation switch on AB the machine plays A and B in turn,
+ * so the version is whichever of this rhythm's patterns is playing, or A.
+ */
+export function panelTarget(panel: PanelState, playingPattern = -1): { rhythm: number; variation: Variation } {
   if (panel.writeTarget === 'fill') return { rhythm: panel.fillRhythm, variation: panel.fillVariation };
-  return { rhythm: panel.basicRhythm, variation: panel.basicVariation === 'b' ? 'b' : 'a' };
+  const rhythm = panel.basicRhythm;
+  if (panel.basicVariation !== 'ab') return { rhythm, variation: panel.basicVariation };
+  const playingB = playingPattern === patternIndex(rhythm, 'b');
+  return { rhythm, variation: playingB ? 'b' : 'a' };
 }
 
 /** The versions CLEAR wipes: both when the rhythm's variation switch stands on AB. */

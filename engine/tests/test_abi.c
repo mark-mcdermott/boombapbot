@@ -21,6 +21,20 @@ _Static_assert(offsetof(SnarePattern, len1) == 48, "SnarePattern.len1");
 _Static_assert(offsetof(SnarePattern, len2) == 49, "SnarePattern.len2");
 _Static_assert(offsetof(SnarePattern, steps_per_beat) == 50, "SnarePattern.steps_per_beat");
 
+_Static_assert(sizeof(SnarePanel) == 8, "SnarePanel is written as 8 bytes by wasm-engine.ts");
+_Static_assert(offsetof(SnarePanel, rhythm) == 0, "SnarePanel.rhythm");
+_Static_assert(offsetof(SnarePanel, variation) == 1, "SnarePanel.variation");
+_Static_assert(offsetof(SnarePanel, fill_rhythm) == 2, "SnarePanel.fill_rhythm");
+_Static_assert(offsetof(SnarePanel, fill_variation) == 3, "SnarePanel.fill_variation");
+_Static_assert(offsetof(SnarePanel, auto_fill) == 4, "SnarePanel.auto_fill");
+_Static_assert(offsetof(SnarePanel, first_beat_rule) == 5, "SnarePanel.first_beat_rule");
+
+_Static_assert(sizeof(SnareMeasure) == 24, "SnareMeasure is read as 24 bytes by wasm-engine.ts");
+_Static_assert(offsetof(SnareMeasure, frame) == 0, "SnareMeasure.frame");
+_Static_assert(offsetof(SnareMeasure, ordinal) == 8, "SnareMeasure.ordinal");
+_Static_assert(offsetof(SnareMeasure, pattern) == 12, "SnareMeasure.pattern");
+_Static_assert(offsetof(SnareMeasure, kind) == 16, "SnareMeasure.kind");
+
 _Static_assert(sizeof(SnareSoundParams) == 24, "SnareSoundParams is written as 24 bytes by wasm-engine.ts");
 _Static_assert(offsetof(SnareSoundParams, sound) == 0, "SnareSoundParams.sound");
 _Static_assert(offsetof(SnareSoundParams, tune) == 4, "SnareSoundParams.tune");

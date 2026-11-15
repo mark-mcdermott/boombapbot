@@ -18,6 +18,8 @@ declare global {
     /** Diagnostics for automated tests and support. Not a stable API. */
     __boombapbot?: {
       debug(): ReturnType<EditorRuntime['debug']>;
+      /** The step and pattern the engine last reported, or -1 while stopped. */
+      playing(): { step: number; pattern: number };
       renderLoop(sampleRate?: number): Promise<{
         frames: number;
         sampleRate: number;
@@ -112,6 +114,10 @@ export function BoombapbotEditor({ baseUrl = '/' }: BoombapbotEditorProps) {
     runtime.attach();
     window.__boombapbot = {
       debug: () => runtime.debug(),
+      playing: () => {
+        const { currentStep, currentPattern } = runtime.store.getState();
+        return { step: currentStep, pattern: currentPattern };
+      },
       renderLoop: async (sampleRate = 44100) => {
         const render = await runtime.renderLoop(sampleRate);
         let peak = 0;

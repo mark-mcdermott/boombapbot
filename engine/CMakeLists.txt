@@ -27,12 +27,14 @@ set(SNARE_WASM_EXPORTS
   snare_engine_set_tempo snare_engine_set_track snare_engine_set_track_level snare_engine_set_accent
   snare_engine_set_master_volume
   snare_engine_set_pattern snare_engine_set_step
-  snare_engine_cue_pattern snare_engine_play snare_engine_play_measures snare_engine_stop snare_engine_trigger
+  snare_engine_cue_pattern snare_engine_set_panel snare_engine_arm_fill
+  snare_engine_play snare_engine_play_measures snare_engine_stop snare_engine_trigger
   snare_engine_render
   snare_engine_is_playing snare_engine_current_step snare_engine_current_pattern snare_engine_current_measure
   snare_engine_frames_rendered snare_engine_stop_frame
   snare_engine_active_voices snare_engine_stolen_voices
   snare_engine_enable_event_log snare_engine_event_count snare_engine_read_events
+  snare_engine_read_measures
   snare_midi_export)
 
 if(EMSCRIPTEN)
@@ -75,7 +77,7 @@ endif()
 
 if(SNARE_BUILD_TESTS)
   enable_testing()
-  foreach(suite timeline scheduler pattern_bank accent voices choke midi sound_map realtime synth)
+  foreach(suite timeline scheduler pattern_bank sequencer accent voices choke midi sound_map realtime synth)
     add_executable(test_${suite} tests/test_${suite}.cpp)
     target_link_libraries(test_${suite} PRIVATE boombapbot_engine)
     target_compile_options(test_${suite} PRIVATE ${SNARE_WARNINGS})

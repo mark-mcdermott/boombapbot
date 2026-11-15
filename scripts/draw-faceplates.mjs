@@ -5,11 +5,10 @@
 // knobs and the voice switches) are placed from the machine's panel manifest,
 // so the artwork and the hit areas cannot drift apart.
 //
-// The editor turns a knob by rotating a round crop of this image, so the
-// knobs it turns are shaded evenly here and the editor lays a fixed light
-// over them. A knob that never moves is lit in the drawing itself, with the
-// same light. The editor draws a live switch's lever and lights the lamps,
-// so only a switch's slot is drawn here, and every lamp is drawn unlit.
+// The editor turns a knob by rotating a round crop of this image, so every
+// knob is shaded evenly here and the editor lays a fixed light over it. The
+// editor also draws each switch's lever and lights the lamps, so only a
+// switch's slot is drawn here, and every lamp is drawn unlit.
 //
 //   node scripts/draw-faceplates.mjs           write assets/faceplates/*.svg
 //   node scripts/draw-faceplates.mjs --check   fail if a committed file differs
@@ -161,14 +160,6 @@ function defs() {
     gradient('panel', [[0, C.panelTop], [1, C.panelBottom]], vertical),
     gradient('cheekLeft', [[0, '#24262c'], [0.5, '#15161a'], [1, '#0b0c0e']], { x1: 0, y1: 0, x2: 1, y2: 0 }),
     gradient('cheekRight', [[0, '#0b0c0e'], [0.5, '#15161a'], [1, '#24262c']], { x1: 0, y1: 0, x2: 1, y2: 0 }),
-    // Light from the upper left. The editor's stylesheet repeats these stops
-    // for the knobs it turns (.sb-panel-knob[data-lighting='fixed']).
-    gradient('knobLight', [[0, '#fff', 0.17], [0.5, '#fff', 0], [0.5, '#000', 0], [1, '#000', 0.34]], {
-      x1: 0.2,
-      y1: 0,
-      x2: 0.8,
-      y2: 1,
-    }),
     gradient('knobShadow', [[0, '#000', 0.6], [0.72, '#000', 0.5], [1, '#000', 0]], { cx: 0.5, cy: 0.5, r: 0.5 }),
     gradient('cream', [[0, '#fbf6dc'], [1, '#e2d9ad']], vertical),
     gradient('well', [[0, '#96938d'], [1, '#85827c']], vertical),
@@ -177,9 +168,6 @@ function defs() {
 
 /** The shadow a knob casts on the panel, down and to the right of it. */
 const castShadow = (cx, cy, r) => circle(cx + r * 0.06, cy + r * 0.14, r * 1.2, { fill: 'url(#knobShadow)' });
-
-/** Fixed light over a knob that never turns. */
-const lit = (cx, cy, r) => circle(cx, cy, r, { fill: 'url(#knobLight)' });
 
 /**
  * A black knob seen from above: a ribbed skirt, a chamfered edge and a flat
@@ -208,11 +196,8 @@ function pointer(cx, cy, r, deg) {
   return line(x1, y1, x2, y2, { stroke: C.orange, 'stroke-width': Math.max(3, r * 0.075), 'stroke-linecap': 'round' });
 }
 
-/**
- * A small knob with a coloured cap inside a tick ring. One the editor turns
- * (`live`) is left unlit, because the editor lights it.
- */
-function smallKnob(cx, cy, { cap, deg, marker = false, live = false }) {
+/** A small knob with a coloured cap inside a tick ring. The editor lights it. */
+function smallKnob(cx, cy, { cap, deg, marker = false }) {
   const ticks = [];
   for (let i = 0; i <= 10; i += 1) {
     const angle = -150 + i * 30;
@@ -230,13 +215,7 @@ function smallKnob(cx, cy, { cap, deg, marker = false, live = false }) {
     knobBody(cx, cy, 22, 26),
     circle(cx, cy, 13, { fill: cap, stroke: '#000', 'stroke-opacity': 0.35, 'stroke-width': 1 }),
     line(qx, qy, px, py, { stroke: C.plateInk, 'stroke-width': 3.2, 'stroke-linecap': 'round' }),
-    live ? '' : lit(cx, cy, 22),
   ]);
-}
-
-/** A plain black knob with an orange pointer, as on the mode and fill-in dials. */
-function dial(cx, cy, r, deg) {
-  return group({}, [castShadow(cx, cy, r), knobBody(cx, cy, r, Math.round(r * 0.9)), pointer(cx, cy, r, deg), lit(cx, cy, r)]);
 }
 
 function screw(cx, cy) {
@@ -377,9 +356,11 @@ function draw808(panel) {
   out.push(liveDial(knob, 30));
 
   // Auto fill-in.
-  for (const [label, deg] of [['MANUAL', -92], ['16', -55], ['12', -18], ['8', 18], ['4', 55], ['2', 92]]) {
-    const [dx, dy] = polar(410, 466, 47, deg);
-    const [lx, ly] = polar(410, 466, 62, deg);
+  const fill = panel.autoFill;
+  ['MANUAL', '16', '12', '8', '4', '2'].forEach((label, index) => {
+    const deg = fill.degs[index];
+    const [dx, dy] = polar(fill.knob.cx, fill.knob.cy, 47, deg);
+    const [lx, ly] = polar(fill.knob.cx, fill.knob.cy, 62, deg);
     out.push(circle(dx, dy, 2, { fill: C.label }));
     out.push(
       text(label === 'MANUAL' ? lx + 4 : lx, ly + 4, label, {
@@ -388,10 +369,10 @@ function draw808(panel) {
         anchor: label === 'MANUAL' ? 'end' : 'middle',
       }),
     );
-  }
-  out.push(dial(410, 466, 38, 62));
-  out.push(text(410, 532, 'MEASURES', { size: 9, fill: C.label, weight: 400 }));
-  out.push(text(410, 546, 'AUTO FILL IN', { size: 12, fill: C.label }));
+  });
+  out.push(liveDial(fill.knob, 34));
+  out.push(text(fill.knob.cx, fill.knob.cy + 66, 'MEASURES', { size: 9, fill: C.label, weight: 400 }));
+  out.push(text(fill.knob.cx, fill.knob.cy + 80, 'AUTO FILL IN', { size: 12, fill: C.label }));
   out.push(screw(430, 586));
 
   // Tempo. Only the part inside the manifest's radius turns with the knob.
@@ -431,7 +412,7 @@ function draw808(panel) {
       `knob at ${n(cx)}, ${cy}`,
     );
     if (knob.r !== 22) throw new Error(`the ${knob.track} ${knob.param} knob must have radius 22`);
-    return smallKnob(cx, cy, { ...look, deg: knob.photoDeg, live: true });
+    return smallKnob(cx, cy, { ...look, deg: knob.photoDeg });
   };
   COLUMNS.forEach((column, index) => {
     const cx = columnCentre(index);

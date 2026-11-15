@@ -307,6 +307,42 @@ describe('editor store', () => {
     expect(store.getState().canUndo).toBe(false);
   });
 
+  it('writes whichever version is playing while the switch is on AB', () => {
+    const store = makeStore();
+    store.setBasicVariation('ab');
+    // Stopped, or before the engine has said what is playing, that is A.
+    expect(editTarget(store.getState().project, store.getState().currentPattern).variation).toBe('a');
+    store.setPlaying(true);
+    store.setPosition(0, patternIndex(0, 'b'));
+    const before = store.getState().project.rhythms[0]!;
+    store.selectTrack('cowbell');
+    store.pressStep(6);
+    expect(isStepOn(store.getState().project.rhythms[0]!.b.cowbell, 6)).toBe(true);
+    expect(store.getState().project.rhythms[0]!.a).toBe(before.a);
+    store.setPosition(0, patternIndex(0, 'a'));
+    store.pressStep(6);
+    expect(isStepOn(store.getState().project.rhythms[0]!.a.cowbell, 6)).toBe(true);
+    // Another rhythm's pattern playing says nothing about this one.
+    store.setPosition(0, patternIndex(5, 'b'));
+    expect(editTarget(store.getState().project, store.getState().currentPattern).variation).toBe('a');
+  });
+
+  it('arms the intro or fill-in in the play modes only', () => {
+    const store = makeStore();
+    store.setMode('manual_play');
+    store.setFillArmed(true);
+    expect(store.getState().fillArmed).toBe(true);
+    store.setAutoFill(8);
+    expect(store.getState().project.panel.autoFill).toBe(8);
+    expect(store.getState().fillArmed).toBe(true);
+    store.setMode('play');
+    expect(store.getState().fillArmed).toBe(true);
+    // Leaving the play modes lets it go.
+    store.setMode('write_first');
+    expect(store.getState().fillArmed).toBe(false);
+    expect(store.getState().canUndo).toBe(false);
+  });
+
   it('tracks where playback is', () => {
     const store = makeStore();
     store.setPlaying(true);

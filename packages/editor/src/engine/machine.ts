@@ -5,6 +5,7 @@ import {
   TRACKS,
   accentGains,
   getTrack,
+  isPlayMode,
   isSwitched,
   levelGain,
   masterGain,
@@ -22,7 +23,7 @@ import {
   type TrackId,
   type Variation,
 } from '@boombapbot/contracts';
-import type { EnginePattern, EngineTrack, SynthSound, WasmEngine } from './wasm-engine';
+import type { EnginePanel, EnginePattern, EngineTrack, SynthSound, WasmEngine } from './wasm-engine';
 
 /**
  * The project document as the engine takes it. Live playback and offline
@@ -104,6 +105,32 @@ export function enginePatterns(rhythms: Rhythm[]): EnginePattern[] {
   const bank = rhythms.flatMap((rhythm, index) => rhythmPatterns(rhythm, index).map((entry) => entry.pattern));
   if (bank.length !== PATTERN_COUNT) throw new Error(`a project has ${PATTERN_COUNT} patterns, not ${bank.length}`);
   return bank;
+}
+
+/**
+ * What the engine is asked to play. In a play mode it is the Basic Rhythm with
+ * its fill-ins; anywhere else it is the rhythm the panel is on, round and
+ * round, with nothing cutting in.
+ */
+export function enginePanel(project: Project): EnginePanel {
+  const { panel } = project;
+  const fill = { fillRhythm: panel.fillRhythm, fillVariation: panel.fillVariation };
+  if (isPlayMode(panel.mode)) {
+    return {
+      ...fill,
+      rhythm: panel.basicRhythm,
+      variation: panel.basicVariation,
+      autoFill: panel.autoFill,
+      firstBeatRule: true,
+    };
+  }
+  return {
+    ...fill,
+    rhythm: panelTarget(panel).rhythm,
+    variation: panel.writeTarget === 'fill' ? panel.fillVariation : panel.basicVariation,
+    autoFill: 0,
+    firstBeatRule: false,
+  };
 }
 
 /** The pattern of the rhythm and version the panel is on. */

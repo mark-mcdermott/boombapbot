@@ -18,9 +18,11 @@ import {
   type Variation,
 } from '@boombapbot/contracts';
 import {
+  applyProject,
   decodeWav,
   encodeWav,
   engineMix,
+  enginePanel,
   enginePatterns,
   engineTracks,
   exportMidi,
@@ -90,6 +92,63 @@ describe('project to engine', () => {
     expect(selectedPattern(fixture)).toBe(0);
     expect(selectedPattern({ ...fixture, panel: { ...fixture.panel, basicRhythm: 3, basicVariation: 'b' } })).toBe(7);
     expect(selectedPattern({ ...fixture, panel: { ...fixture.panel, basicRhythm: 3, basicVariation: 'ab' } })).toBe(6);
+  });
+});
+
+describe('what the panel asks the engine to play', () => {
+  const panel = (change: Partial<Project['panel']>): Project => ({ ...fixture, panel: { ...fixture.panel, ...change } });
+
+  it('loops the rhythm being written, with nothing cutting in', () => {
+    expect(enginePanel(panel({ basicRhythm: 4, basicVariation: 'ab', autoFill: 4 }))).toEqual({
+      rhythm: 4,
+      variation: 'ab',
+      fillRhythm: 12,
+      fillVariation: 'a',
+      autoFill: 0,
+      firstBeatRule: false,
+    });
+    // An Intro/Fill-in being written loops in the version its own switch says.
+    expect(
+      enginePanel(panel({ mode: 'write_second', writeTarget: 'fill', fillRhythm: 14, fillVariation: 'b' })),
+    ).toMatchObject({ rhythm: 14, variation: 'b', autoFill: 0, firstBeatRule: false });
+    expect(enginePanel(panel({ mode: 'pattern_clear', basicRhythm: 9 }))).toMatchObject({ rhythm: 9, autoFill: 0 });
+  });
+
+  it('plays the Basic Rhythm with its fill-ins in manual play', () => {
+    expect(
+      enginePanel(panel({ mode: 'manual_play', basicRhythm: 2, basicVariation: 'b', fillRhythm: 15, autoFill: 8, writeTarget: 'fill' })),
+    ).toEqual({ rhythm: 2, variation: 'b', fillRhythm: 15, fillVariation: 'a', autoFill: 8, firstBeatRule: true });
+  });
+
+  it('is followed by the engine measure by measure, and every measure is reported', () => {
+    const engine = wasm.createEngine(44100, 1024);
+    try {
+      applyProject(engine, fixture);
+      engine.setPanel({ rhythm: 0, variation: 'ab', fillRhythm: 12, fillVariation: 'a', autoFill: 4, firstBeatRule: true });
+      engine.armFill(true);
+      engine.playMeasures(6);
+      const left = new Float32Array(1024);
+      const right = new Float32Array(1024);
+      const measures = [];
+      expect(engine.takeMeasures()).toBeNull();
+      do {
+        engine.render(left, right);
+        measures.push(...(engine.takeMeasures() ?? []));
+      } while (engine.playing);
+      expect(measures.map((measure) => [measure.ordinal, measure.pattern, measure.kind])).toEqual([
+        [1, 24, 'intro'],
+        [2, 0, 'basic'],
+        [3, 1, 'basic'],
+        [4, 0, 'basic'],
+        [5, 24, 'fill'],
+        [6, 1, 'basic'],
+      ]);
+      expect(measures[0]!.frame).toBe(0);
+      expect(measures[1]!.frame).toBeGreaterThan(measures[0]!.frame);
+      expect(engine.playing).toBe(false);
+    } finally {
+      engine.destroy();
+    }
   });
 });
 

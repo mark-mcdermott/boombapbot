@@ -153,6 +153,11 @@
   border-color: var(--color-faint);
 }
 
+.sb-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .sb-button:disabled {
   opacity: 0.45;
 }
@@ -732,9 +737,8 @@
   pointer-events: none;
 }
 
-/* A drawn faceplate shades its knobs evenly; this is the light on them. It
-   sits still while the knob turns under it. The stops repeat the knobLight
-   gradient in scripts/draw-faceplates.mjs, which lights the fixed knobs. */
+/* A drawn faceplate shades its knobs evenly; this is the light on them, from
+   the upper left. It sits still while the knob turns under it. */
 .sb-panel-knob[data-lighting='fixed']::after {
   position: absolute;
   inset: 0;
