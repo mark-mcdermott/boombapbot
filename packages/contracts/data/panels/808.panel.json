@@ -104,8 +104,9 @@
   },
   "pending": [
     "CLEAR is a latch here: press it, then a step button, to set the last step. On the machine it is held down. Whether CLEAR also resets a rhythm's pre-scale is unverified; here it does not.",
-    "Whether a tapped fill-in counts as a measure of the automatic fill-in, and whether the first-beat rule applies outside manual play, is not in the manual. Here a tapped fill-in counts and the rule is manual play's alone.",
-    "Play and compose behave like manual play: rhythm tracks are not modelled yet.",
+    "Whether a tapped fill-in counts as a measure of the automatic fill-in, and whether the first-beat rule applies outside manual play and compose, is not in the manual. Here a tapped fill-in counts and the rule is theirs alone.",
+    "Composing over a written track: here a rhythm chosen on the way replaces every measure from there to the end, a tapped fill-in replaces one, and the machine stops at the end of the track. The manual describes this only loosely.",
+    "A rhythm track plays on into the next track only when it is full, as the manual implies. Turning the mode selector into or out of play or compose stops the machine here.",
     "What each knob does to the sound, and how far the level, accent and volume knobs reach, is a model made by ear.",
     "The lamps follow the manual's description of each mode. What the hardware shows in the cases the manual leaves out is unverified."
   ]

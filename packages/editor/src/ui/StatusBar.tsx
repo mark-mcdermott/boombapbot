@@ -1,4 +1,4 @@
-import { countHits, rhythmLength } from '@boombapbot/contracts';
+import { composition, countHits, isTrackMode, rhythmLength } from '@boombapbot/contracts';
 import { editTarget, type EditorState } from '../state/store';
 import { useEditorState, useRuntime } from './context';
 import { CloseIcon, RedoIcon, UndoIcon } from './icons';
@@ -7,6 +7,22 @@ import { CloseIcon, RedoIcon, UndoIcon } from './icons';
 function selectedHits(state: EditorState): number {
   const { rhythm, variation } = editTarget(state.project);
   return countHits(state.project.rhythms[rhythm]!, variation);
+}
+
+interface TrackSummary {
+  number: number;
+  measures: number;
+}
+
+/** The rhythm track the selector is on, in the modes that work on one. */
+function trackSummary(state: EditorState): TrackSummary | null {
+  const { panel, rhythmTracks } = state.project;
+  if (!isTrackMode(panel.mode)) return null;
+  return { number: panel.selector + 1, measures: composition(rhythmTracks, panel.selector).length };
+}
+
+function sameTrack(a: TrackSummary | null, b: TrackSummary | null): boolean {
+  return a?.number === b?.number && a?.measures === b?.measures;
 }
 
 export function PatternActions() {
@@ -82,6 +98,7 @@ export function StatusBar() {
   const draftState = useEditorState((state) => state.draftState);
   const draftSavedAt = useEditorState((state) => state.draftSavedAt);
   const draftOrigin = useEditorState((state) => state.draftOrigin);
+  const track = useEditorState(trackSummary, sameTrack);
   const steps = useEditorState((state) => rhythmLength(state.project.rhythms[editTarget(state.project).rhythm]!));
   const hits = useEditorState(selectedHits);
 
@@ -105,6 +122,11 @@ export function StatusBar() {
       <span data-testid="hit-count">
         {hits} {hits === 1 ? 'hit' : 'hits'} in {steps} steps
       </span>
+      {track ? (
+        <span data-testid="track-length">
+          Rhythm track {track.number}: {track.measures === 0 ? 'empty' : `${track.measures} measures`}
+        </span>
+      ) : null}
     </div>
   );
 }

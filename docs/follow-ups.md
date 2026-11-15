@@ -5,20 +5,13 @@ in this file has been built unless it says so.
 
 ## Finishing the machine
 
-The editor is being brought up to the whole 808, from its operation manual.
-The engine and the project file already hold the pattern bank, 1st and 2nd
-parts, pre-scale, accent, levels, voice switches and rhythm tracks. What is
-left, in the order it is being done:
+The editor now does what the 808's operation manual describes, short of what
+a browser cannot. What is left of that work:
 
-1. **Rhythm tracks.** Compose, play and edit, twelve tracks of 64 measures
-   chained up to 768, and export of a whole track. The engine already reports
-   every measure it begins (`snare_engine_read_measures`), which is what
-   compose records from. Until then the play and compose positions behave
-   like manual play.
-2. **Export of more than one pattern.** WAV and MIDI export one version of
-   the selected rhythm. With the variation lever on AB they should export A
-   then B.
-3. **Starter rhythms**, screenshots and a last pass over these documents.
+1. **A listen, and what it turns up.** See "How it sounds" below.
+2. **Long exports off the main thread.** A rhythm track renders in memory on
+   the main thread, so WAV export stops at five minutes. A Worker and
+   streamed encoding would lift that.
 
 Left out for good, because a browser cannot do them: DIN sync, trigger
 outputs, separate instrument outputs, pedal jacks and memory protection.
@@ -27,6 +20,14 @@ Not settled by any of that:
 
 - **How it sounds.** `engine/src/synth808.cpp` is a model made by ear. It
   needs a listen beside a real machine, voice by voice and knob by knob.
+- **Composing over a written track.** The manual says a track can be edited
+  "from a certain point onward" without changing its length, and little
+  more. Here a rhythm chosen on the way replaces every measure from there to
+  the end of the track, a tapped fill-in replaces one measure, and the
+  machine stops at the end. A real machine may differ.
+- **Tracks running on.** A composition goes on into the next track when the
+  one before it holds all 64 measures. Whether the hardware decides it that
+  way is an inference from the manual.
 - **What the manual leaves out about fill-ins.** Here a tapped fill-in counts
   as one of the measures the automatic fill-in counts and an intro does not;
   AB keeps its turn across a fill-in; and the first-beat rule applies in the

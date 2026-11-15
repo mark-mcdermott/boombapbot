@@ -4,9 +4,11 @@ import {
   ROLES,
   TRACKS,
   accentGains,
+  composition,
   getTrack,
-  isPlayMode,
+  isPerformMode,
   isSwitched,
+  isTrackMode,
   levelGain,
   masterGain,
   panelTarget,
@@ -108,35 +110,51 @@ export function enginePatterns(rhythms: Rhythm[]): EnginePattern[] {
 }
 
 /**
- * What the engine is asked to play. In a play mode it is the Basic Rhythm with
- * its fill-ins; anywhere else it is the rhythm the panel is on, round and
- * round, with nothing cutting in.
+ * What the engine is asked to play. Played by hand it is the Basic Rhythm
+ * with its fill-ins. A rhythm track brings its own rhythms and takes only the
+ * variation switches from here. Anywhere else it is the rhythm the panel is
+ * on, round and round, with nothing cutting in.
  */
 export function enginePanel(project: Project): EnginePanel {
   const { panel } = project;
-  const fill = { fillRhythm: panel.fillRhythm, fillVariation: panel.fillVariation };
-  if (isPlayMode(panel.mode)) {
-    return {
-      ...fill,
-      rhythm: panel.basicRhythm,
-      variation: panel.basicVariation,
-      autoFill: panel.autoFill,
-      firstBeatRule: true,
-    };
-  }
-  return {
-    ...fill,
-    rhythm: panelTarget(panel).rhythm,
-    variation: panel.writeTarget === 'fill' ? panel.fillVariation : panel.basicVariation,
+  const switches = {
+    rhythm: panel.basicRhythm,
+    variation: panel.basicVariation,
+    fillRhythm: panel.fillRhythm,
+    fillVariation: panel.fillVariation,
     autoFill: 0,
     firstBeatRule: false,
   };
+  if (isPerformMode(panel.mode)) return { ...switches, autoFill: panel.autoFill, firstBeatRule: true };
+  if (panel.mode === 'play') return switches;
+  return {
+    ...switches,
+    rhythm: panelTarget(panel).rhythm,
+    variation: panel.writeTarget === 'fill' ? panel.fillVariation : panel.basicVariation,
+  };
 }
 
-/** The pattern of the rhythm and version the panel is on. */
-export function selectedPattern(project: Project): number {
-  const { rhythm, variation } = panelTarget(project.panel);
-  return patternIndex(rhythm, variation);
+/** Measures to render or export: their rhythms, the switches that choose their versions, and whether they loop. */
+export interface RenderPlan {
+  panel: EnginePanel;
+  rhythms: number[];
+  loop: boolean;
+}
+
+/**
+ * What an export holds. In the track modes it is the rhythm track the
+ * selector is on, played once through. Otherwise it is the rhythm the panel
+ * is on as a loop: one measure, or A then B with its lever on AB.
+ */
+export function exportPlan(project: Project): RenderPlan {
+  const { panel } = project;
+  const switches = { ...enginePanel(project), autoFill: 0, firstBeatRule: false };
+  if (isTrackMode(panel.mode)) {
+    return { panel: switches, rhythms: composition(project.rhythmTracks, panel.selector), loop: false };
+  }
+  const { rhythm } = panelTarget(panel);
+  const both = panel.writeTarget === 'basic' && panel.basicVariation === 'ab';
+  return { panel: { ...switches, variation: panel.basicVariation }, rhythms: both ? [rhythm, rhythm] : [rhythm], loop: true };
 }
 
 /** MIDI note of each track, for the sounds its switches select. The accent has none. */

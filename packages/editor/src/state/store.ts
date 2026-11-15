@@ -8,10 +8,12 @@ import {
   clearedVersions,
   createProject,
   createStarterRhythms,
-  isPlayMode,
+  isPerformMode,
   isStepOn,
   knobPosition,
   panelTarget,
+  selectsRhythms,
+  withComposition,
   withKnob,
   withPartLength,
   withStep,
@@ -71,7 +73,7 @@ interface Snapshot {
 }
 
 /** What pressing a step button did. */
-export type StepPress = { kind: 'step'; on: boolean } | { kind: 'length' } | { kind: 'rhythm' };
+export type StepPress = { kind: 'step'; on: boolean } | { kind: 'length' } | { kind: 'rhythm' } | { kind: 'none' };
 
 /** Where the step buttons write: a version of a rhythm, a track and a part. */
 export interface EditTarget {
@@ -199,14 +201,16 @@ export class EditorStore {
 
   /**
    * Presses a step button. In a write mode it toggles that step of the
-   * selected track, or sets the part's last step while CLEAR is down. In every
-   * other mode it selects a rhythm: 1 to 12 are Basic Rhythms, 13 to 16
-   * Intro/Fill-ins.
+   * selected track, or sets the part's last step while CLEAR is down. In
+   * pattern clear, manual play and compose it selects a rhythm: 1 to 12 are
+   * Basic Rhythms, 13 to 16 Intro/Fill-ins. Playing a rhythm track, the
+   * buttons only show what plays.
    */
   pressStep(button: number): StepPress {
     const { project, clearArmed, currentPattern } = this.state;
     const part = writePart(project.panel.mode);
     if (part === null) {
+      if (!selectsRhythms(project.panel.mode)) return { kind: 'none' };
       this.selectRhythm(button);
       return { kind: 'rhythm' };
     }
@@ -240,12 +244,15 @@ export class EditorStore {
    * Presses CLEAR. In pattern clear it wipes the rhythm the panel is on. In a
    * write mode it stores the pre-scale switch in that rhythm and stays down,
    * so the next step button sets the last step; pressed again, it comes up.
+   * In compose it empties the rhythm track the selector is on.
    */
   pressClear(): void {
     const { project, clearArmed } = this.state;
     const { mode } = project.panel;
     if (mode === 'pattern_clear') {
       this.clearRhythm();
+    } else if (mode === 'compose') {
+      this.commitComposition(project.panel.selector, []);
     } else if (writePart(mode) !== null) {
       const { rhythm: index } = panelTarget(project.panel);
       this.set({ clearArmed: !clearArmed });
@@ -262,6 +269,17 @@ export class EditorStore {
     const { panel, rhythms } = this.state.project;
     const { rhythm: index } = panelTarget(panel);
     this.commitRhythm(index, clearRhythm(rhythms[index]!, clearedVersions(panel)));
+  }
+
+  /**
+   * Stores a composition from a rhythm track onward: sixty-four measures to a
+   * track, going on into the next. One undo step, however long it is.
+   */
+  commitComposition(start: number, measures: readonly number[]): void {
+    const { project } = this.state;
+    const rhythmTracks = withComposition(project.rhythmTracks, start, measures);
+    if (JSON.stringify(rhythmTracks) === JSON.stringify(project.rhythmTracks)) return;
+    this.commit({ ...project, rhythmTracks });
   }
 
   /** Puts the starter rhythms back in place of everything the machine remembers. */
@@ -338,7 +356,7 @@ export class EditorStore {
   setMode(mode: Mode): void {
     this.releaseClear();
     // An intro or fill-in waiting to play belongs to the play modes.
-    if (!isPlayMode(mode)) this.setFillArmed(false);
+    if (!isPerformMode(mode)) this.setFillArmed(false);
     this.adjustPanel({ mode });
   }
 

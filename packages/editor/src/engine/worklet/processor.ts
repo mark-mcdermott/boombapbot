@@ -24,6 +24,7 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
   private engine: WasmEngine | null = null;
   private lastStep = -1;
   private lastPattern = -1;
+  private lastStopFrame = -1;
   private lastPlaying = false;
   private peak = 0;
   private peakEver = 0;
@@ -74,6 +75,9 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
         case 'fill':
           engine.armFill(command.armed);
           break;
+        case 'song':
+          engine.setSong(command.rhythms, command.loop);
+          break;
         case 'play':
           engine.play();
           break;
@@ -109,6 +113,12 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
 
     const measures = engine.takeMeasures();
     if (measures) this.report({ type: 'measures', measures });
+
+    const stopFrame = engine.stopFrame;
+    if (stopFrame !== this.lastStopFrame) {
+      this.lastStopFrame = stopFrame;
+      if (stopFrame >= 0) this.report({ type: 'ended' });
+    }
 
     const step = engine.currentStep;
     const pattern = engine.currentPattern;

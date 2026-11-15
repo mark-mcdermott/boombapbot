@@ -6,6 +6,7 @@ import {
   EMPTY_ROW,
   INSTRUMENT_IDS,
   MAX_STEPS,
+  MODES,
   PANEL,
   PATTERN_COUNT,
   PROJECT_FORMAT,
@@ -19,6 +20,8 @@ import {
   clampKnob,
   clearRhythm,
   clearedVersions,
+  composition,
+  compositionCapacity,
   countHits,
   countSteps,
   createDefaultPanel,
@@ -27,8 +30,9 @@ import {
   createProject,
   createStarterRhythms,
   getTrack,
-  isPlayMode,
+  isPerformMode,
   isStepOn,
+  isTrackMode,
   knobPosition,
   levelGain,
   masterGain,
@@ -39,12 +43,14 @@ import {
   patternIndex,
   rhythmLength,
   rowMask,
+  selectsRhythms,
   serializeProject,
   stepsPerBeat,
   tappedStep,
   tempoBpm,
   tempoFromBpm,
   trackRole,
+  withComposition,
   withKnob,
   withPartLength,
   withStep,
@@ -404,8 +410,10 @@ describe('writing rhythms', () => {
     expect(panelTarget(ab, patternIndex(4, 'a'))).toEqual({ rhythm: 4, variation: 'a' });
     expect(panelTarget(ab, patternIndex(5, 'b'))).toEqual({ rhythm: 4, variation: 'a' });
     expect(panelTarget({ ...panel, basicVariation: 'a' }, patternIndex(4, 'b'))).toEqual({ rhythm: 4, variation: 'a' });
-    expect(isPlayMode('manual_play') && isPlayMode('play') && isPlayMode('compose')).toBe(true);
-    expect(isPlayMode('write_first') || isPlayMode('write_second') || isPlayMode('pattern_clear')).toBe(false);
+    // Manual play and compose are played by hand; play and compose work on a rhythm track.
+    expect(MODES.filter(isPerformMode)).toEqual(['manual_play', 'compose']);
+    expect(MODES.filter(isTrackMode)).toEqual(['play', 'compose']);
+    expect(MODES.filter(selectsRhythms)).toEqual(['pattern_clear', 'manual_play', 'compose']);
     expect(clearedVersions(panel)).toEqual(['a']);
     expect(clearedVersions({ ...panel, basicVariation: 'ab' })).toEqual(['a', 'b']);
     expect(clearedVersions({ ...panel, basicVariation: 'ab', writeTarget: 'fill' })).toEqual(['b']);
@@ -454,5 +462,57 @@ describe('writing rhythms', () => {
     const { writeTarget: _dropped, ...panel } = project.panel;
     const result = parseProject({ ...project, panel });
     expect(result.ok && result.project.panel.writeTarget).toBe('basic');
+  });
+});
+
+describe('rhythm tracks', () => {
+  const empty = (): number[][] => Array.from({ length: 12 }, () => []);
+  const run = (length: number, from = 0) => Array.from({ length }, (_, index) => (from + index) % 16);
+
+  it('plays a track, and goes on into the next only when the track is full', () => {
+    const tracks = empty();
+    tracks[2] = run(10);
+    tracks[3] = run(5, 3);
+    expect(composition(tracks, 2)).toEqual(run(10));
+    expect(composition(tracks, 3)).toEqual(run(5, 3));
+    expect(composition(tracks, 0)).toEqual([]);
+
+    tracks[2] = run(64);
+    expect(composition(tracks, 2)).toEqual([...run(64), ...run(5, 3)]);
+    tracks[3] = run(64, 3);
+    tracks[4] = run(64, 5);
+    expect(composition(tracks, 2)).toHaveLength(192);
+    // The last track has nowhere to go on to.
+    tracks[11] = run(64);
+    expect(composition(tracks, 11)).toHaveLength(64);
+  });
+
+  it('holds sixty-four measures a track from where a composition starts', () => {
+    expect(compositionCapacity(0)).toBe(768);
+    expect(compositionCapacity(11)).toBe(64);
+  });
+
+  it('writes a composition across tracks and leaves the others alone', () => {
+    const tracks = empty();
+    tracks[0] = run(3);
+    tracks[5] = run(9);
+    const long = run(130, 2);
+    const written = withComposition(tracks, 3, long);
+    expect(written[3]).toEqual(long.slice(0, 64));
+    expect(written[4]).toEqual(long.slice(64, 128));
+    expect(written[5]).toEqual(long.slice(128));
+    expect(written[0]).toBe(tracks[0]);
+    expect(written[6]).toBe(tracks[6]);
+    expect(composition(written, 3)).toEqual(long);
+
+    // A shorter one replaces its own track and does not reach the next.
+    const short = withComposition(written, 3, run(4));
+    expect(short[3]).toEqual(run(4));
+    expect(short[4]).toBe(written[4]);
+    // An empty one empties the track.
+    expect(withComposition(written, 3, [])[3]).toEqual([]);
+    // What does not fit in the tracks that are left is dropped.
+    expect(withComposition(tracks, 11, run(100))[11]).toHaveLength(64);
+    expect(tracks[5]).toEqual(run(9));
   });
 });

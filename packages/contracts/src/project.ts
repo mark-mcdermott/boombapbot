@@ -289,9 +289,53 @@ export function writePart(mode: Mode): 0 | 1 | null {
   return mode === 'write_first' ? 0 : mode === 'write_second' ? 1 : null;
 }
 
-/** Modes in which the step buttons choose rhythms and the machine plays them in turn. */
-export function isPlayMode(mode: Mode): boolean {
-  return mode === 'manual_play' || mode === 'play' || mode === 'compose';
+/**
+ * Modes played by hand: the step buttons choose the Basic Rhythm, and TAP
+ * brings in the intro or a fill-in. Composing is manual play that is recorded.
+ */
+export function isPerformMode(mode: Mode): boolean {
+  return mode === 'manual_play' || mode === 'compose';
+}
+
+/** Modes that work on a rhythm track: the selector then chooses a track, not an instrument. */
+export function isTrackMode(mode: Mode): boolean {
+  return mode === 'play' || mode === 'compose';
+}
+
+/** Whether the step buttons choose a rhythm in this mode. In play they only show what the track plays. */
+export function selectsRhythms(mode: Mode): boolean {
+  return mode === 'pattern_clear' || isPerformMode(mode);
+}
+
+/**
+ * The measures a composition plays when it starts on a track: that track, and
+ * each following one for as long as the one before it is full.
+ */
+export function composition(tracks: readonly number[][], start: number): number[] {
+  const measures: number[] = [];
+  for (let index = start; index < tracks.length; index += 1) {
+    measures.push(...tracks[index]!);
+    if (tracks[index]!.length < RHYTHM_TRACK_MEASURES) break;
+  }
+  return measures;
+}
+
+/** How many measures can be composed starting on a track: it and every track after it. */
+export function compositionCapacity(start: number): number {
+  return (RHYTHM_TRACKS - start) * RHYTHM_TRACK_MEASURES;
+}
+
+/**
+ * The tracks with a composition written from `start`: sixty-four measures to
+ * a track, going on into the next. Tracks it does not reach are left alone.
+ */
+export function withComposition(tracks: readonly number[][], start: number, measures: readonly number[]): number[][] {
+  const kept = measures.slice(0, compositionCapacity(start));
+  return tracks.map((track, index) => {
+    const offset = (index - start) * RHYTHM_TRACK_MEASURES;
+    const reached = index === start || (index > start && offset < kept.length);
+    return reached ? kept.slice(offset, offset + RHYTHM_TRACK_MEASURES) : track;
+  });
 }
 
 /**

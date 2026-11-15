@@ -3,10 +3,11 @@ import {
   AUTO_FILLS,
   BASIC_RHYTHMS,
   PRE_SCALES,
-  isPlayMode,
+  isPerformMode,
   panelTarget,
   stepsPerBeat,
   writePart,
+  type Mode,
   type PanelManifest,
   type PanelRect,
   type PreScale,
@@ -22,6 +23,11 @@ interface ControlProps {
 /** What a step button's rhythm is called: twelve Basic Rhythms, then four Intro/Fill-ins. */
 export function rhythmName(button: number): string {
   return button < BASIC_RHYTHMS ? `Basic Rhythm ${button + 1}` : `Intro/Fill-in ${button + 1 - BASIC_RHYTHMS}`;
+}
+
+/** Modes in which CLEAR does something: it wipes a rhythm, sets up a part, or empties a rhythm track. */
+export function clears(mode: Mode): boolean {
+  return mode === 'pattern_clear' || mode === 'compose' || writePart(mode) !== null;
 }
 
 /** The mode selector: a label to press for each position, and the dial that follows. */
@@ -62,12 +68,15 @@ export function ClearButton({ panel }: ControlProps) {
   const { store } = useRuntime();
   const mode = useEditorState((state) => state.project.panel.mode);
   const armed = useEditorState((state) => state.clearArmed);
+  const track = useEditorState((state) => state.project.panel.selector + 1);
   const writing = writePart(mode) !== null;
   const label = writing
     ? 'Clear: store the pre-scale, then press a step button to make it the last step'
     : mode === 'pattern_clear'
       ? 'Clear the selected rhythm'
-      : 'Clear';
+      : mode === 'compose'
+        ? `Clear rhythm track ${track}`
+        : 'Clear';
   return (
     <button
       type="button"
@@ -76,12 +85,17 @@ export function ClearButton({ panel }: ControlProps) {
       data-testid="panel-clear"
       aria-label={label}
       aria-pressed={writing ? armed : undefined}
-      disabled={!writing && mode !== 'pattern_clear'}
+      disabled={!clears(mode)}
       onClick={() => store.pressClear()}
     >
       <span className="sb-panel-text">Clear</span>
     </button>
   );
+}
+
+/** Modes in which TAP does something: it writes a step, or brings in the intro or a fill-in. */
+export function taps(mode: Mode): boolean {
+  return isPerformMode(mode) || writePart(mode) !== null;
 }
 
 /** TAP has to be in time, so it acts as the pointer goes down. Only the keyboard arrives as a click. */
@@ -101,8 +115,10 @@ export function tapHandlers(runtime: EditorRuntime) {
  */
 export function TapButton({ panel }: ControlProps) {
   const runtime = useRuntime();
-  const playMode = useEditorState((state) => isPlayMode(state.project.panel.mode));
+  const playMode = useEditorState((state) => isPerformMode(state.project.panel.mode));
   const armed = useEditorState((state) => state.fillArmed);
+  // TAP has no part in clearing a rhythm or in playing a rhythm track back.
+  const idle = useEditorState((state) => !taps(state.project.panel.mode));
   return (
     <button
       type="button"
@@ -111,6 +127,7 @@ export function TapButton({ panel }: ControlProps) {
       data-testid="panel-tap"
       aria-label={playMode ? 'Tap: play the intro or fill-in next' : 'Tap: write the selected instrument now'}
       aria-pressed={playMode ? armed : undefined}
+      disabled={idle}
       {...tapHandlers(runtime)}
     >
       <span className="sb-panel-text">Tap</span>

@@ -7,11 +7,13 @@ import {
   PART_STEPS,
   TEMPO_STOPS,
   TRACKS,
+  composition,
   countSteps,
   getRole,
   getTrack,
-  isPlayMode,
+  isPerformMode,
   isStepOn,
+  isTrackMode,
   knobPosition,
   rhythmLength,
   tempoBpm,
@@ -33,8 +35,10 @@ import {
   StatusLamps,
   TapButton,
   VariationSwitches,
+  clears,
   rhythmName,
   tapHandlers,
+  taps,
 } from './PanelControls';
 import { KnobFace, PassiveKnob, box, circle, knobLighting } from './panelGeometry';
 import { Segmented } from './Segmented';
@@ -293,6 +297,9 @@ export function HardwarePanel() {
   const fillRhythm = useEditorState((state) => state.project.panel.fillRhythm);
   const clearArmed = useEditorState((state) => state.clearArmed);
   const fillArmed = useEditorState((state) => state.fillArmed);
+  const playingRhythm = useEditorState((state) => (state.currentPattern < 0 ? -1 : state.currentPattern >> 1));
+  const selector = useEditorState((state) => state.project.panel.selector);
+  const trackLength = useEditorState((state) => composition(state.project.rhythmTracks, state.project.panel.selector).length);
   const manifest = useAssetManifest();
   const [fit, setFit] = useState(false);
   // An image that fails to load falls back to the drawn panel.
@@ -311,23 +318,30 @@ export function HardwarePanel() {
   const writing = writePart(mode) !== null;
   const lamp = playing && currentStep >= 0 ? currentStep % PART_STEPS : -1;
   const lampPart = currentStep >= PART_STEPS ? PART_STEPS : 0;
-  const chosen = (button: number) =>
-    mode === 'pattern_clear' ? button === target.rhythm : button === basicRhythm || button === fillRhythm;
+  const tracks = isTrackMode(mode);
+  const chosen = (button: number) => {
+    if (mode === 'pattern_clear') return button === target.rhythm;
+    // Playing a rhythm track, the lamp follows the rhythm of each measure.
+    if (mode === 'play') return button === playingRhythm;
+    return button === basicRhythm || button === fillRhythm;
+  };
   const lit = (button: number) => (writing ? isStepOn(row, target.offset + button) : chosen(button));
   // The lamp runs across the part being written, or across any part while choosing rhythms.
   const running = (button: number) => lamp === button && (!writing || lampPart === target.offset);
   // In a play mode the rhythm with priority flashes: the intro/fill-in once
   // TAP has armed it, otherwise the Basic Rhythm while the machine waits.
   const flashing = (button: number) =>
-    isPlayMode(mode) && (fillArmed ? button === fillRhythm : !playing && button === basicRhythm);
+    isPerformMode(mode) && (fillArmed ? button === fillRhythm : !playing && button === basicRhythm);
   const stepLabel = (button: number) => {
+    if (mode === 'play') return `${rhythmName(button)}${chosen(button) ? ', playing' : ''}`;
     if (!writing) return `${rhythmName(button)}${chosen(button) ? ', selected' : ''}`;
     if (clearArmed) return `Make step ${button + 1} the last step`;
     return `${trackName}, step ${button + 1}, ${lit(button) ? 'on' : 'off'}`;
   };
+  // In the track modes the selector chooses a rhythm track, and makes no sound.
   const selectTrack = (id: typeof target.track) => {
     store.selectTrack(id);
-    void runtime.audition(id);
+    if (!tracks) void runtime.audition(id);
   };
 
   const focusStep = (step: number) =>
@@ -407,8 +421,8 @@ export function HardwarePanel() {
           <StatusLamps panel={panel} dim={!photo || panel.ledsLitInPhoto} />
           <TapButton panel={panel} />
 
-          <div className="sb-panel-layer" role="radiogroup" aria-label={select.label || 'Instrument'}>
-            {select.positions.map((position) => (
+          <div className="sb-panel-layer" role="radiogroup" aria-label={tracks ? 'Rhythm track' : select.label || 'Instrument'}>
+            {select.positions.map((position, index) => (
               <button
                 key={position.track}
                 type="button"
@@ -416,7 +430,7 @@ export function HardwarePanel() {
                 className="sb-panel-voice"
                 style={box(panel, position.hit)}
                 aria-checked={position.track === target.track}
-                aria-label={`${position.label}, ${getTrack(position.track).label}`}
+                aria-label={tracks ? `Rhythm track ${index + 1}` : `${position.label}, ${getTrack(position.track).label}`}
                 data-testid={`panel-voice-${position.track}`}
                 onClick={() => selectTrack(position.track)}
               >
@@ -532,6 +546,11 @@ export function HardwarePanel() {
                 <span className="sb-label">Instrument</span> <strong>{trackName}</strong> ·{' '}
                 {countSteps(row, rhythmLength(rhythm))} steps on
               </>
+            ) : tracks ? (
+              <>
+                <span className="sb-label">Rhythm track</span> <strong>{selector + 1}</strong> ·{' '}
+                {trackLength === 0 ? 'empty' : `${trackLength} ${trackLength === 1 ? 'measure' : 'measures'}`}
+              </>
             ) : (
               <>
                 <span className="sb-label">Rhythm</span> <strong>{rhythmName(target.rhythm)}</strong>, version{' '}
@@ -545,7 +564,7 @@ export function HardwarePanel() {
               className="sb-button"
               data-testid="strip-clear"
               aria-pressed={writing ? clearArmed : undefined}
-              disabled={!writing && mode !== 'pattern_clear'}
+              disabled={!clears(mode)}
               onClick={() => store.pressClear()}
             >
               Clear
@@ -554,11 +573,11 @@ export function HardwarePanel() {
               type="button"
               className="sb-button"
               data-testid="strip-tap"
-              aria-pressed={isPlayMode(mode) ? fillArmed : undefined}
-              disabled={mode === 'pattern_clear'}
+              aria-pressed={isPerformMode(mode) ? fillArmed : undefined}
+              disabled={!taps(mode)}
               {...tapHandlers(runtime)}
             >
-              {isPlayMode(mode) ? 'Fill in' : 'Tap'}
+              {isPerformMode(mode) ? 'Fill in' : 'Tap'}
             </button>
             <button type="button" className="sb-button" aria-pressed={fit} onClick={() => setFit(!fit)}>
               {fit ? 'Zoom in' : 'Fit to screen'}

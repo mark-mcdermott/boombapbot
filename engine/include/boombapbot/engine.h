@@ -39,6 +39,10 @@ extern "C" {
 #define SNARE_PATTERNS 32
 /* A rhythm is one step button: its A version is pattern 2r, its B 2r + 1. */
 #define SNARE_RHYTHMS 16
+/* The first twelve are Basic Rhythms; the last four are Intro/Fill-ins. */
+#define SNARE_BASIC_RHYTHMS 12
+/* The longest song: twelve rhythm tracks of 64 measures. */
+#define SNARE_SONG_MEASURES 768
 #define SNARE_MAX_VOICES 64
 /* The timeline counts in ticks. Every step length is a whole number of them. */
 #define SNARE_TICKS_PER_BEAT 24
@@ -99,7 +103,7 @@ typedef struct SnareMeasure {
   int32_t ordinal; /* 1 for the first measure after play */
   int32_t pattern;
   int32_t kind;    /* SNARE_MEASURE_* */
-  int32_t reserved;
+  int32_t position; /* its measure of the song, or -1 with no song */
 } SnareMeasure;
 
 uint32_t snare_abi_version(void);
@@ -220,6 +224,19 @@ int32_t snare_engine_cue_pattern(SnareEngine* engine, int32_t index);
  * version or the two in turn, with an intro or fill-in when one is armed or
  * due. A change is read at the next bar line. This replaces a cued pattern. */
 int32_t snare_engine_set_panel(SnareEngine* engine, const SnarePanel* panel);
+/* A song: the rhythm of each measure, as a rhythm track holds it. With a song
+ * set, play follows it from its first measure in place of the panel's
+ * rhythm, and the automatic fill-in rests. The panel's variation switches
+ * still choose each measure's version, and a rhythm chosen on the panel while
+ * the song plays takes its place from there on. At the end the song starts
+ * over if `loop` is set and stops if not. A count of 0 removes the song. Set
+ * while playing, a song carries on from the measure it had reached. */
+int32_t snare_engine_set_song(SnareEngine* engine, const uint8_t* rhythms,
+                              int32_t count, int32_t loop);
+/* The pattern each measure of a song plays with the panel's switches as they
+ * stand. Writes `count` pattern indexes and returns `count`. */
+int32_t snare_song_patterns(const SnarePanel* panel, const uint8_t* rhythms,
+                            int32_t count, uint8_t* out);
 /* TAP. Armed, the panel's intro/fill-in plays once: as the intro when
  * stopped, otherwise at the next bar line. It is disarmed as it starts. */
 int32_t snare_engine_arm_fill(SnareEngine* engine, int32_t armed);

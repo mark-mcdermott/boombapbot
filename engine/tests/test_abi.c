@@ -34,6 +34,7 @@ _Static_assert(offsetof(SnareMeasure, frame) == 0, "SnareMeasure.frame");
 _Static_assert(offsetof(SnareMeasure, ordinal) == 8, "SnareMeasure.ordinal");
 _Static_assert(offsetof(SnareMeasure, pattern) == 12, "SnareMeasure.pattern");
 _Static_assert(offsetof(SnareMeasure, kind) == 16, "SnareMeasure.kind");
+_Static_assert(offsetof(SnareMeasure, position) == 20, "SnareMeasure.position");
 
 _Static_assert(sizeof(SnareSoundParams) == 24, "SnareSoundParams is written as 24 bytes by wasm-engine.ts");
 _Static_assert(offsetof(SnareSoundParams, sound) == 0, "SnareSoundParams.sound");

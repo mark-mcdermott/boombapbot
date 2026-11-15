@@ -22,6 +22,8 @@ export interface AudioControllerEvents {
   onStats(stats: AudioStats): void;
   /** Measures the engine began, in order and without gaps. */
   onMeasures(measures: EngineMeasure[]): void;
+  /** Play ended by itself, at the end of a song that does not repeat. */
+  onEnded(): void;
   /** The worklet has taken the sound last sent for this slot. */
   onSound(slot: number): void;
 }
@@ -147,6 +149,9 @@ export class AudioController {
       case 'measures':
         this.events.onMeasures(report.measures);
         break;
+      case 'ended':
+        this.events.onEnded();
+        break;
       case 'sound':
         this.events.onSound(report.slot);
         break;
@@ -186,6 +191,11 @@ export class AudioController {
   /** What the panel asks the engine to play. A change is read at the next bar line. */
   setPanel(panel: EnginePanel): void {
     this.post({ type: 'panel', panel });
+  }
+
+  /** The rhythm of each measure of a rhythm track. Empty goes back to what the panel asks for. */
+  setSong(rhythms: number[], loop: boolean): void {
+    this.post({ type: 'song', rhythms, loop });
   }
 
   /** TAP in manual play: the intro/fill-in plays once. */

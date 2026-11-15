@@ -309,6 +309,180 @@ SNARE_TEST(the_measure_log_is_drained_and_survives_being_left_unread) {
   snare_engine_destroy(engine);
 }
 
+// ---- Songs: what a rhythm track plays --------------------------------------
+
+namespace {
+
+std::vector<int> positions(const std::vector<SnareMeasure>& measures) {
+  std::vector<int> out;
+  for (const SnareMeasure& measure : measures) out.push_back(measure.position);
+  return out;
+}
+
+void setSong(SnareEngine* engine, const std::vector<std::uint8_t>& rhythms, bool loop) {
+  CHECK_EQ(snare_engine_set_song(engine, rhythms.data(), static_cast<int>(rhythms.size()), loop ? 1 : 0), SNARE_OK);
+}
+
+}  // namespace
+
+SNARE_TEST(a_song_plays_its_measures_in_order_and_stops_at_the_end) {
+  SnareEngine* engine = makeEngine(panelOf(9, SNARE_VARIATION_A, 12, 2));
+  setSong(engine, {3, 3, 5, 12, 0}, false);
+  snare_engine_play(engine);
+  snare::io::render(engine, 7 * kMeasure, 512);
+  const std::vector<SnareMeasure> measures = readMeasures(engine);
+  // The panel's own rhythm and its automatic fill-in stay out of it.
+  CHECK(patterns(measures) == (std::vector<int>{6, 6, 10, 24, 0}));
+  CHECK(positions(measures) == (std::vector<int>{0, 1, 2, 3, 4}));
+  CHECK_EQ(measures[3].kind, SNARE_MEASURE_FILL);
+  CHECK_EQ(snare_engine_is_playing(engine), 0);
+  CHECK_EQ(snare_engine_stop_frame(engine), 5.0 * kMeasure);
+  CHECK_EQ(static_cast<int>(readEvents(engine).size()), 5 * 8);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(a_looping_song_starts_over) {
+  SnareEngine* engine = makeEngine(panelOf(0));
+  setSong(engine, {1, 2, 3}, true);
+  snare_engine_play(engine);
+  snare::io::render(engine, 7 * kMeasure + 100, 512);
+  const std::vector<SnareMeasure> measures = readMeasures(engine);
+  CHECK(patterns(measures) == (std::vector<int>{2, 4, 6, 2, 4, 6, 2, 4}));
+  CHECK(positions(measures) == (std::vector<int>{0, 1, 2, 0, 1, 2, 0, 1}));
+  CHECK_EQ(measures[7].ordinal, 8);
+  CHECK_EQ(snare_engine_is_playing(engine), 1);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(a_song_remembers_rhythms_and_the_switches_choose_the_versions) {
+  SnarePanel panel = panelOf(0, SNARE_VARIATION_B);
+  panel.fill_variation = SNARE_VARIATION_B;
+  SnareEngine* engine = makeEngine(panel);
+  setSong(engine, {4, 13, 4, 4, 4, 4}, false);
+  snare_engine_play(engine);
+  snare::io::render(engine, 2 * kMeasure + kBeat, 512);  // into the third measure
+  panel.variation = SNARE_VARIATION_AB;
+  panel.fill_variation = SNARE_VARIATION_A;
+  snare_engine_set_panel(engine, &panel);
+  snare::io::render(engine, 4 * kMeasure, 512);
+  // B while the switch said B, then B, A, B from where it stood.
+  CHECK(patterns(readMeasures(engine)) == (std::vector<int>{9, 27, 9, 8, 9, 8}));
+  snare_engine_destroy(engine);
+
+  std::uint8_t out[6];
+  const std::uint8_t rhythms[6] = {4, 13, 4, 4, 15, 4};
+  panel.variation = SNARE_VARIATION_AB;
+  panel.fill_variation = SNARE_VARIATION_B;
+  CHECK_EQ(snare_song_patterns(&panel, rhythms, 6, out), 6);
+  CHECK(std::vector<int>(out, out + 6) == (std::vector<int>{8, 27, 9, 8, 31, 9}));
+  CHECK_EQ(snare_song_patterns(&panel, rhythms, 0, out), 0);
+  CHECK_EQ(snare_song_patterns(nullptr, rhythms, 6, out), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_song_patterns(&panel, rhythms, 6, nullptr), SNARE_ERR_BAD_ARGUMENT);
+}
+
+SNARE_TEST(a_rhythm_chosen_while_a_song_plays_takes_its_place_from_there_on) {
+  SnareEngine* engine = makeEngine(panelOf(0));
+  setSong(engine, {1, 1, 1, 1, 1, 1}, false);
+  snare_engine_play(engine);
+  snare::io::render(engine, kMeasure + kBeat + 100, 512);  // past the first beat of the second measure
+  const SnarePanel chosen = panelOf(7);
+  snare_engine_set_panel(engine, &chosen);
+  snare::io::render(engine, 6 * kMeasure, 512);
+  const std::vector<SnareMeasure> measures = readMeasures(engine);
+  CHECK(patterns(measures) == (std::vector<int>{2, 2, 14, 14, 14, 14}));
+  CHECK(positions(measures) == (std::vector<int>{0, 1, 2, 3, 4, 5}));
+  // The song's length is what it was.
+  CHECK_EQ(snare_engine_stop_frame(engine), 6.0 * kMeasure);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(chosen_during_the_first_beat_it_is_that_measure_that_changes) {
+  SnareEngine* engine = makeEngine(panelOf(0));
+  setSong(engine, {1, 1, 1, 1}, false);
+  snare_engine_play(engine);
+  snare::io::render(engine, kMeasure + 3000, 512);
+  const SnarePanel chosen = panelOf(7);
+  snare_engine_set_panel(engine, &chosen);
+  snare::io::render(engine, 4 * kMeasure, 512);
+  const std::vector<SnareMeasure> measures = readMeasures(engine);
+  // The second measure is reported again, as the rhythm that took it over.
+  CHECK(patterns(measures) == (std::vector<int>{2, 2, 14, 14, 14}));
+  CHECK(positions(measures) == (std::vector<int>{0, 1, 1, 2, 3}));
+  CHECK_EQ(measures[1].ordinal, measures[2].ordinal);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(a_tapped_fill_in_takes_one_measure_of_a_song) {
+  SnareEngine* engine = makeEngine(panelOf(0, SNARE_VARIATION_A, 14));
+  setSong(engine, {1, 2, 3, 4}, false);
+  snare_engine_play(engine);
+  snare::io::render(engine, kBeat, 512);
+  snare_engine_arm_fill(engine, 1);
+  snare::io::render(engine, 4 * kMeasure, 512);
+  const std::vector<SnareMeasure> measures = readMeasures(engine);
+  CHECK(patterns(measures) == (std::vector<int>{2, 28, 6, 8}));
+  CHECK(positions(measures) == (std::vector<int>{0, 1, 2, 3}));
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(a_long_song_crosses_to_the_engine_whole) {
+  std::vector<std::uint8_t> rhythms(SNARE_SONG_MEASURES);
+  for (std::size_t i = 0; i < rhythms.size(); ++i) rhythms[i] = static_cast<std::uint8_t>((i * 7 + i / 5) % SNARE_BASIC_RHYTHMS);
+  SnareEngine* engine = makeEngine(panelOf(0));
+  const SnarePattern step = shape(1, 0, 8);  // 3000 frames a measure
+  for (int index = 0; index < SNARE_PATTERNS; ++index) snare_engine_set_pattern(engine, index, &step);
+  setSong(engine, rhythms, false);
+  snare_engine_play(engine);
+  std::vector<int> played;
+  for (int pass = 0; pass < 8; ++pass) {
+    snare::io::render(engine, 3000 * 100, 512);
+    for (int pattern : patterns(readMeasures(engine))) played.push_back(pattern);
+  }
+  CHECK_EQ(played.size(), rhythms.size());
+  bool same = played.size() == rhythms.size();
+  for (std::size_t i = 0; same && i < rhythms.size(); ++i) same = played[i] == rhythms[i] * 2;
+  CHECK(same);
+  CHECK_EQ(snare_engine_is_playing(engine), 0);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(a_song_can_be_replaced_or_removed_while_it_plays) {
+  SnareEngine* engine = makeEngine(panelOf(5));
+  setSong(engine, {1, 1, 1, 1, 1, 1}, true);
+  snare_engine_play(engine);
+  snare::io::render(engine, kMeasure + kBeat, 512);
+  setSong(engine, {2, 2, 2, 2, 2, 2}, true);  // carries on from the third measure
+  snare::io::render(engine, 2 * kMeasure, 512);
+  setSong(engine, {}, false);  // back to the panel's rhythm
+  snare::io::render(engine, 2 * kMeasure, 512);
+  const std::vector<SnareMeasure> measures = readMeasures(engine);
+  CHECK(patterns(measures) == (std::vector<int>{2, 2, 4, 4, 10, 10}));
+  CHECK(positions(measures) == (std::vector<int>{0, 1, 2, 3, -1, -1}));
+  CHECK_EQ(snare_engine_is_playing(engine), 1);
+  snare_engine_destroy(engine);
+}
+
+SNARE_TEST(song_arguments_are_checked) {
+  SnareEngine* engine = snare_engine_create(kRate);
+  const std::uint8_t good[2] = {0, 15};
+  const std::uint8_t bad[2] = {0, 16};
+  std::vector<std::uint8_t> tooLong(SNARE_SONG_MEASURES + 1, 0);
+  CHECK_EQ(snare_engine_set_song(engine, good, 2, 0), SNARE_OK);
+  CHECK_EQ(snare_engine_set_song(engine, nullptr, 0, 0), SNARE_OK);
+  CHECK_EQ(snare_engine_set_song(engine, bad, 2, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_song(engine, nullptr, 2, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_song(engine, good, -1, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_song(engine, tooLong.data(), SNARE_SONG_MEASURES + 1, 0), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_song(nullptr, good, 2, 0), SNARE_ERR_BAD_ARGUMENT);
+  // A queue too full for the whole song says so, and the song is not half taken.
+  int result = SNARE_OK;
+  for (int i = 0; i < 2000 && result == SNARE_OK; ++i) result = snare_engine_set_tempo(engine, 100.0 + i);
+  CHECK_EQ(snare_engine_set_song(engine, tooLong.data(), SNARE_SONG_MEASURES, 1), SNARE_ERR_QUEUE_FULL);
+  snare::io::render(engine, 16, 16);
+  CHECK_EQ(snare_engine_set_song(engine, good, 2, 0), SNARE_OK);
+  snare_engine_destroy(engine);
+}
+
 SNARE_TEST(the_sequencer_alone_follows_the_same_rules) {
   snare::Sequencer sequencer;
   SnarePanel panel = panelOf(3, SNARE_VARIATION_AB, 15, 4);

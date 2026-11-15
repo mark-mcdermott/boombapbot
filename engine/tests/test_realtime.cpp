@@ -138,6 +138,11 @@ SNARE_TEST(render_does_not_allocate_while_applying_commands) {
       snare_engine_set_panel(engine, &panel);
       snare_engine_arm_fill(engine, pass & 1);
     }
+    if (pass % 40 == 5) {
+      std::uint8_t song[100];
+      for (int i = 0; i < 100; ++i) song[i] = static_cast<std::uint8_t>((pass + i) % SNARE_RHYTHMS);
+      snare_engine_set_song(engine, song, pass % 80 == 5 ? 100 : 0, 1);
+    }
     if (pass % 50 == 10) snare_engine_stop(engine);
     if (pass % 50 == 20) snare_engine_play(engine);
     if (pass % 50 == 30) snare_engine_play_measures(engine, 2);

@@ -10,6 +10,8 @@ export type EngineCommand =
   | { type: 'tempo'; bpm: number }
   | { type: 'panel'; panel: EnginePanel }
   | { type: 'fill'; armed: boolean }
+  /** The rhythm of each measure of a song. Empty removes it. */
+  | { type: 'song'; rhythms: number[]; loop: boolean }
   | { type: 'play' }
   | { type: 'stop' }
   | { type: 'trigger'; track: number; accent: boolean };
@@ -22,6 +24,8 @@ export type EngineReport =
   | { type: 'position'; step: number; pattern: number; playing: boolean }
   /** Measures begun since the last report, oldest first. None is ever skipped. */
   | { type: 'measures'; measures: EngineMeasure[] }
+  /** Play ended by itself: a song that does not repeat reached its end. */
+  | { type: 'ended' }
   | {
       type: 'stats';
       /** Frames rendered since the processor started. */

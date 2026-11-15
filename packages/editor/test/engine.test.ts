@@ -27,8 +27,10 @@ import {
   engineTracks,
   exportMidi,
   midiVelocities,
+  exportPlan,
+  exportSongMidi,
   renderLoop,
-  selectedPattern,
+  renderSong,
   synthSound,
   trackNotes,
 } from '../src/engine';
@@ -89,9 +91,6 @@ describe('project to engine', () => {
     expect(bank[patternIndex(2, 'a')]).toMatchObject({ firstLength: 16, secondLength: 16, stepsPerBeat: 8 });
     expect(bank[patternIndex(1, 'a')]).toMatchObject({ firstLength: 12, secondLength: 0, stepsPerBeat: 3 });
     expect(bank[0]!.rows[0]).toBe(0x101);
-    expect(selectedPattern(fixture)).toBe(0);
-    expect(selectedPattern({ ...fixture, panel: { ...fixture.panel, basicRhythm: 3, basicVariation: 'b' } })).toBe(7);
-    expect(selectedPattern({ ...fixture, panel: { ...fixture.panel, basicRhythm: 3, basicVariation: 'ab' } })).toBe(6);
   });
 });
 
@@ -146,6 +145,111 @@ describe('what the panel asks the engine to play', () => {
       expect(measures[0]!.frame).toBe(0);
       expect(measures[1]!.frame).toBeGreaterThan(measures[0]!.frame);
       expect(engine.playing).toBe(false);
+    } finally {
+      engine.destroy();
+    }
+  });
+});
+
+describe('rhythm tracks and what an export holds', () => {
+  const panel = (change: Partial<Project['panel']>): Project => ({ ...fixture, panel: { ...fixture.panel, ...change } });
+  // The fixture's first track: rhythms 1, 1, 2, 3, 4, Intro/Fill-in 1, 1.
+  const track = [0, 0, 1, 2, 3, 12, 0];
+
+  it('plans one measure of the rhythm the panel is on, or A then B on AB', () => {
+    expect(exportPlan(panel({ basicRhythm: 3 }))).toMatchObject({ rhythms: [3], loop: true, panel: { variation: 'a' } });
+    expect(exportPlan(panel({ basicRhythm: 3, basicVariation: 'ab' }))).toMatchObject({ rhythms: [3, 3], loop: true });
+    expect(exportPlan(panel({ writeTarget: 'fill', fillRhythm: 13, basicVariation: 'ab' })).rhythms).toEqual([13]);
+    expect(exportPlan(panel({ mode: 'manual_play', autoFill: 4 })).panel).toMatchObject({ autoFill: 0, firstBeatRule: false });
+  });
+
+  it('plans the rhythm track the selector is on in the track modes, played once', () => {
+    for (const mode of ['play', 'compose'] as const) {
+      expect(exportPlan(panel({ mode, selector: 0 }))).toMatchObject({ rhythms: track, loop: false });
+      expect(exportPlan(panel({ mode, selector: 4 })).rhythms).toEqual([]);
+    }
+    // Playing a track back, only the variation switches come from the panel.
+    expect(enginePanel(panel({ mode: 'play', basicVariation: 'ab', fillVariation: 'b', autoFill: 8 }))).toMatchObject({
+      variation: 'ab',
+      fillVariation: 'b',
+      autoFill: 0,
+      firstBeatRule: false,
+    });
+  });
+
+  it('asks the engine which version each measure plays', () => {
+    const plan = exportPlan(panel({ mode: 'play', selector: 0, basicVariation: 'ab' }));
+    expect(wasm.songPatterns(plan.panel, plan.rhythms)).toEqual([0, 1, 2, 5, 6, 24, 1]);
+    expect(wasm.songPatterns({ ...plan.panel, variation: 'b', fillVariation: 'b' }, plan.rhythms)).toEqual([
+      1, 1, 3, 5, 7, 25, 1,
+    ]);
+    expect(wasm.songPatterns(plan.panel, [])).toEqual([]);
+    expect(() => wasm.songPatterns(plan.panel, [16])).toThrow(/rejected a song/);
+  });
+
+  it('renders a track once through, measure after measure, and lets it ring', () => {
+    const plan = exportPlan(panel({ mode: 'play', selector: 0 }));
+    const render = renderSong(wasm, fixture, plan, 44100);
+    const patterns = wasm.songPatterns(plan.panel, plan.rhythms);
+    const bank = enginePatterns(fixture.rhythms);
+    const ticks = patterns.reduce((sum, pattern) => sum + wasm.patternTicks(bank[pattern]!), 0);
+    const length = wasm.tickFrame(ticks, tempoBpm(fixture.tempo), 44100);
+    expect(render.left.length).toBe(length + 3 * 44100);
+    // Every measure of the fixture's track is four beats long.
+    expect(ticks).toBe(7 * 96);
+    const played = [...new Set(render.events.map((event) => event.pattern))];
+    expect(played).toEqual([0, 2, 4, 6, 24]);
+    expect(render.events[0]!.frame).toBe(0);
+    expect(Math.max(...render.events.map((event) => event.frame))).toBeLessThan(length);
+    expect(rms(render.left.subarray(0, length))).toBeGreaterThan(0.01);
+    // Silence by the end of the tail.
+    expect(rms(render.left.subarray(render.left.length - 4410))).toBeLessThan(1e-4);
+  });
+
+  it('renders A then B as one loop of two measures', () => {
+    const plan = exportPlan(panel({ basicVariation: 'ab' }));
+    const both = renderSong(wasm, fixture, plan, 44100);
+    const a = renderLoop(wasm, fixture, 0, 44100);
+    const b = renderLoop(wasm, fixture, 1, 44100);
+    // Each length is rounded to a frame on its own, so the sum can be one out.
+    expect(Math.abs(both.left.length - (a.left.length + b.left.length))).toBeLessThanOrEqual(1);
+    expect(both.events.map((event) => event.pattern)).toEqual([
+      ...a.events.map(() => 0),
+      ...b.events.map(() => 1),
+    ]);
+    const midi = parseMidi(exportSongMidi(wasm, fixture, plan));
+    expect(midi.trackEnds).toEqual([3840, 3840]);
+    expect(midi.notes.filter((note) => note.on)).toHaveLength(a.events.length + b.events.length);
+  });
+
+  it('writes a track to MIDI with every measure in place', () => {
+    const plan = exportPlan(panel({ mode: 'compose', selector: 0 }));
+    const midi = parseMidi(exportSongMidi(wasm, fixture, plan));
+    expect(midi.trackEnds).toEqual([7 * 1920, 7 * 1920]);
+    const hits = wasm
+      .songPatterns(plan.panel, plan.rhythms)
+      .reduce((sum, pattern) => sum + countHits(fixture.rhythms[pattern >> 1]!, pattern % 2 === 1 ? 'b' : 'a'), 0);
+    expect(midi.notes.filter((note) => note.on)).toHaveLength(hits);
+  });
+
+  it('follows a song in the engine, and says which of its measures each one is', () => {
+    const engine = wasm.createEngine(44100, 1024);
+    try {
+      applyProject(engine, fixture);
+      engine.setPanel(enginePanel(panel({ mode: 'play' })));
+      engine.setSong(track, false);
+      engine.play();
+      const left = new Float32Array(1024);
+      const right = new Float32Array(1024);
+      const measures = [];
+      do {
+        engine.render(left, right);
+        measures.push(...(engine.takeMeasures() ?? []));
+      } while (engine.playing);
+      expect(measures.map((measure) => measure.pattern >> 1)).toEqual(track);
+      expect(measures.map((measure) => measure.position)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      expect(engine.stopFrame).toBeGreaterThan(0);
+      expect(() => engine.setSong(new Array(769).fill(0), false)).toThrow(/768/);
     } finally {
       engine.destroy();
     }

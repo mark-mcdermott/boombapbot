@@ -102,6 +102,52 @@ export function faceplateIsCredited(): boolean {
   return manifest.faceplate.credit !== undefined;
 }
 
+/**
+ * Replaces the project with a changed copy of the one on the page, through
+ * the import a person would use. `fast` runs it at 300 beats a minute, so a
+ * sixteen-step measure lasts 0.8 seconds.
+ */
+export async function importChanged(
+  page: Page,
+  change: (project: ProjectSnapshot) => void,
+  { fast = false } = {},
+): Promise<void> {
+  const next = structuredClone(await project(page));
+  if (fast) next.tempo = { coarse: 39, fine: 1 };
+  change(next);
+  await page.getByTestId('import-input').setInputFiles({
+    name: 'seed.boombapbot.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(next)),
+  });
+  await expect(page.getByTestId('notice')).toContainText('Imported');
+}
+
+/** Watches the pattern the engine reports, and keeps each one it changes to. */
+export function patternWatcher(page: Page) {
+  const seen: number[] = [];
+  return {
+    async poll(): Promise<number[]> {
+      const pattern = await page.evaluate(() => window.__boombapbot!.playing().pattern);
+      if (pattern >= 0 && seen[seen.length - 1] !== pattern) seen.push(pattern);
+      return seen;
+    },
+    /**
+     * Waits until the measure playing is past its first beat. A rhythm chosen
+     * during the first beat takes that measure over; chosen after it, the next.
+     */
+    async pastFirstBeat(): Promise<void> {
+      await expect
+        .poll(() => page.evaluate(() => window.__boombapbot!.playing().step), { intervals: [10] })
+        .toBeGreaterThanOrEqual(6);
+    },
+    /** Waits until the engine is playing this pattern. */
+    async until(pattern: number): Promise<void> {
+      await expect.poll(async () => (await this.poll()).at(-1), { intervals: [20] }).toBe(pattern);
+    },
+  };
+}
+
 export function debug(page: Page): Promise<DebugSnapshot> {
   return page.evaluate(() => window.__boombapbot!.debug() as unknown as DebugSnapshot);
 }

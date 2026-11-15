@@ -26,6 +26,8 @@ constexpr int kCommandCapacity = 1024;
 // replaces one sound at a time, so this is sized for a long drag.
 constexpr int kRetiredCapacity = 256;
 constexpr int kMeasureLogCapacity = 255;
+// A song crosses the command queue in pieces this long.
+constexpr int kSongChunk = 48;
 
 // A choked voice fades over this long instead of stopping dead.
 constexpr double kChokeSeconds = 0.004;
@@ -73,6 +75,9 @@ enum class CommandType : std::int32_t {
   CuePattern,
   SetPanel,
   ArmFill,
+  SongBegin,
+  SongChunk,
+  SongCommit,
   Play,
   Stop,
   Trigger
@@ -87,6 +92,7 @@ struct Command {
   double value2 = 0.0;
   SnarePattern pattern{};
   SnarePanel panel{};
+  std::uint8_t bytes[kSongChunk]{};
 };
 
 // How an instrument track plays. Audio thread only.
@@ -204,6 +210,15 @@ struct SnareEngine {
   snare::Sequencer sequencer;
   int measureKind = SNARE_MEASURE_BASIC;
   bool takeoverDue = false;      // a rhythm chosen in the first beat waits for the second
+  std::uint8_t song[SNARE_SONG_MEASURES]{};    // the rhythm of each measure
+  std::uint8_t arriving[SNARE_SONG_MEASURES]{};  // a song crossing the queue piece by piece
+  int songCount = 0;
+  int arrivingCount = 0;
+  bool arrivingLoop = false;
+  bool songLoop = false;
+  int songNext = 0;              // the song measure the next bar line begins
+  int songPosition = -1;         // the song measure playing
+  bool songOverridden = false;   // a rhythm chosen on the panel has taken the song's place
   std::int64_t measureTick = 0;  // where the measure playing began
   int measureFirst = SNARE_PART_STEPS;  // steps in its 1st part, its length and
   int measureSteps = SNARE_PART_STEPS;  // its step size, all fixed for the
@@ -253,14 +268,20 @@ struct SnareEngine {
   // The measure log is for the control thread; a full one drops the entry.
   void logMeasure() {
     measureLog.push(SnareMeasure{static_cast<double>(tickToFrame(measureTick)), static_cast<std::int32_t>(measures),
-                                 pattern, measureKind, 0});
+                                 pattern, measureKind, songPosition});
     currentPattern.store(pattern, std::memory_order_relaxed);
   }
 
   void beginMeasure() {
     measureKind = SNARE_MEASURE_BASIC;
+    songPosition = -1;
     if (followPanel) {
-      const snare::MeasureChoice choice = sequencer.next(panel);
+      int songRhythm = -1;
+      if (songCount > 0) {
+        songPosition = songNext++;
+        songRhythm = songOverridden ? panel.rhythm : song[songPosition];
+      }
+      const snare::MeasureChoice choice = sequencer.next(panel, songRhythm);
       pattern = choice.pattern;
       measureKind = choice.kind;
     } else if (cued >= 0) {
@@ -442,11 +463,13 @@ struct SnareEngine {
 
   // The bar line: the measure that was playing has ended.
   void endMeasure(std::int64_t at) {
-    if (measureLimit > 0 && measures >= measureLimit) {
+    const bool songOver = followPanel && songCount > 0 && songNext >= songCount;
+    if ((measureLimit > 0 && measures >= measureLimit) || (songOver && !songLoop)) {
       // The bar line itself, which may be earlier than the frame being rendered.
       halt(std::min(at, nextEventFrame), true);
       return;
     }
+    if (songOver) songNext = 0;
     measureTick += measureTicks();
     beginMeasure();
     scheduleNextEvent();
@@ -502,6 +525,8 @@ struct SnareEngine {
           takeoverDue = command.panel.first_beat_rule != 0 && measureKind == SNARE_MEASURE_BASIC &&
                         (takeoverDue || inFirstBeat());
         }
+        // Chosen while a song plays, a rhythm takes the song's place from here on.
+        if (playing && followPanel && songCount > 0 && command.panel.rhythm != panel.rhythm) songOverridden = true;
         panel = command.panel;
         followPanel = true;
         cued = -1;
@@ -513,6 +538,20 @@ struct SnareEngine {
         break;
       case CommandType::ArmFill:
         sequencer.armFill(command.a != 0);
+        break;
+      case CommandType::SongBegin:
+        arrivingCount = command.a;
+        arrivingLoop = command.b != 0;
+        break;
+      case CommandType::SongChunk:
+        std::memcpy(arriving + command.a, command.bytes, static_cast<std::size_t>(command.b));
+        break;
+      case CommandType::SongCommit:
+        std::memcpy(song, arriving, static_cast<std::size_t>(arrivingCount));
+        songCount = arrivingCount;
+        songLoop = arrivingLoop;
+        // A song that got shorter while playing ends at the next bar line.
+        songNext = std::min(songNext, songCount);
         break;
       case CommandType::CuePattern:
         followPanel = false;
@@ -533,6 +572,8 @@ struct SnareEngine {
         measures = 0;
         measureLimit = command.a;
         stopFrame.store(-1.0, std::memory_order_relaxed);
+        songNext = 0;
+        songOverridden = false;
         sequencer.start();
         beginMeasure();
         scheduleNextEvent();
@@ -893,6 +934,45 @@ int32_t snare_engine_set_panel(SnareEngine* engine, const SnarePanel* panel) {
   command.type = snare::CommandType::SetPanel;
   command.panel = *panel;
   return engine->enqueue(command);
+}
+
+namespace {
+
+bool validSong(const uint8_t* rhythms, int32_t count) {
+  if (count < 0 || count > SNARE_SONG_MEASURES || (count > 0 && !rhythms)) return false;
+  for (int32_t i = 0; i < count; ++i) {
+    if (rhythms[i] >= SNARE_RHYTHMS) return false;
+  }
+  return true;
+}
+
+}  // namespace
+
+int32_t snare_engine_set_song(SnareEngine* engine, const uint8_t* rhythms, int32_t count, int32_t loop) {
+  if (!engine || !validSong(rhythms, count)) return SNARE_ERR_BAD_ARGUMENT;
+  snare::Command command;
+  command.type = snare::CommandType::SongBegin;
+  command.a = count;
+  command.b = loop != 0 ? 1 : 0;
+  // A song cut short by a full queue is never committed; the next call starts it again.
+  if (engine->enqueue(command) != SNARE_OK) return SNARE_ERR_QUEUE_FULL;
+  command.type = snare::CommandType::SongChunk;
+  for (int32_t offset = 0; offset < count; offset += snare::kSongChunk) {
+    command.a = offset;
+    command.b = std::min<int32_t>(snare::kSongChunk, count - offset);
+    std::memcpy(command.bytes, rhythms + offset, static_cast<std::size_t>(command.b));
+    if (engine->enqueue(command) != SNARE_OK) return SNARE_ERR_QUEUE_FULL;
+  }
+  command.type = snare::CommandType::SongCommit;
+  return engine->enqueue(command);
+}
+
+int32_t snare_song_patterns(const SnarePanel* panel, const uint8_t* rhythms, int32_t count, uint8_t* out) {
+  if (!panel || !out || !snare::validPanel(*panel) || !validSong(rhythms, count)) return SNARE_ERR_BAD_ARGUMENT;
+  snare::Sequencer sequencer;
+  sequencer.start();
+  for (int32_t i = 0; i < count; ++i) out[i] = static_cast<uint8_t>(sequencer.next(*panel, rhythms[i]).pattern);
+  return count;
 }
 
 int32_t snare_engine_arm_fill(SnareEngine* engine, int32_t armed) {

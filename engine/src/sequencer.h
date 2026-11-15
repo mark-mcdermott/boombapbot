@@ -33,8 +33,10 @@ class Sequencer {
   // TAP: the fill-in plays once, at the next bar line or as the intro.
   void armFill(bool armed) { fillArmed_ = armed; }
 
-  // The measure that begins now.
-  MeasureChoice next(const SnarePanel& panel) {
+  // The measure that begins now. A song names its rhythm; with none
+  // (`songRhythm` below zero) it is the panel's, and the automatic fill-in
+  // counts measures.
+  MeasureChoice next(const SnarePanel& panel, int songRhythm = -1) {
     const bool first = !started_;
     started_ = true;
     if (fillArmed_) {
@@ -43,10 +45,17 @@ class Sequencer {
       if (!first) ++counted_;
       return fill(panel, first ? SNARE_MEASURE_INTRO : SNARE_MEASURE_FILL);
     }
-    ++counted_;
-    if (panel.auto_fill > 0 && counted_ % panel.auto_fill == 0) return fill(panel, SNARE_MEASURE_FILL);
-    lastVersion_ = versionAfter(panel.variation);
-    return {patternOf(panel.rhythm, lastVersion_), SNARE_MEASURE_BASIC};
+    if (songRhythm < 0) {
+      ++counted_;
+      if (panel.auto_fill > 0 && counted_ % panel.auto_fill == 0) return fill(panel, SNARE_MEASURE_FILL);
+      return basic(panel.rhythm, panel.variation);
+    }
+    // A track remembers rhythms, not versions: an intro/fill-in in it plays
+    // as its own switch stands now.
+    if (songRhythm >= SNARE_BASIC_RHYTHMS) {
+      return {patternOf(songRhythm, fillVersion(panel)), SNARE_MEASURE_FILL};
+    }
+    return basic(songRhythm, panel.variation);
   }
 
   // A rhythm chosen during the first beat of a measure takes over on the
@@ -54,8 +63,15 @@ class Sequencer {
   int takeover(const SnarePanel& panel) const { return patternOf(panel.rhythm, lastVersion_ < 0 ? 0 : lastVersion_); }
 
  private:
+  static int fillVersion(const SnarePanel& panel) { return panel.fill_variation == SNARE_VARIATION_B ? 1 : 0; }
+
   static MeasureChoice fill(const SnarePanel& panel, int kind) {
-    return {patternOf(panel.fill_rhythm, panel.fill_variation == SNARE_VARIATION_B ? 1 : 0), kind};
+    return {patternOf(panel.fill_rhythm, fillVersion(panel)), kind};
+  }
+
+  MeasureChoice basic(int rhythm, int variation) {
+    lastVersion_ = versionAfter(variation);
+    return {patternOf(rhythm, lastVersion_), SNARE_MEASURE_BASIC};
   }
 
   // AB alternates, beginning with A and carrying on from whichever played last.

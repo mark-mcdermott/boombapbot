@@ -28,6 +28,7 @@ set(SNARE_WASM_EXPORTS
   snare_engine_set_master_volume
   snare_engine_set_pattern snare_engine_set_step
   snare_engine_cue_pattern snare_engine_set_panel snare_engine_arm_fill
+  snare_engine_set_song snare_song_patterns
   snare_engine_play snare_engine_play_measures snare_engine_stop snare_engine_trigger
   snare_engine_render
   snare_engine_is_playing snare_engine_current_step snare_engine_current_pattern snare_engine_current_measure

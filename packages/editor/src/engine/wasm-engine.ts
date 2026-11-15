@@ -14,6 +14,8 @@ const BYTES_PER_SOUND_PARAMS = 24;
 const BYTES_PER_PATTERN = 52;
 const BYTES_PER_PANEL = 8;
 const BYTES_PER_MEASURE = 24;
+/** The longest song: twelve rhythm tracks of 64 measures. */
+export const SNARE_SONG_MEASURES = 768;
 /** Measures read from the log at a time. A render call rarely begins more than one. */
 const MEASURE_BATCH = 16;
 const PATTERN_LENGTHS_OFFSET = SNARE_TRACKS * 4;
@@ -48,6 +50,8 @@ interface EngineExports {
   snare_engine_cue_pattern(engine: number, index: number): number;
   snare_engine_set_panel(engine: number, panel: number): number;
   snare_engine_arm_fill(engine: number, armed: number): number;
+  snare_engine_set_song(engine: number, rhythms: number, count: number, loop: number): number;
+  snare_song_patterns(panel: number, rhythms: number, count: number, out: number): number;
   snare_engine_play(engine: number): number;
   snare_engine_play_measures(engine: number, measures: number): number;
   snare_engine_stop(engine: number): number;
@@ -136,6 +140,8 @@ export interface EngineMeasure {
   ordinal: number;
   pattern: number;
   kind: MeasureKind;
+  /** Its measure of the song, or -1 with no song. */
+  position: number;
 }
 
 export interface EngineEvent {
@@ -256,6 +262,38 @@ export class SnareWasm {
     }
   }
 
+  writePanel(pointer: number, panel: EnginePanel): void {
+    const view = new DataView(this.exports.memory.buffer);
+    view.setUint8(pointer, panel.rhythm);
+    view.setUint8(pointer + 1, VARIATION[panel.variation]);
+    view.setUint8(pointer + 2, panel.fillRhythm);
+    view.setUint8(pointer + 3, VARIATION[panel.fillVariation]);
+    view.setUint8(pointer + 4, panel.autoFill);
+    view.setUint8(pointer + 5, panel.firstBeatRule ? 1 : 0);
+    view.setUint16(pointer + 6, 0, true);
+  }
+
+  /**
+   * The pattern each measure of a song plays with the panel's switches as
+   * they stand. The engine's own rules decide, so an export cannot disagree
+   * with what is heard.
+   */
+  songPatterns(panel: EnginePanel, rhythms: readonly number[]): number[] {
+    const count = rhythms.length;
+    const memory = this.alloc(BYTES_PER_PANEL + count * 2);
+    try {
+      const song = memory + BYTES_PER_PANEL;
+      const out = song + count;
+      this.writePanel(memory, panel);
+      this.heapU8.set(rhythms, song);
+      const written = this.exports.snare_song_patterns(memory, song, count, out);
+      if (written !== count) throw new Error(`the engine rejected a song (${written})`);
+      return Array.from(this.heapU8.subarray(out, out + count));
+    } finally {
+      this.exports.free(memory);
+    }
+  }
+
   /** Ticks in one measure of a pattern. */
   patternTicks(pattern: EnginePattern): number {
     const pointer = this.alloc(BYTES_PER_PATTERN);
@@ -336,6 +374,7 @@ export class WasmEngine {
   /** Scratch for one pattern or one set of sound parameters. */
   private readonly scratch: number;
   private readonly measures: number;
+  private readonly song: number;
 
   constructor(wasm: SnareWasm, sampleRate: number, blockSize: number) {
     this.wasm = wasm;
@@ -347,6 +386,7 @@ export class WasmEngine {
     this.right = wasm.alloc(blockSize * 4);
     this.scratch = wasm.alloc(Math.max(BYTES_PER_PATTERN, BYTES_PER_SOUND_PARAMS, BYTES_PER_PANEL));
     this.measures = wasm.alloc(BYTES_PER_MEASURE * MEASURE_BATCH);
+    this.song = wasm.alloc(SNARE_SONG_MEASURES);
   }
 
   private get x(): EngineExports {
@@ -422,15 +462,19 @@ export class WasmEngine {
 
   /** Plays what the panel asks for, measure by measure. A change is read at the next bar line. */
   setPanel(panel: EnginePanel): void {
-    const view = new DataView(this.x.memory.buffer);
-    view.setUint8(this.scratch, panel.rhythm);
-    view.setUint8(this.scratch + 1, VARIATION[panel.variation]);
-    view.setUint8(this.scratch + 2, panel.fillRhythm);
-    view.setUint8(this.scratch + 3, VARIATION[panel.fillVariation]);
-    view.setUint8(this.scratch + 4, panel.autoFill);
-    view.setUint8(this.scratch + 5, panel.firstBeatRule ? 1 : 0);
-    view.setUint16(this.scratch + 6, 0, true);
+    this.wasm.writePanel(this.scratch, panel);
     this.send(() => this.x.snare_engine_set_panel(this.handle, this.scratch));
+  }
+
+  /**
+   * Gives the engine a song: the rhythm of each measure. Play then follows it
+   * in place of the panel's rhythm, starting over at the end or stopping
+   * there. An empty song removes it.
+   */
+  setSong(rhythms: readonly number[], loop: boolean): void {
+    if (rhythms.length > SNARE_SONG_MEASURES) throw new Error(`a song holds ${SNARE_SONG_MEASURES} measures`);
+    this.wasm.heapU8.set(rhythms, this.song);
+    this.send(() => this.x.snare_engine_set_song(this.handle, this.song, rhythms.length, loop ? 1 : 0));
   }
 
   /** TAP: the panel's intro/fill-in plays once, as the intro or at the next bar line. */
@@ -453,6 +497,7 @@ export class WasmEngine {
           ordinal: view.getInt32(offset + 8, true),
           pattern: view.getInt32(offset + 12, true),
           kind: MEASURE_KINDS[view.getInt32(offset + 16, true)] ?? 'basic',
+          position: view.getInt32(offset + 20, true),
         });
       }
     }
@@ -505,6 +550,11 @@ export class WasmEngine {
     return this.x.snare_engine_current_pattern(this.handle);
   }
 
+  /** Frame at which play ended by itself (a bounded play, or a song's end), or -1 if it has not. */
+  get stopFrame(): number {
+    return this.x.snare_engine_stop_frame(this.handle);
+  }
+
   get framesRendered(): number {
     return this.x.snare_engine_frames_rendered(this.handle);
   }
@@ -553,6 +603,7 @@ export class WasmEngine {
     this.x.free(this.right);
     this.x.free(this.scratch);
     this.x.free(this.measures);
+    this.x.free(this.song);
     this.handle = 0;
   }
 }

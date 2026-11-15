@@ -9,6 +9,7 @@ import {
   hitCount,
   openEditor,
   openSettings,
+  patternWatcher,
   project,
   selectTrack,
   stepButton,
@@ -594,18 +595,6 @@ test('TAP writes the selected instrument while the rhythm runs', async ({ page }
 });
 
 test.describe('manual play', () => {
-  /** Patterns of the measures the engine has begun, as the page heard about them. */
-  const playedPatterns = async (page: import('@playwright/test').Page) => {
-    const seen: number[] = [];
-    return {
-      async poll() {
-        const pattern = await page.evaluate(() => window.__boombapbot!.playing().pattern);
-        if (pattern >= 0 && seen[seen.length - 1] !== pattern) seen.push(pattern);
-        return seen;
-      },
-    };
-  };
-
   test.beforeEach(async ({ page }) => {
     // Fast, so several measures pass in a second or two.
     await page.getByTestId('panel-tempo').focus();
@@ -619,7 +608,7 @@ test.describe('manual play', () => {
     await page.keyboard.press('ArrowRight');
     await expect(lever).toHaveAttribute('aria-valuetext', 'A then B');
     await page.getByTestId('panel-toggle').click();
-    const played = await playedPatterns(page);
+    const played = patternWatcher(page);
     await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(4);
     const seen = await played.poll();
     // It begins with A and never plays one version twice running.
@@ -653,7 +642,7 @@ test.describe('manual play', () => {
     await expect(tap).toHaveAttribute('aria-pressed', 'false');
     await tap.click();
 
-    const played = await playedPatterns(page);
+    const played = patternWatcher(page);
     await page.getByTestId('panel-toggle').click();
     await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(2);
     // The intro, Intro/Fill-in 1 version A, played once and handed over to Basic Rhythm 1.
@@ -675,7 +664,7 @@ test.describe('manual play', () => {
     await expect(selector).toHaveAttribute('aria-valuetext', 'Every 2 measures');
     expect((await project(page)).panel.autoFill).toBe(2);
 
-    const played = await playedPatterns(page);
+    const played = patternWatcher(page);
     await page.getByTestId('panel-toggle').click();
     await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(4);
     expect((await played.poll()).slice(0, 4)).toEqual([0, 24, 0, 24]);
@@ -691,7 +680,7 @@ test.describe('manual play', () => {
   });
 
   test('a rhythm chosen while another plays takes over, and the write modes then edit it', async ({ page }) => {
-    const played = await playedPatterns(page);
+    const played = patternWatcher(page);
     await page.getByTestId('panel-toggle').click();
     await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(1);
     await stepButton(page, 4).click();

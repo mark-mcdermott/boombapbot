@@ -14,8 +14,8 @@ export as WAV, MIDI or a project file. Reload and your beat is still there.
 
 The aim is the whole machine, worked from its operation manual. This build has
 its sounds, its twelve tracks, its accent, every knob and voice switch, its
-pattern memory with the write modes, and manual play with intros and
-fill-ins; rhythm tracks are what is left, and
+pattern memory with the write modes, manual play with intros and fill-ins,
+and the twelve rhythm tracks, and
 [what is modelled so far](#the-machine) says exactly where it stands.
 
 The 808 panel above is original artwork, drawn in code by
@@ -92,6 +92,12 @@ pnpm serve
   intro, or drops it in after the measure that is running, once; the auto
   fill-in selector does that every 2, 4, 8, 12 or 16 measures. All of it is
   decided inside the engine at the bar line, on the audio clock.
+- **Rhythm tracks.** In compose, the instrument selector chooses one of
+  twelve tracks and every measure you play is remembered: which rhythm, not
+  which version, so the variation levers still work on playback. Stop, and
+  the measure you stopped in is the last. Play replays the track and starts
+  over. A track holds 64 measures and runs on into the next. A take is one
+  step to undo.
 - **Twelve tracks, steps that are on or off, and an accent.** The instrument
   selector has its twelve positions: the accent and eleven instruments. A
   step is on or off; an accented step makes every instrument sounding on it
@@ -111,9 +117,11 @@ pnpm serve
   pattern becomes Basic Rhythm 1, and the page says what could not come with
   it (per-step velocity and swing, which the machine does not have).
 - **Import and export.** Project JSON (validated with Zod; an invalid file is
-  rejected and never replaces the current beat), a one-measure seamless PCM
-  WAV loop (24 or 16-bit stereo, 44.1 kHz), and a Type 1 Standard MIDI File
-  with a tempo track and General MIDI drum notes on channel 10.
+  rejected and never replaces the current beat), PCM WAV (24 or 16-bit
+  stereo, 44.1 kHz) and a Type 1 Standard MIDI File with a tempo track and
+  General MIDI drum notes on channel 10. What they hold follows the panel:
+  the selected rhythm as a seamless loop (A then B with the lever on AB), or,
+  with the mode selector on play or compose, the rhythm track.
 
 ![Settings open over the 808 panel](docs/screenshots/settings.jpg)
 
@@ -137,7 +145,10 @@ What the build models, against the operation manual:
 | Manual play: a rhythm chosen while another plays takes over at the bar line, or on the second beat if chosen during the first | Working |
 | A, AB and B: the AB position plays the two versions in turn | Working, in the write modes too |
 | Intro and fill-in with TAP, and the auto fill-in selector (every 2, 4, 8, 12 or 16 measures) | Working |
-| Rhythm tracks: compose, play, chaining | Stored in the project file; not yet playable. The play and compose positions behave like manual play |
+| Rhythm tracks: compose records the rhythm of every measure into the track the selector is on, and CLEAR empties it | Working |
+| Play: the track replays with the variation switches as they stand, and starts over at its end | Working |
+| Twelve tracks of 64 measures, running on into the next when full, 768 in all | Working |
+| Composing over a written track | Working as far as the manual describes it; the details are an interpretation |
 | DIN sync, trigger outputs, separate outputs, pedals | Left out: a browser cannot do them |
 
 Settings lists the same gaps under "what still needs checking", and
@@ -152,12 +163,12 @@ Run in this order; later steps use what earlier ones build.
 | --- | --- |
 | `pnpm kits:check` | The committed demo WAVs match their generator script |
 | `pnpm faceplates:check` | The committed faceplate drawing matches its generator script, and carries no brand names |
-| `pnpm build:engine` | Builds the native engine and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, the contract files, no allocation inside the render call, and the header compiling as C |
+| `pnpm build:engine` | Builds the native engine and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, songs and the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, the contract files, no allocation inside the render call, and the header compiling as C |
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine needs no shared memory, no sample files ship, and only the committed faceplate is included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, composing, playing, editing and exporting rhythm tracks, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -172,11 +183,11 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | `pnpm kits:check` | 24 of 24 files match |
 | `pnpm faceplates:check` | 1 of 1 drawing matches |
 | `pnpm build:engine` | 12 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
-| `pnpm build:wasm` | 61,456-byte module, one import, no threads or shared memory |
+| `pnpm build:wasm` | 63,297-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 103 of 103 pass |
+| `pnpm test:unit` | 115 of 115 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 49 of 49 pass |
+| `pnpm test:e2e` | 55 of 55 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
 
 Earlier versions of this build were also run on Linux x86-64 with GCC 13 and
@@ -297,12 +308,17 @@ and the tempo are docked at the bottom of the screen.
   where the panel's switches stand. Version 1 files (one 16-step pattern with
   velocities and swing) still open, as Basic Rhythm 1. This is the draft and
   interchange file. It is **not** the future portable `.boombapbot` bundle.
-- **WAV**: one measure of the selected rhythm, rendered as the second of two
-  so tails wrap into the start and it loops cleanly.
+- **WAV**: the selected rhythm as a loop, rendered as the second of two
+  passes so tails wrap into the start: one measure, or A then B with the
+  lever on AB. With the mode selector on play or compose it is the rhythm
+  track instead, played once from silence with three seconds for the last
+  hits to ring. A track longer than five minutes is cut at a whole measure,
+  and the page says so; the MIDI export holds all of it.
 - **MIDI**: Type 1, 480 PPQ, a tempo track and a drum track on channel 10.
   Notes are placed on the same tick timeline the audio scheduler uses, 20
   MIDI ticks to an engine tick, so they cannot drift apart. An accented step
-  is written at a higher velocity.
+  is written at a higher velocity. It holds the same measures as the WAV, and
+  the engine itself says which version each measure of a track plays.
 
 ## VST3 compile spike
 

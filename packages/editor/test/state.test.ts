@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { countHits, isStepOn, patternIndex, serializeProject, tempoBpm } from '@boombapbot/contracts';
-import { selectedPattern } from '../src/engine';
+import { exportPlan } from '../src/engine';
 import {
   DRAFT_KEY,
   LEGACY_DRAFT_KEY,
@@ -185,13 +185,13 @@ describe('editor store', () => {
     store.setMode('pattern_clear');
     expect(store.pressStep(2)).toEqual({ kind: 'rhythm' });
     expect(store.getState().project.panel).toMatchObject({ basicRhythm: 2, writeTarget: 'basic' });
-    expect(selectedPattern(store.getState().project)).toBe(patternIndex(2, 'a'));
+    expect(exportPlan(store.getState().project).rhythms).toEqual([2]);
     // Buttons 13 to 16 are the Intro/Fill-ins, with their own variation switch.
     store.pressStep(13);
     store.setFillVariation('b');
     expect(store.getState().project.panel).toMatchObject({ basicRhythm: 2, fillRhythm: 13, writeTarget: 'fill' });
     expect(editTarget(store.getState().project)).toMatchObject({ rhythm: 13, variation: 'b' });
-    expect(selectedPattern(store.getState().project)).toBe(patternIndex(13, 'b'));
+    expect(exportPlan(store.getState().project)).toMatchObject({ rhythms: [13], panel: { fillVariation: 'b' } });
     // Choosing a rhythm writes nothing and is not an undo step.
     expect(store.getState().project.rhythms).toBe(before);
     expect(store.getState().canUndo).toBe(false);
@@ -327,7 +327,7 @@ describe('editor store', () => {
     expect(editTarget(store.getState().project, store.getState().currentPattern).variation).toBe('a');
   });
 
-  it('arms the intro or fill-in in the play modes only', () => {
+  it('arms the intro or fill-in only in the modes played by hand', () => {
     const store = makeStore();
     store.setMode('manual_play');
     store.setFillArmed(true);
@@ -335,12 +335,56 @@ describe('editor store', () => {
     store.setAutoFill(8);
     expect(store.getState().project.panel.autoFill).toBe(8);
     expect(store.getState().fillArmed).toBe(true);
-    store.setMode('play');
+    // Composing is played by hand too.
+    store.setMode('compose');
     expect(store.getState().fillArmed).toBe(true);
-    // Leaving the play modes lets it go.
+    // A rhythm track played back has no fill-ins to bring in, and nor do the write modes.
+    store.setMode('play');
+    expect(store.getState().fillArmed).toBe(false);
+    store.setMode('manual_play');
+    store.setFillArmed(true);
     store.setMode('write_first');
     expect(store.getState().fillArmed).toBe(false);
     expect(store.getState().canUndo).toBe(false);
+  });
+
+  it('empties a rhythm track with CLEAR in compose, and stores a composition as one change', () => {
+    const store = makeStore();
+    // The fixture has seven measures in track 1.
+    expect(store.getState().project.rhythmTracks[0]).toHaveLength(7);
+    store.setMode('compose');
+    store.selectTrack('accent');
+    store.pressClear();
+    expect(store.getState().project.rhythmTracks[0]).toEqual([]);
+    store.undo();
+    expect(store.getState().project.rhythmTracks[0]).toHaveLength(7);
+
+    // Seventy measures from track 3 fill it and go on into track 4.
+    const long = Array.from({ length: 70 }, (_, index) => index % 12);
+    store.commitComposition(2, long);
+    const { rhythmTracks } = store.getState().project;
+    expect(rhythmTracks[2]).toHaveLength(64);
+    expect(rhythmTracks[3]).toEqual(long.slice(64));
+    expect(rhythmTracks[0]).toHaveLength(7);
+    store.commitComposition(2, long);
+    store.undo();
+    expect(store.getState().project.rhythmTracks[2]).toEqual([]);
+    expect(store.getState().project.rhythmTracks[3]).toEqual([]);
+    // Emptying an empty track is not a change.
+    store.selectTrack('snare');
+    store.pressClear();
+    expect(store.getState().canUndo).toBe(false);
+  });
+
+  it('leaves the step buttons alone while a rhythm track plays', () => {
+    const store = makeStore();
+    store.setMode('play');
+    const before = store.getState().project;
+    expect(store.pressStep(5)).toEqual({ kind: 'none' });
+    expect(store.getState().project).toBe(before);
+    store.setMode('compose');
+    expect(store.pressStep(5)).toEqual({ kind: 'rhythm' });
+    expect(store.getState().project.panel.basicRhythm).toBe(5);
   });
 
   it('tracks where playback is', () => {

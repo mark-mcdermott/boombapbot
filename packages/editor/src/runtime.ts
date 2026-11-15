@@ -1,8 +1,12 @@
 import {
   ROLES,
+  composition,
+  compositionCapacity,
   getTrack,
   isInstrumentId,
-  isPlayMode,
+  isPerformMode,
+  isTrackMode,
+  rhythmLength,
   stepsPerBeat,
   tappedStep,
   tempoBpm,
@@ -16,13 +20,14 @@ import {
   engineMix,
   enginePanel,
   engineTracks,
+  exportPlan,
   rhythmPatterns,
-  selectedPattern,
+  type RenderPlan,
   soundOwner,
   synthSound,
 } from './engine/machine';
-import { exportMidi, renderLoop, type LoopRender } from './engine/offline';
-import { SnareWasm, type EnginePanel } from './engine/wasm-engine';
+import { exportSongMidi, renderSong, type LoopRender } from './engine/offline';
+import { SnareWasm, type EngineMeasure, type EnginePanel } from './engine/wasm-engine';
 import { encodeWav, type WavBitDepth } from './engine/wav';
 import {
   browserStorage,
@@ -81,6 +86,12 @@ export class EditorRuntime {
   private readonly soundsInFlight = new Map<number, { stale: boolean }>();
   /** When the step now sounding was reported, for placing a tap. */
   private stepStartedAt = 0;
+  /**
+   * A rhythm track being composed: the track it starts on, and the rhythm of
+   * each measure so far. It is stored when the machine stops, as one change.
+   * A take on an empty track grows; one on a written track edits it in place.
+   */
+  private take: { start: number; fresh: boolean; measures: number[] } | null = null;
   /** What the engine was last told about the intro/fill-in. */
   private fillSent = false;
   private soundsSent = 0;
@@ -129,6 +140,12 @@ export class EditorRuntime {
           this.fillSent = false;
           this.store.setFillArmed(false);
         }
+        this.record(measures);
+      },
+      onEnded: () => {
+        if (!this.store.getState().playing) return;
+        this.store.setPlaying(false);
+        this.finishTake();
       },
       onSound: (slot) => {
         this.soundsTaken += 1;
@@ -149,6 +166,11 @@ export class EditorRuntime {
       const { project, fillArmed } = this.store.getState();
       if (fillArmed !== this.fillSent) this.sendFill(fillArmed);
       if (project === previous) return;
+      // A rhythm track is played or composed from its start, so turning the
+      // mode selector into or out of those modes stops the machine.
+      const from = previous.panel.mode;
+      const to = project.panel.mode;
+      if (this.store.getState().playing && from !== to && (isTrackMode(from) || isTrackMode(to))) this.stop();
       previous = project;
       this.persist(project);
       this.syncAudio();
@@ -310,6 +332,20 @@ export class EditorRuntime {
 
   async play(): Promise<void> {
     if (!(await this.ensureAudio())) return;
+    const { rhythmTracks, panel } = this.store.getState().project;
+    const written = isTrackMode(panel.mode) ? composition(rhythmTracks, panel.selector) : [];
+    if (panel.mode === 'play' && written.length === 0) {
+      this.store.notify(
+        'info',
+        `Rhythm track ${panel.selector + 1} is empty. To compose it, turn the mode selector to compose and press start.`,
+      );
+      return;
+    }
+    this.take =
+      panel.mode === 'compose' ? { start: panel.selector, fresh: written.length === 0, measures: [...written] } : null;
+    // A written track plays as a song: round and round in play, once through
+    // while it is edited. Everything else follows the panel.
+    this.audio.setSong(written, panel.mode === 'play');
     this.store.setPlaying(true);
     // A fill-in armed before audio was running is the intro.
     this.sendFill(this.store.getState().fillArmed);
@@ -319,6 +355,28 @@ export class EditorRuntime {
   stop(): void {
     this.store.setPlaying(false);
     this.audio.stop();
+    this.finishTake();
+  }
+
+  /** Notes the rhythm of each measure the engine began, while composing. */
+  private record(measures: EngineMeasure[]): void {
+    const take = this.take;
+    if (!take) return;
+    const capacity = compositionCapacity(take.start);
+    for (const measure of measures) {
+      // An empty track grows by a measure at a time. A written one keeps its
+      // length: the engine says which of its measures this is.
+      const index = take.fresh ? measure.ordinal - 1 : measure.position;
+      if (index >= 0 && index < capacity) take.measures[index] = measure.pattern >> 1;
+    }
+    if (take.fresh && take.measures.length >= capacity) this.stop();
+  }
+
+  /** Stores what was composed. The measure in which the machine stopped is the last one. */
+  private finishTake(): void {
+    const take = this.take;
+    this.take = null;
+    if (take && take.measures.length > 0) this.store.commitComposition(take.start, take.measures);
   }
 
   private sendFill(armed: boolean): void {
@@ -337,7 +395,7 @@ export class EditorRuntime {
    */
   tap(): void {
     const { project, playing, currentStep, currentPattern, fillArmed } = this.store.getState();
-    if (isPlayMode(project.panel.mode)) {
+    if (isPerformMode(project.panel.mode)) {
       this.store.setFillArmed(!fillArmed);
       return;
     }
@@ -370,10 +428,32 @@ export class EditorRuntime {
 
   // ---- Import and export ---------------------------------------------------
 
-  /** Renders one loop of the selected rhythm offline, with a separate engine instance. */
+  /**
+   * Renders what an export holds, offline, with a separate engine instance:
+   * the selected rhythm as a loop, or the selected rhythm track once through.
+   */
   async renderLoop(sampleRate: number): Promise<LoopRender> {
     const { project } = this.store.getState();
-    return renderLoop(await this.loadOfflineWasm(), project, selectedPattern(project), sampleRate);
+    return renderSong(await this.loadOfflineWasm(), project, this.exportPlan(sampleRate), sampleRate);
+  }
+
+  /** What an export holds, or an error that says why there is nothing to export. */
+  private exportPlan(sampleRate?: number): RenderPlan {
+    const { project } = this.store.getState();
+    const plan = exportPlan(project);
+    if (plan.rhythms.length === 0) {
+      throw new Error(`rhythm track ${project.panel.selector + 1} is empty.`);
+    }
+    if (sampleRate === undefined) return plan;
+    // Audio is rendered in memory, so a long track is cut at a whole measure.
+    const limit = wholeMeasuresWithin(project, plan, MAX_WAV_SECONDS);
+    if (limit < plan.rhythms.length) {
+      this.store.notify(
+        'info',
+        `The WAV holds the first ${limit} of ${plan.rhythms.length} measures: about ${MAX_WAV_SECONDS / 60} minutes. The MIDI export holds them all.`,
+      );
+    }
+    return { ...plan, rhythms: plan.rhythms.slice(0, limit) };
   }
 
   async exportWav(bitDepth: WavBitDepth = 24, sampleRate = 44100): Promise<void> {
@@ -389,7 +469,7 @@ export class EditorRuntime {
   async exportMidi(): Promise<void> {
     try {
       const { project } = this.store.getState();
-      const bytes = exportMidi(await this.loadOfflineWasm(), project, [selectedPattern(project)]);
+      const bytes = exportSongMidi(await this.loadOfflineWasm(), project, this.exportPlan());
       downloadBytes(`${exportBaseName(project)}.mid`, bytes, 'audio/midi');
     } catch (error) {
       this.store.notify('error', `The MIDI export failed: ${describe(error)}`);
@@ -434,6 +514,23 @@ export class EditorRuntime {
 }
 
 const EARLIER_VERSION_NOTE = 'Its pattern is now Basic Rhythm 1.';
+
+/** The longest WAV an export renders. */
+const MAX_WAV_SECONDS = 300;
+
+/** How many measures of a plan fit in a number of seconds, never fewer than one. */
+function wholeMeasuresWithin(project: Project, plan: RenderPlan, seconds: number): number {
+  const beatSeconds = 60 / tempoBpm(project.tempo);
+  let elapsed = 0;
+  let count = 0;
+  for (const rhythm of plan.rhythms) {
+    const entry = project.rhythms[rhythm]!;
+    elapsed += (rhythmLength(entry) / stepsPerBeat(entry.preScale)) * beatSeconds;
+    if (count > 0 && elapsed > seconds) break;
+    count += 1;
+  }
+  return count;
+}
 
 function samePanel(a: EnginePanel, b: EnginePanel): boolean {
   return (Object.keys(a) as Array<keyof EnginePanel>).every((key) => a[key] === b[key]);

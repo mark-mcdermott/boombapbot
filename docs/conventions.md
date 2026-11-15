@@ -103,12 +103,16 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   smoothed per sample, in a way that does not depend on buffer size.
 - The engine, not TypeScript, decides what plays at a bar line.
   `engine/src/sequencer.h` is pure and holds those rules: A, AB and B, intro,
-  tapped and automatic fill-ins. `engine/machine.ts` (`enginePanel`) only
-  tells the engine where the panel's switches stand. Rhythm tracks go into
-  the engine too, not into timers on the main thread.
+  tapped and automatic fill-ins, and songs. `engine/machine.ts`
+  (`enginePanel`) only tells the engine where the panel's switches stand. A
+  rhythm track is handed over whole as a song (`snare_engine_set_song`), and
+  an export asks the engine which version each measure plays
+  (`snare_song_patterns`) so it cannot disagree with what is heard.
 - The page learns what played from the measure log, which the worklet drains
   after every render and never skips. A measure whose rhythm changed on its
-  second beat is reported twice under one ordinal.
+  second beat is reported twice under one ordinal. Compose records from it:
+  `EditorRuntime` keeps the take and stores it when the machine stops, as
+  one undo step.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.
@@ -123,9 +127,12 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   as a convenience.
 - The engine's pattern for a rhythm is `rhythm * 2`, plus one for its B
   version (`patternIndex`).
+- The instrument selector chooses a rhythm track in play and compose, and a
+  track runs on into the next only when it is full (`composition`,
+  `withComposition`).
 - The step buttons do three jobs: steps in the two write modes, the last step
-  of a part while CLEAR is down, and the choice of rhythm in every other
-  mode. `EditorStore.pressStep` is the one place that decides which.
+  of a part while CLEAR is down, and the choice of rhythm in pattern clear,
+  manual play and compose. Playing a track back they do nothing. `EditorStore.pressStep` is the one place that decides which.
   `panelTarget` (contracts) says which rhythm and version the panel is on.
 - Undo covers what the machine remembers (`rhythms`, `rhythmTracks`) and a
   whole-project import. Knobs, switches, tempo and the name are not undo
