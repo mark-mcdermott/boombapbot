@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.astro/
+.vercel/
+build/
+.tools/
+*.log
+.DS_Store
+test-results/
+playwright-report/
+blob-report/
+coverage/
+
+# Generated at build time (see scripts/sync-assets.mjs and scripts/build-wasm.sh)
+apps/site/public/engine/
+apps/site/public/kits/
+apps/site/public/faceplates/
+apps/site/public/boombapbot-assets.json
+
+# Owner-supplied faceplate photos. Rights and provenance are not recorded yet,
+# so they stay out of public source. See misc/assets/README.md.
+misc/assets/*
+!misc/assets/README.md
