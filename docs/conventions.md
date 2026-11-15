@@ -140,6 +140,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - An older project is brought up to date in `parseProject`, which also
   reports what was lost; the page shows that list. Add a step there for every
   schema change, with a fixture.
+- A new project gets the starter rhythms and starter track
+  (`packages/contracts/src/starter.ts`). They are written for boombapbot; do
+  not copy the hardware's factory rhythms into them. Browser tests that need
+  an empty rhythm use Basic Rhythm 10.
 - An invalid project import must never replace the current draft, and an
   unreadable saved draft is set aside, not deleted.
 - `assets/kits/` holds generated sample kits for the 606, 707 and 909, made by

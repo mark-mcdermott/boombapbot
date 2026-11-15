@@ -34,6 +34,7 @@ test('composing records the rhythm of every measure into the selected track', as
   await expect(page.getByTestId('panel-clear')).toHaveAccessibleName('Clear rhythm track 3');
   await expect(page.getByTestId('editor')).toHaveAttribute('data-audio', 'idle');
   expect((await project(page)).rhythmTracks[2]).toEqual([]);
+  const untouched = (await project(page)).rhythmTracks.filter((_, index) => index !== 2);
 
   // Play Basic Rhythm 1, change to 5, drop in a fill-in, and stop back on 5.
   const watch = patternWatcher(page);
@@ -50,9 +51,9 @@ test('composing records the rhythm of every measure into the selected track', as
 
   const composed = (await project(page)).rhythmTracks[2]!;
   expect(composed.join(' ')).toMatch(/^(0 )+(4 )+12( 4)+$/);
-  // Nothing else was written, and the draft has it.
+  // No other track was touched, and the draft has it.
   const after = await project(page);
-  expect(after.rhythmTracks.filter((track) => track.length > 0)).toHaveLength(1);
+  expect(after.rhythmTracks.filter((_, index) => index !== 2)).toEqual(untouched);
   await expect
     .poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)!).rhythmTracks[2].length, DRAFT_KEY))
     .toBe(composed.length);
@@ -142,12 +143,13 @@ test('exports a rhythm track as MIDI and as audio that rings out', async ({ page
   await importChanged(page, (seed) => {
     seed.panel.mode = 'play';
     seed.panel.selector = 0;
-    seed.rhythmTracks[0] = [0, 0, 12, 0];
+    // Basic Rhythm 9 is empty in the starter set: a measure of rest.
+    seed.rhythmTracks[0] = [0, 0, 8, 0];
   });
   const bpm = bpmOf(await project(page));
   const midi = parseMidi(await downloadBytes(await exportVia(page, 'export-midi')));
   expect(midi.trackEnds).toEqual([4 * 1920, 4 * 1920]);
-  // Basic Rhythm 1 three times; the starter's Intro/Fill-in 1 is empty.
+  // Basic Rhythm 1 twice, the rest, and Basic Rhythm 1 again.
   const kicks = midi.notes.filter((note) => note.on && note.note === 36).map((note) => note.tick);
   expect(kicks.filter((tick) => tick >= 2 * 1920 && tick < 3 * 1920)).toEqual([]);
   expect(kicks.filter((tick) => tick < 1920).map((tick) => tick + 3 * 1920)).toEqual(kicks.filter((tick) => tick >= 3 * 1920));
@@ -179,6 +181,12 @@ test('with the lever on AB an export holds A then B', async ({ page }) => {
   expect(Math.abs(both.frames - (44100 * 480) / bpm)).toBeLessThanOrEqual(1);
   const midi = parseMidi(await downloadBytes(await exportVia(page, 'export-midi')));
   expect(midi.trackEnds).toEqual([3840, 3840]);
-  // The starter's B version is empty, so every note is in the first measure.
-  expect(midi.notes.every((note) => note.tick <= 1920)).toBe(true);
+  // The bass drum plays version A's steps in the first measure and version B's in the second.
+  const rhythm = (await project(page)).rhythms[0]!;
+  const steps = (row: string) => [...row].flatMap((mark, index) => (mark === 'x' ? [index] : []));
+  const kicks = midi.notes.filter((note) => note.on && note.note === 36).map((note) => note.tick);
+  expect(kicks).toEqual([
+    ...steps(rhythm.a.kick).map((index) => index * 120),
+    ...steps(rhythm.b.kick).map((index) => 1920 + index * 120),
+  ]);
 });

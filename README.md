@@ -12,11 +12,12 @@ mode selector turns the same sixteen buttons into the choice of rhythm.
 Everything else is behind the cog in the footer: the beat's name, undo, and
 export as WAV, MIDI or a project file. Reload and your beat is still there.
 
-The aim is the whole machine, worked from its operation manual. This build has
-its sounds, its twelve tracks, its accent, every knob and voice switch, its
-pattern memory with the write modes, manual play with intros and fill-ins,
-and the twelve rhythm tracks, and
-[what is modelled so far](#the-machine) says exactly where it stands.
+It is the whole machine as its operation manual describes it: its sixteen
+sounds, twelve tracks and accent, every knob and switch, its pattern memory
+with the write modes, manual play with intros and fill-ins, and its twelve
+rhythm tracks. Only what a browser cannot do is left out. It was built from
+the manual, not from a machine, and [The machine](#the-machine) says where
+it guesses.
 
 The 808 panel above is original artwork, drawn in code by
 [`scripts/draw-faceplates.mjs`](scripts/draw-faceplates.mjs).
@@ -92,6 +93,12 @@ pnpm serve
   intro, or drops it in after the measure that is running, once; the auto
   fill-in selector does that every 2, 4, 8, 12 or 16 measures. All of it is
   decided inside the engine at the bar line, on the audio clock.
+- **Starter rhythms.** A new machine remembers eight Basic Rhythms, a ninth
+  that plays every sound at once for setting levels, four Intro/Fill-ins,
+  each in an A and a B version, and one rhythm track that strings them
+  together. They were written for boombapbot and are not the hardware's
+  factory rhythms. Basic Rhythms 9 to 11 are empty, and settings can put the
+  starter set back.
 - **Rhythm tracks.** In compose, the instrument selector chooses one of
   twelve tracks and every measure you play is remembered: which rhythm, not
   which version, so the variation levers still work on playback. Stop, and
@@ -127,7 +134,7 @@ pnpm serve
 
 ## The machine
 
-What the build models, against the operation manual:
+What the build does, against the operation manual:
 
 | Part of the machine | State |
 | --- | --- |
@@ -185,7 +192,7 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | `pnpm build:engine` | 12 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
 | `pnpm build:wasm` | 63,297-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 115 of 115 pass |
+| `pnpm test:unit` | 119 of 119 pass |
 | `pnpm build` | Build check passes |
 | `pnpm test:e2e` | 55 of 55 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
@@ -233,7 +240,7 @@ start button.
 `pnpm bench` renders a worst case through the WASM engine: every track on
 every step of a 32-step measure of thirty-second notes at 300 BPM, with every
 decay knob fully right, in 128-frame blocks. On the machine above that ran
-about 250 times faster than real time, with the slowest block taking 0.3 ms
+about 200 times faster than real time, with the slowest block taking 0.3 ms
 of its 2.67 ms budget and output bounded. A track has one voice, so the pool
 of 64 is never full in normal use. This is a desktop number.
 
@@ -354,14 +361,12 @@ built from it is distributed. Details and the full not-verified list:
 In the build spec's sequence, v0.1 covers the web half of "prove the platform
 stack" and most of "build one end-to-end beat". Next:
 
-1. Finish the machine: every control on the panel, pattern memory and
-   writing, manual play with intros and fill-ins, then rhythm tracks. The
-   order is in [`docs/follow-ups.md`](docs/follow-ups.md).
-2. Have a person listen to it, on a desktop and a phone, beside a real
-   machine if one can be found, and fix what they hear.
-3. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
+1. Have a person listen to it, on a desktop and a phone, beside a real
+   machine if one can be found, and fix what they hear. What the build
+   guesses at is listed in [`docs/follow-ups.md`](docs/follow-ups.md).
+2. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
    AVAudioEngine and Oboe on mobile, and the VST3 in a real host on Windows
    and macOS.
-4. Bring back the 606, 707 and 909, each with its own sounds and panel.
+3. Bring back the 606, 707 and 909, each with its own sounds and panel.
 
 Cloud sync, accounts, billing, signing and store submission come after that.

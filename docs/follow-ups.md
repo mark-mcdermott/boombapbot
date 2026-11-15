@@ -8,7 +8,8 @@ in this file has been built unless it says so.
 The editor now does what the 808's operation manual describes, short of what
 a browser cannot. What is left of that work:
 
-1. **A listen, and what it turns up.** See "How it sounds" below.
+1. **A listen, and what it turns up.** The sounds, the reach of the level and
+   accent knobs, and the feel of TAP are the parts most likely to need it.
 2. **Long exports off the main thread.** A rhythm track renders in memory on
    the main thread, so WAV export stops at five minutes. A Worker and
    streamed encoding would lift that.

@@ -29,6 +29,7 @@ import {
   createEmptyRhythm,
   createProject,
   createStarterRhythms,
+  createStarterTracks,
   getTrack,
   isPerformMode,
   isStepOn,
@@ -93,9 +94,12 @@ describe('project schema', () => {
     expect(project.format).toBe(PROJECT_FORMAT);
     expect(tempoBpm(project.tempo)).toBeCloseTo(118, 1);
     expect(countHits(project.rhythms[0]!, 'a')).toBeGreaterThan(10);
-    expect(project.rhythms.slice(1).every((rhythm) => countHits(rhythm, 'a') + countHits(rhythm, 'b') === 0)).toBe(
-      true,
-    );
+    expect(project.rhythms).toEqual(createStarterRhythms());
+    expect(project.rhythmTracks).toEqual(createStarterTracks());
+    // Rhythms given to it come without the starter track, which would not suit them.
+    const blank = createProject({ id: 'p', now: new Date(0), rhythms: Array.from({ length: RHYTHM_COUNT }, createEmptyRhythm) });
+    expect(blank.rhythmTracks.every((track) => track.length === 0)).toBe(true);
+    expect(parseProject(blank).ok).toBe(true);
     expect(project.sound.levels.kick).toBe(0.75);
     expect(project.sound.alternates).toEqual({
       low_tom: false,
@@ -104,7 +108,6 @@ describe('project schema', () => {
       rim_shot: false,
       clap: false,
     });
-    expect(project.rhythmTracks).toEqual(Array.from({ length: 12 }, () => []));
   });
 
   const rejected: Array<[string, (project: Record<string, any>) => void]> = [
@@ -514,5 +517,51 @@ describe('rhythm tracks', () => {
     // What does not fit in the tracks that are left is dropped.
     expect(withComposition(tracks, 11, run(100))[11]).toHaveLength(64);
     expect(tracks[5]).toEqual(run(9));
+  });
+});
+
+describe('starter rhythms', () => {
+  const rhythms = createStarterRhythms();
+  const written = rhythms.flatMap((rhythm, index) => (countHits(rhythm, 'a') > 0 ? [index] : []));
+
+  it('fills eight Basic Rhythms, the sound check and the four Intro/Fill-ins, in both versions', () => {
+    expect(written).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 11, 12, 13, 14, 15]);
+    for (const index of written) {
+      expect(countHits(rhythms[index]!, 'b'), `rhythm ${index + 1} version B`).toBeGreaterThan(0);
+      expect(rhythms[index]!.b, `rhythm ${index + 1}`).not.toEqual(index === 11 ? undefined : rhythms[index]!.a);
+    }
+    // Three are left for whoever opens the page.
+    for (const index of [8, 9, 10]) expect(rhythms[index]).toEqual(createEmptyRhythm());
+  });
+
+  it('writes no step past the end of its measure', () => {
+    for (const rhythm of rhythms) {
+      for (const version of ['a', 'b'] as const) {
+        for (const id of TRACK_IDS) {
+          const row = rhythm[version][id];
+          expect(row.slice(rhythm.firstLength, 16)).not.toContain('x');
+          expect(row.slice(16 + rhythm.secondLength)).not.toContain('x');
+        }
+      }
+    }
+  });
+
+  it('shows the machine off: a triplet rhythm, one with a 2nd part, and every sound at once', () => {
+    expect(rhythms[5]).toMatchObject({ preScale: 1, firstLength: 12, secondLength: 0 });
+    expect(rhythms[6]).toMatchObject({ preScale: 3, firstLength: 16, secondLength: 4 });
+    expect(rhythmLength(rhythms[6]!)).toBe(20);
+    for (const id of INSTRUMENT_IDS) expect(countSteps(rhythms[11]!.a[id], 16)).toBe(4);
+    expect(countSteps(rhythms[11]!.a.accent, 16)).toBe(0);
+  });
+
+  it('comes with one rhythm track, made of rhythms that are written', () => {
+    const tracks = createStarterTracks();
+    expect(tracks).toHaveLength(12);
+    expect(tracks[0]).toHaveLength(25);
+    expect(tracks.slice(1).every((track) => track.length === 0)).toBe(true);
+    expect(tracks[0]!.every((rhythm) => written.includes(rhythm))).toBe(true);
+    // It opens with an intro and has fill-ins on the way.
+    expect(tracks[0]![0]).toBeGreaterThanOrEqual(12);
+    expect(tracks[0]!.filter((rhythm) => rhythm >= 12).length).toBeGreaterThanOrEqual(4);
   });
 });

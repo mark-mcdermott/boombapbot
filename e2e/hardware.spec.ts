@@ -391,7 +391,7 @@ test('the mode selector turns the step buttons from steps into rhythm choices', 
   expect((await project(page)).panel.mode).toBe('manual_play');
   await expect(stepButton(page, 0)).toHaveAccessibleName('Basic Rhythm 1, selected');
   await expect(stepButton(page, 12)).toHaveAccessibleName('Intro/Fill-in 1, selected');
-  await expect(stepButton(page, 5)).toHaveAccessibleName('Basic Rhythm 6');
+  await expect(stepButton(page, 9)).toHaveAccessibleName('Basic Rhythm 10');
   const lamps = panel.locator('[data-panel-lamp]');
   await expect(lamps.nth(0)).toHaveAttribute('data-flash', 'true');
   await expect(lamps.nth(12)).toHaveAttribute('data-on', 'true');
@@ -399,18 +399,19 @@ test('the mode selector turns the step buttons from steps into rhythm choices', 
   await expect(page.getByTestId('lamp-first-part')).toHaveAttribute('data-on', 'false');
 
   const before = await project(page);
-  await stepButton(page, 5).click();
+  await stepButton(page, 9).click();
   const after = await project(page);
-  expect(after.panel.basicRhythm).toBe(5);
+  expect(after.panel.basicRhythm).toBe(9);
   expect(after.rhythms).toEqual(before.rhythms);
-  await expect(lamps.nth(5)).toHaveAttribute('data-flash', 'true');
+  await expect(lamps.nth(9)).toHaveAttribute('data-flash', 'true');
   await expect(lamps.nth(0)).toHaveAttribute('data-on', 'false');
 
-  // Back in a write mode, the buttons are the steps of the rhythm just chosen: an empty one.
+  // Back in a write mode, the buttons are the steps of the rhythm just chosen,
+  // which the starter set leaves empty.
   await page.getByTestId('panel-mode-write_first').click();
   await expect(stepButton(page, 0)).toHaveAccessibleName('Bass Drum, step 1, off');
   await stepButton(page, 0).click();
-  expect(stepsOn(await project(page), 'kick', 5)).toEqual([0]);
+  expect(stepsOn(await project(page), 'kick', 9)).toEqual([0]);
   expect(hitCount(await project(page), 0)).toBe(hitCount(before, 0));
 });
 
@@ -533,25 +534,30 @@ test('the 2nd part adds steps after the 1st, written from the same sixteen butto
 });
 
 test('each rhythm has an A and a B version, chosen with the variation lever', async ({ page }) => {
+  // Basic Rhythm 10 is empty in the starter set, in both versions.
+  await page.getByTestId('panel-mode-pattern_clear').click();
+  await stepButton(page, 9).click();
+  await page.getByTestId('panel-mode-write_first').click();
   const lever = page.getByTestId('panel-basic-variation');
   await expect(lever).toHaveAttribute('aria-valuetext', 'A');
   await expect(page.getByTestId('lamp-variation-a')).toHaveAttribute('data-on', 'true');
+  await stepButton(page, 0).click();
   const a = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
-  expect(a.events.every((event) => event.pattern === 0)).toBe(true);
+  expect(a.events.map((event) => [event.pattern, event.step])).toEqual([[18, 0]]);
 
   await lever.focus();
   await page.keyboard.press('End');
   await expect(lever).toHaveAttribute('aria-valuetext', 'B');
   await expect(page.getByTestId('lamp-variation-b')).toHaveAttribute('data-on', 'true');
   await expect(page.getByTestId('lamp-variation-a')).toHaveAttribute('data-on', 'false');
-  // The starter's B version is empty, so the buttons are dark and it writes separately.
+  // Version B has its own steps: the one just written in A is not among them.
   await expect(stepButton(page, 0)).toHaveAttribute('aria-pressed', 'false');
   await stepButton(page, 2).click();
   const snapshot = await project(page);
-  expect(snapshot.rhythms[0]!.b.kick[2]).toBe('x');
-  expect(stepsOn(snapshot, 'kick')).not.toContain(2);
+  expect(snapshot.rhythms[9]!.b.kick[2]).toBe('x');
+  expect(stepsOn(snapshot, 'kick', 9)).toEqual([0]);
   const b = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
-  expect(b.events.map((event) => [event.pattern, event.step])).toEqual([[1, 2]]);
+  expect(b.events.map((event) => [event.pattern, event.step])).toEqual([[19, 2]]);
 
   // An Intro/Fill-in has its own lever, with two positions.
   await page.getByTestId('panel-mode-pattern_clear').click();
@@ -680,6 +686,7 @@ test.describe('manual play', () => {
   });
 
   test('a rhythm chosen while another plays takes over, and the write modes then edit it', async ({ page }) => {
+    const before = (await project(page)).rhythms;
     const played = patternWatcher(page);
     await page.getByTestId('panel-toggle').click();
     await expect.poll(async () => (await played.poll()).length, { intervals: [20] }).toBeGreaterThanOrEqual(1);
@@ -688,6 +695,6 @@ test.describe('manual play', () => {
     await expect.poll(async () => (await played.poll()).includes(8), { intervals: [20] }).toBe(true);
     await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
     // Nothing was written by choosing it.
-    expect(hitCount(await project(page), 4)).toBe(0);
+    expect((await project(page)).rhythms).toEqual(before);
   });
 });

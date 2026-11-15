@@ -8,6 +8,7 @@ import {
   clearedVersions,
   createProject,
   createStarterRhythms,
+  createStarterTracks,
   isPerformMode,
   isStepOn,
   knobPosition,
@@ -288,7 +289,7 @@ export class EditorStore {
     this.commit({
       ...project,
       rhythms: createStarterRhythms(),
-      rhythmTracks: project.rhythmTracks.map(() => []),
+      rhythmTracks: createStarterTracks(),
     });
   }
 

@@ -26,7 +26,7 @@ import {
   type TrackId,
   type Variation,
 } from './machine';
-import { createStarterRhythms } from './starter';
+import { createStarterRhythms, createStarterTracks } from './starter';
 
 /**
  * The project document: everything the 808 remembers. Its sound settings, its
@@ -246,7 +246,8 @@ export function createProject(options: NewProjectOptions): Project {
     tempo: tempoFromBpm(options.bpm ?? 120),
     sound: createDefaultSound(),
     rhythms: options.rhythms ?? createStarterRhythms(),
-    rhythmTracks: Array.from({ length: RHYTHM_TRACKS }, () => []),
+    // The starter track plays the starter rhythms, so it comes only with them.
+    rhythmTracks: options.rhythms ? Array.from({ length: RHYTHM_TRACKS }, () => []) : createStarterTracks(),
     panel: createDefaultPanel(),
   };
 }

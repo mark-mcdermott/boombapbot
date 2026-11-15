@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { countHits, isStepOn, patternIndex, serializeProject, tempoBpm } from '@boombapbot/contracts';
+import {
+  countHits,
+  createStarterRhythms,
+  createStarterTracks,
+  isStepOn,
+  patternIndex,
+  serializeProject,
+  tempoBpm,
+} from '@boombapbot/contracts';
 import { exportPlan } from '../src/engine';
 import {
   DRAFT_KEY,
@@ -102,9 +110,10 @@ describe('editor store', () => {
     const store = makeStore();
     const before = store.getState().project.rhythms;
     store.loadStarterRhythms();
-    expect(hits(store, 1)).toBe(0);
-    expect(hits(store)).toBeGreaterThan(0);
-    expect(store.getState().project.rhythmTracks.every((track) => track.length === 0)).toBe(true);
+    expect(store.getState().project.rhythms).toEqual(createStarterRhythms());
+    expect(store.getState().project.rhythmTracks).toEqual(createStarterTracks());
+    // The fixture's fourth rhythm had a 2nd part of eight steps; the starter's does not.
+    expect(store.getState().project.rhythms[3]!.secondLength).toBe(0);
     store.undo();
     expect(store.getState().project.rhythms).toEqual(before);
     expect(store.getState().project.rhythmTracks[0]).toHaveLength(7);
