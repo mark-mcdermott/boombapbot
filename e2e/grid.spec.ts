@@ -119,3 +119,23 @@ test('tempo and swing controls edit the project', async ({ page }) => {
   expect((await project(page)).swing).toBe(75);
   await expect(page.getByTestId('swing-value')).toHaveText('75%');
 });
+
+test('the header shows the mascot and the wordmark', async ({ page }) => {
+  const mascot = page.getByTestId('brand-mascot');
+  await expect(mascot).toBeVisible();
+  await expect
+    .poll(() => mascot.evaluate((element: HTMLImageElement) => element.naturalWidth))
+    .toBeGreaterThan(0);
+  const wordmark = page.getByRole('img', { name: 'boombapbot' });
+  await expect(wordmark).toBeVisible();
+
+  // Mascot to the left of the wordmark, and a little taller than it.
+  const mascotBox = (await mascot.boundingBox())!;
+  const wordmarkBox = (await wordmark.boundingBox())!;
+  expect(mascotBox.x + mascotBox.width).toBeLessThanOrEqual(wordmarkBox.x);
+  expect(mascotBox.height).toBeGreaterThan(wordmarkBox.height);
+  expect(mascotBox.height).toBeLessThan(wordmarkBox.height * 1.5);
+  // Vertically centred on each other.
+  const offset = mascotBox.y + mascotBox.height / 2 - (wordmarkBox.y + wordmarkBox.height / 2);
+  expect(Math.abs(offset)).toBeLessThanOrEqual(2);
+});

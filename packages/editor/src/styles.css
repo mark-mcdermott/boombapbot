@@ -85,18 +85,31 @@
 
 .sb-brand {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The mascot's outline is near-black, which would vanish on this background.
+   A hairline in its own cream, drawn around the silhouette, keeps the whole
+   figure readable without altering the artwork. */
+.sb-mascot {
+  --mascot-edge: #f7e8d3;
+  display: block;
+  width: auto;
+  height: 42px;
+  flex: none;
+  filter: drop-shadow(0.6px 0 0 var(--mascot-edge)) drop-shadow(-0.6px 0 0 var(--mascot-edge))
+    drop-shadow(0 0.6px 0 var(--mascot-edge)) drop-shadow(0 -0.6px 0 var(--mascot-edge));
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .sb-wordmark {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.sb-wordmark::first-letter {
-  color: var(--accent);
+  display: block;
+  width: auto;
+  height: 31px;
+  flex: none;
+  fill: currentColor;
 }
 
 .sb-tag {
@@ -1179,6 +1192,14 @@
     --step-size: 46px;
     gap: 14px;
     padding: 14px 12px 24px;
+  }
+
+  .sb-mascot {
+    height: 38px;
+  }
+
+  .sb-wordmark {
+    height: 27px;
   }
 
   .sb-header-actions {

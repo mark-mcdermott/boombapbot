@@ -1,6 +1,7 @@
 import { Menu } from '@base-ui/react/menu';
 import { useEffect, useRef, useState } from 'react';
 import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
+import { Brand } from './Brand';
 import { useEditorState, useRuntime } from './context';
 import { ChevronIcon, DownloadIcon, UploadIcon } from './icons';
 import { Segmented } from './Segmented';
@@ -77,10 +78,7 @@ export function Header() {
 
   return (
     <header className="sb-header">
-      <div className="sb-brand">
-        <span className="sb-wordmark">boombapbot</span>
-        <span className="sb-tag">v0.1</span>
-      </div>
+      <Brand />
       <NameField />
       <div className="sb-header-actions">
         <Segmented<EditorMode>
