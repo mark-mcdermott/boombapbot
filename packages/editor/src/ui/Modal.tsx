@@ -1,10 +1,13 @@
 import { Dialog } from '@base-ui/react/dialog';
 import type { ReactNode, RefObject } from 'react';
 import { CloseIcon } from './icons';
+import { Tip } from './Tip';
 
 export interface ModalProps {
   /** What the icon button is called. */
   label: string;
+  /** What its tip says, when the name carries more than a tip should. */
+  tip?: string;
   title: string;
   /** The button's test id. The modal is `<testId>-modal` and its close button `<testId>-close`. */
   testId: string;
@@ -25,14 +28,20 @@ export function Modal(props: ModalProps) {
   const { testId, title } = props;
   return (
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
-      <Dialog.Trigger className={`sb-footer-icon ${props.className ?? ''}`} data-testid={testId} aria-label={props.label}>
-        {props.icon}
-        {props.badge && (
-          <span className="sb-footer-badge" aria-hidden="true">
-            {props.badge}
-          </span>
-        )}
-      </Dialog.Trigger>
+      <Tip label={props.tip ?? props.label} container={props.container}>
+        <Dialog.Trigger
+          className={`sb-footer-icon ${props.className ?? ''}`}
+          data-testid={testId}
+          aria-label={props.label}
+        >
+          {props.icon}
+          {props.badge && (
+            <span className="sb-footer-badge" aria-hidden="true">
+              {props.badge}
+            </span>
+          )}
+        </Dialog.Trigger>
+      </Tip>
       <Dialog.Portal container={props.container}>
         <Dialog.Backdrop className="sb-modal-backdrop" />
         {/* Closed with the keyboard, focus goes back to the button. Closed with a

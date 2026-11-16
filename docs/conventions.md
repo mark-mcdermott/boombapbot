@@ -186,7 +186,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   A control the machine has belongs on its faceplate. Anything else about the
   machine lives in the settings modal behind the footer's cog
   (`packages/editor/src/ui/Settings.tsx`).
-- `Header` (the brand: mascot over the tagline, beside the wordmark) and
+- `Header` (the brand: mascot over the tagline, together as tall as the
+  wordmark beside them) and
   `Footer` (About, Docs, manifesto, credits, policies, upgrade, cart,
   settings, account) are shared. The owner asked for the machines in the
   header to be hidden for now (`SHOW_MACHINES` in `ui/Header.tsx`).
@@ -198,6 +199,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   the bottom. Keep
   Policies true to what the site does, and update it before payments open.
   Every footer modal goes through `ui/Modal.tsx`.
+- Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
+  and a move of its own when pointed at. The tip is for the eye only: the
+  icon keeps its `aria-label`. The moves are CSS that picks shapes inside
+  lucide's icons by their order, so look at all nine after changing an icon
+  or upgrading `lucide-react`.
 - The upgrade has no backend. Its modal says so and offers no form. Do not
   add a form, a price or a feature list until the real thing exists. The
   cart is the shop (`ui/Shop.tsx`); it shows products only when the server

@@ -172,7 +172,7 @@ test.describe('the page around the machine', () => {
     await expect(page.getByTestId('shop-unreachable')).toContainText('The machine does not need it');
   });
 
-  test('the tagline sits under the mascot, and the wordmark beside them', async ({ page }) => {
+  test('the tagline sits under the mascot, and together they are as tall as the wordmark beside them', async ({ page }) => {
     await openEditor(page);
     const tagline = page.getByTestId('tagline');
     await expect(tagline).toHaveText('Let’s cook');
@@ -183,6 +183,9 @@ test.describe('the page around the machine', () => {
     // Centred under the mascot.
     expect(Math.abs(words.x + words.width / 2 - (mascot.x + mascot.width / 2))).toBeLessThanOrEqual(2);
     expect(mark.x).toBeGreaterThan(Math.max(mascot.x + mascot.width, words.x + words.width));
+    // The mascot starts level with the top of the wordmark and the tagline's letters stand on its foot.
+    expect(Math.abs(mascot.y - mark.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(words.y + words.height - (mark.y + mark.height))).toBeLessThanOrEqual(1);
   });
 
   test('the footer sits 50px under the machine once the notice is closed', async ({ page }) => {
@@ -211,6 +214,77 @@ test.describe('the page around the machine', () => {
     expect(firstTool.y).toBeCloseTo(lastPage.y, 0);
     expect(firstTool.x - (lastPage.x + lastPage.width)).toBeLessThanOrEqual(4);
     expect(lastTool.x + lastTool.width).toBeGreaterThanOrEqual(footer.x + footer.width);
+  });
+
+  test('pointing at a footer icon shows its name over it', async ({ page }) => {
+    await openEditor(page);
+    const tip = page.getByTestId('tip');
+    await expect(tip).toHaveCount(0);
+    const names: [string, string][] = [
+      ['nav-about', 'About'],
+      ['nav-docs', 'Docs'],
+      ['nav-manifesto', 'Manifesto'],
+      ['nav-credits', 'Credits'],
+      ['nav-policies', 'Policies'],
+      ['upgrade', 'Upgrade'],
+      ['cart', 'Cart'],
+      ['settings', 'Settings'],
+      ['account', 'Account'],
+    ];
+    for (const [id, name] of names) {
+      const icon = page.getByTestId(id);
+      await icon.hover();
+      await expect(tip).toHaveText(name);
+      const over = (await tip.boundingBox())!;
+      const under = (await icon.boundingBox())!;
+      expect(over.y + over.height).toBeLessThanOrEqual(under.y + 1);
+      // The tip is for the eye: a screen reader has the icon's own name and is not told twice.
+      await expect(icon).not.toHaveAttribute('aria-describedby');
+      await expect(tip).toHaveAttribute('aria-hidden', 'true');
+    }
+    await page.getByTestId('hardware').hover();
+    await expect(tip).toHaveCount(0);
+  });
+
+  test('a tip shows for the keyboard too, and goes when its modal opens', async ({ page }) => {
+    await openEditor(page);
+    const tip = page.getByTestId('tip');
+    await page.locator('.sb-made a').focus();
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('nav-about')).toBeFocused();
+    await expect(tip).toHaveText('About');
+
+    await page.getByTestId('settings').hover();
+    await expect(tip).toHaveText('Settings');
+    await page.getByTestId('settings').click();
+    await expect(page.getByTestId('settings-modal')).toBeVisible();
+    await expect(tip).toHaveCount(0);
+  });
+
+  test('each footer icon moves when it is pointed at', async ({ page }) => {
+    await openEditor(page);
+    // These hold a pose for as long as the pointer stays.
+    for (const id of ['nav-manifesto', 'cart', 'settings']) {
+      const drawing = page.getByTestId(id).locator('svg');
+      expect(await drawing.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
+      await page.getByTestId(id).hover();
+      await expect.poll(() => drawing.evaluate((node) => getComputedStyle(node).transform)).not.toBe('none');
+    }
+    // These play once: one shape inside the icon is animated.
+    const played: [string, number][] = [
+      ['nav-about', 3],
+      ['nav-docs', 2],
+      ['nav-credits', 1],
+      ['nav-policies', 3],
+      ['upgrade', 1],
+      ['account', 2],
+    ];
+    for (const [id, shape] of played) {
+      const part = page.getByTestId(id).locator(`svg > :nth-child(${shape})`);
+      expect(await part.evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
+      await page.getByTestId(id).hover();
+      expect(await part.evaluate((node) => getComputedStyle(node).animationName)).toMatch(/^sb-ico-/);
+    }
   });
 
   test('says once what it keeps in the browser, without covering anything', async ({ page }) => {

@@ -3,7 +3,7 @@ import mascotUrl from '../assets/mascot.svg?url';
 /** The mascot's drawing is 560 by 434 units. */
 const MASCOT_ASPECT = 560 / 434;
 /** Height at full size; the stylesheet shrinks it to fit narrow screens. */
-const MASCOT_HEIGHT = 63;
+const MASCOT_HEIGHT = 57;
 
 export const TAGLINE = 'Let’s cook';
 
