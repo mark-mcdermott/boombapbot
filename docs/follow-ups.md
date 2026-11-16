@@ -52,13 +52,12 @@ Accounts are built: sign-up with a confirmed address, log-in, log-out and
 password reset, in the account modal. The upgrade and the cart still open a
 modal that says they are not open.
 
-- **Before accounts go live.** The Neon database has its tables
-  (`pnpm db:migrate`, run once) and the built server reads from it. Still to
-  do: verify a sending domain in Resend and fill in `RESEND_API_KEY` and
-  `EMAIL_FROM`, then set the same values in Vercel with its own
-  `BETTER_AUTH_SECRET`. No real sign-up has been made yet, and nothing has
-  been tried on Vercel: the tests use a database inside the process and an
-  outbox folder.
+- **Accounts are live.** The Neon database has its tables, and Vercel has
+  the Resend key, the sending address and its own `BETTER_AUTH_SECRET`. On
+  2026-11-16 the owner signed up on the live site and the confirmation
+  email worked. The Resend key was replaced later that day, and a password
+  reset with the new key worked too. The tests still use a database inside
+  the process and an outbox folder.
 - **What an account is for.** Decided by the owner: as much as possible
   works with no account. A free account adds some cloud storage for beats
   and syncing across devices. That is the next piece: a projects table per
@@ -78,19 +77,19 @@ modal that says they are not open.
   ordinary effects (distortion, a flanger and the like) stay free. None of it
   exists. The engine has no effects at all yet, and the exact split is still
   loose.
-- **The shop** is built and closed. The catalog holds the one product in the
-  Printful store and ships wherever Printful does, at Printful's live rate
-  for the address. Before it opens:
-  - Put the Stripe secret key in place. (The `orders` table is in the
-    database since 2026-11-15.) The owner chose live keys, so the first real
-    purchase is a real charge and a real Printful order, made by the owner
-    and by nothing automated. Nothing has
-    run against real Stripe; in particular a Checkout with a shipping option
-    and no address collection has only been sent to the stand-in.
-  - Register both webhooks, Stripe's on the current API version. Printful's
-    is set through its API: put `PRINTFUL_WEBHOOK_SECRET` in Vercel and in
-    `apps/site/.env`, deploy, then `pnpm shop:webhook --register`. That
-    script has only run against a stand-in.
+- **The shop** has been open on the live site since 2026-11-16. The catalog
+  holds the two products in the Printful store, a hoodie and a sticker, and
+  ships wherever Printful does, at Printful's live rate for the address.
+  What is left:
+  - The first real purchase. The owner chose live keys, so it is a real
+    charge and a real Printful order, made by the owner and by nothing
+    automated. Nothing has run against real Stripe; in particular a Checkout
+    with a shipping option and no address collection has only been sent to
+    the stand-in.
+  - Both webhooks are registered: Stripe's in its dashboard, Printful's by
+    `pnpm shop:webhook --register`. No real event has reached either yet. To
+    change Printful's secret, set the new value in Vercel and in
+    `apps/site/.env`, deploy, and run that command again.
   - The Policies page has a section on the shop since 2026-11-16: returns
     and refunds in the owner's words, what is paid, that Stripe takes the
     payment and Printful gets the address, and what an order keeps. Keep it
@@ -102,8 +101,9 @@ modal that says they are not open.
   - The buyer gets no email from the site and has nowhere to see an order's
     status; tracking is recorded but not shown.
   - A pending order that is never paid stays in the table, with its address.
-  - The product is named "Unisex Hoodie" in Printful, which is what the shop
-    shows. Rename it there and run `pnpm shop:sync`.
+  - The shop shows each product under its name in Printful. To change a
+    name, a price or a picture, change it there and run `pnpm shop:sync`.
+    In the sticker's picture the character lies on its side.
 - **Policies.** The Policies page says what an account and an order keep
   and how the shop works. It was drafted from how the site behaves and is
   not legal advice; nobody qualified has read it. It says no sales tax or
@@ -194,8 +194,7 @@ the compile spike. Beyond it:
     stops and says so if it is not.
   - The site's own values, set in Vercel for Production (see
     `apps/site/.env.example`). A changed value needs a new deployment: run
-    the workflow by hand. Still missing there: the Resend, Stripe and
-    webhook values.
+    the workflow by hand. All of them are set there as of 2026-11-16.
 - **Browsers.** Only headless Chromium was exercised. Firefox, Safari and real
   phones need a pass, in particular iOS Safari's audio unlock and the phone
   layout on small screens.
