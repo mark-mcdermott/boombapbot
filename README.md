@@ -1,8 +1,9 @@
 # boombapbot
 
 A drums-only beat maker. This is **v0.1**: the web editor. The machine runs
-entirely on your computer and needs no account. Accounts are optional and
-are the only part with a server behind it.
+entirely on your computer and needs no account. Accounts are optional: a
+free one holds up to 20 saved beats, to pick up on another device. Accounts
+and the shop are the only parts with a server behind them.
 
 ![The page as it opens: the 808 panel playing the starter rhythm](docs/screenshots/hardware-808.jpg)
 
@@ -79,7 +80,9 @@ pnpm serve
   (see [Shop](#shop)).
 - **Accounts, if you want one.** The account button opens a modal to make an
   account, confirm the address from an emailed link, log in and out, and
-  reset a forgotten password. An account does nothing else yet.
+  reset a forgotten password. Logged in, it saves the beat on the machine
+  to the account, lists what is saved there, and loads or deletes one (see
+  [Saved beats](#saved-beats)).
 - **One machine.** Only the 808 is built. The other three machines are drawn
   for the header but are not shown for now.
 - **Every control on the faceplate works**, the power switch included: off,
@@ -184,7 +187,7 @@ in.
 
 Accounts follow the same pattern as the owner's other apps: Better Auth with
 email and password, Neon Postgres through Drizzle, and Resend for email. The
-pages are still prerendered; only `/api/auth/*` runs on a server.
+pages are still prerendered; only the routes under `/api` run on a server.
 
 Copy `apps/site/.env.example` to `apps/site/.env` and fill in the first five
 values. Then create the tables:
@@ -211,6 +214,34 @@ with the in-process database and the outbox, and that the built server
 reads from the real Neon database once it is migrated. On the live site, on
 2026-11-16, the owner signed up and later reset a password: both emails
 arrived through Resend and their links worked.
+
+### Saved beats
+
+A free account holds up to 20 beats, each at most 64 KB of project JSON.
+Both numbers are constants in `packages/contracts/src/beats.ts`, enforced
+by the server.
+
+- Saving is explicit. "Save this beat to my account" in the account modal
+  sends the project on the machine; nothing is sent otherwise, and there is
+  no background sync. The draft in the browser stays the working copy.
+- The list under the button shows each beat's name, when it was saved and
+  its size, with a button to load it and one to delete it. Deleting asks
+  first. Loading takes the same road as importing a project file: it is
+  validated, and undo brings back the beat that was on the machine.
+- Saving a beat that was loaded from the account, or saved to it before,
+  replaces that copy. The last save wins, with one guard: if the copy in
+  the account was saved after the one this device last loaded or saved, the
+  page says so and asks whether to replace it or keep the cloud copy.
+- The routes are `GET` and `POST /api/beats`, and `GET`, `PUT` and `DELETE
+  /api/beats/<uuid>`. Each needs a session and only reaches the caller's
+  own rows. What is stored is the project after `parseProject` has checked
+  it.
+- The table is `beats` (`apps/site/drizzle/0002_beats.sql`). It reaches the
+  real database only when `pnpm db:migrate` is run.
+
+What has been checked: all of the above in a browser against the built
+server with the in-process database. Nothing about saved beats has run
+against the real Neon database, and nobody has tried it on two real devices.
 
 ## Shop
 
@@ -253,9 +284,9 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm build:engine` | Builds the native engine and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, songs and the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, the contract files, no allocation inside the render call, and the header compiling as C |
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
-| `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store |
+| `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store, the limits and the conflict rule for saved beats, what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine needs no shared memory, no sample files ship, and only the committed faceplate is included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, composing, playing, editing and exporting rhythm tracks, the power switch, dials and cursors, the header and footer, the modals, the About and Docs pages, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, composing, playing, editing and exporting rhythm tracks, the power switch, dials and cursors, the header and footer, the modals, the About and Docs pages, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan. Against the built server with its database in memory: accounts, the shop, and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -272,9 +303,9 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | `pnpm build:engine` | 12 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
 | `pnpm build:wasm` | 63,297-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 120 of 120 pass |
+| `pnpm test:unit` | 167 of 167 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 63 of 63 pass |
+| `pnpm test:e2e` | 101 of 101 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
 
 Earlier versions of this build were also run on Linux x86-64 with GCC 13 and
@@ -310,6 +341,10 @@ Two cross-checks worth knowing about:
   plays, the pages load and the server answers. The owner signed up there
   the same day and reset a password, and both emails worked. A real order
   and a real event at either webhook have not been tried there.
+- **Saved beats on the real database.** The tests use a Postgres inside
+  the server process, built from the same migrations. The `beats` table has
+  not been created on Neon by this work, and no beat has been saved on the
+  live site.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.
@@ -380,8 +415,8 @@ and the tempo are docked at the bottom of the screen.
 | --- | --- |
 | `engine/` | C++20 core, C ABI, WASM target, CTest suites, `boombapbot-render` tool |
 | `packages/contracts/` | Zod project schema, the machine's tracks and sounds, panel geometry, shared fixtures |
-| `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft |
-| `apps/site/` | Astro site: the machine as a client-only island, and the About and Docs pages |
+| `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft, the account and shop modals |
+| `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
 | `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
 | `assets/faceplates/` | Cleared faceplate images, drawn or photographed, and their provenance |
 | `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |
@@ -453,4 +488,5 @@ stack" and most of "build one end-to-end beat". Next:
    and macOS.
 3. Bring back the 606, 707 and 909, each with its own sounds and panel.
 
-Cloud sync, billing, signing and store submission come after that.
+Saving beats to an account is built. Sync in the background, billing,
+signing and store submission come after that.

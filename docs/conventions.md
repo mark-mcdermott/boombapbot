@@ -5,9 +5,9 @@ machine, the 808, running entirely locally, plus a VST3 compile spike. It is
 being brought up to the whole machine from its operation manual; `README.md`
 says what is modelled so far and how it was verified, and
 `docs/follow-ups.md` has what is left and in what order. Accounts exist and
-are optional: sign-up, log-in and password reset, and nothing else yet. The
-rest of the build spec's wider scope (cloud sync, native shells, billing) is
-not started.
+are optional: sign-up, log-in and password reset, and a free account can
+hold up to 20 saved beats. The rest of the build spec's wider scope
+(background sync, native shells, billing) is not started.
 
 ## Commands
 
@@ -66,9 +66,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `apps/site/` is an Astro site that mounts the editor as a client-only
   island. Its pages are prerendered. The one thing that runs on a server is
   `src/pages/api/`, backed by `src/server/`: accounts (`api/auth`, Better
-  Auth, Drizzle on Neon Postgres, Resend) and the shop (`api/store`,
-  `api/webhooks`, Stripe and Printful). The modals that talk to it are
-  `packages/editor/src/ui/Account.tsx` and `Shop.tsx`.
+  Auth, Drizzle on Neon Postgres, Resend), saved beats (`api/beats`) and the
+  shop (`api/store`, `api/webhooks`, Stripe and Printful). The modals that
+  talk to it are `packages/editor/src/ui/Account.tsx` (with
+  `SavedBeats.tsx`) and `Shop.tsx`.
 
 ## Rules that are easy to break
 
@@ -197,9 +198,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - On the machine's page the footer sits 50px under the machine
   (`--footer-drop`, `.sb-below-machine`). On a page of words it stays at
   the bottom. Keep
-  Policies true to what the site does: it covers accounts and the shop, with
-  the returns policy in the owner's words. Update it before the upgrade is
-  sold.
+  Policies true to what the site does: it covers accounts, saved beats and
+  the shop, with the returns policy in the owner's words. Update it before
+  the upgrade is sold.
   Every footer modal goes through `ui/Modal.tsx`.
 - Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
   and a move of its own when pointed at. The tip is for the eye only: the
@@ -221,7 +222,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - A dial with fixed positions gets a `DialHandle` so it can be turned by
   hand; its labels and the keyboard are the accessible way to the same choice.
 - Browser tests reach buried controls through `openSettings`, and the
-  machine through `selectTrack` and `stepButton` (`e2e/helpers.ts`).
+  machine through `selectTrack` and `stepButton` (`e2e/helpers.ts`). The
+  ones that need an account share `e2e/account.ts`.
 
 **Accounts**
 
@@ -245,6 +247,38 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - Sign-up always needs a confirmed address. Better Auth sends that email in
   the background, so a failed send does not fail the sign-up; the modal
   always offers to send it again. Keep that.
+
+**Saved beats**
+
+- Saving is something a person does: a button in the account modal sends the
+  project, and a list there loads or deletes. There is no background sync.
+  The browser's draft stays the working copy, and the page asks for no beats
+  until the modal is open with someone logged in; a browser test holds that.
+- The limits are two constants in `packages/contracts/src/beats.ts`:
+  `FREE_BEAT_LIMIT` (20 beats) and `MAX_BEAT_BYTES` (64 KB of project JSON).
+  The server enforces both and tells the page the limit with the list, so a
+  paid tier changes them in one place.
+- Every route under `api/beats` asks who is calling first (`signedIn`,
+  `readBeatRequest` in `src/server/beats.ts`) and finds a row by its uuid
+  and the caller's id together (`ownedBeat`). Somebody else's beat is
+  answered exactly as one that does not exist.
+- What is stored is what `parseProject` returns, never the body as it came.
+  The body is weighed first. One that is too large is still read to its end
+  before the answer goes out, because answering early resets the connection.
+- The conflict rule is `cloudCopyIsNewer`. A replace carries `lastSeen`, the
+  time of the copy this device last loaded or saved; a newer row answers 409
+  with its time, and only a replace sent again with `overwrite` writes over
+  it. The page sets `overwrite` only after the person has said so. The
+  server stamps `updatedAt` itself, always later than the copy it replaces.
+- What a device last saw is kept in the browser beside the draft
+  (`account/beat-links.ts`), by account and by project id. A save replaces
+  the beat the project is linked to, and makes a new one otherwise.
+- Loading goes through `EditorRuntime.loadSavedBeat`, which shares
+  `adopt` with a file import: checked first, never replacing the draft with
+  something invalid, and one undo step.
+- On a page of words there is no machine, so the modal points back to it.
+  `SavedBeats` reads the runtime from context for that reason; do not make
+  it require one.
 
 **Shop**
 
@@ -328,7 +362,10 @@ VST3 in any host. The site is deployed and was checked live on 2026-11-16.
 That day the owner signed up there and reset a password (both emails
 arrived and their links worked), the shop opened and both webhooks were
 registered. Never tried: a real order, and a real event reaching either
-webhook. Say so rather than assuming these work.
+webhook. Saved beats have only run against the database inside the process:
+nothing about them has touched Neon, and the `beats` table exists there only
+once the owner has run `pnpm db:migrate`. Say so rather than assuming these
+work.
 
 ## Working in this repo
 

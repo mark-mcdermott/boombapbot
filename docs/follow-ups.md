@@ -49,8 +49,8 @@ Not settled by any of that:
 ## Accounts, upgrades and the shop
 
 Accounts are built: sign-up with a confirmed address, log-in, log-out and
-password reset, in the account modal. The upgrade and the cart still open a
-modal that says they are not open.
+password reset, in the account modal, and saving beats to an account. The
+upgrade still opens a modal that says it is not open.
 
 - **Accounts are live.** The Neon database has its tables, and Vercel has
   the Resend key, the sending address and its own `BETTER_AUTH_SECRET`. On
@@ -60,13 +60,43 @@ modal that says they are not open.
   the process and an outbox folder.
 - **What an account is for.** Decided by the owner: as much as possible
   works with no account. A free account adds some cloud storage for beats
-  and syncing across devices. That is the next piece: a projects table per
-  user, an upload and download API, a limit, and a rule for two devices
-  editing the same beat. Until it exists the modal says an account only logs
-  you in.
+  and syncing across devices. The first part is built: a logged-in visitor
+  saves the beat on the machine to the account, sees what is saved, and
+  loads or deletes one. The owner handed over three decisions on
+  2026-11-16, and they were made this way: 20 beats per free account, each
+  at most 64 KB; the last save wins, except that a newer cloud copy is
+  asked about first; and saving is explicit, with no background sync.
+  What is left:
+  - **The migration.** `apps/site/drizzle/0002_beats.sql` adds the `beats`
+    table. It has not been run on Neon. Until it is, `/api/beats` fails on
+    the live site and the modal says something went wrong. It only adds a
+    table, so it is safe to run before the code is deployed: do that first.
+  - Nothing has run against the real database, and nobody has saved on one
+    device and loaded on another outside the tests.
+  - The limit is counted and then the row is inserted, as two statements.
+    Two saves sent at the same instant could both get in at 19. Harmless at
+    this size; a paid tier with a hard quota would want it in one statement.
+  - A device remembers which saved beat its project goes with in its own
+    browser storage. A project brought over as a file, not loaded from the
+    account, is saved as a new beat there.
+  - There is no way to rename a saved beat except to load it, rename it in
+    settings and save again, and no way to save or load from a page of
+    words: the modal there points back to the machine.
+  - No background sync and no merge. Two devices editing the same beat get
+    the question, not a combined beat.
+  - The beats routes have no rate limit of their own. An account can hold
+    only 20 rows of 64 KB, but it can rewrite them as often as it likes.
+  - If the session runs out while the modal is open, a save is refused with
+    "Log in to save beats to your account" and the modal still shows the
+    account until it next checks the session.
+  - The Policies page says what a saved beat keeps. Like the rest of that
+    page it was drafted from how the site behaves and nobody qualified has
+    read it. Neon keeps its own history of the database for a while; the
+    page does not go into that.
 - **Deleting an account.** There is no button. The Policies page says to
   write in and it will be done by hand. Better Auth can do it
-  (`user.deleteUser`); it needs a confirmation step in the modal.
+  (`user.deleteUser`); it needs a confirmation step in the modal. Deleting
+  the user's row takes its saved beats with it.
 - **Rate limiting.** Better Auth's limiter is on in production and counts in
   memory, which on Vercel means per instance. Move it to the database before
   relying on it.
@@ -205,10 +235,11 @@ the compile spike. Beyond it:
   DOM dependencies.
 - **Draft storage.** One draft in `localStorage`, written whole on every
   change, knob moves included. Multiple projects want IndexedDB. Two tabs
-  editing at once overwrite each other.
-- **Stack items not used yet.** The build spec lists TanStack Query, Better
-  Auth, Drizzle, Neon, Vercel Blob and Resend. v0.1 has no remote data, so none
-  of them are installed. They arrive with the cloud API.
+  editing at once overwrite each other. An account now holds several beats,
+  but the machine still works on one at a time.
+- **Stack items not used yet.** The build spec lists TanStack Query and
+  Vercel Blob. Neither is installed: the account and shop modals fetch by
+  hand, and a saved beat is a row in Postgres, not a file.
 - **The other three machines.** The 606, 707 and 909 are out of the editor.
   Their generated sample kits and faceplate photographs are still in
   `assets/`, with provenance. Each needs what the 808 now has: a track table,
@@ -222,7 +253,7 @@ the compile spike. Beyond it:
 
 ## Product
 
-Out of scope for v0.1 and not started: accounts, cloud library and sync,
-conflict handling, user sample upload, the portable `.boombapbot` bundle with
-bundled samples, a mixer and effects beyond the machine's own knobs, stems,
-paid effects and billing, signing, store submission, release metrics.
+Out of scope for v0.1 and not started: background sync and merging, user
+sample upload, the portable `.boombapbot` bundle with bundled samples, a mixer
+and effects beyond the machine's own knobs, stems, paid effects and billing,
+signing, store submission, release metrics.
