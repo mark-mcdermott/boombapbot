@@ -95,7 +95,7 @@ jobs:
       - name: Check what is about to be deployed
         run: |
           node scripts/check-build.mjs .vercel/output/static
-          for route in api/auth api/store/checkout api/webhooks/stripe api/webhooks/printful; do
+          for route in api/auth api/beats api/store/checkout api/webhooks/stripe api/webhooks/printful; do
             grep -q "$route" .vercel/output/config.json || { echo "::error::The build has no /$route"; exit 1; }
           done
 
