@@ -330,7 +330,14 @@ export class EditorRuntime {
     await this.play();
   }
 
+  /** The power switch. Switching off stops the machine; nothing it remembers is lost. */
+  setPower(on: boolean): void {
+    if (!on && this.store.getState().playing) this.stop();
+    this.store.setPower(on);
+  }
+
   async play(): Promise<void> {
+    if (!this.store.getState().power) return;
     if (!(await this.ensureAudio())) return;
     const { rhythmTracks, panel } = this.store.getState().project;
     const written = isTrackMode(panel.mode) ? composition(rhythmTracks, panel.selector) : [];
@@ -415,6 +422,7 @@ export class EditorRuntime {
 
   /** Plays one hit of a track. Starts audio if this is the first gesture. */
   async audition(track: TrackId): Promise<void> {
+    if (!this.store.getState().power) return;
     if (!isInstrumentId(track) || !(await this.ensureAudio())) return;
     this.audio.trigger(getTrack(track).index, false);
   }

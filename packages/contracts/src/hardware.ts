@@ -140,6 +140,8 @@ export const panelManifestSchema = z.object({
     /** Pointer angle for each position, in the order of AUTO_FILLS. */
     degs: z.array(z.number()).length(AUTO_FILLS.length),
   }),
+  /** The power switch: a rocker whose pressed half shows whether the machine is on. */
+  power: z.object({ hit: rectSchema, rocker: rectSchema }),
   /** The CLEAR button under the mode selector, and TAP beside the step buttons. */
   clear: z.object({ hit: rectSchema }),
   tap: z.object({ hit: rectSchema }),

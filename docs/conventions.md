@@ -176,12 +176,25 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 **Page layout**
 
-- The page is the brand, the machine and the footer, nothing else. A control
-  the machine has belongs on its faceplate. Anything else lives in the
-  settings sheet behind the footer's cog
+- The machine's page is the header, the machine and the footer, nothing else.
+  A control the machine has belongs on its faceplate. Anything else about the
+  machine lives in the settings modal behind the footer's cog
   (`packages/editor/src/ui/Settings.tsx`).
+- `Header` (brand and `MachineNav`) and `Footer` (About, Docs, policies,
+  upgrade, cart, settings, account) are shared. `SitePage` wraps a page of words in them;
+  About, Docs and Policies are Astro pages in `apps/site/src/pages` that use
+  it. Keep Policies true to what the site does; it must be rewritten before
+  accounts or payments open. Every
+  footer modal goes through `ui/Modal.tsx`.
+- Upgrades, the cart and accounts have no backend. Their modals say so and
+  offer no form. Do not add a form, a price or a feature list until the real
+  thing exists.
 - What stays on the page with the machine: import and error notices, and on
-  a phone the instrument strip and the docked start button.
+  a phone the instrument and mode strips and the docked start button.
+- The power switch makes everything else on the panel `inert` through the
+  `sb-panel-controls` wrapper. A new panel control goes inside that wrapper.
+- A dial with fixed positions gets a `DialHandle` so it can be turned by
+  hand; its labels and the keyboard are the accessible way to the same choice.
 - Browser tests reach buried controls through `openSettings`, and the
   machine through `selectTrack` and `stepButton` (`e2e/helpers.ts`).
 

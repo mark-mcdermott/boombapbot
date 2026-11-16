@@ -1,0 +1,69 @@
+---
+import { SitePage } from '@boombapbot/editor';
+import Base from '../layouts/Base.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="Policies · boombapbot"
+  description="What boombapbot keeps, the terms it is offered on, and what it is and is not."
+>
+  <SitePage client:load baseUrl={base} current="policies">
+    <h1>Policies</h1>
+    <p class="sb-lede">
+      This page is short because the site does very little with you. It will be rewritten before accounts or
+      payments open.
+    </p>
+
+    <h2>Privacy</h2>
+    <ul>
+      <li>
+        <strong>There are no accounts.</strong> The site does not ask who you are and does not collect personal
+        information.
+      </li>
+      <li>
+        <strong>Your work stays in your browser.</strong> Rhythms, tracks and knob positions are kept in this
+        browser's storage on your device. They are not sent anywhere. Clearing the site's data in your browser
+        removes them.
+      </li>
+      <li>
+        <strong>Nothing is uploaded.</strong> Sound is made on your device, and exports are files your browser
+        saves for you.
+      </li>
+      <li>
+        <strong>No analytics, cookies or third-party scripts.</strong> The company that hosts the site keeps
+        ordinary request logs, as any web host does.
+      </li>
+    </ul>
+
+    <h2>Terms</h2>
+    <ul>
+      <li>What you make is yours. Use your exports however you like.</li>
+      <li>
+        The site is offered as it is, with no warranty. It is a preview: things may change or break, and a saved
+        beat may stop opening. Export the project file to keep a copy.
+      </li>
+      <li>Do not use the site to harm it or anyone else.</li>
+    </ul>
+
+    <h2>Disclosures</h2>
+    <ul>
+      <li>
+        boombapbot is an independent project. It is not affiliated with or endorsed by the makers of the machines
+        it is modelled on.
+      </li>
+      <li>The sounds are synthesised here. They are not samples or recordings of any hardware.</li>
+      <li>The faceplate and the machine icons are original artwork.</li>
+      <li>
+        Nothing is for sale yet. A one-time upgrade and a shop are planned. What they cost, how refunds work and
+        what is collected to take payment will be set out here before either opens.
+      </li>
+    </ul>
+
+    <h2>Contact</h2>
+    <p>
+      Questions go to <a href="https://mm.coffee" target="_blank" rel="noreferrer noopener">mm.coffee</a>.
+    </p>
+  </SitePage>
+</Base>

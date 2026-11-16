@@ -46,6 +46,35 @@ Not settled by any of that:
 - **The level model.** How far the level and accent knobs reach, and the taper
   of each, are guesses (`packages/contracts/src/machine.ts`).
 
+## Accounts, upgrades and the shop
+
+The footer has buttons for an upgrade, a cart and an account. None has
+anything behind it: each opens a modal that says so. The site is static, with
+no API routes, database or secrets, so all three need the same groundwork.
+
+- **Accounts.** The owner's other apps (diamondheart, tova) use self-hosted
+  Better Auth with email and password, email verification and password
+  reset, Neon Postgres with Drizzle, and Resend for mail. Following them
+  means API routes on Vercel, a database, and a build the browser tests can
+  still run against. The owner wants sign-up and log-in in a modal; links in
+  email still need a page to land on. What an account is for has to be
+  decided first: there is no cloud sync yet.
+- **Upgrades.** Decided by the owner: a flat one-time 5 dollars unlocks every
+  paid extra. Ordinary effects (distortion, a flanger and the like) are to be
+  free; the stranger ones (delay, compression and the like) come with the
+  upgrade, and paid accounts may get a place to show their beats. None of it
+  exists: the engine has no effects at all yet, and the payment needs Stripe
+  and accounts. Which effects fall on which side is still loose.
+- **Policies.** The Policies page describes the site as it is today: no
+  accounts, nothing collected, nothing for sale. It was drafted from how the
+  site behaves and is not legal advice. It has to be rewritten, and read by
+  someone qualified, before accounts or payments open.
+- **The shop.** diamondheart already has the flow: products in code, a React
+  cart, Stripe Checkout, then a Stripe webhook that creates and confirms the
+  Printful order. It needs products to exist in Printful, and the Printful
+  webhook there does not check its signature, which must not be copied.
+- **The other machines** in the header are drawn but not built.
+
 ## Native shells
 
 All three shells reuse two things that exist today: the engine's C ABI

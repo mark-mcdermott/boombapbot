@@ -21,3 +21,8 @@ apps/site/public/boombapbot-assets.json
 # so they stay out of public source. See misc/assets/README.md.
 misc/assets/*
 !misc/assets/README.md
+
+# Secrets. Only the example, which holds names and no values, is committed.
+.env
+.env.*
+!.env.example

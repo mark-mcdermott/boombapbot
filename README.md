@@ -68,10 +68,20 @@ pnpm serve
 
 ## What v0.1 does
 
-- **A page that is just the machine.** The mascot and wordmark, the drum
-  machine, and a footer with a cog. The cog opens a settings sheet holding
-  the beat name, undo and redo, a reset to the starter rhythms, a clear
-  action, import and export, and the save and audio status.
+- **A page that is just the machine.** The brand and the four machines along
+  the top, the drum machine, and a footer. The footer's icons lead to the
+  About and Docs pages and open modals for upgrades, the cart, settings and
+  your account. Settings holds the beat name, undo and redo, a reset to the
+  starter rhythms, a clear action, import and export, and the save and audio
+  status. Upgrades, the cart and accounts are not built: their modals say so.
+  Of the four machines in the header only the 808 is built.
+- **Every control on the faceplate works**, the power switch included: off,
+  the machine stops, its lamps go dark and nothing else on it answers. Knobs
+  that turn freely are dragged up and down; dials with fixed positions turn
+  to wherever you press or drag around them, and their labels can be pressed
+  too.
+- **About and Docs** are pages of their own on the same Astro site, with the
+  same header and footer. Docs goes through every control.
 - **The 808's sounds, synthesised.** All sixteen: bass drum, snare, three
   toms and three congas, rim shot and claves, hand clap and maracas, cowbell,
   cymbal, open and closed hi-hat. The engine builds each one from its knob
@@ -175,7 +185,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine needs no shared memory, no sample files ship, and only the committed faceplate is included |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, composing, playing, editing and exporting rhythm tracks, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium: the page layout and settings sheet, every selector position, knob and switch, the write modes, manual play with intros and fill-ins, composing, playing, editing and exporting rhythm tracks, the power switch, dials and cursors, the header and footer, the modals, the About and Docs pages, lamps, keyboard, touch layout, playback activation, reload, a draft from the earlier version, downloads, import rejection, accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -192,9 +202,9 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 | `pnpm build:engine` | 12 CTest suites, all pass with Apple clang 21, and under AddressSanitizer and UndefinedBehaviorSanitizer |
 | `pnpm build:wasm` | 63,297-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 119 of 119 pass |
+| `pnpm test:unit` | 120 of 120 pass |
 | `pnpm build` | Build check passes |
-| `pnpm test:e2e` | 55 of 55 pass |
+| `pnpm test:e2e` | 63 of 63 pass |
 | VST3 spike (`cmake`, then `ctest --test-dir build/vst3`) | Builds on macOS for Apple silicon; processor self-test passes 179 of 179 checks |
 
 Earlier versions of this build were also run on Linux x86-64 with GCC 13 and
@@ -297,7 +307,7 @@ and the tempo are docked at the bottom of the screen.
 | `engine/` | C++20 core, C ABI, WASM target, CTest suites, `boombapbot-render` tool |
 | `packages/contracts/` | Zod project schema, the machine's tracks and sounds, panel geometry, shared fixtures |
 | `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft |
-| `apps/site/` | Astro site; the editor is a client-only island |
+| `apps/site/` | Astro site: the machine as a client-only island, and the About and Docs pages |
 | `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
 | `assets/faceplates/` | Cleared faceplate images, drawn or photographed, and their provenance |
 | `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |

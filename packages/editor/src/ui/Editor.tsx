@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { tempoBpm } from '@boombapbot/contracts';
 import { EditorRuntime } from '../runtime';
-import { Brand } from './Brand';
 import { RuntimeContext, useEditorState } from './context';
 import { Footer } from './Footer';
+import { Header } from './Header';
 import { HardwarePanel } from './HardwarePanel';
 import { NoticeBanner } from './StatusBar';
 import { PlayButton } from './PlayButton';
+import { Settings } from './Settings';
 
 export interface BoombapbotEditorProps {
   /** Base URL the site is served from. */
@@ -59,10 +60,10 @@ function Dock() {
   );
 }
 
-function EditorBody({ runtime }: { runtime: EditorRuntime }) {
+function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: string }) {
   const audioStatus = useEditorState((state) => state.audioStatus);
   const playing = useEditorState((state) => state.playing);
-  const sheetContainer = useRef<HTMLDivElement>(null);
+  const modals = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -94,14 +95,12 @@ function EditorBody({ runtime }: { runtime: EditorRuntime }) {
       data-audio={audioStatus}
       data-playing={playing}
     >
-      <header className="sb-header">
-        <Brand />
-      </header>
+      <Header baseUrl={baseUrl} current="808" />
       <NoticeBanner />
       <HardwarePanel />
-      <Footer sheetContainer={sheetContainer} />
+      <Footer baseUrl={baseUrl} container={modals} settings={<Settings container={modals} />} />
       <Dock />
-      <div ref={sheetContainer} className="sb-sheet-root" />
+      <div ref={modals} className="sb-modal-root" />
     </div>
   );
 }
@@ -143,7 +142,7 @@ export function BoombapbotEditor({ baseUrl = '/' }: BoombapbotEditorProps) {
 
   return (
     <RuntimeContext.Provider value={runtime}>
-      <EditorBody runtime={runtime} />
+      <EditorBody runtime={runtime} baseUrl={baseUrl} />
     </RuntimeContext.Provider>
   );
 }

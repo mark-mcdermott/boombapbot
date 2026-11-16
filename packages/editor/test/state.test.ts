@@ -396,6 +396,20 @@ describe('editor store', () => {
     expect(store.getState().project.panel.basicRhythm).toBe(5);
   });
 
+  it('switches off without losing anything it remembers', () => {
+    const store = makeStore();
+    store.pressClear();
+    store.setMode('manual_play');
+    store.setFillArmed(true);
+    const before = store.getState().project;
+    store.setPower(false);
+    expect(store.getState()).toMatchObject({ power: false, clearArmed: false, fillArmed: false });
+    expect(store.getState().project).toBe(before);
+    store.setPower(true);
+    expect(store.getState().power).toBe(true);
+    expect(store.getState().project).toBe(before);
+  });
+
   it('tracks where playback is', () => {
     const store = makeStore();
     store.setPlaying(true);

@@ -311,6 +311,12 @@ describe('the 808 panel', () => {
       ...PANEL.transport.map((control) => control.hit),
       ...PANEL.voiceSelect.positions.map((position) => position.hit),
       ...PANEL.switches.flatMap((entry) => [entry.hit, entry.slot]),
+      PANEL.power.hit,
+      PANEL.power.rocker,
+      PANEL.clear.hit,
+      PANEL.tap.hit,
+      PANEL.autoFill.hit,
+      ...PANEL.modeSelect.positions.map((position) => position.hit),
     ];
     for (const [x, y, w, h] of rects) {
       expect(x).toBeGreaterThanOrEqual(0);

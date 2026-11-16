@@ -44,6 +44,8 @@ export interface Notice {
 
 export interface EditorState {
   project: Project;
+  /** The power switch. Off, the machine is dark and silent; its memory is kept. */
+  power: boolean;
   /** Whether the user asked for playback. */
   playing: boolean;
   /** Step the engine last played within its measure, or -1. The 2nd part starts at 16. */
@@ -135,6 +137,7 @@ export class EditorStore {
     this.newId = options.newId ?? defaultId;
     this.state = {
       project: options.project ?? this.starterProject(),
+      power: true,
       playing: false,
       currentStep: -1,
       currentPattern: -1,
@@ -405,6 +408,11 @@ export class EditorStore {
   }
 
   // ---- Editing state --------------------------------------------------------
+
+  setPower(power: boolean): void {
+    if (power === this.state.power) return;
+    this.set({ power, clearArmed: false, fillArmed: false });
+  }
 
   setPlaying(playing: boolean): void {
     if (playing === this.state.playing) return;

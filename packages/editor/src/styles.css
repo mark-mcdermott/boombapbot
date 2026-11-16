@@ -73,14 +73,75 @@
 
 .sb-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
   padding-bottom: 6px;
 }
 
-/* The lockup is about 5.93 times as wide as the mascot is tall, so on a
+.sb-brand-link {
+  display: block;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+/* The machines, each a small drawing over its number. */
+.sb-machines ul {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-machine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px 6px;
+  border-radius: 12px;
+  color: var(--color-dim);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition: background 120ms, color 120ms;
+}
+
+.sb-machine-icon {
+  display: block;
+  width: 56px;
+  height: 35px;
+}
+
+a.sb-machine:hover {
+  background: rgb(255 255 255 / 0.07);
+  color: var(--color-text);
+}
+
+.sb-machine[aria-current='page'] {
+  background: var(--color-raised);
+  color: var(--color-text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* A machine that is not built yet is there to be seen, not pressed. */
+.sb-machine[aria-disabled='true'] {
+  cursor: default;
+}
+
+.sb-machine[aria-disabled='true'] .sb-machine-icon {
+  opacity: 0.38;
+  filter: saturate(0.4);
+}
+
+/* The lockup is about 6.04 times as wide as the mascot is tall, so on a
    narrow screen its height follows the width left between the gutters. */
 .sb-brand {
-  --brand-height: min(105px, calc((100vw - 2 * var(--gutter)) / 6.05));
+  --brand-height: min(105px, calc((100vw - 2 * var(--gutter)) / 6.16));
   /* The lockup's cream, chosen by the owner: the wordmark's fill and the
      hairline around the mascot. */
   --brand-cream: #fbefe2;
@@ -394,9 +455,10 @@
 
 .sb-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 8px 16px;
   margin-top: auto;
   color: var(--color-dim);
   font-size: 14px;
@@ -432,13 +494,24 @@
   text-decoration-color: var(--accent);
 }
 
-.sb-cog {
+/* On a narrow screen the icons drop under the credit, still at the right. */
+.sb-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-right: -10px;
+  margin-left: auto;
+}
+
+/* An icon in the footer: a link to a page, or the button for a modal. */
+.sb-footer-icon {
   display: grid;
   place-items: center;
   width: 44px;
   height: 44px;
   flex: none;
-  margin-right: -10px;
   padding: 0;
   border: 0;
   border-radius: 10px;
@@ -447,14 +520,15 @@
   transition: color 120ms, background 120ms;
 }
 
-.sb-cog svg {
+.sb-footer-icon svg {
   width: 22px;
   height: 22px;
   transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.sb-cog:hover,
-.sb-cog[data-popup-open] {
+.sb-footer-icon:hover,
+.sb-footer-icon[data-popup-open],
+.sb-footer-icon[aria-current='page'] {
   background: rgb(255 255 255 / 0.07);
   color: var(--color-text) !important;
 }
@@ -464,49 +538,52 @@
   transform: rotate(60deg);
 }
 
-/* ---- Settings sheet ----------------------------------------------------- */
+/* ---- Modals -------------------------------------------------------------- */
 
-/* The sheet mounts here, inside the editor, so it shares its theme. The
-   element itself takes no part in the layout. */
-.sb-sheet-root {
+/* Modals mount here, inside the page, so they share its theme. The element
+   itself takes no part in the layout. */
+.sb-modal-root {
   display: contents;
 }
 
-.sb-sheet-backdrop {
+.sb-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 44;
-  background: rgb(8 7 6 / 0.5);
-  transition: opacity 200ms;
+  background: rgb(8 7 6 / 0.62);
+  transition: opacity 180ms;
 }
 
-.sb-sheet {
+.sb-modal {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: 50%;
+  left: 50%;
   z-index: 45;
   display: flex;
   flex-direction: column;
-  width: min(400px, 100vw);
-  border-left: 1px solid var(--color-line);
+  width: min(520px, calc(100vw - 24px));
+  max-height: min(760px, calc(100dvh - 24px));
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
   background: var(--color-panel);
-  box-shadow: -28px 0 70px rgb(0 0 0 / 0.5);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
   outline: none;
-  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: translate(-50%, -50%);
+  transition: opacity 180ms, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.sb-sheet-backdrop[data-starting-style],
-.sb-sheet-backdrop[data-ending-style] {
+.sb-modal-backdrop[data-starting-style],
+.sb-modal-backdrop[data-ending-style] {
   opacity: 0;
 }
 
-.sb-sheet[data-starting-style],
-.sb-sheet[data-ending-style] {
-  transform: translateX(100%);
+.sb-modal[data-starting-style],
+.sb-modal[data-ending-style] {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 10px)) scale(0.98);
 }
 
-.sb-sheet-head {
+.sb-modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -515,28 +592,28 @@
   border-bottom: 1px solid var(--color-line-soft);
 }
 
-.sb-sheet-title {
+.sb-modal-title {
   margin: 0;
   font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 
-.sb-sheet-head .sb-icon-button {
+.sb-modal-head .sb-icon-button {
   width: 40px;
   height: 40px;
   font-size: 18px;
 }
 
-.sb-sheet-body {
+.sb-modal-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 22px calc(28px + env(safe-area-inset-bottom));
+  padding: 0 22px 24px;
 }
 
-.sb-sheet-group {
+.sb-modal-group {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -544,8 +621,108 @@
   border-top: 1px solid var(--color-line-soft);
 }
 
-.sb-sheet-group:first-child {
+.sb-modal-group:first-child {
   border-top: 0;
+}
+
+.sb-modal-text {
+  margin: 18px 0 0;
+  color: var(--color-dim);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* ---- Pages of words ------------------------------------------------------ */
+
+.sb-prose {
+  width: 100%;
+  max-width: 68ch;
+  padding: 18px 0 40px;
+  color: var(--color-dim);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.sb-prose h1 {
+  margin: 0 0 18px;
+  color: var(--color-text);
+  font-size: clamp(30px, 5vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.sb-prose h2 {
+  margin: 44px 0 10px;
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.sb-prose h3 {
+  margin: 28px 0 6px;
+  color: var(--color-text);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sb-prose p,
+.sb-prose ul,
+.sb-prose ol,
+.sb-prose dl {
+  margin: 0 0 16px;
+}
+
+.sb-prose ul,
+.sb-prose ol {
+  padding-left: 22px;
+}
+
+.sb-prose ul {
+  list-style: disc;
+}
+
+.sb-prose ol {
+  list-style: decimal;
+}
+
+.sb-prose li + li {
+  margin-top: 6px;
+}
+
+.sb-prose strong,
+.sb-prose dt {
+  color: var(--color-text);
+  font-weight: 650;
+}
+
+.sb-prose dd {
+  margin: 2px 0 14px;
+}
+
+.sb-prose a {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 4px;
+}
+
+.sb-prose kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--color-line);
+  border-radius: 5px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+}
+
+.sb-prose .sb-lede {
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1.5;
 }
 
 /* ---- Phone dock --------------------------------------------------------- */
@@ -588,8 +765,31 @@
 }
 
 .sb-panel > *,
+.sb-panel-controls > *,
 .sb-panel-layer > * {
   position: absolute;
+}
+
+/* Everything on the machine but its power switch. It takes up no box of its
+   own, so its children sit on the faceplate as before. */
+.sb-panel > .sb-panel-controls {
+  position: static;
+  display: contents;
+}
+
+/* The raised half of the power rocker. */
+.sb-panel-rocker {
+  border-radius: 0.15cqw;
+  background: linear-gradient(#34353b, #26272c);
+  box-shadow: inset 0 0.05cqw 0 rgb(255 255 255 / 0.12);
+  pointer-events: none;
+}
+
+/* A selector dial is turned to one of a few positions: press where it should point. */
+.sb-panel-dial {
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: none;
 }
 
 /* Groups of controls span the faceplate so their children can be placed in
@@ -672,6 +872,18 @@
 .sb-panel-led[data-now='true'] {
   background: radial-gradient(circle at 50% 50%, #fff 0%, #ffd9b0 60%, var(--panel-led) 100%);
   box-shadow: 0 0 1.4cqw 0.5cqw #ffd9b0;
+}
+
+/* Power off: every lamp is dark, whatever it would be showing. */
+.sb-panel[data-power='off'] .sb-panel-led {
+  background: none;
+  box-shadow: none;
+  animation: none;
+}
+
+.sb-panel[data-power='off'] .sb-panel-led[data-dim='true'] {
+  background: #2a0605;
+  box-shadow: inset 0 0 0.3cqw rgb(0 0 0 / 0.8);
 }
 
 /* A switch with fixed positions: press where it should go. */
@@ -949,10 +1161,6 @@
     gap: 14px;
     padding-top: 18px;
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
-  }
-
-  .sb-sheet {
-    border-left: 0;
   }
 
   .sb-dock {
