@@ -315,7 +315,9 @@ deployment, and the VST3 in any host. Say so rather than assuming these work.
   `main`: it builds the engine and the site and hands Vercel the finished
   output, because Vercel cannot build the engine. `apps/site/vercel.json`
   switches off Vercel's own build on push; do not turn it back on. The
-  build reads none of the site's secrets; keep it that way.
+  build reads none of the site's secrets; keep it that way. `engines` in
+  `apps/site/package.json` is what sets the Node version on Vercel; the
+  project's own setting there is ignored.
 - Run the checks that cover what you changed before pushing, and report
   results as they are, including what you could not run.
 - Keep `README.md` and `docs/follow-ups.md` in step with changes to scope,
