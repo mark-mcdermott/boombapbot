@@ -1,8 +1,10 @@
-import { BookOpen, CircleUserRound, Heart, Info, Scale, ShoppingCart, Sparkles } from 'lucide-react';
+import { BookOpen, HandFist, Heart, Info, Scale, Sparkles } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
+import { Account } from './Account';
 import { Modal } from './Modal';
+import { Shop } from './Shop';
 
-export type SitePageId = 'about' | 'docs' | 'policies';
+export type SitePageId = 'about' | 'docs' | 'manifesto' | 'policies';
 
 interface FooterProps {
   /** Base URL the site is served from, ending in a slash. */
@@ -15,7 +17,7 @@ interface FooterProps {
   settings?: ReactNode;
 }
 
-/** The row under every page: who made it, then about, docs, policies, upgrade, cart, settings and account. */
+/** The row under every page: who made it, then about, docs, manifesto, policies, upgrade, cart, settings and account. */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {
   const link = (page: SitePageId, label: string, icon: ReactNode) => (
     <a
@@ -39,6 +41,7 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
       <nav className="sb-footer-actions" aria-label="Site">
         {link('about', 'About', <Info />)}
         {link('docs', 'Docs', <BookOpen />)}
+        {link('manifesto', 'Manifesto', <HandFist />)}
         {link('policies', 'Policies', <Scale />)}
         <Modal label="Upgrade" title="Upgrade" testId="upgrade" icon={<Sparkles />} container={container}>
           <p className="sb-modal-text">
@@ -47,19 +50,9 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
           </p>
           <p className="sb-modal-text">Everything on the machine today is free to use, and stays that way.</p>
         </Modal>
-        <Modal label="Cart" title="Cart" testId="cart" icon={<ShoppingCart />} container={container}>
-          <p className="sb-modal-text">The shop is not open yet, so there is nothing to put in a cart.</p>
-        </Modal>
+        <Shop baseUrl={baseUrl} container={container} />
         {settings}
-        <Modal label="Account" title="Your account" testId="account" icon={<CircleUserRound />} container={container}>
-          <p className="sb-modal-text">
-            Accounts are not switched on yet. When they are, this is where you will sign up and log in.
-          </p>
-          <p className="sb-modal-text">
-            Until then, everything you make is saved in this browser. Export the project file from settings to keep
-            a copy or move it to another device.
-          </p>
-        </Modal>
+        <Account baseUrl={baseUrl} container={container} />
       </nav>
     </footer>
   );

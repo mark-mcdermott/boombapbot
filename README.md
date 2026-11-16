@@ -1,7 +1,8 @@
 # boombapbot
 
-A drums-only beat maker. This is **v0.1**: the web editor, running entirely on
-your machine with no accounts, secrets or external services.
+A drums-only beat maker. This is **v0.1**: the web editor. The machine runs
+entirely on your computer and needs no account. Accounts are optional and
+are the only part with a server behind it.
 
 ![The page as it opens: the 808 panel playing the starter rhythm](docs/screenshots/hardware-808.jpg)
 
@@ -53,8 +54,8 @@ Then open http://localhost:4321.
   into `.tools/emsdk`. It is needed once and touches nothing outside the repo.
 - `build:engine` builds the native C++ core and runs its tests. `build:wasm`
   builds the same sources to WebAssembly.
-- No environment variables are read. The site makes no network requests
-  beyond its own files.
+- The machine reads no environment variables and makes no network requests
+  beyond its own files. Accounts need a few; see [Accounts](#accounts).
 
 To try the production build instead:
 
@@ -73,7 +74,11 @@ pnpm serve
   About and Docs pages and open modals for upgrades, the cart, settings and
   your account. Settings holds the beat name, undo and redo, a reset to the
   starter rhythms, a clear action, import and export, and the save and audio
-  status. Upgrades, the cart and accounts are not built: their modals say so.
+  status. The upgrade is not built: its modal says so. The cart is a shop
+  that is built but not open (see [Shop](#shop)).
+- **Accounts, if you want one.** The account button opens a modal to make an
+  account, confirm the address from an emailed link, log in and out, and
+  reset a forgotten password. An account does nothing else yet.
   Of the four machines in the header only the 808 is built.
 - **Every control on the faceplate works**, the power switch included: off,
   the machine stops, its lamps go dark and nothing else on it answers. Knobs
@@ -172,6 +177,61 @@ Settings lists the same gaps under "what still needs checking", and
 [`docs/follow-ups.md`](docs/follow-ups.md) has the order they are being done
 in.
 
+## Accounts
+
+Accounts follow the same pattern as the owner's other apps: Better Auth with
+email and password, Neon Postgres through Drizzle, and Resend for email. The
+pages are still prerendered; only `/api/auth/*` runs on a server.
+
+Copy `apps/site/.env.example` to `apps/site/.env` and fill in the first five
+values. Then create the tables:
+
+```bash
+pnpm db:migrate
+```
+
+- To try accounts with no database and no email provider, set
+  `DATABASE_URL=pglite:memory` and `EMAIL_OUTBOX=./.data/outbox`. The database
+  then lives inside the server process and each email is written to that
+  folder as a file.
+- `pnpm build` makes the static pages in `apps/site/dist/client` and a Node
+  server in `apps/site/dist/server`. `pnpm serve` serves the pages alone;
+  `node apps/site/dist/server/entry.mjs` serves them with the API. On Vercel
+  the build uses Vercel's adapter instead.
+- Every table has an integer `id` and a `uuid`. Only the uuid ever leaves
+  the server.
+- After changing `apps/site/src/server/db/schema.ts`, run `pnpm db:generate`
+  and commit the new migration.
+
+What has been checked: the whole flow in a browser against the built server
+with the in-process database and the outbox, and that the built server
+reads from the real Neon database once it is migrated. What has not: a real
+sign-up, real delivery through Resend, and a deployment.
+
+## Shop
+
+The cart button opens the shop: what is for sale and a cart kept in the
+browser. Checking out asks where the order is going, gets the shipping price
+for that address from Printful, and then goes to Stripe Checkout to pay.
+When Stripe says an order is paid, the site sends it to Printful to be
+printed and posted. It ships wherever Printful does.
+
+- `pnpm shop:sync` reads the Printful store's products, and the countries
+  Printful delivers to, into `packages/contracts/data/shop.json` and saves
+  the product pictures. It only reads. Commit what it writes.
+- The shop opens when the catalog has a product and both `STRIPE_SECRET_KEY`
+  and `PRINTFUL_API_KEY` are set. Until then the modal says it is not open.
+- Orders live in an `orders` table (`apps/site/drizzle/0001_orders.sql`).
+- Two webhooks have to be registered before it opens: Stripe's, to
+  `/api/webhooks/stripe`, and Printful's, to
+  `/api/webhooks/printful?secret=...`.
+
+What has been checked: `pnpm shop:sync` and shipping quotes against the real
+Printful store, and the whole purchase in a browser against the built server
+with a stand-in for Stripe and Printful (`e2e/fake-shop-services.mjs`). What
+has not: a real Stripe checkout, a real Printful order, either real webhook,
+sales tax, and a deployment.
+
 ## Tests
 
 Run in this order; later steps use what earlier ones build.
@@ -234,8 +294,9 @@ Two cross-checks worth knowing about:
 - **Browsers other than headless Chromium.** Firefox, Safari and iOS have not
   been tried. The phone layout was checked in Chromium's device emulation,
   not on a phone.
-- **Deployment.** The Vercel adapter build was produced locally, never
-  deployed.
+- **Deployment.** `.github/workflows/deploy.yml` builds the site and hands it
+  to Vercel after CI passes on `main`. It has not run. `vercel build` was
+  tried locally and its output checked; nothing has been deployed.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.
@@ -379,4 +440,4 @@ stack" and most of "build one end-to-end beat". Next:
    and macOS.
 3. Bring back the 606, 707 and 909, each with its own sounds and panel.
 
-Cloud sync, accounts, billing, signing and store submission come after that.
+Cloud sync, billing, signing and store submission come after that.

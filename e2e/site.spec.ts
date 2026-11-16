@@ -127,14 +127,15 @@ test.describe('the page around the machine', () => {
     expect(nav.x).toBeGreaterThan(brand.x + brand.width);
   });
 
-  test('the footer has about, docs, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
+  test('the footer has about, docs, manifesto, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
     await openEditor(page);
-    const ids = ['nav-about', 'nav-docs', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
+    const ids = ['nav-about', 'nav-docs', 'nav-manifesto', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
     const xs: number[] = [];
     for (const id of ids) xs.push((await page.getByTestId(id).boundingBox())!.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-docs')).toHaveAccessibleName('Docs');
+    await expect(page.getByTestId('nav-manifesto')).toHaveAccessibleName('Manifesto');
     await expect(page.getByTestId('nav-policies')).toHaveAccessibleName('Policies');
     await expect(page.getByTestId('upgrade')).toHaveAccessibleName('Upgrade');
     await expect(page.getByTestId('cart')).toHaveAccessibleName('Cart');
@@ -163,22 +164,55 @@ test.describe('the page around the machine', () => {
       await expect(modal).toHaveCount(0);
       await expect(page.getByTestId(id)).toBeFocused();
     }
-    // Accounts, upgrades and the shop are not switched on, and they say so without offering a form.
+    // Upgrades and the shop are not switched on, and they say so without offering a form.
     await page.getByTestId('upgrade').click();
     await expect(page.getByTestId('upgrade-modal')).toContainText('not open yet');
     await expect(page.getByTestId('upgrade-modal').locator('input, button:not([data-testid="upgrade-close"])')).toHaveCount(0);
     await page.getByTestId('upgrade-close').click();
     await page.getByTestId('account').click();
-    await expect(page.getByTestId('account-modal')).toContainText('not switched on yet');
+    // These pages are served as plain files with no server behind them. The
+    // account modal says it cannot reach one, and the machine carries on.
+    await expect(page.getByTestId('account-unreachable')).toContainText('The machine does not need it');
     await expect(page.getByTestId('account-modal').locator('input')).toHaveCount(0);
+    await expect(page.getByTestId('account-retry')).toBeVisible();
     await page.getByTestId('account-close').click();
     await page.getByTestId('cart').click();
-    await expect(page.getByTestId('cart-modal')).toContainText('not open yet');
+    await expect(page.getByTestId('shop-unreachable')).toContainText('The machine does not need it');
+  });
+
+  test('the tagline sits under the wordmark and does not widen the lockup', async ({ page }) => {
+    await openEditor(page);
+    const tagline = page.getByTestId('tagline');
+    await expect(tagline).toHaveText('Let me cook');
+    const words = (await tagline.boundingBox())!;
+    const mark = (await page.locator('.sb-wordmark').boundingBox())!;
+    expect(words.y).toBeGreaterThanOrEqual(mark.y + mark.height);
+    expect(words.x + words.width).toBeLessThanOrEqual(mark.x + mark.width);
+  });
+
+  test('says once what it keeps in the browser, without covering anything', async ({ page }) => {
+    await openEditor(page);
+    const notice = page.getByTestId('cookie-notice');
+    await expect(notice).toContainText('one cookie keeps you logged in');
+    // It is part of the page, between the machine and the footer.
+    const box = (await notice.boundingBox())!;
+    const panel = (await page.getByTestId('panel').boundingBox())!;
+    const footer = (await page.locator('.sb-footer').boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(panel.y + panel.height);
+    expect(footer.y).toBeGreaterThanOrEqual(box.y + box.height);
+    expect((await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+
+    await page.getByTestId('cookie-notice-ok').click();
+    await expect(notice).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId('editor')).toBeVisible();
+    await expect(notice).toHaveCount(0);
   });
 
   for (const [id, heading] of [
     ['about', 'About boombapbot'],
     ['docs', 'How to use the 808'],
+    ['manifesto', 'Stay Stoked, Stay Woke'],
     ['policies', 'Policies'],
   ] as const) {
     test(`the ${id} page is a page of its own with the same header and footer`, async ({ page }) => {
@@ -199,7 +233,7 @@ test.describe('the page around the machine', () => {
       // The page does not scroll sideways, and the brand leads back to the machine.
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
-      await page.getByRole('link', { name: 'boombapbot, home' }).click();
+      await page.getByRole('link', { name: 'boombapbot home, Let me cook' }).click();
       await expect(page.getByTestId('editor')).toBeVisible();
     });
   }

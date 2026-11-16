@@ -9,6 +9,8 @@ export interface ModalProps {
   /** The button's test id. The modal is `<testId>-modal` and its close button `<testId>-close`. */
   testId: string;
   icon: ReactNode;
+  /** A short count shown on the button's corner. */
+  badge?: string;
   /** Where the modal mounts, so it inherits the page's theme. */
   container: RefObject<HTMLElement | null>;
   className?: string;
@@ -25,6 +27,11 @@ export function Modal(props: ModalProps) {
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
       <Dialog.Trigger className={`sb-footer-icon ${props.className ?? ''}`} data-testid={testId} aria-label={props.label}>
         {props.icon}
+        {props.badge && (
+          <span className="sb-footer-badge" aria-hidden="true">
+            {props.badge}
+          </span>
+        )}
       </Dialog.Trigger>
       <Dialog.Portal container={props.container}>
         <Dialog.Backdrop className="sb-modal-backdrop" />

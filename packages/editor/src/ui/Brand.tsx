@@ -24,7 +24,7 @@ function Wordmark() {
   );
 }
 
-/** Mascot and wordmark, the only thing in the header. */
+/** Mascot, wordmark and tagline: the lockup on the left of the header. */
 export function Brand() {
   return (
     <div className="sb-brand" data-testid="brand">
@@ -38,7 +38,12 @@ export function Brand() {
         height={MASCOT_HEIGHT}
         draggable={false}
       />
-      <Wordmark />
+      <div className="sb-brand-words">
+        <Wordmark />
+        <p className="sb-tagline" data-testid="tagline">
+          Let me cook
+        </p>
+      </div>
     </div>
   );
 }

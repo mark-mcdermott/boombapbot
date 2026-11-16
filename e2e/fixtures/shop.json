@@ -1,0 +1,19 @@
+{
+  "syncedAt": "2026-01-01T00:00:00.000Z",
+  "countries": [
+    { "code": "CA", "name": "Canada", "states": [{ "code": "ON", "name": "Ontario" }, { "code": "QC", "name": "Quebec" }] },
+    { "code": "DE", "name": "Germany", "states": [] },
+    { "code": "US", "name": "United States", "states": [{ "code": "CA", "name": "California" }, { "code": "TX", "name": "Texas" }] }
+  ],
+  "products": [
+    {
+      "id": "100",
+      "name": "Test Hoodie",
+      "image": null,
+      "variants": [
+        { "id": "1001", "catalogVariantId": 501, "label": "M", "priceCents": 4000 },
+        { "id": "1002", "catalogVariantId": 502, "label": "XL", "priceCents": 4200 }
+      ]
+    }
+  ]
+}
