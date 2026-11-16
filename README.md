@@ -72,7 +72,8 @@ pnpm serve
 - **A page that is just the machine.** The brand along the top, the drum
   machine, and a footer 50px under it. The footer's icons lead to the About,
   Docs, manifesto, Credits and Policies pages and open modals for upgrades,
-  the cart, settings and your account. Settings holds the beat name, undo and redo, a reset to the
+  the cart, settings and your account; each shows its name when pointed at.
+  Settings holds the beat name, undo and redo, a reset to the
   starter rhythms, a clear action, import and export, and the save and audio
   status. The upgrade is not built: its modal says so. The cart is a shop
   that is built but not open (see [Shop](#shop)).

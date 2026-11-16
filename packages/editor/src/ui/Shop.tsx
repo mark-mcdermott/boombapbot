@@ -479,8 +479,10 @@ export function Shop({ baseUrl, container }: ShopProps) {
   return (
     <Modal
       label={count > 0 ? `Cart, ${count} in it` : 'Cart'}
+      tip="Cart"
       title="Shop"
       testId="cart"
+      className="sb-ico-cart"
       icon={<ShoppingCart />}
       badge={count > 0 ? String(count) : undefined}
       container={container}

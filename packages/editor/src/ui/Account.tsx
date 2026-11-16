@@ -414,11 +414,12 @@ export function Account({ baseUrl, container }: AccountProps) {
   return (
     <Modal
       label={session.data ? 'Account, logged in' : 'Account'}
+      tip="Account"
       title="Your account"
       testId="account"
       icon={<CircleUserRound />}
       container={container}
-      className={session.data ? 'sb-signed-in' : undefined}
+      className={session.data ? 'sb-ico-account sb-signed-in' : 'sb-ico-account'}
       open={open}
       onOpenChange={setOpen}
     >

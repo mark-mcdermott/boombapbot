@@ -3,6 +3,7 @@ import type { ReactNode, RefObject } from 'react';
 import { Account } from './Account';
 import { Modal } from './Modal';
 import { Shop } from './Shop';
+import { Tip, TipGroup } from './Tip';
 
 export type SitePageId = 'about' | 'docs' | 'manifesto' | 'credits' | 'policies';
 
@@ -24,15 +25,17 @@ interface FooterProps {
  */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {
   const link = (page: SitePageId, label: string, icon: ReactNode) => (
-    <a
-      className="sb-footer-icon"
-      href={`${baseUrl}${page}`}
-      data-testid={`nav-${page}`}
-      aria-label={label}
-      aria-current={current === page ? 'page' : undefined}
-    >
-      {icon}
-    </a>
+    <Tip label={label} container={container}>
+      <a
+        className={`sb-footer-icon sb-ico-${page}`}
+        href={`${baseUrl}${page}`}
+        data-testid={`nav-${page}`}
+        aria-label={label}
+        aria-current={current === page ? 'page' : undefined}
+      >
+        {icon}
+      </a>
+    </Tip>
   );
   return (
     <footer className="sb-footer">
@@ -42,25 +45,34 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
           mm.coffee
         </a>
       </p>
-      <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
-        {link('about', 'About', <Info />)}
-        {link('docs', 'Docs', <BookOpen />)}
-        {link('manifesto', 'Manifesto', <HandFist />)}
-        {link('credits', 'Credits', <ScrollText />)}
-        {link('policies', 'Policies', <Scale />)}
-      </nav>
-      <div className="sb-footer-icons sb-footer-tools">
-        <Modal label="Upgrade" title="Upgrade" testId="upgrade" icon={<Sparkles />} container={container}>
-          <p className="sb-modal-text">
-            A one-time upgrade is planned: extra effects beyond the free ones, and a place to show your beats. It
-            is not open yet, and nothing can be bought here for now.
-          </p>
-          <p className="sb-modal-text">Everything on the machine today is free to use, and stays that way.</p>
-        </Modal>
-        <Shop baseUrl={baseUrl} container={container} />
-        {settings}
-        <Account baseUrl={baseUrl} container={container} />
-      </div>
+      <TipGroup>
+        <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
+          {link('about', 'About', <Info />)}
+          {link('docs', 'Docs', <BookOpen />)}
+          {link('manifesto', 'Manifesto', <HandFist />)}
+          {link('credits', 'Credits', <ScrollText />)}
+          {link('policies', 'Policies', <Scale />)}
+        </nav>
+        <div className="sb-footer-icons sb-footer-tools">
+          <Modal
+            label="Upgrade"
+            title="Upgrade"
+            testId="upgrade"
+            className="sb-ico-upgrade"
+            icon={<Sparkles />}
+            container={container}
+          >
+            <p className="sb-modal-text">
+              A one-time upgrade is planned: extra effects beyond the free ones, and a place to show your beats. It
+              is not open yet, and nothing can be bought here for now.
+            </p>
+            <p className="sb-modal-text">Everything on the machine today is free to use, and stays that way.</p>
+          </Modal>
+          <Shop baseUrl={baseUrl} container={container} />
+          {settings}
+          <Account baseUrl={baseUrl} container={container} />
+        </div>
+      </TipGroup>
     </footer>
   );
 }

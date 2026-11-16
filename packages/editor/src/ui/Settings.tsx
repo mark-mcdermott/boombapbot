@@ -132,7 +132,7 @@ export function Settings({ container }: SettingsProps) {
         label="Settings"
         title="Settings"
         testId="settings"
-        className="sb-cog"
+        className="sb-ico-settings"
         icon={<SettingsIcon />}
         container={container}
         open={open}
