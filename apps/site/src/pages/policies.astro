@@ -7,13 +7,13 @@ const base = import.meta.env.BASE_URL;
 
 <Base
   title="Policies · boombapbot"
-  description="What boombapbot keeps, the terms it is offered on, and what it is and is not."
+  description="What boombapbot keeps, how the shop works, the terms it is offered on, and what it is and is not."
 >
   <SitePage client:load baseUrl={base} current="policies">
     <h1>Policies</h1>
     <p class="sb-lede">
-      This page is short because the site does very little with you. I'll update it again before anything is for
-      sale.
+      This page is short because the site does very little with you. I'll update it again before the upgrade is
+      for sale.
     </p>
 
     <h2>Privacy</h2>
@@ -47,11 +47,41 @@ const base = import.meta.env.BASE_URL;
       <li>
         <strong>No analytics, no ads, no third-party scripts.</strong> Three companies do the plumbing: Vercel
         hosts the site and keeps ordinary request logs, Neon runs the database the accounts live in, and Resend
-        delivers the emails.
+        delivers the emails. Buying from the shop brings in two more, set out below.
       </li>
       <li>
         <strong>Deleting an account.</strong> There is no button for it yet. Write to me and I'll delete it by
         hand.
+      </li>
+    </ul>
+
+    <h2>The shop</h2>
+    <ul>
+      <li>
+        <strong>Returns and refunds.</strong> Everything in the shop is printed to order when you buy it, so I
+        can't take returns for a wrong size or a change of mind. If something arrives damaged or misprinted, or
+        doesn't arrive, tell me within 30 days, with a photo if there's something to show, and I'll send a
+        replacement or refund you.
+      </li>
+      <li>
+        <strong>What you pay.</strong> Prices are in US dollars. You pay for the items and for the delivery you
+        choose, which is priced for your address. I don't collect sales tax or VAT. If your country charges
+        customs or import duty on a parcel, that is yours to pay when it arrives.
+      </li>
+      <li>
+        <strong>Who takes the money.</strong> Stripe does, on its own page. Your card details go to Stripe and
+        never reach this site.
+      </li>
+      <li>
+        <strong>Who makes and sends it.</strong> Printful prints each order and posts it. To do that it gets
+        your name, delivery address and email address. It also gets the address before you pay, to price the
+        delivery.
+      </li>
+      <li>
+        <strong>What an order keeps.</strong> Your name, email address and delivery address, what you ordered
+        and what it cost, and later the parcel's tracking number. If you were logged in, the order is tied to
+        your account. The order is written down when you go to pay, so it is kept even if you turn back at
+        Stripe's page.
       </li>
     </ul>
 
@@ -74,8 +104,8 @@ const base = import.meta.env.BASE_URL;
       <li>The sounds are synthesised here. They are not samples or recordings of any hardware.</li>
       <li>The faceplate and the machine icons are original artwork.</li>
       <li>
-        Nothing is for sale yet. A one-time upgrade and a shop are planned. What they cost, how refunds work and
-        what is collected to take payment will be set out here before either opens.
+        The one-time upgrade is not for sale yet. What it costs, how refunds for it work and what is collected
+        to take payment will be set out here before it opens.
       </li>
     </ul>
 

@@ -91,9 +91,10 @@ modal that says they are not open.
     is set through its API: put `PRINTFUL_WEBHOOK_SECRET` in Vercel and in
     `apps/site/.env`, deploy, then `pnpm shop:webhook --register`. That
     script has only run against a stand-in.
-  - Say on the Policies page what an order keeps (email, address, items),
-    that Stripe takes the payment and Printful gets the address, and how
-    returns and refunds work. That last one is the owner's to decide.
+  - The Policies page has a section on the shop since 2026-11-16: returns
+    and refunds in the owner's words, what is paid, that Stripe takes the
+    payment and Printful gets the address, and what an order keeps. Keep it
+    true when the shop changes.
   - Sales tax, VAT and customs are not collected or worked out. The modal
     says customs is not included.
   - The shipping route asks Printful on every request and has no limit of
@@ -103,9 +104,11 @@ modal that says they are not open.
   - A pending order that is never paid stays in the table, with its address.
   - The product is named "Unisex Hoodie" in Printful, which is what the shop
     shows. Rename it there and run `pnpm shop:sync`.
-- **Policies.** The Policies page says what an account keeps. It was drafted
-  from how the site behaves and is not legal advice. It has to be read by
-  someone qualified, and updated again, before payments open.
+- **Policies.** The Policies page says what an account and an order keep
+  and how the shop works. It was drafted from how the site behaves and is
+  not legal advice; nobody qualified has read it. It says no sales tax or
+  VAT is collected, which is true of the site and is not a view on what the
+  owner owes. Update it again before the upgrade is sold.
 - **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own text, put
   in word for word on 2026-11-15, "for now". It mentions a small paid tier,
   which does not exist yet; the shop is the only thing with a price.
