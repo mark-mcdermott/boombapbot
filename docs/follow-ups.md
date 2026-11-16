@@ -67,12 +67,14 @@ upgrade still opens a modal that says it is not open.
   at most 64 KB; the last save wins, except that a newer cloud copy is
   asked about first; and saving is explicit, with no background sync.
   What is left:
-  - **The migration.** `apps/site/drizzle/0002_beats.sql` adds the `beats`
-    table. It has not been run on Neon. Until it is, `/api/beats` fails on
-    the live site and the modal says something went wrong. It only adds a
-    table, so it is safe to run before the code is deployed: do that first.
-  - Nothing has run against the real database, and nobody has saved on one
-    device and loaded on another outside the tests.
+  - **The migration is run.** `apps/site/drizzle/0002_beats.sql` adds the
+    `beats` table, and it was run on Neon on 2026-11-16, ahead of the
+    code. The table was checked afterwards: its columns, the unique uuid
+    and the cascading owner are as the migration has them, it is empty,
+    and the existing users and orders were not touched.
+  - No beat has been saved on the live site, and nobody has saved on one
+    device and loaded on another outside the tests. Try both once this is
+    deployed.
   - The limit is counted and then the row is inserted, as two statements.
     Two saves sent at the same instant could both get in at 19. Harmless at
     this size; a paid tier with a hard quota would want it in one statement.
@@ -111,15 +113,14 @@ upgrade still opens a modal that says it is not open.
   holds the two products in the Printful store, a hoodie and a sticker, and
   ships wherever Printful does, at Printful's live rate for the address.
   What is left:
-  - The first real purchase. The owner chose live keys, so it is a real
-    charge and a real Printful order, made by the owner and by nothing
-    automated. Nothing has run against real Stripe; in particular a Checkout
-    with a shipping option and no address collection has only been sent to
-    the stand-in.
+  - The first real order went through on 2026-11-16: paid at Stripe,
+    accepted from Stripe's webhook and placed with Printful. Still untried:
+    a real Printful shipping event, a refund, and a purchase without an
+    account.
   - Both webhooks are registered: Stripe's in its dashboard, Printful's by
-    `pnpm shop:webhook --register`. No real event has reached either yet. To
-    change Printful's secret, set the new value in Vercel and in
-    `apps/site/.env`, deploy, and run that command again.
+    `pnpm shop:webhook --register`. Stripe's has taken a real event;
+    Printful's has not yet. To change Printful's secret, set the new value
+    in Vercel and in `apps/site/.env`, deploy, and run that command again.
   - The Policies page has a section on the shop since 2026-11-16: returns
     and refunds in the owner's words, what is paid, that Stripe takes the
     payment and Printful gets the address, and what an order keeps. Keep it

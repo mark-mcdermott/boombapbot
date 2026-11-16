@@ -236,12 +236,14 @@ by the server.
   /api/beats/<uuid>`. Each needs a session and only reaches the caller's
   own rows. What is stored is the project after `parseProject` has checked
   it.
-- The table is `beats` (`apps/site/drizzle/0002_beats.sql`). It reaches the
-  real database only when `pnpm db:migrate` is run.
+- The table is `beats` (`apps/site/drizzle/0002_beats.sql`). It has been in
+  the real database since 2026-11-16, when the migration was run there.
 
 What has been checked: all of the above in a browser against the built
-server with the in-process database. Nothing about saved beats has run
-against the real Neon database, and nobody has tried it on two real devices.
+server with the in-process database, and that the migration applied to the
+real Neon database, leaving an empty `beats` table and the existing rows as
+they were. No beat has been saved to the real database, and nobody has
+tried it on two real devices.
 
 ## Shop
 
@@ -268,10 +270,11 @@ printed and posted. It ships wherever Printful does.
 What has been checked: `pnpm shop:sync` and shipping quotes against the real
 Printful store, and the whole purchase in a browser against the built server
 with a stand-in for Stripe and Printful (`e2e/fake-shop-services.mjs`). What
-has not: a real Stripe checkout, a real Printful order, a real event at
-either webhook, and sales tax. The shop has been open on the live site since
-2026-11-16, with both webhooks registered (Printful's by `pnpm
-shop:webhook --register`), and nothing has been bought there yet.
+has not: a real Printful shipping event, a refund, a purchase without an
+account, and sales tax. The first real order went through on 2026-11-16:
+paid at Stripe, accepted from Stripe's webhook, and placed with Printful.
+The shop has been open on the live site since 2026-11-16, with both
+webhooks registered (Printful's by `pnpm shop:webhook --register`).
 
 ## Tests
 
@@ -339,12 +342,14 @@ Two cross-checks worth knowing about:
   to Vercel after CI passes on `main`. It ran for the first time on
   2026-11-16, and the live site was checked by hand afterwards: the machine
   plays, the pages load and the server answers. The owner signed up there
-  the same day and reset a password, and both emails worked. A real order
-  and a real event at either webhook have not been tried there.
-- **Saved beats on the real database.** The tests use a Postgres inside
-  the server process, built from the same migrations. The `beats` table has
-  not been created on Neon by this work, and no beat has been saved on the
-  live site.
+  the same day and reset a password, and both emails worked. The first real
+  order went through that day too: paid at Stripe, accepted from Stripe's
+  webhook and placed with Printful. A real Printful shipping event, a
+  refund and a purchase without an account have not been tried there.
+- **Saved beats on the live site.** The tests use a Postgres inside the
+  server process, built from the same migrations. The `beats` table was
+  created on Neon on 2026-11-16 and is empty: no beat has been saved on the
+  live site, which cannot happen until this is deployed.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.
