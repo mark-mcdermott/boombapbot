@@ -7,23 +7,35 @@
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
     "preview": "ASTRO_TELEMETRY_DISABLED=1 astro preview",
-    "check": "ASTRO_TELEMETRY_DISABLED=1 astro check"
+    "check": "ASTRO_TELEMETRY_DISABLED=1 astro check",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@astrojs/node": "11.1.13",
     "@astrojs/react": "7.1.9",
     "@astrojs/vercel": "11.0.22",
+    "@neondatabase/serverless": "1.2.0",
     "@boombapbot/contracts": "workspace:*",
     "@boombapbot/editor": "workspace:*",
     "@tailwindcss/vite": "4.3.5",
     "astro": "7.4.12",
+    "better-auth": "1.7.7",
+    "drizzle-orm": "0.45.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "tailwindcss": "4.3.5"
+    "resend": "6.32.0",
+    "stripe": "20.4.1",
+    "tailwindcss": "4.3.5",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
+    "@electric-sql/pglite": "0.5.16",
+    "@types/node": "22.20.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "drizzle-kit": "0.31.11",
     "typescript": "6.0.3"
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { tempoBpm } from '@boombapbot/contracts';
 import { EditorRuntime } from '../runtime';
 import { RuntimeContext, useEditorState } from './context';
+import { CookieNotice } from './CookieNotice';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { HardwarePanel } from './HardwarePanel';
@@ -98,6 +99,7 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
       <Header baseUrl={baseUrl} current="808" />
       <NoticeBanner />
       <HardwarePanel />
+      <CookieNotice baseUrl={baseUrl} />
       <Footer baseUrl={baseUrl} container={modals} settings={<Settings container={modals} />} />
       <Dock />
       <div ref={modals} className="sb-modal-root" />

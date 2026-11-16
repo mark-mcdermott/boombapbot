@@ -4,8 +4,10 @@ A drums-only beat maker. This repo holds v0.1: a web editor that is one drum
 machine, the 808, running entirely locally, plus a VST3 compile spike. It is
 being brought up to the whole machine from its operation manual; `README.md`
 says what is modelled so far and how it was verified, and
-`docs/follow-ups.md` has what is left and in what order. The build spec's
-wider scope (cloud, accounts, native shells, billing) is not started.
+`docs/follow-ups.md` has what is left and in what order. Accounts exist and
+are optional: sign-up, log-in and password reset, and nothing else yet. The
+rest of the build spec's wider scope (cloud sync, native shells, billing) is
+not started.
 
 ## Commands
 
@@ -62,7 +64,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `engine/machine.ts` turns a project into what the engine takes, for live
   playback and offline rendering alike.
 - `apps/site/` is an Astro site that mounts the editor as a client-only
-  island. It has no API routes and reads no environment variables.
+  island. Its pages are prerendered. The one thing that runs on a server is
+  `src/pages/api/`, backed by `src/server/`: accounts (`api/auth`, Better
+  Auth, Drizzle on Neon Postgres, Resend) and the shop (`api/store`,
+  `api/webhooks`, Stripe and Printful). The modals that talk to it are
+  `packages/editor/src/ui/Account.tsx` and `Shop.tsx`.
 
 ## Rules that are easy to break
 
@@ -180,15 +186,19 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   A control the machine has belongs on its faceplate. Anything else about the
   machine lives in the settings modal behind the footer's cog
   (`packages/editor/src/ui/Settings.tsx`).
-- `Header` (brand and `MachineNav`) and `Footer` (About, Docs, policies,
-  upgrade, cart, settings, account) are shared. `SitePage` wraps a page of words in them;
-  About, Docs and Policies are Astro pages in `apps/site/src/pages` that use
-  it. Keep Policies true to what the site does; it must be rewritten before
-  accounts or payments open. Every
-  footer modal goes through `ui/Modal.tsx`.
-- Upgrades, the cart and accounts have no backend. Their modals say so and
-  offer no form. Do not add a form, a price or a feature list until the real
-  thing exists.
+- `Header` (brand, tagline and `MachineNav`) and `Footer` (About, Docs,
+  manifesto, policies, upgrade, cart, settings, account) are shared.
+  `SitePage` wraps a page of words in them; About, Docs, the manifesto and
+  Policies are Astro pages in `apps/site/src/pages` that use it. Keep
+  Policies true to what the site does, and update it before payments open.
+  Every footer modal goes through `ui/Modal.tsx`.
+- The upgrade has no backend. Its modal says so and offers no form. Do not
+  add a form, a price or a feature list until the real thing exists. The
+  cart is the shop (`ui/Shop.tsx`); it shows products only when the server
+  says the shop is open.
+- The cookie notice (`ui/CookieNotice.tsx`) is on the machine's page only and
+  sits in the page above the footer. Do not make it an overlay: it must
+  never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument and mode strips and the docked start button.
 - The power switch makes everything else on the panel `inert` through the
@@ -197,6 +207,69 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   hand; its labels and the keyboard are the accessible way to the same choice.
 - Browser tests reach buried controls through `openSettings`, and the
   machine through `selectTrack` and `stepButton` (`e2e/helpers.ts`).
+
+**Accounts**
+
+- The machine must work with no server at all. Most browser tests serve
+  `apps/site/dist/client` as plain files to hold that; the account modal then
+  says it cannot reach the server. Do not make the machine wait on a session.
+- Every table has an integer `id`, used for joins, and a `uuid`. Only the
+  uuid leaves the server: in a URL, an API answer or an email.
+  `src/server/public-ids.ts` rewrites every Better Auth answer that way, and a
+  browser test checks no row id gets out. New tables and endpoints follow it.
+- The database and Better Auth are built on first use (`getDb`, `getAuth`),
+  because Astro runs module top-level code at build time. Read secrets from
+  `astro:env/server`, not `process.env`.
+- Change the schema in `src/server/db/schema.ts`, then `pnpm db:generate`
+  and commit the migration. `pnpm db:migrate` runs against the owner's
+  database: ask first.
+- `DATABASE_URL=pglite:memory` opens a Postgres inside the process, built
+  from the committed migrations, and `EMAIL_OUTBOX` files mail in a folder
+  in place of sending it. The accounts tests use both. A Vercel build
+  leaves the in-process database out (`__LOCAL_DATABASE__`).
+- Sign-up always needs a confirmed address. Better Auth sends that email in
+  the background, so a failed send does not fail the sign-up; the modal
+  always offers to send it again. Keep that.
+
+**Shop**
+
+- `packages/contracts/data/shop.json` is the catalog: the products of the
+  Printful store and the countries Printful delivers to. `pnpm shop:sync`
+  writes it (read-only at Printful) and saves each picture under
+  `apps/site/public/shop`; do not hand-edit it. The shop is closed while it
+  has no products or countries, or the Stripe or Printful key is missing.
+- The owner decided (2026-11-15): it ships anywhere Printful does, at
+  Printful's live rate. So the address is taken in the modal, before
+  payment: `/api/store/shipping` asks Printful for quotes, the buyer picks
+  one, and Stripe only takes the money. Shipping quotes are asked by the
+  blank garment's `catalogVariantId`; orders are placed by the sync
+  variant's `id`.
+- The page asks `/api/store/catalog` what is for sale. Checkout prices the
+  cart from the same catalog and asks Printful for the shipping again. Never
+  take a price from a request.
+- Checkout records a pending order with its address and shipping method,
+  then sends the buyer to Stripe. Only the
+  signed Stripe webhook marks it paid and sends it to Printful
+  (`server/shop/fulfil.ts`). Each step there can run twice without doing
+  anything twice, and an error is meant to reach Stripe so it retries.
+  Confirming a Printful order spends the owner's money: keep it behind the
+  verified webhook.
+- Printful does not sign webhooks. Its address carries
+  `PRINTFUL_WEBHOOK_SECRET` as `?secret=`; keep the check.
+- `SHOP_CATALOG`, `STRIPE_API_URL` and `PRINTFUL_API_URL` exist for the
+  browser tests, which run against `e2e/fake-shop-services.mjs`. Nothing else
+  sets them.
+
+**Written copy**
+
+- Everything a visitor reads (pages, modals, emails) is in the owner's voice:
+  first person singular, true and plain. One person made this in their spare
+  time. No "we", no mission statements, no marketing adjectives, nothing
+  grandiose.
+- The About page says who that person is, in their words. Do not add their
+  name or other personal details beyond what they have offered.
+- The manifesto (`manifesto.astro`) is the owner's own position. Do not
+  soften it, extend it or add commitments to it unasked.
 
 **Build output**
 
@@ -238,6 +311,11 @@ deployment, and the VST3 in any host. Say so rather than assuming these work.
 
 - Work goes on a feature branch and lands through a pull request. CI
   (`.github/workflows/ci.yml`) runs every check above plus the VST3 spike.
+- Production is deployed by `.github/workflows/deploy.yml` once CI passes on
+  `main`: it builds the engine and the site and hands Vercel the finished
+  output, because Vercel cannot build the engine. `apps/site/vercel.json`
+  switches off Vercel's own build on push; do not turn it back on. The
+  build reads none of the site's secrets; keep it that way.
 - Run the checks that cover what you changed before pushing, and report
   results as they are, including what you could not run.
 - Keep `README.md` and `docs/follow-ups.md` in step with changes to scope,

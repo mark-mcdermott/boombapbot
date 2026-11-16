@@ -3,13 +3,19 @@
 // worklet must resolve from the built output, the engine must not need
 // shared memory (so no cross-origin isolation headers), and only the
 // committed faceplate image may be present.
+//
+//   node scripts/check-build.mjs                          the local build
+//   node scripts/check-build.mjs .vercel/output/static    what `vercel build` made
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const candidates = [join(root, 'apps/site/dist'), join(root, 'apps/site/.vercel/output/static')];
+const asked = process.argv[2];
+const candidates = asked
+  ? [resolve(asked)]
+  : [join(root, 'apps/site/dist/client'), join(root, 'apps/site/.vercel/output/static')];
 const dist = candidates.find((dir) => existsSync(join(dir, 'index.html')));
 const problems = [];
 const notes = [];
@@ -20,7 +26,7 @@ function check(condition, message) {
 }
 
 if (!dist) {
-  console.error('check-build: no built site found. Run pnpm build.');
+  console.error(`check-build: no built site found${asked ? ` in ${asked}` : ''}. Run pnpm build.`);
   process.exit(1);
 }
 

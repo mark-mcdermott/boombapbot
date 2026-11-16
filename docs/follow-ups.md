@@ -48,31 +48,65 @@ Not settled by any of that:
 
 ## Accounts, upgrades and the shop
 
-The footer has buttons for an upgrade, a cart and an account. None has
-anything behind it: each opens a modal that says so. The site is static, with
-no API routes, database or secrets, so all three need the same groundwork.
+Accounts are built: sign-up with a confirmed address, log-in, log-out and
+password reset, in the account modal. The upgrade and the cart still open a
+modal that says they are not open.
 
-- **Accounts.** The owner's other apps (diamondheart, tova) use self-hosted
-  Better Auth with email and password, email verification and password
-  reset, Neon Postgres with Drizzle, and Resend for mail. Following them
-  means API routes on Vercel, a database, and a build the browser tests can
-  still run against. The owner wants sign-up and log-in in a modal; links in
-  email still need a page to land on. What an account is for has to be
-  decided first: there is no cloud sync yet.
-- **Upgrades.** Decided by the owner: a flat one-time 5 dollars unlocks every
-  paid extra. Ordinary effects (distortion, a flanger and the like) are to be
-  free; the stranger ones (delay, compression and the like) come with the
-  upgrade, and paid accounts may get a place to show their beats. None of it
-  exists: the engine has no effects at all yet, and the payment needs Stripe
-  and accounts. Which effects fall on which side is still loose.
-- **Policies.** The Policies page describes the site as it is today: no
-  accounts, nothing collected, nothing for sale. It was drafted from how the
-  site behaves and is not legal advice. It has to be rewritten, and read by
-  someone qualified, before accounts or payments open.
-- **The shop.** diamondheart already has the flow: products in code, a React
-  cart, Stripe Checkout, then a Stripe webhook that creates and confirms the
-  Printful order. It needs products to exist in Printful, and the Printful
-  webhook there does not check its signature, which must not be copied.
+- **Before accounts go live.** The Neon database has its tables
+  (`pnpm db:migrate`, run once) and the built server reads from it. Still to
+  do: verify a sending domain in Resend and fill in `RESEND_API_KEY` and
+  `EMAIL_FROM`, then set the same values in Vercel with its own
+  `BETTER_AUTH_SECRET`. No real sign-up has been made yet, and nothing has
+  been tried on Vercel: the tests use a database inside the process and an
+  outbox folder.
+- **What an account is for.** Decided by the owner: as much as possible
+  works with no account. A free account adds some cloud storage for beats
+  and syncing across devices. That is the next piece: a projects table per
+  user, an upload and download API, a limit, and a rule for two devices
+  editing the same beat. Until it exists the modal says an account only logs
+  you in.
+- **Deleting an account.** There is no button. The Policies page says to
+  write in and it will be done by hand. Better Auth can do it
+  (`user.deleteUser`); it needs a confirmation step in the modal.
+- **Rate limiting.** Better Auth's limiter is on in production and counts in
+  memory, which on Vercel means per instance. Move it to the database before
+  relying on it.
+- **Upgrade.** Decided by the owner: a flat one-time 5 dollars unlocks every
+  paid feature, with a license key the buyer is given and can retrieve later.
+  Paid features are the stranger effects (delay, compression and the like),
+  perhaps a place to show beats, and AI add-ons that are not defined yet;
+  ordinary effects (distortion, a flanger and the like) stay free. None of it
+  exists. The engine has no effects at all yet, and the exact split is still
+  loose.
+- **The shop** is built and closed. The catalog holds the one product in the
+  Printful store and ships wherever Printful does, at Printful's live rate
+  for the address. Before it opens:
+  - Put the Stripe secret key in place. (The `orders` table is in the
+    database since 2026-11-15.) The owner chose live keys, so the first real
+    purchase is a real charge and a real Printful order, made by the owner
+    and by nothing automated. Nothing has
+    run against real Stripe; in particular a Checkout with a shipping option
+    and no address collection has only been sent to the stand-in.
+  - Register both webhooks, Stripe's on the current API version. Printful's
+    is set through its API and needs the live address.
+  - Say on the Policies page what an order keeps (email, address, items),
+    that Stripe takes the payment and Printful gets the address, and how
+    returns and refunds work. That last one is the owner's to decide.
+  - Sales tax, VAT and customs are not collected or worked out. The modal
+    says customs is not included.
+  - The shipping route asks Printful on every request and has no limit of
+    its own.
+  - The buyer gets no email from the site and has nowhere to see an order's
+    status; tracking is recorded but not shown.
+  - A pending order that is never paid stays in the table, with its address.
+  - The product is named "Unisex Hoodie" in Printful, which is what the shop
+    shows. Rename it there and run `pnpm shop:sync`.
+- **Policies.** The Policies page says what an account keeps. It was drafted
+  from how the site behaves and is not legal advice. It has to be read by
+  someone qualified, and updated again, before payments open.
+- **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own text, put
+  in word for word on 2026-11-15, "for now". It mentions a small paid tier,
+  which does not exist yet; the shop is the only thing with a price.
 - **The other machines** in the header are drawn but not built.
 
 ## Native shells
@@ -142,11 +176,20 @@ the compile spike. Beyond it:
 
 ## Web
 
-- **Deployment.** Vercel's build machines do not have Emscripten. Either build
-  in GitHub Actions and deploy the prebuilt output, or install the pinned
-  Emscripten in the Vercel build. The site builds with the Vercel adapter when
-  `VERCEL` is set (`apps/site/astro.config.mjs`); that output was produced
-  locally but never deployed.
+- **Deployment.** Vercel's build machines do not have Emscripten, so the site
+  is built in GitHub Actions and handed to Vercel finished
+  (`.github/workflows/deploy.yml`, after CI passes on `main`, or by hand).
+  Vercel's own build on push is switched off in `apps/site/vercel.json`. The
+  workflow has never run: `vercel build` was tried locally with made-up
+  project settings and its output checked, but `vercel pull` and
+  `vercel deploy` need the owner's account. Before the first run:
+  - Add three repository secrets on GitHub: `VERCEL_TOKEN`, `VERCEL_ORG_ID`
+    and `VERCEL_PROJECT_ID`.
+  - The Vercel project's Root Directory has to be `apps/site`; the workflow
+    stops and says so if it is not.
+  - Set the site's own values in Vercel for Production (see
+    `apps/site/.env.example`). A changed value needs a new deployment: run
+    the workflow by hand.
 - **Browsers.** Only headless Chromium was exercised. Firefox, Safari and real
   phones need a pass, in particular iOS Safari's audio unlock and the phone
   layout on small screens.

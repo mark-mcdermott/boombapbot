@@ -11,7 +11,7 @@ interface HeaderProps {
 export function Header({ baseUrl, current }: HeaderProps) {
   return (
     <header className="sb-header">
-      <a className="sb-brand-link" href={baseUrl} aria-label="boombapbot, home">
+      <a className="sb-brand-link" href={baseUrl} aria-label="boombapbot home, Let me cook">
         <Brand />
       </a>
       <MachineNav baseUrl={baseUrl} current={current} />

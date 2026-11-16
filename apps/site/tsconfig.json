@@ -5,6 +5,6 @@
     "jsxImportSource": "react",
     "resolveJsonModule": true
   },
-  "include": [".astro/types.d.ts", "src"],
+  "include": [".astro/types.d.ts", "src", "test"],
   "exclude": ["dist"]
 }

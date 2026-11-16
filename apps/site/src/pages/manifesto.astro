@@ -1,0 +1,27 @@
+---
+import { SitePage } from '@boombapbot/editor';
+import Base from '../layouts/Base.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<Base
+  title="Stay Stoked, Stay Woke · boombapbot"
+  description="A footnote to a drum machine app made by a white guy in tech, about whose music made these machines matter."
+>
+  <SitePage client:load baseUrl={base} current="manifesto">
+    <h1>Stay Stoked, Stay Woke</h1>
+    <p>
+      I want to add a little footnote to this drum machine app made by a white guy in tech (me) that offers a small
+      paid tier. A lot of the reason anyone still cares about these machines is what Black musicians figured out how
+      to do with them. You can hear house and techno all weekend without hearing much about the Black artists who
+      built those scenes. And in hip-hop and dance music, white artists like the Beastie Boys and Diplo built hugely
+      successful careers drawing on sounds that Black artists developed.
+    </p>
+    <p>
+      There’s something familiar about how easily Black music, slang, and dances travel while Black kids get pushed
+      into the school-to-prison pipeline and Black patients struggle to be heard in the health care system. I think
+      about that when I put a price on an app built around sounds I love.
+    </p>
+  </SitePage>
+</Base>

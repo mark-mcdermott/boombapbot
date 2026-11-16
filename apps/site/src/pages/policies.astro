@@ -12,28 +12,46 @@ const base = import.meta.env.BASE_URL;
   <SitePage client:load baseUrl={base} current="policies">
     <h1>Policies</h1>
     <p class="sb-lede">
-      This page is short because the site does very little with you. It will be rewritten before accounts or
-      payments open.
+      This page is short because the site does very little with you. I'll update it again before anything is for
+      sale.
     </p>
 
     <h2>Privacy</h2>
     <ul>
       <li>
-        <strong>There are no accounts.</strong> The site does not ask who you are and does not collect personal
-        information.
+        <strong>You don't need an account.</strong> The machine works the same without one, and without one the
+        site does not know who you are.
+      </li>
+      <li>
+        <strong>If you make an account, I keep three things.</strong> Your email address. A scrambled form of your
+        password that I can't read. And for each time you log in: when it was, the IP address it came from and
+        which browser it was, so you stay logged in and I can tell you from someone guessing.
+      </li>
+      <li>
+        <strong>I email you twice at most, and only when you ask.</strong> Once to confirm the address, and again
+        if you ask to reset your password. Nothing else.
+      </li>
+      <li>
+        <strong>One cookie.</strong> Logging in sets a cookie that keeps you logged in. Logging out removes it.
+        There are no advertising or tracking cookies.
       </li>
       <li>
         <strong>Your work stays in your browser.</strong> Rhythms, tracks and knob positions are kept in this
-        browser's storage on your device. They are not sent anywhere. Clearing the site's data in your browser
-        removes them.
+        browser's storage on your device. They are not sent anywhere, account or not. Clearing the site's data
+        in your browser removes them.
       </li>
       <li>
         <strong>Nothing is uploaded.</strong> Sound is made on your device, and exports are files your browser
         saves for you.
       </li>
       <li>
-        <strong>No analytics, cookies or third-party scripts.</strong> The company that hosts the site keeps
-        ordinary request logs, as any web host does.
+        <strong>No analytics, no ads, no third-party scripts.</strong> Three companies do the plumbing: Vercel
+        hosts the site and keeps ordinary request logs, Neon runs the database the accounts live in, and Resend
+        delivers the emails.
+      </li>
+      <li>
+        <strong>Deleting an account.</strong> There is no button for it yet. Write to me and I'll delete it by
+        hand.
       </li>
     </ul>
 
@@ -63,7 +81,7 @@ const base = import.meta.env.BASE_URL;
 
     <h2>Contact</h2>
     <p>
-      Questions go to <a href="https://mm.coffee" target="_blank" rel="noreferrer noopener">mm.coffee</a>.
+      Questions come to me at <a href="https://mm.coffee" target="_blank" rel="noreferrer noopener">mm.coffee</a>.
     </p>
   </SitePage>
 </Base>

@@ -173,7 +173,25 @@ a.sb-machine:hover {
   fill: var(--brand-cream);
 }
 
-.sb-name {
+/* The tagline sits under the wordmark and never makes the lockup wider. */
+.sb-brand-words {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--brand-height) * 0.1);
+}
+
+.sb-tagline {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: max(11px, calc(var(--brand-height) * 0.17));
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.sb-name,
+.sb-input {
   width: 100%;
   min-width: 0;
   height: 40px;
@@ -184,10 +202,14 @@ a.sb-machine:hover {
   color: var(--color-text);
   font: inherit;
   font-size: 16px;
+}
+
+.sb-name {
   font-weight: 600;
 }
 
-.sb-name:hover {
+.sb-name:hover,
+.sb-input:hover {
   border-color: var(--color-faint);
 }
 
@@ -221,6 +243,20 @@ a.sb-machine:hover {
 
 .sb-button:disabled {
   opacity: 0.45;
+}
+
+/* The one thing a form is for. */
+.sb-app .sb-button-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  transition: filter 120ms;
+}
+
+.sb-app .sb-button-primary:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--accent);
+  filter: brightness(1.08);
 }
 
 .sb-button-danger:hover:not(:disabled) {
@@ -451,6 +487,33 @@ a.sb-machine:hover {
   font-size: 11px;
 }
 
+/* ---- Cookie notice ------------------------------------------------------ */
+
+.sb-cookie-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  margin-top: auto;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+  color: var(--color-dim);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sb-cookie-notice p {
+  flex: 1 1 280px;
+  margin: 0;
+}
+
+.sb-cookie-notice + .sb-footer {
+  margin-top: 0;
+}
+
 /* ---- Footer ------------------------------------------------------------- */
 
 .sb-footer {
@@ -630,6 +693,273 @@ a.sb-machine:hover {
   color: var(--color-dim);
   font-size: 15px;
   line-height: 1.55;
+}
+
+/* ---- Account ------------------------------------------------------------- */
+
+.sb-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Takes no room until there is something to say. */
+.sb-form-problem {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.sb-form-problem:empty,
+.sb-form .sb-hint:empty {
+  display: none;
+}
+
+.sb-account-notice {
+  margin-top: 18px;
+}
+
+.sb-account-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+
+/* A link, or a button that reads as one. */
+.sb-app .sb-link {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--color-faint);
+  text-underline-offset: 4px;
+  transition: text-decoration-color 120ms;
+}
+
+.sb-app .sb-link:hover {
+  text-decoration-color: var(--accent);
+}
+
+/* Logged in: a small light on the account button. */
+.sb-footer-icon.sb-signed-in {
+  position: relative;
+}
+
+.sb-footer-icon.sb-signed-in::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-ok);
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+/* ---- Shop ---------------------------------------------------------------- */
+
+/* How many things are in the cart, on the corner of its button. */
+.sb-footer-icon:has(.sb-footer-badge) {
+  position: relative;
+}
+
+.sb-footer-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.sb-product {
+  display: flex;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.sb-product-image {
+  width: 160px;
+  height: 160px;
+  flex: none;
+  border: 1px solid var(--color-line-soft);
+  border-radius: var(--radius);
+  background: var(--color-raised);
+  object-fit: contain;
+}
+
+.sb-product-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sb-product-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sb-product-price,
+.sb-cart-price,
+.sb-cart-total strong {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-product-price {
+  color: var(--color-dim);
+}
+
+.sb-cart-heading {
+  margin: 24px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-line-soft);
+}
+
+.sb-cart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.sb-cart-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sb-cart-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 76px;
+  align-items: center;
+  gap: 12px;
+}
+
+.sb-cart-label {
+  color: var(--color-dim);
+}
+
+.sb-cart-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+}
+
+.sb-cart-count svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sb-cart-count > span {
+  min-width: 22px;
+  text-align: center;
+}
+
+.sb-cart-price {
+  text-align: right;
+}
+
+/* The line that opens a step of the checkout. */
+.sb-form .sb-form-lead,
+.sb-cart .sb-form-lead {
+  margin: 0;
+}
+
+select.sb-input {
+  appearance: none;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-dim) 50%),
+    linear-gradient(135deg, var(--color-dim) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 17px, calc(100% - 13px) 17px;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+}
+
+.sb-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sb-choices legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+
+.sb-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.sb-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--color-raised);
+}
+
+.sb-choice input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.sb-choice-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sb-choice-what .sb-cart-label {
+  font-size: 13px;
+}
+
+.sb-cart-total {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-line-soft);
 }
 
 /* ---- Pages of words ------------------------------------------------------ */
@@ -1205,6 +1535,26 @@ a.sb-machine:hover {
     display: flex;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .sb-product {
+    flex-direction: column;
+  }
+
+  /* Eight icons do not fit a phone at full size, so they share its width. */
+  .sb-footer-actions {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 0;
+    width: 100%;
+    margin: 0;
+  }
+
+  .sb-footer-icon {
+    flex: 1 1 0;
+    width: auto;
+    max-width: 44px;
+    min-width: 0;
   }
 }
 

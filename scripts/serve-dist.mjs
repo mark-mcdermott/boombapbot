@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Serves the built site (apps/site/dist) as plain static files, the way any
-// static host would: no cross-origin isolation headers, no rewrites. Used by
-// the Playwright tests and handy for trying a production build locally.
+// Serves the built pages (apps/site/dist/client) as plain static files, the
+// way any static host would: no cross-origin isolation headers, no rewrites
+// and no API. The machine has to work like this. Used by the Playwright
+// tests and handy for trying a production build locally. For the build with
+// its API, run `node apps/site/dist/server/entry.mjs`.
 //
 //   node scripts/serve-dist.mjs [--port 4173] [--host 127.0.0.1]
 
@@ -11,7 +13,7 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const dist = join(root, 'apps/site/dist');
+const dist = join(root, 'apps/site/dist/client');
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
   const index = args.indexOf(name);
@@ -21,7 +23,7 @@ const port = Number(option('--port', '4173'));
 const host = option('--host', '127.0.0.1');
 
 if (!existsSync(join(dist, 'index.html'))) {
-  console.error('serve-dist: apps/site/dist is missing. Run pnpm build first.');
+  console.error('serve-dist: apps/site/dist/client is missing. Run pnpm build first.');
   process.exit(1);
 }
 
@@ -69,5 +71,5 @@ const server = createServer((request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`serve-dist: http://${host}:${port}/ (apps/site/dist)`);
+  console.log(`serve-dist: http://${host}:${port}/ (apps/site/dist/client)`);
 });
