@@ -361,11 +361,13 @@ browsers other than headless Chromium, real phones, Windows builds, and the
 VST3 in any host. The site is deployed and was checked live on 2026-11-16.
 That day the owner signed up there and reset a password (both emails
 arrived and their links worked), the shop opened and both webhooks were
-registered. Never tried: a real order, and a real event reaching either
-webhook. Saved beats have only run against the database inside the process:
-nothing about them has touched Neon, and the `beats` table exists there only
-once the owner has run `pnpm db:migrate`. Say so rather than assuming these
-work.
+registered. The first real order went through that day too: paid at Stripe,
+accepted from Stripe's webhook and placed with Printful. Never tried: a
+real Printful shipping event, a refund, and a purchase without an account.
+Saved beats have only run against the database inside the process. The
+`beats` table has been on Neon since 2026-11-16, empty: no beat has been
+saved on the live site, and none on one real device and loaded on another.
+Say so rather than assuming these work.
 
 ## Working in this repo
 
