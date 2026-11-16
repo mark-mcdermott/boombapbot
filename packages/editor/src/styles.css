@@ -26,7 +26,7 @@
   --gutter: 20px;
   --stack-gap: 18px;
   /* How far under the machine the footer sits. */
-  --footer-drop: 200px;
+  --footer-drop: 50px;
   display: flex;
   flex-direction: column;
   gap: var(--stack-gap);
@@ -168,7 +168,7 @@ a.sb-machine:hover {
   grid-area: 1 / 1;
   justify-self: center;
   width: auto;
-  height: calc(var(--wordmark-height) * 1.058);
+  height: calc(var(--wordmark-height) * 0.7935);
   filter: drop-shadow(1px 0 0 var(--mascot-edge)) drop-shadow(-1px 0 0 var(--mascot-edge))
     drop-shadow(0 1px 0 var(--mascot-edge)) drop-shadow(0 -1px 0 var(--mascot-edge));
   user-select: none;
@@ -183,7 +183,7 @@ a.sb-machine:hover {
   fill: var(--brand-cream);
 }
 
-/* The tagline sits under the mascot, about as wide as it. */
+/* The tagline sits centred under the mascot. */
 .sb-tagline {
   grid-area: 2 / 1;
   margin: 0;
@@ -519,8 +519,8 @@ a.sb-machine:hover {
 /* ---- Footer ------------------------------------------------------------- */
 
 /* On the machine's page the footer sits a fixed drop below the machine. The
-   cookie notice lives in that space, at its foot, so closing it moves
-   nothing; a notice taller than the space pushes the footer down. */
+   cookie notice goes between the two; it is taller than the drop, so it
+   holds the footer lower until it is closed. */
 .sb-below-machine {
   display: grid;
   grid-template-rows: minmax(calc(var(--footer-drop) - var(--stack-gap)), auto) auto;
@@ -541,13 +541,14 @@ a.sb-machine:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px 2px;
   margin-top: auto;
   color: var(--color-dim);
   font-size: 14px;
 }
 
-/* The credit keeps to the left and the icons to the right. */
+/* The credit keeps to the left and the icons, as one set, to the right. */
 .sb-made {
   display: inline-flex;
   flex-wrap: wrap;
@@ -590,7 +591,6 @@ a.sb-machine:hover {
 
 .sb-footer-tools {
   margin-right: -10px;
-  margin-left: auto;
 }
 
 /* An icon in the footer: a link to a page, or the button for a modal. */

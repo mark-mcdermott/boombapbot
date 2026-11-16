@@ -70,7 +70,7 @@ pnpm serve
 ## What v0.1 does
 
 - **A page that is just the machine.** The brand along the top, the drum
-  machine, and a footer 200px under it. The footer's icons lead to the About,
+  machine, and a footer 50px under it. The footer's icons lead to the About,
   Docs, manifesto, Credits and Policies pages and open modals for upgrades,
   the cart, settings and your account. Settings holds the beat name, undo and redo, a reset to the
   starter rhythms, a clear action, import and export, and the save and audio
