@@ -111,31 +111,23 @@ test.describe('dials and cursors', () => {
 });
 
 test.describe('the page around the machine', () => {
-  test('the header has the four machines, and only the 808 is built', async ({ page }) => {
+  test('the header is the brand alone, with no machines to choose from for now', async ({ page }) => {
     await openEditor(page);
-    const machines = page.getByRole('navigation', { name: 'Machines' });
-    await expect(machines.locator('[data-testid^="machine-"]')).toHaveCount(4);
-    await expect(page.getByTestId('machine-808')).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByTestId('machine-808')).toHaveAttribute('href', '/');
-    for (const id of ['606', '707', '909']) {
-      await expect(page.getByTestId(`machine-${id}`)).toHaveAttribute('aria-disabled', 'true');
-      await expect(page.getByTestId(`machine-${id}`)).toContainText('not built yet');
-    }
-    // Brand on the left, machines on the right.
-    const brand = (await page.getByTestId('brand').boundingBox())!;
-    const nav = (await machines.boundingBox())!;
-    expect(nav.x).toBeGreaterThan(brand.x + brand.width);
+    await expect(page.getByTestId('brand')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Machines' })).toHaveCount(0);
+    await expect(page.locator('[data-testid^="machine-"]')).toHaveCount(0);
   });
 
-  test('the footer has about, docs, manifesto, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
+  test('the footer has about, docs, manifesto, credits, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
     await openEditor(page);
-    const ids = ['nav-about', 'nav-docs', 'nav-manifesto', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
+    const ids = ['nav-about', 'nav-docs', 'nav-manifesto', 'nav-credits', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
     const xs: number[] = [];
     for (const id of ids) xs.push((await page.getByTestId(id).boundingBox())!.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-docs')).toHaveAccessibleName('Docs');
     await expect(page.getByTestId('nav-manifesto')).toHaveAccessibleName('Manifesto');
+    await expect(page.getByTestId('nav-credits')).toHaveAccessibleName('Credits');
     await expect(page.getByTestId('nav-policies')).toHaveAccessibleName('Policies');
     await expect(page.getByTestId('upgrade')).toHaveAccessibleName('Upgrade');
     await expect(page.getByTestId('cart')).toHaveAccessibleName('Cart');
@@ -180,14 +172,32 @@ test.describe('the page around the machine', () => {
     await expect(page.getByTestId('shop-unreachable')).toContainText('The machine does not need it');
   });
 
-  test('the tagline sits under the wordmark and does not widen the lockup', async ({ page }) => {
+  test('the tagline sits under the mascot, and the wordmark beside them', async ({ page }) => {
     await openEditor(page);
     const tagline = page.getByTestId('tagline');
-    await expect(tagline).toHaveText('Let me cook');
+    await expect(tagline).toHaveText('Let’s cook');
     const words = (await tagline.boundingBox())!;
+    const mascot = (await page.getByTestId('brand-mascot').boundingBox())!;
     const mark = (await page.locator('.sb-wordmark').boundingBox())!;
-    expect(words.y).toBeGreaterThanOrEqual(mark.y + mark.height);
-    expect(words.x + words.width).toBeLessThanOrEqual(mark.x + mark.width);
+    expect(words.y).toBeGreaterThanOrEqual(mascot.y + mascot.height);
+    // Centred under the mascot, and no wider than it.
+    expect(Math.abs(words.x + words.width / 2 - (mascot.x + mascot.width / 2))).toBeLessThanOrEqual(2);
+    expect(words.width).toBeLessThanOrEqual(mascot.width + 1);
+    expect(mark.x).toBeGreaterThan(Math.max(mascot.x + mascot.width, words.x + words.width));
+  });
+
+  test('the footer sits 200px under the machine, with or without the notice', async ({ page }) => {
+    await openEditor(page);
+    const drop = async () => {
+      const machine = (await page.getByTestId('hardware').boundingBox())!;
+      const footer = (await page.locator('.sb-footer').boundingBox())!;
+      return footer.y - (machine.y + machine.height);
+    };
+    await expect(page.getByTestId('cookie-notice')).toBeVisible();
+    expect(await drop()).toBeCloseTo(200, 0);
+    await page.getByTestId('cookie-notice-ok').click();
+    await expect(page.getByTestId('cookie-notice')).toHaveCount(0);
+    expect(await drop()).toBeCloseTo(200, 0);
   });
 
   test('says once what it keeps in the browser, without covering anything', async ({ page }) => {
@@ -213,6 +223,7 @@ test.describe('the page around the machine', () => {
     ['about', 'About boombapbot'],
     ['docs', 'How to use the 808'],
     ['manifesto', 'Stay Stoked, Stay Woke'],
+    ['credits', 'Credits'],
     ['policies', 'Policies'],
   ] as const) {
     test(`the ${id} page is a page of its own with the same header and footer`, async ({ page }) => {
@@ -233,7 +244,7 @@ test.describe('the page around the machine', () => {
       // The page does not scroll sideways, and the brand leads back to the machine.
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
-      await page.getByRole('link', { name: 'boombapbot home, Let me cook' }).click();
+      await page.getByRole('link', { name: 'boombapbot home, Let’s cook' }).click();
       await expect(page.getByTestId('editor')).toBeVisible();
     });
   }
