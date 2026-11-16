@@ -54,11 +54,10 @@ modal that says they are not open.
 
 - **Accounts are live.** The Neon database has its tables, and Vercel has
   the Resend key, the sending address and its own `BETTER_AUTH_SECRET`. On
-  2026-11-16 the owner signed up on the live site: the confirmation email
-  arrived and its button worked. The Resend key was replaced later that day
-  and no email has been sent with the new one. Password reset has not been
-  tried there. The tests still use a database inside the process and an
-  outbox folder.
+  2026-11-16 the owner signed up on the live site and the confirmation
+  email worked. The Resend key was replaced later that day, and a password
+  reset with the new key worked too. The tests still use a database inside
+  the process and an outbox folder.
 - **What an account is for.** Decided by the owner: as much as possible
   works with no account. A free account adds some cloud storage for beats
   and syncing across devices. That is the next piece: a projects table per

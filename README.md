@@ -209,8 +209,8 @@ pnpm db:migrate
 What has been checked: the whole flow in a browser against the built server
 with the in-process database and the outbox, and that the built server
 reads from the real Neon database once it is migrated. On the live site, on
-2026-11-16, the owner signed up, the confirmation email arrived through
-Resend and its button worked. What has not been tried there: password reset.
+2026-11-16, the owner signed up and later reset a password: both emails
+arrived through Resend and their links worked.
 
 ## Shop
 
@@ -308,8 +308,8 @@ Two cross-checks worth knowing about:
   to Vercel after CI passes on `main`. It ran for the first time on
   2026-11-16, and the live site was checked by hand afterwards: the machine
   plays, the pages load and the server answers. The owner signed up there
-  the same day and the confirmation email worked. Password reset, a real
-  order and a real event at either webhook have not been tried there.
+  the same day and reset a password, and both emails worked. A real order
+  and a real event at either webhook have not been tried there.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.
