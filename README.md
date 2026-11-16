@@ -76,7 +76,7 @@ pnpm serve
   Settings holds the beat name, undo and redo, a reset to the
   starter rhythms, a clear action, import and export, and the save and audio
   status. The upgrade is not built: its modal says so. The cart is a shop
-  that is built but not open (see [Shop](#shop)).
+  (see [Shop](#shop)).
 - **Accounts, if you want one.** The account button opens a modal to make an
   account, confirm the address from an emailed link, log in and out, and
   reset a forgotten password. An account does nothing else yet.
@@ -208,8 +208,9 @@ pnpm db:migrate
 
 What has been checked: the whole flow in a browser against the built server
 with the in-process database and the outbox, and that the built server
-reads from the real Neon database once it is migrated. What has not: a real
-sign-up, real delivery through Resend, and a deployment.
+reads from the real Neon database once it is migrated. On the live site, on
+2026-11-16, the owner signed up, the confirmation email arrived through
+Resend and its button worked. What has not been tried there: password reset.
 
 ## Shop
 
@@ -236,9 +237,10 @@ printed and posted. It ships wherever Printful does.
 What has been checked: `pnpm shop:sync` and shipping quotes against the real
 Printful store, and the whole purchase in a browser against the built server
 with a stand-in for Stripe and Printful (`e2e/fake-shop-services.mjs`). What
-has not: a real Stripe checkout, a real Printful order, either real webhook,
-and sales tax. `pnpm shop:webhook` has only run against a stand-in, and the
-shop has never been open on the live site.
+has not: a real Stripe checkout, a real Printful order, a real event at
+either webhook, and sales tax. The shop has been open on the live site since
+2026-11-16, with both webhooks registered (Printful's by `pnpm
+shop:webhook --register`), and nothing has been bought there yet.
 
 ## Tests
 
@@ -305,8 +307,9 @@ Two cross-checks worth knowing about:
 - **Deployment.** `.github/workflows/deploy.yml` builds the site and hands it
   to Vercel after CI passes on `main`. It ran for the first time on
   2026-11-16, and the live site was checked by hand afterwards: the machine
-  plays, the pages load and the server answers. A real sign-up, a real order
-  and both webhooks have not been tried there.
+  plays, the pages load and the server answers. The owner signed up there
+  the same day and the confirmation email worked. Password reset, a real
+  order and a real event at either webhook have not been tried there.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.

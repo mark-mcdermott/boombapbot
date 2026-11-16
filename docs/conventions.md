@@ -324,9 +324,12 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 The owner has listened to an earlier build; the sounds are a model made by
 ear and have not been compared with a real machine. Also untested are
 browsers other than headless Chromium, real phones, Windows builds, and the
-VST3 in any host. The site is deployed and was checked live once, on
-2026-11-16; a real sign-up, a real order and both webhooks have never been
-tried. Say so rather than assuming these work.
+VST3 in any host. The site is deployed and was checked live on 2026-11-16.
+That day the owner signed up there (the confirmation email arrived and its
+button worked), the shop opened and both webhooks were registered. Never
+tried: password reset, a real order, and a real event reaching either
+webhook. The Resend key was replaced after that sign-up and no email has
+been sent with the new one. Say so rather than assuming these work.
 
 ## Working in this repo
 
