@@ -262,6 +262,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   verified webhook.
 - Printful does not sign webhooks. Its address carries
   `PRINTFUL_WEBHOOK_SECRET` as `?secret=`; keep the check.
+  `pnpm shop:webhook --register` gives Printful that address. It changes the
+  owner's Printful account, so ask first. The events it asks for and the
+  ones the webhook acts on are one list,
+  `apps/site/src/server/shop/printful-events.json`.
 - `SHOP_CATALOG`, `STRIPE_API_URL` and `PRINTFUL_API_URL` exist for the
   browser tests, which run against `e2e/fake-shop-services.mjs`. Nothing else
   sets them.

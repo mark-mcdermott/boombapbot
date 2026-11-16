@@ -30,7 +30,8 @@
     "serve": "node scripts/serve-dist.mjs",
     "db:generate": "pnpm --filter @boombapbot/site db:generate",
     "db:migrate": "pnpm --filter @boombapbot/site db:migrate",
-    "shop:sync": "node scripts/sync-shop.mjs"
+    "shop:sync": "node scripts/sync-shop.mjs",
+    "shop:webhook": "node scripts/register-printful-webhook.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

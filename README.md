@@ -227,12 +227,17 @@ printed and posted. It ships wherever Printful does.
 - Two webhooks have to be registered before it opens: Stripe's, to
   `/api/webhooks/stripe`, and Printful's, to
   `/api/webhooks/printful?secret=...`.
+- Printful's can only be set through its API. `pnpm shop:webhook` shows what
+  Printful has now and changes nothing; `pnpm shop:webhook --register` points
+  it at the live site, after checking that the site takes the secret in
+  `apps/site/.env`. It never prints the secret.
 
 What has been checked: `pnpm shop:sync` and shipping quotes against the real
 Printful store, and the whole purchase in a browser against the built server
 with a stand-in for Stripe and Printful (`e2e/fake-shop-services.mjs`). What
 has not: a real Stripe checkout, a real Printful order, either real webhook,
-sales tax, and a deployment.
+and sales tax. `pnpm shop:webhook` has only run against a stand-in, and the
+shop has never been open on the live site.
 
 ## Tests
 

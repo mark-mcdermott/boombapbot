@@ -4,8 +4,9 @@ import { PRINTFUL_WEBHOOK_SECRET } from 'astro:env/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb } from '../../../server/db';
-import { order, type OrderStatus } from '../../../server/db/schema';
+import { ORDER_STATUSES, order } from '../../../server/db/schema';
 import { orderUuid } from '../../../server/shop/printful';
+import events from '../../../server/shop/printful-events.json';
 import { json } from '../../../server/site';
 
 export const prerender = false;
@@ -18,12 +19,11 @@ const EventSchema = z.object({
   }),
 });
 
-/** What each of Printful's events means for an order here. */
-const STATUS: Record<string, OrderStatus> = {
-  package_shipped: 'shipped',
-  order_failed: 'failed',
-  order_canceled: 'canceled',
-};
+/**
+ * What each of Printful's events means for an order here. The list is a file
+ * so that `pnpm shop:webhook` asks Printful for exactly these events.
+ */
+const STATUS = z.record(z.string(), z.enum(ORDER_STATUSES)).parse(events);
 
 /** Printful does not sign its webhooks, so the address it is given carries a secret. */
 function carriesSecret(request: Request): boolean {

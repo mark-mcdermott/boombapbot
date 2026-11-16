@@ -315,4 +315,9 @@ test('Printful’s updates are taken only with the secret in the address', async
   expect((await post('?secret=wrong', shipped)).status()).toBe(403);
   expect((await post(`?secret=${PRINTFUL_WEBHOOK_SECRET}`, { nothing: 'useful' })).status()).toBe(400);
   expect((await post(`?secret=${PRINTFUL_WEBHOOK_SECRET}`, shipped)).status()).toBe(200);
+
+  // What `pnpm shop:webhook` sends to learn whether the site takes the secret.
+  const check = { type: 'boombapbot_secret_check', data: {} };
+  expect((await post('?secret=wrong', check)).status()).toBe(403);
+  expect((await post(`?secret=${PRINTFUL_WEBHOOK_SECRET}`, check)).status()).toBe(200);
 });
