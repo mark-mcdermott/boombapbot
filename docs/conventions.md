@@ -193,7 +193,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `SitePage` wraps a page of words in them; About, Docs, the manifesto,
   Credits and Policies are Astro pages in `apps/site/src/pages` that use it.
   Credits is blank until the owner writes it.
-- On the machine's page the footer sits 200px under the machine
+- On the machine's page the footer sits 50px under the machine
   (`--footer-drop`, `.sb-below-machine`). On a page of words it stays at
   the bottom. Keep
   Policies true to what the site does, and update it before payments open.
@@ -203,8 +203,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   cart is the shop (`ui/Shop.tsx`); it shows products only when the server
   says the shop is open.
 - The cookie notice (`ui/CookieNotice.tsx`) is on the machine's page only and
-  sits in the space between the machine and the footer, so closing it moves
-  nothing. Do not make it an overlay: it must never cover a control.
+  sits between the machine and the footer. It is taller than the gap there,
+  so the footer sits lower until it is closed. Do not make it an overlay: it
+  must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument and mode strips and the docked start button.
 - The power switch makes everything else on the panel `inert` through the

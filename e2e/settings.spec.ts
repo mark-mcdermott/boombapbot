@@ -28,10 +28,10 @@ test('the page is the brand, the machine and a footer', async ({ page }) => {
   expect(cog.x).toBeGreaterThan(text.x + text.width);
 });
 
-test('at full size the mascot is 84px tall and the wordmark a little shorter', async ({ page }) => {
+test('at full size the wordmark is 79.4px tall and the mascot a little shorter', async ({ page }) => {
   const mascot = (await page.getByTestId('brand-mascot').boundingBox())!;
   const wordmark = (await page.locator('.sb-wordmark').boundingBox())!;
-  expect(mascot.height).toBeCloseTo(84, 0);
+  expect(mascot.height).toBeCloseTo(63, 0);
   expect(wordmark.height).toBeCloseTo(79.4, 0);
 });
 

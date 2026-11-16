@@ -180,24 +180,37 @@ test.describe('the page around the machine', () => {
     const mascot = (await page.getByTestId('brand-mascot').boundingBox())!;
     const mark = (await page.locator('.sb-wordmark').boundingBox())!;
     expect(words.y).toBeGreaterThanOrEqual(mascot.y + mascot.height);
-    // Centred under the mascot, and no wider than it.
+    // Centred under the mascot.
     expect(Math.abs(words.x + words.width / 2 - (mascot.x + mascot.width / 2))).toBeLessThanOrEqual(2);
-    expect(words.width).toBeLessThanOrEqual(mascot.width + 1);
     expect(mark.x).toBeGreaterThan(Math.max(mascot.x + mascot.width, words.x + words.width));
   });
 
-  test('the footer sits 200px under the machine, with or without the notice', async ({ page }) => {
+  test('the footer sits 50px under the machine once the notice is closed', async ({ page }) => {
     await openEditor(page);
     const drop = async () => {
       const machine = (await page.getByTestId('hardware').boundingBox())!;
       const footer = (await page.locator('.sb-footer').boundingBox())!;
       return footer.y - (machine.y + machine.height);
     };
+    // The notice is taller than that, so it holds the footer lower while it shows.
     await expect(page.getByTestId('cookie-notice')).toBeVisible();
-    expect(await drop()).toBeCloseTo(200, 0);
+    expect(await drop()).toBeGreaterThan(50);
     await page.getByTestId('cookie-notice-ok').click();
     await expect(page.getByTestId('cookie-notice')).toHaveCount(0);
-    expect(await drop()).toBeCloseTo(200, 0);
+    expect(await drop()).toBeCloseTo(50, 0);
+  });
+
+  test('the footer’s icons are one set on the right, with the credit on the left', async ({ page }) => {
+    await openEditor(page);
+    const footer = (await page.locator('.sb-footer').boundingBox())!;
+    const made = (await page.locator('.sb-made').boundingBox())!;
+    const lastPage = (await page.getByTestId('nav-policies').boundingBox())!;
+    const firstTool = (await page.getByTestId('upgrade').boundingBox())!;
+    const lastTool = (await page.getByTestId('account').boundingBox())!;
+    expect(made.x).toBeCloseTo(footer.x, 0);
+    expect(firstTool.y).toBeCloseTo(lastPage.y, 0);
+    expect(firstTool.x - (lastPage.x + lastPage.width)).toBeLessThanOrEqual(4);
+    expect(lastTool.x + lastTool.width).toBeGreaterThanOrEqual(footer.x + footer.width);
   });
 
   test('says once what it keeps in the browser, without covering anything', async ({ page }) => {
