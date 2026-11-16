@@ -179,17 +179,18 @@ the compile spike. Beyond it:
 - **Deployment.** Vercel's build machines do not have Emscripten, so the site
   is built in GitHub Actions and handed to Vercel finished
   (`.github/workflows/deploy.yml`, after CI passes on `main`, or by hand).
-  Vercel's own build on push is switched off in `apps/site/vercel.json`. The
-  workflow has never run: `vercel build` was tried locally with made-up
-  project settings and its output checked, but `vercel pull` and
-  `vercel deploy` need the owner's account. Before the first run:
-  - Add three repository secrets on GitHub: `VERCEL_TOKEN`, `VERCEL_ORG_ID`
-    and `VERCEL_PROJECT_ID`.
-  - The Vercel project's Root Directory has to be `apps/site`; the workflow
+  Vercel's own build on push is switched off in `apps/site/vercel.json`. It
+  first ran on 2026-11-16 and the live site was checked by hand. What it
+  depends on:
+  - Three repository secrets on GitHub: `VERCEL_TOKEN` (scoped to the team
+    that owns the project; it expires), `VERCEL_ORG_ID` and
+    `VERCEL_PROJECT_ID`.
+  - The Vercel project's Root Directory being `apps/site`; the workflow
     stops and says so if it is not.
-  - Set the site's own values in Vercel for Production (see
+  - The site's own values, set in Vercel for Production (see
     `apps/site/.env.example`). A changed value needs a new deployment: run
-    the workflow by hand.
+    the workflow by hand. Still missing there: the Resend, Stripe and
+    webhook values.
 - **Browsers.** Only headless Chromium was exercised. Firefox, Safari and real
   phones need a pass, in particular iOS Safari's audio unlock and the phone
   layout on small screens.

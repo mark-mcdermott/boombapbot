@@ -99,8 +99,10 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
       <Header baseUrl={baseUrl} current="808" />
       <NoticeBanner />
       <HardwarePanel />
-      <CookieNotice baseUrl={baseUrl} />
-      <Footer baseUrl={baseUrl} container={modals} settings={<Settings container={modals} />} />
+      <div className="sb-below-machine">
+        <CookieNotice baseUrl={baseUrl} />
+        <Footer baseUrl={baseUrl} container={modals} settings={<Settings container={modals} />} />
+      </div>
       <Dock />
       <div ref={modals} className="sb-modal-root" />
     </div>

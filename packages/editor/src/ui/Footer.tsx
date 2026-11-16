@@ -1,10 +1,10 @@
-import { BookOpen, HandFist, Heart, Info, Scale, Sparkles } from 'lucide-react';
+import { BookOpen, HandFist, Heart, Info, Scale, ScrollText, Sparkles } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
 import { Account } from './Account';
 import { Modal } from './Modal';
 import { Shop } from './Shop';
 
-export type SitePageId = 'about' | 'docs' | 'manifesto' | 'policies';
+export type SitePageId = 'about' | 'docs' | 'manifesto' | 'credits' | 'policies';
 
 interface FooterProps {
   /** Base URL the site is served from, ending in a slash. */
@@ -17,7 +17,11 @@ interface FooterProps {
   settings?: ReactNode;
 }
 
-/** The row under every page: who made it, then about, docs, manifesto, policies, upgrade, cart, settings and account. */
+/**
+ * The row under every page: who made it, then the pages (about, docs,
+ * manifesto, credits, policies) and the buttons (upgrade, cart, settings,
+ * account).
+ */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {
   const link = (page: SitePageId, label: string, icon: ReactNode) => (
     <a
@@ -38,11 +42,14 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
           mm.coffee
         </a>
       </p>
-      <nav className="sb-footer-actions" aria-label="Site">
+      <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
         {link('about', 'About', <Info />)}
         {link('docs', 'Docs', <BookOpen />)}
         {link('manifesto', 'Manifesto', <HandFist />)}
+        {link('credits', 'Credits', <ScrollText />)}
         {link('policies', 'Policies', <Scale />)}
+      </nav>
+      <div className="sb-footer-icons sb-footer-tools">
         <Modal label="Upgrade" title="Upgrade" testId="upgrade" icon={<Sparkles />} container={container}>
           <p className="sb-modal-text">
             A one-time upgrade is planned: extra effects beyond the free ones, and a place to show your beats. It
@@ -53,7 +60,7 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
         <Shop baseUrl={baseUrl} container={container} />
         {settings}
         <Account baseUrl={baseUrl} container={container} />
-      </nav>
+      </div>
     </footer>
   );
 }

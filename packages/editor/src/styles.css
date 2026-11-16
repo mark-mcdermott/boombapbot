@@ -24,9 +24,12 @@
   --accent-ink: #1f0903;
   --radius: 10px;
   --gutter: 20px;
+  --stack-gap: 18px;
+  /* How far under the machine the footer sits. */
+  --footer-drop: 200px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--stack-gap);
   width: 100%;
   max-width: 1180px;
   min-height: 100dvh;
@@ -138,16 +141,22 @@ a.sb-machine:hover {
   filter: saturate(0.4);
 }
 
-/* The lockup is about 6.04 times as wide as the mascot is tall, so on a
-   narrow screen its height follows the width left between the gutters. */
+/* Everything in the lockup is sized from the wordmark's height. The lockup
+   is about 10.05 times as wide as that, so on a narrow screen the height
+   follows the width left between the gutters. The second limit is for
+   phones, where the tagline stops shrinking at 11px and its column stays
+   about 70px wide. */
 .sb-brand {
-  --brand-height: min(105px, calc((100vw - 2 * var(--gutter)) / 6.16));
+  --brand-room: calc(100vw - 2 * var(--gutter));
+  --wordmark-height: min(79.4px, calc(var(--brand-room) / 10.1), calc((var(--brand-room) - 70px) / 8.7));
   /* The lockup's cream, chosen by the owner: the wordmark's fill and the
      hairline around the mascot. */
   --brand-cream: #fbefe2;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto;
   align-items: center;
-  gap: calc(var(--brand-height) * 0.2);
+  justify-content: start;
+  gap: calc(var(--wordmark-height) * 0.12) calc(var(--wordmark-height) * 0.26);
 }
 
 /* The mascot's outline is near-black, which would vanish on this background.
@@ -156,9 +165,10 @@ a.sb-machine:hover {
 .sb-mascot {
   --mascot-edge: var(--brand-cream);
   display: block;
+  grid-area: 1 / 1;
+  justify-self: center;
   width: auto;
-  height: var(--brand-height);
-  flex: none;
+  height: calc(var(--wordmark-height) * 1.058);
   filter: drop-shadow(1px 0 0 var(--mascot-edge)) drop-shadow(-1px 0 0 var(--mascot-edge))
     drop-shadow(0 1px 0 var(--mascot-edge)) drop-shadow(0 -1px 0 var(--mascot-edge));
   user-select: none;
@@ -167,27 +177,24 @@ a.sb-machine:hover {
 
 .sb-wordmark {
   display: block;
+  grid-area: 1 / 2;
   width: auto;
-  height: calc(var(--brand-height) * 0.54);
-  flex: none;
+  height: var(--wordmark-height);
   fill: var(--brand-cream);
 }
 
-/* The tagline sits under the wordmark and never makes the lockup wider. */
-.sb-brand-words {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--brand-height) * 0.1);
-}
-
+/* The tagline sits under the mascot, about as wide as it. */
 .sb-tagline {
+  grid-area: 2 / 1;
   margin: 0;
   color: var(--accent);
   font-family: var(--font-mono);
-  font-size: max(11px, calc(var(--brand-height) * 0.17));
+  font-size: max(11px, calc(var(--wordmark-height) * 0.21));
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .sb-name,
@@ -495,7 +502,6 @@ a.sb-machine:hover {
   align-items: center;
   justify-content: space-between;
   gap: 10px 18px;
-  margin-top: auto;
   padding: 12px 12px 12px 16px;
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
@@ -510,29 +516,45 @@ a.sb-machine:hover {
   margin: 0;
 }
 
-.sb-cookie-notice + .sb-footer {
-  margin-top: 0;
+/* ---- Footer ------------------------------------------------------------- */
+
+/* On the machine's page the footer sits a fixed drop below the machine. The
+   cookie notice lives in that space, at its foot, so closing it moves
+   nothing; a notice taller than the space pushes the footer down. */
+.sb-below-machine {
+  display: grid;
+  grid-template-rows: minmax(calc(var(--footer-drop) - var(--stack-gap)), auto) auto;
 }
 
-/* ---- Footer ------------------------------------------------------------- */
+.sb-below-machine > .sb-cookie-notice {
+  grid-row: 1;
+  align-self: end;
+  margin-bottom: var(--stack-gap);
+}
+
+.sb-below-machine > .sb-footer {
+  grid-row: 2;
+  margin-top: 0;
+}
 
 .sb-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
+  gap: 8px 2px;
   margin-top: auto;
   color: var(--color-dim);
   font-size: 14px;
 }
 
+/* The credit keeps to the left and the icons to the right. */
 .sb-made {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0 6px;
-  margin: 0;
+  margin: 0 auto 0 0;
+  padding-right: 14px;
 }
 
 /* The mascot's orange. */
@@ -557,13 +579,16 @@ a.sb-machine:hover {
   text-decoration-color: var(--accent);
 }
 
-/* On a narrow screen the icons drop under the credit, still at the right. */
-.sb-footer-actions {
+/* Two groups of icons side by side: the links to pages, then the buttons.
+   The last icon's drawing lines up with the edge of the page. */
+.sb-footer-icons {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
+}
+
+.sb-footer-tools {
   margin-right: -10px;
   margin-left: auto;
 }
@@ -1488,7 +1513,7 @@ select.sb-input {
 @media (max-width: 680px) {
   .sb-app {
     --gutter: 12px;
-    gap: 14px;
+    --stack-gap: 14px;
     padding-top: 18px;
     padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
@@ -1541,20 +1566,21 @@ select.sb-input {
     flex-direction: column;
   }
 
-  /* Eight icons do not fit a phone at full size, so they share its width. */
-  .sb-footer-actions {
-    flex-wrap: nowrap;
-    justify-content: space-between;
-    gap: 0;
-    width: 100%;
-    margin: 0;
+  /* Nine icons do not fit one row of a phone at a size a thumb can hit, so
+     the pages take a row of their own above the credit and the buttons. */
+  .sb-footer-pages {
+    order: -1;
+    width: calc(100% + 10px);
+    margin-right: -10px;
   }
 
-  .sb-footer-icon {
-    flex: 1 1 0;
-    width: auto;
-    max-width: 44px;
-    min-width: 0;
+  .sb-made {
+    padding-right: 0;
+  }
+
+  /* Touching, so the credit and four buttons share a row on a 375px phone. */
+  .sb-footer-icons {
+    gap: 0;
   }
 }
 

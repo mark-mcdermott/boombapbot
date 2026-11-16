@@ -4,8 +4,9 @@ import { browserStorage } from '../state/draft-storage';
 const SEEN_KEY = 'boombapbot.storage-notice.v1';
 
 /**
- * What the site keeps in the browser, said once. It sits in the page above
- * the footer, so it never covers the machine.
+ * What the site keeps in the browser, said once. It sits in the space
+ * between the machine and the footer, so it never covers the machine and
+ * closing it moves nothing.
  */
 export function CookieNotice({ baseUrl }: { baseUrl: string }) {
   const [storage] = useState(browserStorage);

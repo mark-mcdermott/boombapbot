@@ -69,24 +69,26 @@ pnpm serve
 
 ## What v0.1 does
 
-- **A page that is just the machine.** The brand and the four machines along
-  the top, the drum machine, and a footer. The footer's icons lead to the
-  About and Docs pages and open modals for upgrades, the cart, settings and
-  your account. Settings holds the beat name, undo and redo, a reset to the
+- **A page that is just the machine.** The brand along the top, the drum
+  machine, and a footer 200px under it. The footer's icons lead to the About,
+  Docs, manifesto, Credits and Policies pages and open modals for upgrades,
+  the cart, settings and your account. Settings holds the beat name, undo and redo, a reset to the
   starter rhythms, a clear action, import and export, and the save and audio
   status. The upgrade is not built: its modal says so. The cart is a shop
   that is built but not open (see [Shop](#shop)).
 - **Accounts, if you want one.** The account button opens a modal to make an
   account, confirm the address from an emailed link, log in and out, and
   reset a forgotten password. An account does nothing else yet.
-  Of the four machines in the header only the 808 is built.
+- **One machine.** Only the 808 is built. The other three machines are drawn
+  for the header but are not shown for now.
 - **Every control on the faceplate works**, the power switch included: off,
   the machine stops, its lamps go dark and nothing else on it answers. Knobs
   that turn freely are dragged up and down; dials with fixed positions turn
   to wherever you press or drag around them, and their labels can be pressed
   too.
 - **About and Docs** are pages of their own on the same Astro site, with the
-  same header and footer. Docs goes through every control.
+  same header and footer. Docs goes through every control. Credits is a
+  blank page for now.
 - **The 808's sounds, synthesised.** All sixteen: bass drum, snare, three
   toms and three congas, rim shot and claves, hand clap and maracas, cowbell,
   cymbal, open and closed hi-hat. The engine builds each one from its knob
@@ -295,8 +297,10 @@ Two cross-checks worth knowing about:
   been tried. The phone layout was checked in Chromium's device emulation,
   not on a phone.
 - **Deployment.** `.github/workflows/deploy.yml` builds the site and hands it
-  to Vercel after CI passes on `main`. It has not run. `vercel build` was
-  tried locally and its output checked; nothing has been deployed.
+  to Vercel after CI passes on `main`. It ran for the first time on
+  2026-11-16, and the live site was checked by hand afterwards: the machine
+  plays, the pages load and the server answers. A real sign-up, a real order
+  and both webhooks have not been tried there.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.

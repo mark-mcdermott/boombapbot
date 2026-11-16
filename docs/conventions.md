@@ -186,10 +186,16 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   A control the machine has belongs on its faceplate. Anything else about the
   machine lives in the settings modal behind the footer's cog
   (`packages/editor/src/ui/Settings.tsx`).
-- `Header` (brand, tagline and `MachineNav`) and `Footer` (About, Docs,
-  manifesto, policies, upgrade, cart, settings, account) are shared.
-  `SitePage` wraps a page of words in them; About, Docs, the manifesto and
-  Policies are Astro pages in `apps/site/src/pages` that use it. Keep
+- `Header` (the brand: mascot over the tagline, beside the wordmark) and
+  `Footer` (About, Docs, manifesto, credits, policies, upgrade, cart,
+  settings, account) are shared. The owner asked for the machines in the
+  header to be hidden for now (`SHOW_MACHINES` in `ui/Header.tsx`).
+  `SitePage` wraps a page of words in them; About, Docs, the manifesto,
+  Credits and Policies are Astro pages in `apps/site/src/pages` that use it.
+  Credits is blank until the owner writes it.
+- On the machine's page the footer sits 200px under the machine
+  (`--footer-drop`, `.sb-below-machine`). On a page of words it stays at
+  the bottom. Keep
   Policies true to what the site does, and update it before payments open.
   Every footer modal goes through `ui/Modal.tsx`.
 - The upgrade has no backend. Its modal says so and offers no form. Do not
@@ -197,8 +203,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   cart is the shop (`ui/Shop.tsx`); it shows products only when the server
   says the shop is open.
 - The cookie notice (`ui/CookieNotice.tsx`) is on the machine's page only and
-  sits in the page above the footer. Do not make it an overlay: it must
-  never cover a control.
+  sits in the space between the machine and the footer, so closing it moves
+  nothing. Do not make it an overlay: it must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument and mode strips and the docked start button.
 - The power switch makes everything else on the panel `inert` through the
@@ -304,8 +310,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 The owner has listened to an earlier build; the sounds are a model made by
 ear and have not been compared with a real machine. Also untested are
-browsers other than headless Chromium, real phones, Windows builds,
-deployment, and the VST3 in any host. Say so rather than assuming these work.
+browsers other than headless Chromium, real phones, Windows builds, and the
+VST3 in any host. The site is deployed and was checked live once, on
+2026-11-16; a real sign-up, a real order and both webhooks have never been
+tried. Say so rather than assuming these work.
 
 ## Working in this repo
 

@@ -3,7 +3,9 @@ import mascotUrl from '../assets/mascot.svg?url';
 /** The mascot's drawing is 560 by 434 units. */
 const MASCOT_ASPECT = 560 / 434;
 /** Height at full size; the stylesheet shrinks it to fit narrow screens. */
-const MASCOT_HEIGHT = 105;
+const MASCOT_HEIGHT = 84;
+
+export const TAGLINE = 'Let’s cook';
 
 /**
  * The boombapbot wordmark, as the outlines supplied by the owner. The
@@ -24,7 +26,7 @@ function Wordmark() {
   );
 }
 
-/** Mascot, wordmark and tagline: the lockup on the left of the header. */
+/** The lockup on the left of the header: the mascot over the tagline, beside the wordmark. */
 export function Brand() {
   return (
     <div className="sb-brand" data-testid="brand">
@@ -38,12 +40,10 @@ export function Brand() {
         height={MASCOT_HEIGHT}
         draggable={false}
       />
-      <div className="sb-brand-words">
-        <Wordmark />
-        <p className="sb-tagline" data-testid="tagline">
-          Let me cook
-        </p>
-      </div>
+      <Wordmark />
+      <p className="sb-tagline" data-testid="tagline">
+        {TAGLINE}
+      </p>
     </div>
   );
 }
