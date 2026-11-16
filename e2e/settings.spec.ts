@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await openEditor(page);
 });
 
-const BURIED = ['beat-name', 'undo', 'redo', 'starter', 'clear', 'import', 'export-menu', 'draft-status'];
+const BURIED = ['beat-name', 'undo', 'redo', 'starter', 'clear', 'clear-everything', 'import', 'export-menu', 'draft-status'];
 // What settings no longer holds: the machine has its own tempo knob and no second editor.
 const GONE = ['bpm', 'swing', 'mode-modern', 'mode-hardware', 'kit-808', 'grid'];
 
@@ -110,4 +110,33 @@ test('a rhythm can be cleared, undone and reset to the starter rhythms', async (
   await openSettings(page);
   await page.getByTestId('starter').click();
   expect((await project(page)).rhythms).toEqual(starter.rhythms);
+});
+
+test('everything can be cleared at once, stays cleared after a reload, and comes back with undo', async ({ page }) => {
+  const starter = await project(page);
+  const blank = (snapshot: Awaited<ReturnType<typeof project>>) =>
+    snapshot.rhythms.every((_, index) => hitCount(snapshot, index) === 0) &&
+    snapshot.rhythmTracks.every((track) => track.length === 0);
+  expect(blank(starter)).toBe(false);
+
+  await openSettings(page);
+  await page.getByTestId('clear-everything').click();
+  await expect(page.getByTestId('clear-everything')).toBeDisabled();
+  await expect(page.getByTestId('hit-count')).toHaveText('0 hits in 16 steps');
+  const cleared = await project(page);
+  expect(blank(cleared)).toBe(true);
+  // The knobs and the tempo are not part of what it clears.
+  expect(cleared.sound).toEqual(starter.sound);
+  expect(cleared.tempo).toEqual(starter.tempo);
+
+  await page.getByTestId('undo').click();
+  expect((await project(page)).rhythms).toEqual(starter.rhythms);
+  expect((await project(page)).rhythmTracks).toEqual(starter.rhythmTracks);
+  await page.getByTestId('redo').click();
+  expect(blank(await project(page))).toBe(true);
+
+  await expect(page.getByTestId('draft-status')).toContainText('Draft saved in this browser');
+  await page.reload();
+  await expect(page.getByTestId('editor')).toBeVisible();
+  expect(blank(await project(page))).toBe(true);
 });

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   countHits,
+  createEmptyRhythms,
+  createEmptyTracks,
   createStarterRhythms,
   createStarterTracks,
   isStepOn,
@@ -19,7 +21,7 @@ import {
   type KeyValueStorage,
 } from '../src/state/draft-storage';
 import { exportBaseName, projectFileName, readProjectFile } from '../src/state/project-io';
-import { EditorStore, editTarget } from '../src/state/store';
+import { EditorStore, editTarget, remembersAnything } from '../src/state/store';
 import { fixturePath, legacyFixturePath, loadFixture } from './helpers';
 
 class MemoryStorage implements KeyValueStorage {
@@ -117,6 +119,50 @@ describe('editor store', () => {
     store.undo();
     expect(store.getState().project.rhythms).toEqual(before);
     expect(store.getState().project.rhythmTracks[0]).toHaveLength(7);
+  });
+
+  it('clears everything the machine remembers in one step that undo brings back', () => {
+    const store = makeStore();
+    const before = store.getState().project;
+    expect(remembersAnything(before)).toBe(true);
+
+    store.clearEverything();
+    const cleared = store.getState().project;
+    expect(cleared.rhythms).toEqual(createEmptyRhythms());
+    expect(cleared.rhythmTracks).toEqual(createEmptyTracks());
+    expect(remembersAnything(cleared)).toBe(false);
+    // The knobs, the tempo and the name are not memory, and stay.
+    expect(cleared.sound).toEqual(before.sound);
+    expect(cleared.tempo).toEqual(before.tempo);
+    expect(cleared.name).toBe(before.name);
+
+    store.undo();
+    expect(store.getState().project.rhythms).toEqual(before.rhythms);
+    expect(store.getState().project.rhythmTracks).toEqual(before.rhythmTracks);
+    expect(store.getState().canUndo).toBe(false);
+  });
+
+  it('has nothing to clear, and so nothing to undo, when the machine is already blank', () => {
+    const store = makeStore();
+    store.clearEverything();
+    store.undo();
+    store.redo();
+    expect(store.getState().canUndo).toBe(true);
+    store.clearEverything();
+    store.undo();
+    // That undo took back the one real clear, not a second empty one.
+    expect(remembersAnything(store.getState().project)).toBe(true);
+    expect(store.getState().canUndo).toBe(false);
+  });
+
+  it('counts a part\'s length or a measure of a track as something remembered', () => {
+    const store = makeStore();
+    store.clearEverything();
+    const blank = store.getState().project;
+    const longer = { ...blank, rhythms: blank.rhythms.map((r, i) => (i === 3 ? { ...r, secondLength: 4 } : r)) };
+    const composed = { ...blank, rhythmTracks: blank.rhythmTracks.map((t, i) => (i === 0 ? [2] : t)) };
+    expect(remembersAnything(longer)).toBe(true);
+    expect(remembersAnything(composed)).toBe(true);
   });
 
   it('sets the tempo as a click stop and a fine adjustment, inside the machine\'s range', () => {
