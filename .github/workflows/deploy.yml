@@ -1,0 +1,114 @@
+name: Deploy
+
+# Vercel's own build machines have no Emscripten, so they cannot build the
+# engine. The site is built here and handed to Vercel finished. Vercel's
+# build on push is switched off in apps/site/vercel.json.
+#
+# Needs three repository secrets: VERCEL_TOKEN, VERCEL_ORG_ID and
+# VERCEL_PROJECT_ID. The site's own secrets live in Vercel and are read by
+# the running site, never by this build.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  ASTRO_TELEMETRY_DISABLED: '1'
+  VERCEL_TELEMETRY_DISABLED: '1'
+  VERCEL_CLI_VERSION: 59.19.0
+  SITE_URL: https://boombapbot.com
+
+jobs:
+  production:
+    name: Build and deploy to production
+    # After CI passes on a push to main, or by hand from main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install native build tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build
+
+      - name: Cache Emscripten
+        uses: actions/cache@v4
+        with:
+          path: .tools/emsdk
+          key: emsdk-${{ runner.os }}-${{ hashFiles('.emscripten-version') }}
+
+      - name: Install the pinned Emscripten
+        run: ./scripts/setup-emsdk.sh
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the WebAssembly engine
+        run: pnpm build:wasm
+
+      - name: Put the engine, worklet and faceplate where the site serves them
+        run: pnpm prepare:assets
+
+      - name: Install the Vercel CLI
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
+
+      - name: Read the Vercel project's settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel pull --yes --environment=production
+          # The build needs none of the site's secrets, so they do not stay on this machine.
+          rm -f .vercel/.env.production.local
+          root_directory="$(jq -r '.settings.rootDirectory // ""' .vercel/project.json)"
+          if [ "$root_directory" != "apps/site" ]; then
+            echo "::error::The Vercel project's Root Directory is '${root_directory}'. Set it to apps/site in Vercel under Settings, Build and Deployment."
+            exit 1
+          fi
+
+      - name: Build the site for Vercel
+        run: vercel build --prod
+
+      - name: Check what is about to be deployed
+        run: |
+          node scripts/check-build.mjs .vercel/output/static
+          for route in api/auth api/store/checkout api/webhooks/stripe api/webhooks/printful; do
+            grep -q "$route" .vercel/output/config.json || { echo "::error::The build has no /$route"; exit 1; }
+          done
+
+      - name: Deploy to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          url="$(vercel deploy --prebuilt --prod)"
+          echo "Deployed ${url}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the live site has its engine and its server
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+            "${SITE_URL}/boombapbot-assets.json" > /dev/null
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+            "${SITE_URL}/api/store/catalog" > /dev/null
