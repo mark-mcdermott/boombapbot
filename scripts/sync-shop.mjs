@@ -9,14 +9,14 @@
 // Needs PRINTFUL_API_KEY in apps/site/.env (and PRINTFUL_STORE_ID if the
 // token can reach more than one store). Commit what it writes.
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadSiteEnv, printfulClient } from './printful-api.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const catalogPath = join(root, 'packages/contracts/data/shop.json');
 const imageDir = join(root, 'apps/site/public/shop');
-const API = 'https://api.printful.com';
 const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 /** "45.00" becomes 4500. */
@@ -53,15 +53,6 @@ export function toCatalogProduct({ sync_product: product, sync_variants: variant
   };
 }
 
-async function printful(path, headers) {
-  const response = await fetch(`${API}${path}`, { headers });
-  const body = await response.json();
-  if (!response.ok) {
-    throw new Error(`Printful answered ${response.status} for ${path}: ${body.error?.message ?? 'no reason given'}`);
-  }
-  return body.result;
-}
-
 /** Printful's country list as the catalog holds it, in alphabetical order. */
 export function toCatalogCountries(countries) {
   return countries
@@ -89,21 +80,17 @@ async function savePicture(product) {
 }
 
 async function main() {
-  const envFile = join(root, 'apps/site/.env');
-  if (existsSync(envFile)) process.loadEnvFile(envFile);
-  const token = process.env.PRINTFUL_API_KEY;
-  if (!token) throw new Error('PRINTFUL_API_KEY is not set in apps/site/.env');
-  const headers = { authorization: `Bearer ${token}` };
-  if (process.env.PRINTFUL_STORE_ID) headers['x-pf-store-id'] = process.env.PRINTFUL_STORE_ID;
+  loadSiteEnv();
+  const printful = printfulClient({ token: process.env.PRINTFUL_API_KEY, storeId: process.env.PRINTFUL_STORE_ID });
 
-  const listed = await printful('/store/products?limit=100', headers);
+  const listed = await printful('/store/products?limit=100');
   const products = [];
   for (const entry of listed.filter((product) => !product.is_ignored)) {
-    const detail = await printful(`/store/products/${entry.id}`, headers);
+    const detail = await printful(`/store/products/${entry.id}`);
     products.push(toCatalogProduct(detail, await savePicture(detail.sync_product)));
   }
 
-  const countries = toCatalogCountries(await printful('/countries', headers));
+  const countries = toCatalogCountries(await printful('/countries'));
   const catalog = { syncedAt: new Date().toISOString(), countries, products };
   writeFileSync(catalogPath, `${JSON.stringify(catalog)}\n`);
 

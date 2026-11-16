@@ -88,7 +88,9 @@ modal that says they are not open.
     run against real Stripe; in particular a Checkout with a shipping option
     and no address collection has only been sent to the stand-in.
   - Register both webhooks, Stripe's on the current API version. Printful's
-    is set through its API and needs the live address.
+    is set through its API: put `PRINTFUL_WEBHOOK_SECRET` in Vercel and in
+    `apps/site/.env`, deploy, then `pnpm shop:webhook --register`. That
+    script has only run against a stand-in.
   - Say on the Policies page what an order keeps (email, address, items),
     that Stripe takes the payment and Printful gets the address, and how
     returns and refunds work. That last one is the owner's to decide.

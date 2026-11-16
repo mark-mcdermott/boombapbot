@@ -1,0 +1,5 @@
+{
+  "package_shipped": "shipped",
+  "order_failed": "failed",
+  "order_canceled": "canceled"
+}
