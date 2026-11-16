@@ -197,7 +197,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - On the machine's page the footer sits 50px under the machine
   (`--footer-drop`, `.sb-below-machine`). On a page of words it stays at
   the bottom. Keep
-  Policies true to what the site does, and update it before payments open.
+  Policies true to what the site does: it covers accounts and the shop, with
+  the returns policy in the owner's words. Update it before the upgrade is
+  sold.
   Every footer modal goes through `ui/Modal.tsx`.
 - Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
   and a move of its own when pointed at. The tip is for the eye only: the

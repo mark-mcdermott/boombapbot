@@ -335,4 +335,14 @@ test.describe('the page around the machine', () => {
       await expect(page.getByTestId('editor')).toBeVisible();
     });
   }
+
+  test('the policies page says how the shop works before anything can be bought', async ({ page }) => {
+    await page.goto('/policies');
+    const shop = page.locator('h2', { hasText: 'The shop' }).locator('xpath=following-sibling::ul[1]');
+    await expect(shop).toContainText('printed to order');
+    await expect(shop).toContainText('tell me within 30 days');
+    await expect(shop).toContainText('Stripe');
+    await expect(shop).toContainText('Printful');
+    await expect(shop).toContainText("I don't collect sales tax or VAT");
+  });
 });
