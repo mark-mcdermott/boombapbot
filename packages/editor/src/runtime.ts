@@ -6,11 +6,13 @@ import {
   isInstrumentId,
   isPerformMode,
   isTrackMode,
+  parseProject,
   rhythmLength,
   stepsPerBeat,
   tappedStep,
   tempoBpm,
   writePart,
+  type ParseResult,
   type Project,
   type Role,
   type TrackId,
@@ -492,18 +494,36 @@ export class EditorRuntime {
   /** Imports a project file. An invalid file leaves the current beat alone. */
   async importProject(file: Blob, name = 'The file'): Promise<boolean> {
     const result = await readProjectFile(file);
+    return this.adopt(result, `${name} was not imported.`, (beat) => `Imported “${beat}”.`) !== null;
+  }
+
+  /**
+   * Puts a beat saved to an account on the machine, by the same road as an
+   * imported file: checked first, and one undo step. Returns the project it
+   * became, or null when it was not a project and nothing changed.
+   */
+  loadSavedBeat(saved: unknown): Project | null {
+    return this.adopt(
+      parseProject(saved),
+      'That saved beat could not be read.',
+      (beat) => `Loaded “${beat}” from your account.`,
+    );
+  }
+
+  /** Replaces the project with one read from elsewhere, or says why not. */
+  private adopt(result: ParseResult, refused: string, done: (name: string) => string): Project | null {
     if (!result.ok) {
-      this.store.notify('error', `${name} was not imported. Your current beat is unchanged.`, result.errors);
-      return false;
+      this.store.notify('error', `${refused} Your current beat is unchanged.`, result.errors);
+      return null;
     }
     this.store.replaceProject(result.project);
     const earlier = result.changes.length > 0 ? ` It came from an earlier version. ${EARLIER_VERSION_NOTE}` : '';
     this.store.notify(
       'info',
-      `Imported “${result.project.name}”. Undo brings back the previous beat.${earlier}`,
+      `${done(result.project.name)} Undo brings back the previous beat.${earlier}`,
       result.changes,
     );
-    return true;
+    return result.project;
   }
 
   // ---- Diagnostics ---------------------------------------------------------

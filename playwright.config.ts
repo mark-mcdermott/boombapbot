@@ -12,7 +12,7 @@ import {
 } from './e2e/accounts-server';
 
 const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
-const withServer = /(accounts|shop)\.spec\.ts/;
+const withServer = /(accounts|beats|shop)\.spec\.ts/;
 
 // The tests run against the production build. Run `pnpm build` first.
 //
@@ -20,7 +20,7 @@ const withServer = /(accounts|shop)\.spec\.ts/;
 // is how the machine has to work: with no server behind it at all. The
 // accounts and shop tests use the built server instead, with a database that
 // lives in memory, an outbox folder in place of real email, and a fake that
-// answers for Stripe and Printful.
+// answers for Stripe and Printful. So do the saved beats tests.
 export default defineConfig({
   testDir: 'e2e',
   globalSetup: './e2e/global-setup.ts',
