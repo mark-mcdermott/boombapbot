@@ -15,6 +15,13 @@
       "when": 1794792616091,
       "tag": "0001_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794858166478,
+      "tag": "0002_beats",
+      "breakpoints": true
     }
   ]
 }

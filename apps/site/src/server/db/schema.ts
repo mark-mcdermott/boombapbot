@@ -1,4 +1,4 @@
-import type { Address } from '@boombapbot/contracts';
+import type { Address, Project } from '@boombapbot/contracts';
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Every table has two keys. `id` is a plain integer for joins and never
@@ -122,4 +122,23 @@ export const order = pgTable(
     updatedAt: moment('updated_at').notNull().defaultNow(),
   },
   (table) => [index('orders_user_id_idx').on(table.userId)],
+);
+
+/**
+ * A beat saved to an account: the project as the machine holds it, already
+ * checked against the project schema. `bytes` is what it weighed when saved.
+ */
+export const beat = pgTable(
+  'beats',
+  {
+    id: rowId(),
+    uuid: publicId(),
+    userId: owner(),
+    name: text('name').notNull(),
+    project: jsonb('project').$type<Project>().notNull(),
+    bytes: integer('bytes').notNull(),
+    createdAt: moment('created_at').notNull().defaultNow(),
+    updatedAt: moment('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('beats_user_id_idx').on(table.userId)],
 );

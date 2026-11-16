@@ -1,45 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
+import { PASSWORD, ROW_ID, UUID, confirm, fill, logOut, openAccount, signUp } from './account';
 import { ACCOUNTS_URL } from './accounts-server';
-import { openEditor } from './helpers';
 import { linkIn, mailTo, newAddress } from './mail';
 
 // These run against the built server (see playwright.config.ts): a database
 // in memory, and an outbox folder where it files the email it would send.
-
-const PASSWORD = 'four on the floor';
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-async function openAccount(page: Page): Promise<void> {
-  await openEditor(page);
-  await page.getByTestId('account').click();
-  await expect(page.getByTestId('account-log-in')).toBeVisible();
-}
-
-async function fill(page: Page, form: string, values: { email?: string; password?: string }): Promise<void> {
-  const fields = page.getByTestId(form);
-  if (values.email !== undefined) await fields.getByTestId('account-email').fill(values.email);
-  if (values.password !== undefined) await fields.getByTestId('account-password').fill(values.password);
-  await fields.getByTestId('account-submit').click();
-}
-
-async function signUp(page: Page, address: string): Promise<void> {
-  await openAccount(page);
-  await page.getByTestId('account-to-sign-up').click();
-  await fill(page, 'account-sign-up', { email: address, password: PASSWORD });
-  await expect(page.getByTestId('account-check-inbox')).toContainText(address);
-}
-
-/** Opens the emailed link, which confirms the address and logs in. */
-async function confirm(page: Page, address: string): Promise<void> {
-  await page.goto(await linkIn(address, /Confirm/));
-  await expect(page.getByTestId('account-address')).toHaveText(address);
-}
-
-async function logOut(page: Page): Promise<void> {
-  await page.getByTestId('account-log-out').click();
-  await expect(page.getByTestId('account-log-in')).toBeVisible();
-}
 
 test('signing up needs the address confirmed, and the emailed link logs you in', async ({ page }) => {
   const address = newAddress();
@@ -156,9 +122,6 @@ test('the account forms have no detectable accessibility violations', async ({ p
 test.describe('what the server answers', () => {
   const post = (request: APIRequestContext, path: string, data: Record<string, string>) =>
     request.post(`/api/auth/${path}`, { data, headers: { origin: ACCOUNTS_URL } });
-
-  /** Every key under which a row id could travel. */
-  const ROW_ID = /"(id|userId|accountId)":\s*("\d+"|\d+\b|null)/;
 
   test('row ids never leave it: a record is known outside by its uuid', async ({ request }) => {
     const address = newAddress();

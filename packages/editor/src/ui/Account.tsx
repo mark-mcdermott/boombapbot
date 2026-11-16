@@ -1,3 +1,4 @@
+import { FREE_BEAT_LIMIT } from '@boombapbot/contracts';
 import { CircleUserRound } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import {
@@ -12,6 +13,7 @@ import {
 import { takeParams } from './arrival';
 import { TextField } from './fields';
 import { Modal } from './Modal';
+import { SavedBeats } from './SavedBeats';
 
 type View =
   | { name: 'log-in' }
@@ -139,8 +141,8 @@ function LogIn({ go }: { go: Go }) {
   return (
     <>
       <p className="sb-modal-text">
-        An account is free, and right now it does not do much: it logs you in. Saving beats to it and picking them
-        up on another device is what I am building next.
+        An account is free. It keeps up to {FREE_BEAT_LIMIT} of your beats, so you can pick them up on another device.
+        The machine works the same without one.
       </p>
       <Form
         testId="account-log-in"
@@ -316,18 +318,24 @@ function NewPassword({ token, go }: { token: string; go: Go }) {
   );
 }
 
-function SignedIn({ email }: { email: string }) {
+interface SignedInProps {
+  email: string;
+  /** The account's public id. */
+  account: string;
+  baseUrl: string;
+  close(): void;
+}
+
+function SignedIn({ email, account, baseUrl, close }: SignedInProps) {
   const { waiting, problem, run } = useAttempt();
   return (
     <div data-testid="account-signed-in">
       <p className="sb-modal-text">
-        Logged in as <strong data-testid="account-address">{email}</strong>.
+        Logged in as <strong data-testid="account-address">{email}</strong>. Saving puts a copy of the beat on the
+        machine in your account, so you can pick it up on another device. Nothing goes there until you save.
       </p>
-      <p className="sb-modal-text">
-        That is all an account does so far. Saving beats to it and picking them up on another device is what I am
-        building next. Until then they stay saved in this browser, as before.
-      </p>
-      <div className="sb-form">
+      <SavedBeats baseUrl={baseUrl} account={account} close={close} />
+      <div className="sb-form sb-account-leave">
         <Problem text={problem} />
         <button
           className="sb-button"
@@ -366,7 +374,7 @@ interface AccountProps {
   container: RefObject<HTMLElement | null>;
 }
 
-/** The account button in the footer and its modal: log in, sign up, reset a password, log out. */
+/** The account button in the footer and its modal: log in, sign up, reset a password, saved beats, log out. */
 export function Account({ baseUrl, container }: AccountProps) {
   const session = authClient.useSession();
   const [open, setOpen] = useState(false);
@@ -388,7 +396,10 @@ export function Account({ baseUrl, container }: AccountProps) {
 
   const body = () => {
     if (view.name === 'new-password') return <NewPassword token={view.token} go={go} />;
-    if (session.data) return <SignedIn email={session.data.user.email} />;
+    if (session.data) {
+      const { email, id } = session.data.user;
+      return <SignedIn email={email} account={id} baseUrl={baseUrl} close={() => setOpen(false)} />;
+    }
     if (session.error) return <Unreachable retry={() => void session.refetch()} />;
     if (session.isPending) {
       return (

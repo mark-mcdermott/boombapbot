@@ -167,6 +167,8 @@ test.describe('the page around the machine', () => {
     await expect(page.getByTestId('account-unreachable')).toContainText('The machine does not need it');
     await expect(page.getByTestId('account-modal').locator('input')).toHaveCount(0);
     await expect(page.getByTestId('account-retry')).toBeVisible();
+    // Saved beats need the server, so nothing about them is offered here.
+    await expect(page.getByTestId('beats')).toHaveCount(0);
     await page.getByTestId('account-close').click();
     await page.getByTestId('cart').click();
     await expect(page.getByTestId('shop-unreachable')).toContainText('The machine does not need it');
@@ -344,5 +346,16 @@ test.describe('the page around the machine', () => {
     await expect(shop).toContainText('Stripe');
     await expect(shop).toContainText('Printful');
     await expect(shop).toContainText("I don't collect sales tax or VAT");
+  });
+
+  test('the policies page says what stays in the browser and what a saved beat keeps', async ({ page }) => {
+    await page.goto('/policies');
+    const privacy = page.locator('h2', { hasText: 'Privacy' }).locator('xpath=following-sibling::ul[1]');
+    await expect(privacy).toContainText('Your work stays in your browser unless you save it to your account.');
+    await expect(privacy).toContainText('With no account, or with one you never save a beat to, they are not sent anywhere.');
+    await expect(privacy).toContainText('If you save a beat to your account, I keep that beat.');
+    await expect(privacy).toContainText('Nothing goes there until you press save');
+    await expect(privacy).toContainText('an account holds up to 20 beats');
+    await expect(privacy).toContainText('No sound is uploaded.');
   });
 });

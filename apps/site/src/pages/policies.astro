@@ -25,7 +25,8 @@ const base = import.meta.env.BASE_URL;
       <li>
         <strong>If you make an account, I keep three things.</strong> Your email address. A scrambled form of your
         password that I can't read. And for each time you log in: when it was, the IP address it came from and
-        which browser it was, so you stay logged in and I can tell you from someone guessing.
+        which browser it was, so you stay logged in and I can tell you from someone guessing. Beats are kept only
+        if you save them to it, as set out below.
       </li>
       <li>
         <strong>I email you twice at most, and only when you ask.</strong> Once to confirm the address, and again
@@ -36,22 +37,29 @@ const base = import.meta.env.BASE_URL;
         There are no advertising or tracking cookies.
       </li>
       <li>
-        <strong>Your work stays in your browser.</strong> Rhythms, tracks and knob positions are kept in this
-        browser's storage on your device. They are not sent anywhere, account or not. Clearing the site's data
-        in your browser removes them.
+        <strong>Your work stays in your browser unless you save it to your account.</strong> Rhythms, tracks and
+        knob positions are kept in this browser's storage on your device. With no account, or with one you never
+        save a beat to, they are not sent anywhere. Clearing the site's data in your browser removes them.
       </li>
       <li>
-        <strong>Nothing is uploaded.</strong> Sound is made on your device, and exports are files your browser
-        saves for you.
+        <strong>If you save a beat to your account, I keep that beat.</strong> Pressing save in the account
+        window sends a copy of the project to the database: its name, its rhythms, tracks and knob positions, how
+        large it is and when it was saved. Nothing goes there until you press save, and an account holds up to 20
+        beats. A saved beat is tied to your account and the site only hands it back while you are logged in.
+        Deleting one there removes it from the database, and the copy in your browser stays where it is.
+      </li>
+      <li>
+        <strong>No sound is uploaded.</strong> Sound is made on your device, and exports are files your browser
+        saves for you. A saved beat is steps and settings, not audio.
       </li>
       <li>
         <strong>No analytics, no ads, no third-party scripts.</strong> Three companies do the plumbing: Vercel
-        hosts the site and keeps ordinary request logs, Neon runs the database the accounts live in, and Resend
+        hosts the site and keeps ordinary request logs, Neon runs the database the accounts and saved beats live in, and Resend
         delivers the emails. Buying from the shop brings in two more, set out below.
       </li>
       <li>
         <strong>Deleting an account.</strong> There is no button for it yet. Write to me and I'll delete it by
-        hand.
+        hand, and the beats saved to it go with it.
       </li>
     </ul>
 

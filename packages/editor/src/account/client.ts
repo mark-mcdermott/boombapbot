@@ -17,7 +17,8 @@ export const EMAIL_NOT_VERIFIED = 'EMAIL_NOT_VERIFIED';
 /** Its code for asking to confirm an address that already is. */
 export const EMAIL_ALREADY_VERIFIED = 'EMAIL_ALREADY_VERIFIED';
 
-const UNREACHABLE: Failure = { code: 'UNREACHABLE' };
+/** No answer came at all: offline, or no server behind the page. */
+export const UNREACHABLE = { code: 'UNREACHABLE' } as const satisfies Failure;
 
 /**
  * Runs one call to the server and returns what went wrong, or null. The
