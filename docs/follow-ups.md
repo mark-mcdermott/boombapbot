@@ -212,6 +212,16 @@ the compile spike. Beyond it:
 
 ## Web
 
+- **The rename.** The code is renamed throughout. The wordmark in the header
+  is a stand-in drawn on the grid of the owner's earlier one; theirs replaces
+  it in `ui/Brand.tsx` when it exists. With ten letters the lockup is tight
+  on a phone, where the mascot comes out about 18px tall. Outside the code,
+  the new domain has to answer before the deploy's last check passes, and
+  these follow it: `PUBLIC_SITE_URL` and `EMAIL_FROM` in Vercel, the sending
+  domain in Resend, the Stripe webhook's address, and
+  `pnpm shop:webhook --register` for Printful. Browser storage does not
+  carry over to a new domain, so drafts kept only in a browser at the old
+  address stay there; beats saved to an account are not affected.
 - **Deployment.** Vercel's build machines do not have Emscripten, so the site
   is built in GitHub Actions and handed to Vercel finished
   (`.github/workflows/deploy.yml`, after CI passes on `main`, or by hand).
