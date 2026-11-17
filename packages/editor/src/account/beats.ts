@@ -6,7 +6,7 @@ import {
   type BeatListAnswer,
   type BeatRefusal,
   type BeatSummary,
-  type Project,
+  type ProjectBase,
 } from '@boombapbot/contracts';
 import { UNREACHABLE, type Failure } from './client';
 
@@ -52,7 +52,7 @@ export function listBeats(baseUrl: string): Promise<Asked<BeatListAnswer>> {
   return ask(address(baseUrl), BeatListAnswerSchema);
 }
 
-export function saveNewBeat(baseUrl: string, project: Project): Promise<Asked<{ beat: BeatSummary }>> {
+export function saveNewBeat(baseUrl: string, project: ProjectBase): Promise<Asked<{ beat: BeatSummary }>> {
   return ask(address(baseUrl), BeatSavedAnswerSchema, 'POST', { project });
 }
 
@@ -64,7 +64,7 @@ export function saveNewBeat(baseUrl: string, project: Project): Promise<Asked<{ 
 export function replaceBeat(
   baseUrl: string,
   id: string,
-  project: Project,
+  project: ProjectBase,
   lastSeen: string,
   overwrite: boolean,
 ): Promise<Asked<{ beat: BeatSummary }>> {

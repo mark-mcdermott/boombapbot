@@ -3,7 +3,6 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
 import { useEditorState, useRuntime } from './context';
-import { PanelNotes } from './HardwarePanel';
 import { ChevronIcon, DownloadIcon, UploadIcon } from './icons';
 import { Modal } from './Modal';
 import { PatternActions, StatusBar } from './StatusBar';
@@ -159,16 +158,13 @@ export function Settings({ container }: SettingsProps) {
           </div>
         </Group>
         <Group>
-          <PanelNotes />
+          <runtime.machine.Notes />
         </Group>
         <Group>
           <StatusBar />
         </Group>
         <Group>
-          <p className="sb-footnote">
-            Keys: <kbd>Space</kbd> start or stop · arrows move between steps and turn knobs and switches ·{' '}
-            <kbd>Enter</kbd> presses a step · <kbd>Esc</kbd> lets CLEAR up · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo
-          </p>
+          <p className="sb-footnote">{runtime.machine.keysHelp}</p>
           <p className="sb-hint">
             v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not
             recordings of any hardware. Your beat is saved only in this browser; export the project file to keep

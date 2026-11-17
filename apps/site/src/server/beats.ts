@@ -3,11 +3,12 @@ import {
   MAX_BEAT_BYTES,
   beatBytes,
   beatTooLarge,
+  createProjectCodec,
   formatKilobytes,
-  parseProject,
   type BeatRefusal,
-  type Project,
+  type ProjectBase,
 } from '@boombapbot/contracts';
+import { documentKind } from '#machine/document';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { beat } from './db/schema';
@@ -63,6 +64,9 @@ export function ownedBeat(user: SignedInUser, id: string | undefined) {
   return uuid.success ? and(eq(beat.uuid, uuid.data), eq(beat.userId, user.id)) : null;
 }
 
+/** Reads the projects of the machine this build is. */
+const codec = createProjectCodec([documentKind]);
+
 /** Room for the few fields a request carries beside the project. */
 const ENVELOPE_BYTES = 1024;
 
@@ -100,7 +104,7 @@ function parseJson(text: string): unknown {
 export async function readBeatRequest<Body extends { project?: unknown }>(
   request: Request,
   schema: z.ZodType<Body>,
-): Promise<{ user: SignedInUser; data: Body; project: Project; bytes: number } | Refused> {
+): Promise<{ user: SignedInUser; data: Body; project: ProjectBase; bytes: number } | Refused> {
   const asked = await signedIn(request);
   if ('refusal' in asked) return asked;
   const text = await readBody(request);
@@ -108,7 +112,7 @@ export async function readBeatRequest<Body extends { project?: unknown }>(
   const body = schema.safeParse(parseJson(text));
   if (!body.success) return { refusal: refuse('invalid') };
   if (beatTooLarge(beatBytes(body.data.project))) return { refusal: refuse('too_large') };
-  const parsed = parseProject(body.data.project);
+  const parsed = codec.parse(body.data.project);
   if (!parsed.ok) return { refusal: refuse('invalid') };
   return { user: asked.user, data: body.data, project: parsed.project, bytes: beatBytes(parsed.project) };
 }

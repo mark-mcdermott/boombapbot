@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import panel808 from '../data/panels/808.panel.json';
+import panel808 from '@boombapbot/contracts/data/panels/808.panel.json';
 import { KNOB_PARAMS, PART_STEPS, SWITCHED_IDS, TRACK_IDS, getTrack } from './machine';
 import { AUTO_FILLS, MODES } from './project';
 

@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { tempoBpm } from '@boombapbot/contracts';
+import type { ProjectBase } from '@boombapbot/contracts';
+import type { Machine, MachineSession } from '../machine';
 import { EditorRuntime } from '../runtime';
-import { RuntimeContext, useEditorState } from './context';
+import { RuntimeContext, useEditorState, useRuntime } from './context';
 import { CookieNotice } from './CookieNotice';
 import { Footer } from './Footer';
 import { Header } from './Header';
-import { HardwarePanel } from './HardwarePanel';
 import { NoticeBanner } from './StatusBar';
 import { PlayButton } from './PlayButton';
 import { Settings } from './Settings';
 
-export interface BoombapbotEditorProps {
+export interface BoombapbotEditorProps<
+  Document extends ProjectBase,
+  Transient extends object,
+  Session extends MachineSession<Document, Transient>,
+> {
+  /** The drum machine this editor is. */
+  machine: Machine<Document, Transient, Session>;
   /** Base URL the site is served from. */
   baseUrl?: string;
 }
@@ -50,7 +56,8 @@ function isActivatable(target: EventTarget | null): boolean {
 
 /** Start/stop and the tempo, pinned to the bottom of a phone screen. */
 function Dock() {
-  const bpm = useEditorState((state) => Math.round(tempoBpm(state.project.tempo)));
+  const { machine } = useRuntime();
+  const bpm = useEditorState((state) => Math.round(machine.bpm(state.project)));
   return (
     <div className="sb-dock" role="group" aria-label="Quick transport">
       <PlayButton className="sb-dock-play" testId="dock-play" />
@@ -77,8 +84,8 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
       } else if (command && event.key.toLowerCase() === 'y' && !isTextEntry(event.target)) {
         event.preventDefault();
         runtime.store.redo();
-      } else if (event.key === 'Escape') {
-        runtime.store.releaseClear();
+      } else if (runtime.session.keyDown?.(event)) {
+        return;
       } else if (event.key === ' ' && !command && !isTextEntry(event.target) && !isActivatable(event.target)) {
         // Space plays and stops, except where it already activates a control.
         event.preventDefault();
@@ -96,9 +103,9 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
       data-audio={audioStatus}
       data-playing={playing}
     >
-      <Header baseUrl={baseUrl} current="808" />
+      <Header baseUrl={baseUrl} />
       <NoticeBanner />
-      <HardwarePanel />
+      <runtime.machine.Panel />
       <div className="sb-below-machine">
         <CookieNotice baseUrl={baseUrl} />
         <Footer baseUrl={baseUrl} container={modals} settings={<Settings container={modals} />} />
@@ -110,8 +117,12 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
 }
 
 /** The boombapbot beat editor. Client-only: it needs Web Audio and storage. */
-export function BoombapbotEditor({ baseUrl = '/' }: BoombapbotEditorProps) {
-  const [runtime] = useState(() => new EditorRuntime({ baseUrl }));
+export function BoombapbotEditor<
+  Document extends ProjectBase,
+  Transient extends object,
+  Session extends MachineSession<Document, Transient>,
+>({ machine, baseUrl = '/' }: BoombapbotEditorProps<Document, Transient, Session>) {
+  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine }));
 
   useEffect(() => {
     runtime.attach();
@@ -144,9 +155,11 @@ export function BoombapbotEditor({ baseUrl = '/' }: BoombapbotEditorProps) {
     };
   }, [runtime]);
 
+  // The context is not generic. A machine's own hooks give its panel the types back.
+  const shared = runtime as unknown as EditorRuntime;
   return (
-    <RuntimeContext.Provider value={runtime}>
-      <EditorBody runtime={runtime} baseUrl={baseUrl} />
+    <RuntimeContext.Provider value={shared}>
+      <EditorBody runtime={shared} baseUrl={baseUrl} />
     </RuntimeContext.Provider>
   );
 }

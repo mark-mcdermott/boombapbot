@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, envField } from 'astro/config';
 
 const onVercel = Boolean(process.env.VERCEL);
+// The drum machine this build is. Only its package is ever imported.
+const machine = `@boombapbot/machine-${process.env.BOOMBAPBOT_MACHINE ?? '808'}`;
 
 // Read when a request needs it, never at build time, so a build succeeds
 // with none of them set and a missing one is named by whatever asks for it.
@@ -41,6 +43,12 @@ export default defineConfig({
   },
   vite: {
     plugins: [tailwindcss()],
+    resolve: {
+      alias: [
+        { find: '#machine/document', replacement: `${machine}/document` },
+        { find: '#machine', replacement: machine },
+      ],
+    },
     // The in-process database is for tests and offline work. A Vercel build
     // drops it, driver and all.
     define: { __LOCAL_DATABASE__: JSON.stringify(!onVercel) },

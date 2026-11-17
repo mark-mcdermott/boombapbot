@@ -1,27 +1,17 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseProject, type Project } from '@boombapbot/contracts';
 import { SnareWasm } from '../src/engine';
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const wasmPath = resolve(repoRoot, 'build/wasm/boombapbot-engine.wasm');
 export const nativeRenderPath = resolve(repoRoot, 'build/native/boombapbot-render');
-export const contractsPath = resolve(repoRoot, 'packages/contracts');
-export const fixturePath = resolve(contractsPath, 'fixtures/mixed-rhythms.project.json');
-export const legacyFixturePath = resolve(contractsPath, 'fixtures/v1-kick-snare-hat.project.json');
 
 export function loadWasm(): SnareWasm {
   if (!existsSync(wasmPath)) {
     throw new Error(`${wasmPath} is missing. Run "pnpm build:wasm" first.`);
   }
   return SnareWasm.fromBytes(readFileSync(wasmPath));
-}
-
-export function loadFixture(): Project {
-  const result = parseProject(JSON.parse(readFileSync(fixturePath, 'utf8')));
-  if (!result.ok) throw new Error(result.errors.join('; '));
-  return result.project;
 }
 
 export function rms(signal: Float32Array): number {

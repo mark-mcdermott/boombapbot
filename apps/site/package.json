@@ -21,6 +21,7 @@
     "@neondatabase/serverless": "1.2.0",
     "@boombapbot/contracts": "workspace:*",
     "@boombapbot/editor": "workspace:*",
+    "@boombapbot/machine-808": "workspace:*",
     "@tailwindcss/vite": "4.3.5",
     "astro": "7.4.12",
     "better-auth": "1.7.7",

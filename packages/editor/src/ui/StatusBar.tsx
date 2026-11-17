@@ -1,36 +1,10 @@
-import { composition, countHits, isTrackMode, rhythmLength } from '@boombapbot/contracts';
-import { editTarget, remembersAnything, type EditorState } from '../state/store';
 import { useEditorState, useRuntime } from './context';
 import { CloseIcon, RedoIcon, UndoIcon } from './icons';
 
-/** Hits in the version of the rhythm the step buttons show. */
-function selectedHits(state: EditorState): number {
-  const { rhythm, variation } = editTarget(state.project);
-  return countHits(state.project.rhythms[rhythm]!, variation);
-}
-
-interface TrackSummary {
-  number: number;
-  measures: number;
-}
-
-/** The rhythm track the selector is on, in the modes that work on one. */
-function trackSummary(state: EditorState): TrackSummary | null {
-  const { panel, rhythmTracks } = state.project;
-  if (!isTrackMode(panel.mode)) return null;
-  return { number: panel.selector + 1, measures: composition(rhythmTracks, panel.selector).length };
-}
-
-function sameTrack(a: TrackSummary | null, b: TrackSummary | null): boolean {
-  return a?.number === b?.number && a?.measures === b?.measures;
-}
-
 export function PatternActions() {
-  const { store } = useRuntime();
+  const { store, machine } = useRuntime();
   const canUndo = useEditorState((state) => state.canUndo);
   const canRedo = useEditorState((state) => state.canRedo);
-  const hits = useEditorState(selectedHits);
-  const remembers = useEditorState((state) => remembersAnything(state.project));
   return (
     <div className="sb-actions" role="toolbar" aria-label="Pattern actions">
       <button type="button" className="sb-button" data-testid="undo" disabled={!canUndo} onClick={() => store.undo()}>
@@ -41,27 +15,7 @@ export function PatternActions() {
         <RedoIcon />
         <span>Redo</span>
       </button>
-      <button type="button" className="sb-button" data-testid="starter" onClick={() => store.loadStarterRhythms()}>
-        Starter rhythms
-      </button>
-      <button
-        type="button"
-        className="sb-button sb-button-danger"
-        data-testid="clear"
-        disabled={hits === 0}
-        onClick={() => store.clearRhythm()}
-      >
-        Clear rhythm
-      </button>
-      <button
-        type="button"
-        className="sb-button sb-button-danger"
-        data-testid="clear-everything"
-        disabled={!remembers}
-        onClick={() => store.clearEverything()}
-      >
-        Clear everything
-      </button>
+      <machine.SettingsActions />
     </div>
   );
 }
@@ -108,9 +62,7 @@ export function StatusBar() {
   const draftState = useEditorState((state) => state.draftState);
   const draftSavedAt = useEditorState((state) => state.draftSavedAt);
   const draftOrigin = useEditorState((state) => state.draftOrigin);
-  const track = useEditorState(trackSummary, sameTrack);
-  const steps = useEditorState((state) => rhythmLength(state.project.rhythms[editTarget(state.project).rhythm]!));
-  const hits = useEditorState(selectedHits);
+  const { machine } = useRuntime();
 
   const saved =
     draftState === 'error'
@@ -129,14 +81,7 @@ export function StatusBar() {
         {AUDIO_TEXT[audioStatus]}
         {audioError ? `: ${audioError}` : ''}
       </span>
-      <span data-testid="hit-count">
-        {hits} {hits === 1 ? 'hit' : 'hits'} in {steps} steps
-      </span>
-      {track ? (
-        <span data-testid="track-length">
-          Rhythm track {track.number}: {track.measures === 0 ? 'empty' : `${track.measures} measures`}
-        </span>
-      ) : null}
+      <machine.StatusLines />
     </div>
   );
 }

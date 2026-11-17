@@ -1,4 +1,4 @@
-import { parseProjectText, serializeProject, type Project } from '@boombapbot/contracts';
+import type { DocumentKind, ProjectBase, ProjectCodec } from '@boombapbot/contracts';
 
 /** The part of Web Storage this module needs, so tests can supply a fake. */
 export interface KeyValueStorage {
@@ -7,17 +7,14 @@ export interface KeyValueStorage {
   removeItem(key: string): void;
 }
 
-export const DRAFT_KEY = 'boombapbot.draft.v2';
-/** Where earlier versions kept the draft. Read once, when there is no current draft. */
-export const LEGACY_DRAFT_KEY = 'boombapbot.draft.v1';
 /** Holds a draft that failed validation, so nothing is silently discarded. */
 export const UNREADABLE_DRAFT_KEY = 'boombapbot.draft.unreadable';
 
-export type DraftLoad =
+export type DraftLoad<Document extends ProjectBase> =
   | { status: 'empty' }
   | {
       status: 'restored';
-      project: Project;
+      project: Document;
       /** What a draft from an earlier version lost on the way in. */
       changes: string[];
     }
@@ -28,21 +25,24 @@ export type DraftLoad =
  * Reads the saved draft, falling back to one left by an earlier version. An
  * invalid draft is set aside, not deleted.
  */
-export function loadDraft(storage: KeyValueStorage): DraftLoad {
-  let key = DRAFT_KEY;
-  let text: string | null;
+export function loadDraft<Document extends ProjectBase>(
+  storage: KeyValueStorage,
+  kind: DocumentKind<Document>,
+  codec: ProjectCodec<Document>,
+): DraftLoad<Document> {
+  let key = kind.draftKey;
+  let text: string | null = null;
   try {
-    text = storage.getItem(key);
-    if (text === null) {
-      key = LEGACY_DRAFT_KEY;
+    for (key of [kind.draftKey, ...kind.earlierDraftKeys]) {
       text = storage.getItem(key);
+      if (text !== null) break;
     }
   } catch (error) {
     return { status: 'unavailable', errors: [describe(error)] };
   }
   if (text === null) return { status: 'empty' };
 
-  const result = parseProjectText(text);
+  const result = codec.parseText(text);
   if (result.ok) return { status: 'restored', project: result.project, changes: result.changes };
 
   try {
@@ -56,9 +56,13 @@ export function loadDraft(storage: KeyValueStorage): DraftLoad {
 
 export type DraftSave = { ok: true } | { ok: false; error: string };
 
-export function saveDraft(storage: KeyValueStorage, project: Project): DraftSave {
+export function saveDraft<Document extends ProjectBase>(
+  storage: KeyValueStorage,
+  kind: DocumentKind<Document>,
+  project: Document,
+): DraftSave {
   try {
-    storage.setItem(DRAFT_KEY, serializeProject(project));
+    storage.setItem(kind.draftKey, kind.serialize(project));
     return { ok: true };
   } catch (error) {
     return { ok: false, error: describe(error) };

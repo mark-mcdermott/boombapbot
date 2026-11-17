@@ -1,5 +1,5 @@
 ---
-import { BoombapbotEditor } from '@boombapbot/editor';
+import { Machine } from '../components/Machine';
 import Base from '../layouts/Base.astro';
 
 const base = import.meta.env.BASE_URL;
@@ -11,9 +11,9 @@ const base = import.meta.env.BASE_URL;
 >
   <main class="min-h-dvh">
     <h1 class="sb-visually-hidden">boombapbot drum machine</h1>
-    <BoombapbotEditor client:only="react" baseUrl={base}>
+    <Machine client:only="react" baseUrl={base}>
       <p slot="fallback" class="mx-auto max-w-[1180px] px-5 py-10 text-dim">Loading the machine…</p>
-    </BoombapbotEditor>
+    </Machine>
     <noscript>
       <p class="mx-auto max-w-[1180px] px-5 py-10 text-dim">boombapbot needs JavaScript and Web Audio to run.</p>
     </noscript>

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BEAT_LINKS_KEY, BeatLinks } from '../src/account/beat-links';
-import { EditorRuntime } from '../src/runtime';
 import type { KeyValueStorage } from '../src/state/draft-storage';
-import { loadFixture } from './helpers';
 
 class MemoryStorage implements KeyValueStorage {
   readonly items = new Map<string, string>();
@@ -76,41 +74,6 @@ describe('what this device remembers about saved beats', () => {
     for (const links of [new BeatLinks(null), new BeatLinks(blocked)]) {
       links.set('account', 'project', { beat: 'beat-1', seen: SEEN });
       expect(links.get('account', 'project')).toEqual({ beat: 'beat-1', seen: SEEN });
-    }
-  });
-});
-
-describe('loading a saved beat onto the machine', () => {
-  const saved = () => ({ ...loadFixture(), id: 'from-the-account', name: 'From the account' });
-
-  it('replaces the beat as one undo step, as an import does', () => {
-    const machine = new EditorRuntime({ baseUrl: '/', storage: null });
-    const before = machine.store.getState().project;
-
-    const loaded = machine.loadSavedBeat(JSON.parse(JSON.stringify(saved())));
-    expect(loaded?.id).toBe('from-the-account');
-    expect(machine.store.getState().project.name).toBe('From the account');
-    expect(machine.store.getState().notice).toMatchObject({
-      kind: 'info',
-      message: 'Loaded “From the account” from your account. Undo brings back the previous beat.',
-    });
-
-    machine.store.undo();
-    expect(machine.store.getState().project).toEqual(before);
-    expect(machine.store.getState().canUndo).toBe(false);
-  });
-
-  it('leaves the beat alone when what came back is not a project', () => {
-    const machine = new EditorRuntime({ baseUrl: '/', storage: null });
-    const before = machine.store.getState().project;
-    for (const broken of [null, 'a beat', {}, { ...saved(), rhythms: [] }, { ...saved(), schemaVersion: 99 }]) {
-      expect(machine.loadSavedBeat(broken)).toBeNull();
-      expect(machine.store.getState().project).toBe(before);
-      expect(machine.store.getState().canUndo).toBe(false);
-      expect(machine.store.getState().notice).toMatchObject({
-        kind: 'error',
-        message: 'That saved beat could not be read. Your current beat is unchanged.',
-      });
     }
   });
 });

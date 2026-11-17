@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { PROJECT_FORMAT } from '@boombapbot/contracts';
 import {
   BPM_MAX,
   BPM_MIN,
@@ -9,7 +10,6 @@ import {
   MODES,
   PANEL,
   PATTERN_COUNT,
-  PROJECT_FORMAT,
   RHYTHM_COUNT,
   ROLES,
   ROLE_IDS,
@@ -56,10 +56,10 @@ import {
   withPartLength,
   withStep,
   writePart,
-} from '../src';
+} from '../src/document';
 
 function read(name: string): string {
-  return readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
+  return readFileSync(new URL(`../../contracts/fixtures/${name}`, import.meta.url), 'utf8');
 }
 
 const fixtureText = read('mixed-rhythms.project.json');
