@@ -75,7 +75,7 @@ pnpm serve
   Docs, manifesto, Credits and Policies pages and open modals for upgrades,
   the cart, settings and your account; each shows its name when pointed at.
   Settings holds the beat name, undo and redo, a reset to the
-  starter rhythms, a clear action, import and export, and the save and audio
+  starter rhythms, a clear for one rhythm and one for everything, import and export, and the save and audio
   status. The upgrade is not built: its modal says so. The cart is a shop
   (see [Shop](#shop)).
 - **Accounts, if you want one.** The account button opens a modal to make an

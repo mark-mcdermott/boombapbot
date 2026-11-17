@@ -1,5 +1,5 @@
 import { composition, countHits, isTrackMode, rhythmLength } from '@boombapbot/contracts';
-import { editTarget, type EditorState } from '../state/store';
+import { editTarget, remembersAnything, type EditorState } from '../state/store';
 import { useEditorState, useRuntime } from './context';
 import { CloseIcon, RedoIcon, UndoIcon } from './icons';
 
@@ -30,6 +30,7 @@ export function PatternActions() {
   const canUndo = useEditorState((state) => state.canUndo);
   const canRedo = useEditorState((state) => state.canRedo);
   const hits = useEditorState(selectedHits);
+  const remembers = useEditorState((state) => remembersAnything(state.project));
   return (
     <div className="sb-actions" role="toolbar" aria-label="Pattern actions">
       <button type="button" className="sb-button" data-testid="undo" disabled={!canUndo} onClick={() => store.undo()}>
@@ -51,6 +52,15 @@ export function PatternActions() {
         onClick={() => store.clearRhythm()}
       >
         Clear rhythm
+      </button>
+      <button
+        type="button"
+        className="sb-button sb-button-danger"
+        data-testid="clear-everything"
+        disabled={!remembers}
+        onClick={() => store.clearEverything()}
+      >
+        Clear everything
       </button>
     </div>
   );

@@ -1,14 +1,18 @@
 import {
   EMPTY_ROW,
-  RHYTHM_COUNT,
-  RHYTHM_TRACKS,
   TRACK_IDS,
   withStep,
   type InstrumentId,
   type PreScale,
   type TrackId,
 } from './machine';
-import { createEmptyRhythm, type Rhythm, type RhythmVariation } from './project';
+import {
+  createEmptyRhythm,
+  createEmptyRhythms,
+  createEmptyTracks,
+  type Rhythm,
+  type RhythmVariation,
+} from './project';
 
 type Hits = Partial<Record<TrackId, number[]>>;
 
@@ -46,7 +50,7 @@ function everySound(): Hits {
  * the hardware's factory rhythms. Basic Rhythms 9 to 11 are left empty.
  */
 export function createStarterRhythms(): Rhythm[] {
-  const rhythms = Array.from({ length: RHYTHM_COUNT }, createEmptyRhythm);
+  const rhythms = createEmptyRhythms();
 
   // 1: the beat the page opens on.
   rhythms[0] = rhythm(
@@ -164,7 +168,7 @@ export function createStarterRhythms(): Rhythm[] {
  * play: an intro, two eight-measure phrases with fill-ins, and an ending.
  */
 export function createStarterTracks(): number[][] {
-  const tracks: number[][] = Array.from({ length: RHYTHM_TRACKS }, () => []);
+  const tracks = createEmptyTracks();
   const phrase = (basic: number, turn: number, end: number) => [basic, basic, basic, turn, basic, basic, basic, end];
   tracks[0] = [12, ...phrase(0, 0, 13), ...phrase(1, 14, 12), ...phrase(2, 2, 15)];
   return tracks;

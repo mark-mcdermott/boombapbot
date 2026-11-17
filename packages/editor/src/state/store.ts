@@ -6,6 +6,8 @@ import {
   clampKnob,
   clearRhythm,
   clearedVersions,
+  createEmptyRhythms,
+  createEmptyTracks,
   createProject,
   createStarterRhythms,
   createStarterTracks,
@@ -107,6 +109,13 @@ function defaultId(): string {
 
 function memoryOf(project: Project): Memory {
   return { rhythms: project.rhythms, rhythmTracks: project.rhythmTracks };
+}
+
+const EMPTY_MEMORY = JSON.stringify({ rhythms: createEmptyRhythms(), rhythmTracks: createEmptyTracks() } satisfies Memory);
+
+/** Whether the machine remembers anything: a step, a part's length, a measure of a track. */
+export function remembersAnything(project: Project): boolean {
+  return JSON.stringify(memoryOf(project)) !== EMPTY_MEMORY;
 }
 
 export function editTarget(project: Project, playingPattern = -1): EditTarget {
@@ -294,6 +303,13 @@ export class EditorStore {
       rhythms: createStarterRhythms(),
       rhythmTracks: createStarterTracks(),
     });
+  }
+
+  /** Wipes everything the machine remembers: all sixteen rhythms and every rhythm track. One undo step. */
+  clearEverything(): void {
+    const { project } = this.state;
+    if (!remembersAnything(project)) return;
+    this.commit({ ...project, rhythms: createEmptyRhythms(), rhythmTracks: createEmptyTracks() });
   }
 
   /** Replaces the whole project, for example after an import. Undoable. */

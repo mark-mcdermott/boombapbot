@@ -202,6 +202,16 @@ export function createEmptyRhythm(): Rhythm {
   };
 }
 
+/** Sixteen rhythms with nothing in them. */
+export function createEmptyRhythms(): Rhythm[] {
+  return Array.from({ length: RHYTHM_COUNT }, createEmptyRhythm);
+}
+
+/** Twelve rhythm tracks with no measures. */
+export function createEmptyTracks(): number[][] {
+  return Array.from({ length: RHYTHM_TRACKS }, () => []);
+}
+
 export function createDefaultSound(): SoundSettings {
   return {
     master: DEFAULT_LEVEL,
@@ -247,14 +257,14 @@ export function createProject(options: NewProjectOptions): Project {
     sound: createDefaultSound(),
     rhythms: options.rhythms ?? createStarterRhythms(),
     // The starter track plays the starter rhythms, so it comes only with them.
-    rhythmTracks: options.rhythms ? Array.from({ length: RHYTHM_TRACKS }, () => []) : createStarterTracks(),
+    rhythmTracks: options.rhythms ? createEmptyTracks() : createStarterTracks(),
     panel: createDefaultPanel(),
   };
 }
 
 /** A version 1 beat as a current project: it becomes Basic Rhythm 1, version A. */
 function fromV1(beat: V1Beat): Project {
-  const rhythms = Array.from({ length: RHYTHM_COUNT }, createEmptyRhythm);
+  const rhythms = createEmptyRhythms();
   rhythms[0] = { ...createEmptyRhythm(), a: beat.variation };
   return {
     format: PROJECT_FORMAT,
@@ -266,7 +276,7 @@ function fromV1(beat: V1Beat): Project {
     tempo: tempoFromBpm(beat.bpm),
     sound: createDefaultSound(),
     rhythms,
-    rhythmTracks: Array.from({ length: RHYTHM_TRACKS }, () => []),
+    rhythmTracks: createEmptyTracks(),
     panel: createDefaultPanel(),
   };
 }
