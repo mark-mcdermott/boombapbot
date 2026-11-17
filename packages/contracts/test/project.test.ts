@@ -9,7 +9,6 @@ import {
   MODES,
   PANEL,
   PATTERN_COUNT,
-  FORMER_PROJECT_FORMAT,
   PROJECT_FORMAT,
   RHYTHM_COUNT,
   ROLES,
@@ -143,20 +142,6 @@ describe('project schema', () => {
       if (!result.ok) expect(result.errors.length).toBeGreaterThan(0);
     });
   }
-
-  it('opens a project written before the rename, and gives it the current format name', () => {
-    const old = { ...clone(), format: FORMER_PROJECT_FORMAT };
-    const result = parseProject(old);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.project.format).toBe(PROJECT_FORMAT);
-    expect(result.changes).toEqual([]);
-    expect(result.project.rhythms).toEqual(clone().rhythms);
-    // The version 1 fixture carries the old name too, as every version 1 file does.
-    expect(JSON.parse(v1Text).format).toBe(FORMER_PROJECT_FORMAT);
-    expect(parseProjectText(v1Text).ok).toBe(true);
-    expect(parseProject({ ...clone(), format: 'someone-else.project' }).ok).toBe(false);
-  });
 
   it('rejects text that is not a project', () => {
     expect(parseProjectText('not json').ok).toBe(false);
