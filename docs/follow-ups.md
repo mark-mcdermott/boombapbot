@@ -44,7 +44,7 @@ Not settled by any of that:
 - **Lamp behaviour.** The manual describes the lamps in each mode in words.
   What they do on the hardware in the corner cases is unverified.
 - **The level model.** How far the level and accent knobs reach, and the taper
-  of each, are guesses (`packages/contracts/src/machine.ts`).
+  of each, are guesses (`packages/machine-808/src/document/machine.ts`).
 
 ## Accounts, upgrades and the shop
 

@@ -234,7 +234,7 @@ by the server.
   page says so and asks whether to replace it or keep the cloud copy.
 - The routes are `GET` and `POST /api/beats`, and `GET`, `PUT` and `DELETE
   /api/beats/<uuid>`. Each needs a session and only reaches the caller's
-  own rows. What is stored is the project after `parseProject` has checked
+  own rows. What is stored is the project after the project codec has checked
   it.
 - The table is `beats` (`apps/site/drizzle/0002_beats.sql`). It has been in
   the real database since 2026-11-16, when the migration was run there.
@@ -425,8 +425,9 @@ and the tempo are docked at the bottom of the screen.
 | Path | Contents |
 | --- | --- |
 | `engine/` | C++20 core, C ABI, WASM target, CTest suites, `boombapbot-render` tool |
-| `packages/contracts/` | Zod project schema, the machine's tracks and sounds, panel geometry, shared fixtures |
-| `packages/editor/` | React editor, AudioWorklet bridge, exporters, local draft, the account and shop modals |
+| `packages/contracts/` | What every project document carries, saved-beat and shop schemas, and for now the 808's data files and fixtures |
+| `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
+| `packages/machine-808/` | The 808 as a machine: its project schema, tracks and sounds, panel, and what its controls do |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
 | `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
 | `assets/faceplates/` | Cleared faceplate images, drawn or photographed, and their provenance |
