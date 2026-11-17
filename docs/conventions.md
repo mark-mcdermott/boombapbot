@@ -147,6 +147,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - An older project is brought up to date in `parseProject`, which also
   reports what was lost; the page shows that list. Add a step there for every
   schema change, with a fixture.
+- The app was renamed on 2026-11-16. A project's format is
+  `boombapbot.project`; files and saved beats written before that carry
+  `FORMER_PROJECT_FORMAT` and must keep opening. That constant and the
+  version 1 fixture are the only places the old name belongs.
 - A new project gets the starter rhythms and starter track
   (`packages/contracts/src/starter.ts`). They are written for boombapbot; do
   not copy the hardware's factory rhythms into them. Browser tests that need

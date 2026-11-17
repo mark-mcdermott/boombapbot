@@ -145,7 +145,7 @@ a.sb-machine:hover {
 }
 
 /* Everything in the lockup is sized from the wordmark's height. The lockup
-   is about 10.05 times as wide as that, so on a narrow screen the height
+   is about 12.3 times as wide as that, so on a narrow screen the height
    follows the width left between the gutters. The second limit is for
    phones, where the tagline stops shrinking at 11px and its column stays
    about 70px wide.
@@ -155,7 +155,7 @@ a.sb-machine:hover {
    its row and the tagline to the foot of its own. */
 .sb-brand {
   --brand-room: calc(100vw - 2 * var(--gutter));
-  --wordmark-height: min(79.4px, calc(var(--brand-room) / 10.1), calc((var(--brand-room) - 70px) / 8.7));
+  --wordmark-height: min(79.4px, calc(var(--brand-room) / 12.35), calc((var(--brand-room) - 70px) / 10.95));
   display: grid;
   grid-template-columns: auto auto;
   align-items: center;

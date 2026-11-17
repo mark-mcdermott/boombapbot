@@ -37,6 +37,8 @@ import { createStarterRhythms, createStarterTracks } from './starter';
  * export. It is not the future portable `.boombapbot` bundle.
  */
 export const PROJECT_FORMAT = 'boombapbot.project';
+/** What the format was called before the app was renamed. Files and saved beats from then still open. */
+export const FORMER_PROJECT_FORMAT = 'boombapbot.project';
 export const PROJECT_SCHEMA_VERSION = 2;
 export const PROJECT_FILE_EXTENSION = '.boombapbot.json';
 export const MAX_PROJECT_BYTES = 1_000_000;
@@ -142,11 +144,13 @@ export function parseProject(input: unknown): ParseResult {
   let changes: string[] = [];
   if (typeof input === 'object' && input !== null) {
     const header = input as { format?: unknown; schemaVersion?: unknown };
-    if (header.format !== PROJECT_FORMAT) {
+    if (header.format === FORMER_PROJECT_FORMAT) {
+      value = { ...input, format: PROJECT_FORMAT };
+    } else if (header.format !== PROJECT_FORMAT) {
       return { ok: false, errors: ['This is not a boombapbot project file.'] };
     }
     if (header.schemaVersion === 1) {
-      const old = readV1(input);
+      const old = readV1(value);
       if (!old.ok) return old;
       value = fromV1(old.beat);
       changes = old.changes;
