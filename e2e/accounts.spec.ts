@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { PASSWORD, ROW_ID, UUID, confirm, fill, logOut, openAccount, signUp } from './account';
+import { PASSWORD, ROW_ID, UUID, confirm, fill, logOut, openAccount, signUp, signedUp } from './account';
 import { ACCOUNTS_URL } from './accounts-server';
 import { linkIn, mailTo, newAddress } from './mail';
 
@@ -117,6 +117,54 @@ test('the account forms have no detectable accessibility violations', async ({ p
   await page.getByTestId('account-to-sign-up').click();
   await expect(page.getByTestId('account-sign-up')).toBeVisible();
   expect(await scan()).toEqual([]);
+});
+
+test('an account is deleted with its password, and its saved beats go with it', async ({ page }) => {
+  const address = await signedUp(page);
+  await page.getByTestId('beats-save').click();
+  await expect(page.getByTestId('beat')).toHaveCount(1);
+  const { beats } = (await (await page.request.get('/api/beats')).json()) as { beats: { id: string }[] };
+  const beat = beats[0]!.id;
+
+  // Asking is not doing: the step can be left, and the account is as it was.
+  await page.getByTestId('account-to-delete').click();
+  await expect(page.getByTestId('account-delete')).toContainText('for good');
+  expect((await new AxeBuilder({ page }).include('[data-testid="account-modal"]').analyze()).violations).toEqual([]);
+  await page.getByTestId('account-delete-cancel').click();
+  await expect(page.getByTestId('account-address')).toHaveText(address);
+  await expect(page.getByTestId('beat')).toHaveCount(1);
+
+  // The wrong password deletes nothing and says so.
+  await page.getByTestId('account-to-delete').click();
+  await fill(page, 'account-delete-form', { password: 'not the password' });
+  await expect(page.getByTestId('account-problem')).toHaveText('That is not your password.');
+  expect((await page.request.get('/api/auth/get-session')).ok()).toBe(true);
+  expect((await page.request.get(`/api/beats/${beat}`)).status()).toBe(200);
+
+  // The right one logs out, says what went, and leaves the machine alone.
+  await fill(page, 'account-delete-form', { password: PASSWORD });
+  await expect(page.getByTestId('account-notice')).toHaveText('Your account and its saved beats are deleted.');
+  await expect(page.getByTestId('account-log-in')).toBeVisible();
+  await expect(page.getByTestId('editor')).toBeVisible();
+  expect((await page.request.get('/api/beats')).status()).toBe(401);
+
+  // The old password opens nothing, and the address is free to use again.
+  await fill(page, 'account-log-in', { email: address, password: PASSWORD });
+  await expect(page.getByTestId('account-problem')).toHaveText('That email and password do not match an account.');
+  await page.getByTestId('account-to-sign-up').click();
+  await fill(page, 'account-sign-up', { email: address, password: PASSWORD });
+  await expect(page.getByTestId('account-check-inbox')).toContainText(address);
+  await confirm(page, address);
+  await expect(page.getByTestId('beats-empty')).toBeVisible();
+  expect((await page.request.get(`/api/beats/${beat}`)).status()).toBe(404);
+});
+
+test('nobody can delete an account without being logged in to it', async ({ request }) => {
+  const refused = await request.post('/api/auth/delete-user', {
+    data: { password: PASSWORD },
+    headers: { origin: ACCOUNTS_URL },
+  });
+  expect(refused.status()).toBe(401);
 });
 
 test.describe('what the server answers', () => {

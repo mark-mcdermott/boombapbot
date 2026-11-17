@@ -242,8 +242,9 @@ by the server.
 What has been checked: all of the above in a browser against the built
 server with the in-process database, and that the migration applied to the
 real Neon database, leaving an empty `beats` table and the existing rows as
-they were. No beat has been saved to the real database, and nobody has
-tried it on two real devices.
+they were. On 2026-11-17 the owner saved a beat on the live site from a
+computer and loaded it on an iPhone and an Android phone. Deleting a saved
+beat, the newer-copy question and the limit have only run in the tests.
 
 ## Shop
 
@@ -335,9 +336,11 @@ Two cross-checks worth knowing about:
   the sounds, the accent and the knobs feel needs ears.
 - **The GitHub Actions workflow** has not run on GitHub. Every command in it
   was run locally from a fresh clone.
-- **Browsers other than headless Chromium.** Firefox, Safari and iOS have not
-  been tried. The phone layout was checked in Chromium's device emulation,
-  not on a phone.
+- **Browsers other than headless Chromium.** On 2026-11-17 the owner logged
+  in, loaded a beat and played it on an iPhone in Safari and in Chrome and
+  on a Samsung Galaxy S9 in Chrome. Firefox and Safari on a Mac have not
+  been tried, and the phone layout was checked in Chromium's device
+  emulation, not gone over on a phone.
 - **Deployment.** `.github/workflows/deploy.yml` builds the site and hands it
   to Vercel after CI passes on `main`. It ran for the first time on
   2026-11-16, and the live site was checked by hand afterwards: the machine
@@ -347,9 +350,12 @@ Two cross-checks worth knowing about:
   webhook and placed with Printful. A real Printful shipping event, a
   refund and a purchase without an account have not been tried there.
 - **Saved beats on the live site.** The tests use a Postgres inside the
-  server process, built from the same migrations. The `beats` table was
-  created on Neon on 2026-11-16 and is empty: no beat has been saved on the
-  live site, which cannot happen until this is deployed.
+  server process, built from the same migrations. On the live site the
+  owner has saved and loaded across three devices; deleting a saved beat,
+  the newer-copy question and the limit have not been tried there.
+- **Deleting an account.** Built and tested against the in-process
+  database. Nobody has deleted an account through the page on the live
+  site.
 - **Hardware behaviour.** The panel follows the operation manual, read from
   a scan. Nothing has been checked against a machine. Settings lists what is
   not modelled yet.

@@ -247,6 +247,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - Sign-up always needs a confirmed address. Better Auth sends that email in
   the background, so a failed send does not fail the sign-up; the modal
   always offers to send it again. Keep that.
+- An account is deleted from the modal with its password
+  (`user.deleteUser` in `src/server/auth.ts`). The schema does the rest:
+  sessions, the credential and saved beats cascade, and orders keep their
+  rows with the user unset. A new table that hangs off a user has to choose
+  one of those two on purpose. Both app stores require this button.
 
 **Saved beats**
 
@@ -356,17 +361,17 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 ## Not verified yet
 
 The owner has listened to an earlier build; the sounds are a model made by
-ear and have not been compared with a real machine. Also untested are
-browsers other than headless Chromium, real phones, Windows builds, and the
-VST3 in any host. The site is deployed and was checked live on 2026-11-16.
-That day the owner signed up there and reset a password (both emails
-arrived and their links worked), the shop opened and both webhooks were
-registered. The first real order went through that day too: paid at Stripe,
-accepted from Stripe's webhook and placed with Printful. Never tried: a
-real Printful shipping event, a refund, and a purchase without an account.
-Saved beats have only run against the database inside the process. The
-`beats` table has been on Neon since 2026-11-16, empty: no beat has been
-saved on the live site, and none on one real device and loaded on another.
+ear and have not been compared with a real machine. Untested: Firefox,
+Safari on a Mac, Windows builds, and the VST3 in any host. The site is
+deployed at `boombapbot.com`, and the owner has done these on it: signed up
+and reset a password (the emails arrived and their links worked), bought a
+sticker (paid at Stripe, accepted from Stripe's webhook, placed with
+Printful), saved a beat from a computer and loaded it on two phones, and
+logged in, loaded a beat and played it on an iPhone in Safari and in Chrome
+and on a Samsung Galaxy S9 in Chrome. Never tried there: deleting an
+account or a saved beat, the newer-copy question, the beat limit, a real
+Printful shipping event, a refund, and a purchase without an account.
+Nobody has gone over the phone layout or long playing on a real phone.
 Say so rather than assuming these work.
 
 ## Working in this repo

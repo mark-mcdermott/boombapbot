@@ -49,7 +49,9 @@ async function build() {
     trustedOrigins: previewOrigins(),
     database: drizzleAdapter(await getDb(), { provider: 'pg', schema }),
 
-    user: { additionalFields: publicId },
+    // Deleting needs the password again. The database takes the account's
+    // sessions, credential and saved beats with it, and unties its orders.
+    user: { additionalFields: publicId, deleteUser: { enabled: true } },
 
     emailAndPassword: {
       enabled: true,
