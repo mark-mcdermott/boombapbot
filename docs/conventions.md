@@ -39,7 +39,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
   `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
   `realtime`, `synth`).
-- One Vitest file: `pnpm exec vitest run packages/editor/test/engine.test.ts`.
+- One Vitest file: `pnpm exec vitest run packages/machine-808/test/engine.test.ts`.
 - One Playwright file: `pnpm exec playwright test e2e/hardware.spec.ts`.
 - VST3 spike: `cmake -S plugins/vst3 -B build/vst3 -G Ninja`, then
   `cmake --build build/vst3`, then `ctest --test-dir build/vst3`.
@@ -52,17 +52,32 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   808's synthesiser and a mix bus. It builds natively and to WebAssembly from
   the same sources. Do not add a second engine in JavaScript, even to work
   around a failing WASM build.
-- `packages/contracts/` is the source of truth for data shapes: the Zod
-  project schema (`project.ts`, version 2, with the move from version 1 in
-  `legacy.ts`), the machine's tracks, tempo and level model (`machine.ts`,
-  `data/machine-808.json`), the sounds (`roles.ts`) and the panel geometry.
-  The C++ tests read the same JSON files, so a change there is checked on
-  both sides.
-- `packages/editor/` is the React editor. `EditorStore` holds the project;
-  `EditorRuntime` connects it to audio, local storage and the exporters;
-  `AudioController` is the only thing that talks to the AudioWorklet.
-  `engine/machine.ts` turns a project into what the engine takes, for live
-  playback and offline rendering alike.
+- A machine is one package, and the rest is core that knows no machine.
+  `packages/machine-808/` is the 808: its project document
+  (`src/document/`: `project.ts`, version 2, with the move from version 1 in
+  `legacy.ts`; the tracks, tempo and level model in `machine.ts`; the sounds
+  in `roles.ts`; the panel geometry in `hardware.ts`), what its controls do
+  and how it plays and composes (`src/session.ts`), what it asks of the
+  engine (`src/engine.ts`) and its panel (`src/ui/`). `src/index.tsx` puts
+  those together as a `Machine`. Core must never import a machine package.
+- `packages/contracts/` holds what every machine shares: what any project
+  document carries and the codec a build makes from its machines
+  (`document.ts`), saved beats and the shop. For now it also holds the
+  808's JSON data files and fixtures (`data/`, `fixtures/`), because the C++
+  tests read the same files by path, so a change there is checked on both
+  sides.
+- `packages/editor/` is the React editor core. `EditorStore` holds the
+  project and undo; `EditorRuntime` connects it to audio, local storage and
+  the exporters and hosts the machine; `AudioController` is the only thing
+  that talks to the AudioWorklet. `machine.ts` is the contract a machine
+  fills in. A machine's `setup` turns a project into an `EngineSetup`
+  (`engine/setup.ts`), which the runtime compares with the last one and
+  sends on, for live playback and offline rendering alike.
+- The site mounts the editor through `apps/site/src/components/Machine.tsx`,
+  which imports `#machine`: an alias in `astro.config.mjs` set by
+  `BOOMBAPBOT_MACHINE` (the 808 when unset), with the matching `paths` in
+  `apps/site/tsconfig.json`. The server reads projects with a codec made
+  from `#machine/document`. Only the chosen machine is ever imported.
 - `apps/site/` is an Astro site that mounts the editor as a client-only
   island. Its pages are prerendered. The one thing that runs on a server is
   `src/pages/api/`, backed by `src/server/`: accounts (`api/auth`, Better
@@ -104,13 +119,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   flight at a time and the newest setting follows when the worklet
   acknowledges.
 - A track has one voice: its new hit fades the old one. The engine takes
-  linear gains; the knob tapers live in `packages/contracts/src/machine.ts`
+  linear gains; the knob tapers live in `packages/machine-808/src/document/machine.ts`
   and are mirrored in `engine/tools/project_io.h` and
   `plugins/vst3/Source/Machine808.h`. Track level and master volume are
   smoothed per sample, in a way that does not depend on buffer size.
 - The engine, not TypeScript, decides what plays at a bar line.
   `engine/src/sequencer.h` is pure and holds those rules: A, AB and B, intro,
-  tapped and automatic fill-ins, and songs. `engine/machine.ts`
+  tapped and automatic fill-ins, and songs. The 808's `engine.ts`
   (`enginePanel`) only tells the engine where the panel's switches stand. A
   rhythm track is handed over whole as a song (`snare_engine_set_song`), and
   an export asks the engine which version each measure plays
@@ -118,8 +133,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - The page learns what played from the measure log, which the worklet drains
   after every render and never skips. A measure whose rhythm changed on its
   second beat is reported twice under one ordinal. Compose records from it:
-  `EditorRuntime` keeps the take and stores it when the machine stops, as
-  one undo step.
+  the 808's `Session808` keeps the take and stores it when the machine stops,
+  as one undo step.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.
@@ -139,16 +154,17 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `withComposition`).
 - The step buttons do three jobs: steps in the two write modes, the last step
   of a part while CLEAR is down, and the choice of rhythm in pattern clear,
-  manual play and compose. Playing a track back they do nothing. `EditorStore.pressStep` is the one place that decides which.
-  `panelTarget` (contracts) says which rhythm and version the panel is on.
-- Undo covers what the machine remembers (`rhythms`, `rhythmTracks`) and a
+  manual play and compose. Playing a track back they do nothing. `Session808.pressStep` is the one place that decides which.
+  `panelTarget` says which rhythm and version the panel is on.
+- Undo covers what the machine remembers (its `memory`: for the 808,
+  `rhythms` and `rhythmTracks`) and a
   whole-project import. Knobs, switches, tempo and the name are not undo
   steps.
 - An older project is brought up to date in `parseProject`, which also
   reports what was lost; the page shows that list. Add a step there for every
   schema change, with a fixture.
 - A new project gets the starter rhythms and starter track
-  (`packages/contracts/src/starter.ts`). They are written for boombapbot; do
+  (`packages/machine-808/src/document/starter.ts`). They are written for boombapbot; do
   not copy the hardware's factory rhythms into them. Browser tests that need
   an empty rhythm use Basic Rhythm 10.
 - An invalid project import must never replace the current draft, and an
@@ -190,8 +206,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `Header` (the brand: mascot over the tagline, together as tall as the
   wordmark beside them) and
   `Footer` (About, Docs, manifesto, credits, policies, upgrade, cart,
-  settings, account) are shared. The owner asked for the machines in the
-  header to be hidden for now (`SHOW_MACHINES` in `ui/Header.tsx`).
+  settings, account) are shared. The header is the brand alone.
   `SitePage` wraps a page of words in them; About, Docs, the manifesto,
   Credits and Policies are Astro pages in `apps/site/src/pages` that use it.
   Credits is blank until the owner writes it.
@@ -267,7 +282,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `readBeatRequest` in `src/server/beats.ts`) and finds a row by its uuid
   and the caller's id together (`ownedBeat`). Somebody else's beat is
   answered exactly as one that does not exist.
-- What is stored is what `parseProject` returns, never the body as it came.
+- What is stored is what the build's project codec returns, never the body
+  as it came.
   The body is weighed first. One that is too large is still read to its end
   before the answer goes out, because answering early resets the connection.
 - The conflict rule is `cloudCopyIsNewer`. A replace carries `lastSeen`, the

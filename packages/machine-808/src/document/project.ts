@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  MAX_PROJECT_BYTES,
+  PROJECT_FORMAT,
+  type ParseResult as DocumentParseResult,
+} from '@boombapbot/contracts';
 import { readV1, type V1Beat } from './legacy';
 import {
   DEFAULT_LEVEL,
@@ -36,10 +41,7 @@ import { createStarterRhythms, createStarterTracks } from './starter';
  * This is the plain JSON project used for local drafts and JSON import and
  * export. It is not the future portable `.boombapbot` bundle.
  */
-export const PROJECT_FORMAT = 'boombapbot.project';
 export const PROJECT_SCHEMA_VERSION = 2;
-export const PROJECT_FILE_EXTENSION = '.boombapbot.json';
-export const MAX_PROJECT_BYTES = 1_000_000;
 
 /** Positions of the mode selector, clockwise from the lower left. */
 export const MODES = ['pattern_clear', 'write_first', 'write_second', 'manual_play', 'play', 'compose'] as const;
@@ -120,14 +122,7 @@ export type SoundKnobs = Record<SoundParam, number>;
 export type PanelState = z.infer<typeof panelSchema>;
 export type Project = z.infer<typeof projectSchema>;
 
-export type ParseResult =
-  | {
-      ok: true;
-      project: Project;
-      /** What an older file lost on the way in. Empty for a current file. */
-      changes: string[];
-    }
-  | { ok: false; errors: string[] };
+export type ParseResult = DocumentParseResult<Project>;
 
 function describeIssues(error: z.ZodError): string[] {
   return error.issues.slice(0, 8).map((issue) => {

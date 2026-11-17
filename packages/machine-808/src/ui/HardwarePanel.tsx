@@ -22,10 +22,10 @@ import {
   type PanelKnob,
   type PanelManifest,
   type PanelSwitch,
-} from '@boombapbot/contracts';
-import { trackLabel } from '../engine/machine';
-import type { AssetManifest } from '../runtime';
-import { editTarget } from '../state/store';
+} from '../document';
+import { trackLabel } from '../engine';
+import { Segmented, type AssetManifest } from '@boombapbot/editor';
+import { editTarget } from '../session';
 import { useEditorState, useRuntime } from './context';
 import {
   AutoFillSelector,
@@ -42,7 +42,6 @@ import {
   taps,
 } from './PanelControls';
 import { DialHandle, KnobFace, PassiveKnob, box, circle, knobLighting } from './panelGeometry';
-import { Segmented } from './Segmented';
 
 function useAssetManifest(): AssetManifest | null {
   const runtime = useRuntime();
@@ -165,7 +164,7 @@ function useBpmText(): string {
 
 /** The tempo knob turns in click stops: forty of them across its travel. */
 function TempoKnob({ panel, photo }: FaceplateProps) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const stop = useEditorState((state) => state.project.tempo.coarse);
   const bpm = useBpmText();
   return (
@@ -182,14 +181,14 @@ function TempoKnob({ panel, photo }: FaceplateProps) {
       // Its whole travel in 200 pixels.
       perPixel={(TEMPO_STOPS - 1) / 200}
       valueText={`${bpm}, stop ${stop + 1} of ${TEMPO_STOPS}`}
-      onChange={(value) => store.setTempo({ coarse: value })}
+      onChange={(value) => session.setTempo({ coarse: value })}
     />
   );
 }
 
 /** The fine knob moves the tempo by up to one click stop either way. */
 function FineKnob({ panel, photo }: FaceplateProps) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const fine = useEditorState((state) => Math.round(state.project.tempo.fine * 100));
   const bpm = useBpmText();
   return (
@@ -205,13 +204,13 @@ function FineKnob({ panel, photo }: FaceplateProps) {
       step={5}
       perPixel={1}
       valueText={bpm}
-      onChange={(value) => store.setTempo({ fine: value / 100 })}
+      onChange={(value) => session.setTempo({ fine: value / 100 })}
     />
   );
 }
 
 function MasterKnob({ panel, photo }: FaceplateProps) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const percent = useEditorState((state) => Math.round(state.project.sound.master * 100));
   return (
     <Knob
@@ -223,14 +222,14 @@ function MasterKnob({ panel, photo }: FaceplateProps) {
       value={percent}
       {...PERCENT}
       valueText={`${percent}%`}
-      onChange={(value) => store.setMasterVolume(value / 100)}
+      onChange={(value) => session.setMasterVolume(value / 100)}
     />
   );
 }
 
 /** A knob of an instrument column: its level, or its tone, decay, tuning or snappy. */
 function ColumnKnob({ panel, photo, knob }: FaceplateProps & { knob: PanelKnob }) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const percent = useEditorState((state) =>
     Math.round(knobPosition(state.project.sound, knob.track, knob.param) * 100),
   );
@@ -245,7 +244,7 @@ function ColumnKnob({ panel, photo, knob }: FaceplateProps & { knob: PanelKnob }
       value={percent}
       {...PERCENT}
       valueText={`${percent}%`}
-      onChange={(value) => store.setKnob(knob.track, knob.param, value / 100)}
+      onChange={(value) => session.setKnob(knob.track, knob.param, value / 100)}
     />
   );
 }
@@ -271,8 +270,8 @@ function VoiceSwitch({ panel, entry }: { panel: PanelManifest; entry: PanelSwitc
         aria-checked={on}
         aria-label={`${getRole(track.alternate!).name} in place of ${getRole(track.sound!).name}`}
         onClick={() => {
-          runtime.store.setAlternate(entry.track, !on);
-          runtime.auditionIfRunning(entry.track);
+          runtime.session.setAlternate(entry.track, !on);
+          runtime.session.auditionIfRunning(entry.track);
         }}
       >
         <span className="sb-panel-text">{getRole(track.alternate!).short}</span>
@@ -288,7 +287,7 @@ function VoiceSwitch({ panel, entry }: { panel: PanelManifest; entry: PanelSwitc
 
 export function HardwarePanel() {
   const runtime = useRuntime();
-  const { store } = runtime;
+  const { store, session } = runtime;
   const target = useEditorState((state) => editTarget(state.project, state.currentPattern), sameTarget);
   const rhythm = useEditorState((state) => state.project.rhythms[editTarget(state.project).rhythm]!);
   const playing = useEditorState((state) => state.playing);
@@ -296,8 +295,8 @@ export function HardwarePanel() {
   const mode = useEditorState((state) => state.project.panel.mode);
   const basicRhythm = useEditorState((state) => state.project.panel.basicRhythm);
   const fillRhythm = useEditorState((state) => state.project.panel.fillRhythm);
-  const clearArmed = useEditorState((state) => state.clearArmed);
-  const fillArmed = useEditorState((state) => state.fillArmed);
+  const clearArmed = useEditorState((state) => state.transient.clearArmed);
+  const fillArmed = useEditorState((state) => state.transient.fillArmed);
   const power = useEditorState((state) => state.power);
   const playingRhythm = useEditorState((state) => (state.currentPattern < 0 ? -1 : state.currentPattern >> 1));
   const selector = useEditorState((state) => state.project.panel.selector);
@@ -342,8 +341,8 @@ export function HardwarePanel() {
   };
   // In the track modes the selector chooses a rhythm track, and makes no sound.
   const selectTrack = (id: typeof target.track) => {
-    store.selectTrack(id);
-    if (!tracks) void runtime.audition(id);
+    session.selectTrack(id);
+    if (!tracks) void runtime.session.audition(id);
   };
 
   const focusStep = (step: number) =>
@@ -492,9 +491,9 @@ export function HardwarePanel() {
                   aria-pressed={lit(index)}
                   aria-label={stepLabel(index)}
                   onClick={() => {
-                    const press = store.pressStep(index);
+                    const press = session.pressStep(index);
                     if (press.kind === 'step' && press.on && !store.getState().playing) {
-                      runtime.auditionIfRunning(target.track);
+                      runtime.session.auditionIfRunning(target.track);
                     }
                   }}
                   onKeyDown={(event) => {
@@ -550,7 +549,7 @@ export function HardwarePanel() {
           label="Mode"
           className="sb-segmented-fill sb-panel-strip"
           value={mode}
-          onChange={(next) => store.setMode(next)}
+          onChange={(next) => session.setMode(next)}
           options={MODES.map((entry, index) => ({
             value: entry,
             label: MODE_SHORT[index]!,
@@ -584,7 +583,7 @@ export function HardwarePanel() {
               data-testid="strip-clear"
               aria-pressed={writing ? clearArmed : undefined}
               disabled={!clears(mode)}
-              onClick={() => store.pressClear()}
+              onClick={() => session.pressClear()}
             >
               Clear
             </button>

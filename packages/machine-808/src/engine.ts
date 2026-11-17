@@ -24,14 +24,21 @@ import {
   type SoundSettings,
   type TrackId,
   type Variation,
-} from '@boombapbot/contracts';
-import type { EnginePanel, EnginePattern, EngineTrack, SynthSound, WasmEngine } from './wasm-engine';
+} from './document';
+import {
+  exportSongMidi,
+  renderSong,
+  type EnginePanel,
+  type EnginePattern,
+  type EngineSetup,
+  type EngineTrack,
+  type ExportPlan,
+  type LoopRender,
+  type SnareWasm,
+  type SynthSound,
+} from '@boombapbot/editor/engine';
 
-/**
- * The project document as the engine takes it. Live playback and offline
- * rendering both go through here, so they cannot disagree about what a
- * project sounds like.
- */
+/** The 808's project document as the engine takes it. */
 
 /** The instrument whose panel column a sound belongs to. */
 const OWNERS = new Map<number, InstrumentId>(
@@ -134,27 +141,26 @@ export function enginePanel(project: Project): EnginePanel {
   };
 }
 
-/** Measures to render or export: their rhythms, the switches that choose their versions, and whether they loop. */
-export interface RenderPlan {
-  panel: EnginePanel;
-  rhythms: number[];
-  loop: boolean;
-}
-
 /**
  * What an export holds. In the track modes it is the rhythm track the
  * selector is on, played once through. Otherwise it is the rhythm the panel
  * is on as a loop: one measure, or A then B with its lever on AB.
  */
-export function exportPlan(project: Project): RenderPlan {
+export function exportPlan(project: Project): ExportPlan {
   const { panel } = project;
   const switches = { ...enginePanel(project), autoFill: 0, firstBeatRule: false };
+  const midi = { notes: trackNotes(project.sound), velocities: midiVelocities(project.sound) };
   if (isTrackMode(panel.mode)) {
-    return { panel: switches, rhythms: composition(project.rhythmTracks, panel.selector), loop: false };
+    return { ...midi, panel: switches, rhythms: composition(project.rhythmTracks, panel.selector), loop: false };
   }
   const { rhythm } = panelTarget(panel);
   const both = panel.writeTarget === 'basic' && panel.basicVariation === 'ab';
-  return { panel: { ...switches, variation: panel.basicVariation }, rhythms: both ? [rhythm, rhythm] : [rhythm], loop: true };
+  return {
+    ...midi,
+    panel: { ...switches, variation: panel.basicVariation },
+    rhythms: both ? [rhythm, rhythm] : [rhythm],
+    loop: true,
+  };
 }
 
 /** MIDI note of each track, for the sounds its switches select. The accent has none. */
@@ -168,14 +174,46 @@ export function midiVelocities(sound: SoundSettings): { plain: number; accented:
   return { plain: Math.round(gains.plain * 127), accented: Math.round(gains.accented * 127) };
 }
 
-/** Loads a whole project into an engine, synthesising its sounds at the engine's rate. */
-export function applyProject(engine: WasmEngine, project: Project): void {
+/** Everything the engine is asked for, for one project. */
+export function engineSetup(project: Project): EngineSetup {
   const { sound } = project;
-  for (const role of ROLES) engine.synthSound(synthSound(role, sound));
-  engineTracks(sound).forEach((track) => engine.setTrack(track));
   const mix = engineMix(sound);
-  engine.setAccent(mix.plain, mix.accented);
-  engine.setMasterVolume(mix.master);
-  engine.setTempo(tempoBpm(project.tempo));
-  enginePatterns(project.rhythms).forEach((pattern, index) => engine.setPattern(index, pattern));
+  return {
+    tempo: tempoBpm(project.tempo),
+    sounds: ROLES.map((role) => synthSound(role, sound)),
+    tracks: engineTracks(sound),
+    accent: { plain: mix.plain, accented: mix.accented },
+    master: mix.master,
+    patterns: enginePatterns(project.rhythms),
+    panel: enginePanel(project),
+  };
+}
+
+/** The switches that make a song of one rhythm play exactly this pattern. */
+function panelFor(pattern: number): EnginePanel {
+  const variation = pattern % 2 === 1 ? 'b' : 'a';
+  return {
+    rhythm: pattern >> 1,
+    variation,
+    fillRhythm: pattern >> 1,
+    fillVariation: variation,
+    autoFill: 0,
+    firstBeatRule: false,
+  };
+}
+
+/** One seamless loop of a single pattern of the bank. */
+export function renderLoop(wasm: SnareWasm, project: Project, pattern: number, sampleRate: number): LoopRender {
+  return renderSong(wasm, engineSetup(project), { panel: panelFor(pattern), rhythms: [pattern >> 1], loop: true }, sampleRate);
+}
+
+/** Standard MIDI File of measures of the project's patterns, each named by its place in the bank. */
+export function exportMidi(wasm: SnareWasm, project: Project, sequence: number[]): Uint8Array {
+  return wasm.midiExport(
+    enginePatterns(project.rhythms),
+    sequence,
+    trackNotes(project.sound),
+    midiVelocities(project.sound),
+    tempoBpm(project.tempo),
+  );
 }

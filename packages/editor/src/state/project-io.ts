@@ -1,14 +1,13 @@
 import {
   MAX_PROJECT_BYTES,
   PROJECT_FILE_EXTENSION,
-  parseProjectText,
-  serializeProject,
   type ParseResult,
-  type Project,
+  type ProjectBase,
+  type ProjectCodec,
 } from '@boombapbot/contracts';
 
 /** A file-system-safe base name for exports. */
-export function exportBaseName(project: Project): string {
+export function exportBaseName(project: ProjectBase): string {
   const slug = project.name
     .normalize('NFKD')
     .replace(/[^\w\s-]/g, '')
@@ -19,12 +18,8 @@ export function exportBaseName(project: Project): string {
   return slug || 'boombapbot-beat';
 }
 
-export function projectFileName(project: Project): string {
+export function projectFileName(project: ProjectBase): string {
   return `${exportBaseName(project)}${PROJECT_FILE_EXTENSION}`;
-}
-
-export function projectFileContents(project: Project): string {
-  return serializeProject(project);
 }
 
 /**
@@ -32,7 +27,10 @@ export function projectFileContents(project: Project): string {
  * project or a list of reasons; the caller decides what to do with it, so an
  * invalid file can never replace the current draft.
  */
-export async function readProjectFile(file: Blob): Promise<ParseResult> {
+export async function readProjectFile<Document extends ProjectBase>(
+  file: Blob,
+  codec: ProjectCodec<Document>,
+): Promise<ParseResult<Document>> {
   if (file.size > MAX_PROJECT_BYTES) {
     return { ok: false, errors: ['The file is too large to be a boombapbot project.'] };
   }
@@ -42,7 +40,7 @@ export async function readProjectFile(file: Blob): Promise<ParseResult> {
   } catch {
     return { ok: false, errors: ['The file could not be read.'] };
   }
-  return parseProjectText(text);
+  return codec.parseText(text);
 }
 
 /** Saves bytes as a download. Browser only. */

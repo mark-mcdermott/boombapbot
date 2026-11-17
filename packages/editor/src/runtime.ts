@@ -1,50 +1,18 @@
-import {
-  ROLES,
-  composition,
-  compositionCapacity,
-  getTrack,
-  isInstrumentId,
-  isPerformMode,
-  isTrackMode,
-  parseProject,
-  rhythmLength,
-  stepsPerBeat,
-  tappedStep,
-  tempoBpm,
-  writePart,
-  type ParseResult,
-  type Project,
-  type Role,
-  type TrackId,
-} from '@boombapbot/contracts';
+import { createProjectCodec, type ParseResult, type ProjectBase, type ProjectCodec } from '@boombapbot/contracts';
 import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
-import {
-  engineMix,
-  enginePanel,
-  engineTracks,
-  exportPlan,
-  rhythmPatterns,
-  type RenderPlan,
-  soundOwner,
-  synthSound,
-} from './engine/machine';
-import { exportSongMidi, renderSong, type LoopRender } from './engine/offline';
-import { SnareWasm, type EngineMeasure, type EnginePanel } from './engine/wasm-engine';
+import { exportSongMidi, measureSeconds, renderSong, type LoopRender } from './engine/offline';
+import { samePattern, sameValues, type EngineSetup, type ExportPlan } from './engine/setup';
+import { SnareWasm } from './engine/wasm-engine';
 import { encodeWav, type WavBitDepth } from './engine/wav';
+import type { Machine, MachineHost, MachineSession } from './machine';
 import {
   browserStorage,
   loadDraft,
   saveDraft,
   type KeyValueStorage,
 } from './state/draft-storage';
-import {
-  downloadBytes,
-  exportBaseName,
-  projectFileContents,
-  projectFileName,
-  readProjectFile,
-} from './state/project-io';
-import { EditorStore, editTarget } from './state/store';
+import { downloadBytes, exportBaseName, projectFileName, readProjectFile } from './state/project-io';
+import { EditorStore, newProjectId } from './state/store';
 
 /** Written by scripts/prepare-assets.mjs next to the built site. */
 export interface AssetManifest {
@@ -53,72 +21,82 @@ export interface AssetManifest {
   faceplate: string | null;
 }
 
-export interface RuntimeOptions {
+export interface RuntimeOptions<
+  Document extends ProjectBase,
+  Transient extends object,
+  Session extends MachineSession<Document, Transient>,
+> {
   /** Base URL the site is served from, ending in a slash. */
   baseUrl: string;
+  machine: Machine<Document, Transient, Session>;
   storage?: KeyValueStorage | null;
 }
 
-export interface DebugSnapshot {
+export interface DebugSnapshot<Document extends ProjectBase = ProjectBase> {
   audioStatus: string;
   sampleRate: number | null;
   stats: AudioStats | null;
   /** Sounds synthesised and sent to the audio thread, and taken by it. */
   soundsSent: number;
   soundsTaken: number;
-  project: Project;
+  project: Document;
 }
 
 /**
- * Connects the store to audio, local persistence and the exporters. One
- * instance per mounted editor.
+ * Connects the store to audio, local persistence and the exporters, and
+ * hosts the machine. One instance per mounted editor.
  */
-export class EditorRuntime {
-  readonly store: EditorStore;
+export class EditorRuntime<
+  Document extends ProjectBase = ProjectBase,
+  Transient extends object = object,
+  Session extends MachineSession<Document, Transient> = MachineSession<Document, Transient>,
+> {
+  readonly store: EditorStore<Document, Transient>;
+  readonly machine: Machine<Document, Transient, Session>;
+  /** The machine at work here. Its own panel talks to it. */
+  readonly session: Session;
+  private readonly codec: ProjectCodec<Document>;
   private readonly baseUrl: string;
   private readonly storage: KeyValueStorage | null;
   private readonly audio: AudioController;
   private manifest: Promise<AssetManifest> | null = null;
   private wasmBytes: Promise<ArrayBuffer> | null = null;
   private offlineWasm: Promise<SnareWasm> | null = null;
-  private synced: Project | null = null;
+  private synced: EngineSetup | null = null;
   private stats: AudioStats | null = null;
   // One sound per slot may be on its way to the audio thread. A knob that
   // moves again meanwhile marks the slot, and the newest setting follows.
   private readonly soundsInFlight = new Map<number, { stale: boolean }>();
   /** When the step now sounding was reported, for placing a tap. */
   private stepStartedAt = 0;
-  /**
-   * A rhythm track being composed: the track it starts on, and the rhythm of
-   * each measure so far. It is stored when the machine stops, as one change.
-   * A take on an empty track grows; one on a written track edits it in place.
-   */
-  private take: { start: number; fresh: boolean; measures: number[] } | null = null;
-  /** What the engine was last told about the intro/fill-in. */
-  private fillSent = false;
   private soundsSent = 0;
   private soundsTaken = 0;
   private unsubscribe: (() => void) | null = null;
 
-  constructor(options: RuntimeOptions) {
+  constructor(options: RuntimeOptions<Document, Transient, Session>) {
+    const { machine } = options;
+    this.machine = machine;
+    this.codec = createProjectCodec([machine.document]);
     this.baseUrl = options.baseUrl.endsWith('/') ? options.baseUrl : `${options.baseUrl}/`;
     this.storage = options.storage === undefined ? browserStorage() : options.storage;
 
-    const draft = this.storage ? loadDraft(this.storage) : { status: 'empty' as const };
-    this.store = new EditorStore(
-      draft.status === 'restored'
-        ? { project: draft.project, draftOrigin: 'restored' }
-        : { draftOrigin: draft.status === 'unreadable' ? 'recovered' : 'new' },
-    );
+    const draft = this.storage ? loadDraft(this.storage, machine.document, this.codec) : { status: 'empty' as const };
+    this.store = new EditorStore({
+      project:
+        draft.status === 'restored' ? draft.project : machine.document.create({ id: newProjectId(), now: new Date() }),
+      memory: machine.memory,
+      transient: machine.transient,
+      draftOrigin: draft.status === 'restored' ? 'restored' : draft.status === 'unreadable' ? 'recovered' : 'new',
+    });
     if (draft.status === 'restored' && draft.changes.length > 0) {
-      this.store.notify('info', `Your saved beat came from an earlier version. ${EARLIER_VERSION_NOTE}`, draft.changes);
+      this.store.notify(
+        'info',
+        `Your saved beat came from an earlier version. ${machine.messages.earlierVersion}`,
+        draft.changes,
+      );
     }
     if (draft.status === 'unreadable') {
-      this.store.notify(
-        'error',
-        'Your saved draft could not be read, so the starter rhythms were loaded. The unreadable draft was kept in this browser.',
-        draft.errors,
-      );
+      this.store.notify('error', machine.messages.unreadableDraft, draft.errors);
     }
 
     this.audio = new AudioController({
@@ -136,45 +114,44 @@ export class EditorRuntime {
       onStats: (stats) => {
         this.stats = stats;
       },
-      onMeasures: (measures) => {
-        // The engine lets an armed intro or fill-in go as it starts to play.
-        if (measures.some((measure) => measure.kind !== 'basic')) {
-          this.fillSent = false;
-          this.store.setFillArmed(false);
-        }
-        this.record(measures);
-      },
+      onMeasures: (measures) => this.session.measures?.(measures),
       onEnded: () => {
         if (!this.store.getState().playing) return;
         this.store.setPlaying(false);
-        this.finishTake();
+        this.session.stopped();
       },
       onSound: (slot) => {
         this.soundsTaken += 1;
         const flight = this.soundsInFlight.get(slot);
         this.soundsInFlight.delete(slot);
-        const role = ROLES[slot];
-        if (flight?.stale && role) void this.sendSound(role);
+        if (flight?.stale) void this.sendSound(slot);
       },
     });
+
+    const host: MachineHost<Document, Transient> = {
+      store: this.store,
+      ensureAudio: () => this.ensureAudio(),
+      audioRunning: () => this.audio.isReady && this.audio.status === 'running',
+      trigger: (track, accent) => this.audio.trigger(track, accent),
+      armFill: (armed) => this.audio.armFill(armed),
+      stop: () => this.stop(),
+      stepStartedAt: () => this.stepStartedAt,
+    };
+    this.session = machine.session(host);
   }
 
   /** Starts watching the store. Call once after construction. */
   attach(): void {
     if (this.unsubscribe) return;
     this.persist(this.store.getState().project);
-    let previous = this.store.getState().project;
+    let previous = this.store.getState();
     this.unsubscribe = this.store.subscribe(() => {
-      const { project, fillArmed } = this.store.getState();
-      if (fillArmed !== this.fillSent) this.sendFill(fillArmed);
-      if (project === previous) return;
-      // A rhythm track is played or composed from its start, so turning the
-      // mode selector into or out of those modes stops the machine.
-      const from = previous.panel.mode;
-      const to = project.panel.mode;
-      if (this.store.getState().playing && from !== to && (isTrackMode(from) || isTrackMode(to))) this.stop();
-      previous = project;
-      this.persist(project);
+      const before = previous;
+      const next = this.store.getState();
+      previous = next;
+      this.session.changed?.(before, next);
+      if (next.project === before.project) return;
+      this.persist(next.project);
       this.syncAudio();
     });
     // Warm the caches so the first Play is quick. Sounds are synthesised once
@@ -189,9 +166,9 @@ export class EditorRuntime {
     void this.audio.dispose();
   }
 
-  private persist(project: Project): void {
+  private persist(project: Document): void {
     if (!this.storage) return;
-    const result = saveDraft(this.storage, project);
+    const result = saveDraft(this.storage, this.machine.document, project);
     this.store.setDraftSaved(result.ok);
   }
 
@@ -263,63 +240,61 @@ export class EditorRuntime {
     }
   }
 
-  /** Sends whatever changed in the project to the engine. */
+  private setup(): EngineSetup {
+    return this.machine.setup(this.store.getState().project);
+  }
+
+  /** Sends whatever changed in the machine's setup to the engine. */
   private syncAudio(): void {
     if (!this.audio.isReady) return;
-    const { project } = this.store.getState();
+    const setup = this.setup();
     const previous = this.synced;
-    this.synced = project;
-    const { sound } = project;
-    const before = previous?.sound;
+    this.synced = setup;
 
-    if (!previous || tempoBpm(previous.tempo) !== tempoBpm(project.tempo)) {
-      this.audio.setTempo(tempoBpm(project.tempo));
+    if (previous?.tempo !== setup.tempo) this.audio.setTempo(setup.tempo);
+    const sameTracks =
+      previous?.tracks.length === setup.tracks.length &&
+      setup.tracks.every((track, index) => sameValues(track, previous.tracks[index]!));
+    if (!sameTracks) this.audio.setTracks(setup.tracks);
+    if (!previous || !sameValues(previous.accent, setup.accent) || previous.master !== setup.master) {
+      this.audio.setMix(setup.accent.plain, setup.accent.accented, setup.master);
     }
-    if (!before || before.levels !== sound.levels || before.alternates !== sound.alternates) {
-      this.audio.setTracks(engineTracks(sound));
-    }
-    if (!before || before.accent !== sound.accent || before.master !== sound.master) {
-      const mix = engineMix(sound);
-      this.audio.setMix(mix.plain, mix.accented, mix.master);
-    }
-    if (!previous || previous.rhythms !== project.rhythms) {
-      this.audio.setPatterns(
-        project.rhythms.flatMap((rhythm, index) =>
-          previous?.rhythms[index] === rhythm ? [] : rhythmPatterns(rhythm, index),
-        ),
-      );
-    }
-    if (!previous || !samePanel(enginePanel(previous), enginePanel(project))) {
-      this.audio.setPanel(enginePanel(project));
-    }
-    for (const role of ROLES) {
-      const owner = soundOwner(role);
-      if (!before || before.knobs[owner] !== sound.knobs[owner]) void this.sendSound(role);
+    this.audio.setPatterns(
+      setup.patterns.flatMap((pattern, index) => {
+        const old = previous?.patterns[index];
+        return old && samePattern(old, pattern) ? [] : [{ index, pattern }];
+      }),
+    );
+    if (!previous || !sameValues(previous.panel, setup.panel)) this.audio.setPanel(setup.panel);
+    for (const sound of setup.sounds) {
+      const old = previous?.sounds.find((candidate) => candidate.sound === sound.sound);
+      if (!old || !sameValues(old, sound)) void this.sendSound(sound.sound);
     }
   }
 
   /**
-   * Synthesises one sound from the knobs of its column and sends it to the
-   * audio thread. The work happens here, on the main thread, never in the
-   * worklet. One sound per slot is on its way at a time; a knob that moves
-   * again meanwhile is followed once the worklet has taken the last one.
+   * Synthesises the sound of one slot from the machine's settings and sends
+   * it to the audio thread. The work happens here, on the main thread, never
+   * in the worklet. One sound per slot is on its way at a time; a knob that
+   * moves again meanwhile is followed once the worklet has taken the last one.
    */
-  private async sendSound(role: Role): Promise<void> {
+  private async sendSound(slot: number): Promise<void> {
     const sampleRate = this.audio.sampleRate;
     if (!this.audio.isReady || sampleRate === null) return;
-    const flight = this.soundsInFlight.get(role.index);
+    const flight = this.soundsInFlight.get(slot);
     if (flight) {
       flight.stale = true;
       return;
     }
-    this.soundsInFlight.set(role.index, { stale: false });
+    this.soundsInFlight.set(slot, { stale: false });
     try {
       const wasm = await this.loadOfflineWasm();
-      const pcm = wasm.synthesise(synthSound(role, this.store.getState().project.sound), sampleRate);
-      this.audio.setSound(role.index, pcm, 1, sampleRate);
+      const sound = this.setup().sounds.find((candidate) => candidate.sound === slot);
+      if (!sound) throw new Error(`the machine has no sound in slot ${slot}`);
+      this.audio.setSound(slot, wasm.synthesise(sound, sampleRate), 1, sampleRate);
       this.soundsSent += 1;
     } catch (error) {
-      this.soundsInFlight.delete(role.index);
+      this.soundsInFlight.delete(slot);
       this.store.notify('error', describe(error));
     }
   }
@@ -341,122 +316,35 @@ export class EditorRuntime {
   async play(): Promise<void> {
     if (!this.store.getState().power) return;
     if (!(await this.ensureAudio())) return;
-    const { rhythmTracks, panel } = this.store.getState().project;
-    const written = isTrackMode(panel.mode) ? composition(rhythmTracks, panel.selector) : [];
-    if (panel.mode === 'play' && written.length === 0) {
-      this.store.notify(
-        'info',
-        `Rhythm track ${panel.selector + 1} is empty. To compose it, turn the mode selector to compose and press start.`,
-      );
-      return;
-    }
-    this.take =
-      panel.mode === 'compose' ? { start: panel.selector, fresh: written.length === 0, measures: [...written] } : null;
-    // A written track plays as a song: round and round in play, once through
-    // while it is edited. Everything else follows the panel.
-    this.audio.setSong(written, panel.mode === 'play');
+    const plan = this.session.start();
+    if (!plan) return;
+    this.audio.setSong(plan.song, plan.loop);
     this.store.setPlaying(true);
-    // A fill-in armed before audio was running is the intro.
-    this.sendFill(this.store.getState().fillArmed);
+    this.session.started?.();
     this.audio.play();
   }
 
   stop(): void {
     this.store.setPlaying(false);
     this.audio.stop();
-    this.finishTake();
-  }
-
-  /** Notes the rhythm of each measure the engine began, while composing. */
-  private record(measures: EngineMeasure[]): void {
-    const take = this.take;
-    if (!take) return;
-    const capacity = compositionCapacity(take.start);
-    for (const measure of measures) {
-      // An empty track grows by a measure at a time. A written one keeps its
-      // length: the engine says which of its measures this is.
-      const index = take.fresh ? measure.ordinal - 1 : measure.position;
-      if (index >= 0 && index < capacity) take.measures[index] = measure.pattern >> 1;
-    }
-    if (take.fresh && take.measures.length >= capacity) this.stop();
-  }
-
-  /** Stores what was composed. The measure in which the machine stopped is the last one. */
-  private finishTake(): void {
-    const take = this.take;
-    this.take = null;
-    if (take && take.measures.length > 0) this.store.commitComposition(take.start, take.measures);
-  }
-
-  private sendFill(armed: boolean): void {
-    this.fillSent = armed;
-    this.audio.armFill(armed);
-  }
-
-  /**
-   * TAP. In a play mode it gives the intro/fill-in priority: it plays once,
-   * as the intro or after the measure that is running. Pressed again before
-   * then, it takes that back.
-   *
-   * While a rhythm runs in a write mode it writes the selected track on the
-   * step that is sounding, or on the next one once that step is more than
-   * half over. Stopped, it plays the selected instrument.
-   */
-  tap(): void {
-    const { project, playing, currentStep, currentPattern, fillArmed } = this.store.getState();
-    if (isPerformMode(project.panel.mode)) {
-      this.store.setFillArmed(!fillArmed);
-      return;
-    }
-    if (writePart(project.panel.mode) === null) return;
-    const target = editTarget(project, currentPattern);
-    if (!playing || currentStep < 0) {
-      void this.audition(target.track);
-      return;
-    }
-    const rhythm = project.rhythms[target.rhythm]!;
-    const stepMs = 60_000 / tempoBpm(project.tempo) / stepsPerBeat(rhythm.preScale);
-    const step = tappedStep(rhythm, currentStep, (performance.now() - this.stepStartedAt) / stepMs);
-    this.store.tapStep(step);
-    // A tap on the step already sounding would otherwise be silent until the next measure.
-    if (step === currentStep) this.auditionIfRunning(target.track);
-  }
-
-  /** Plays one hit of a track. Starts audio if this is the first gesture. */
-  async audition(track: TrackId): Promise<void> {
-    if (!this.store.getState().power) return;
-    if (!isInstrumentId(track) || !(await this.ensureAudio())) return;
-    this.audio.trigger(getTrack(track).index, false);
-  }
-
-  /** Plays a hit only if audio is already running; never starts it. */
-  auditionIfRunning(track: TrackId): void {
-    if (isInstrumentId(track) && this.audio.isReady && this.audio.status === 'running') {
-      this.audio.trigger(getTrack(track).index, false);
-    }
+    this.session.stopped();
   }
 
   // ---- Import and export ---------------------------------------------------
 
-  /**
-   * Renders what an export holds, offline, with a separate engine instance:
-   * the selected rhythm as a loop, or the selected rhythm track once through.
-   */
+  /** Renders what an export holds, offline, with a separate engine instance. */
   async renderLoop(sampleRate: number): Promise<LoopRender> {
-    const { project } = this.store.getState();
-    return renderSong(await this.loadOfflineWasm(), project, this.exportPlan(sampleRate), sampleRate);
+    const wasm = await this.loadOfflineWasm();
+    return renderSong(wasm, this.setup(), this.exportPlan(wasm, true), sampleRate);
   }
 
-  /** What an export holds, or an error that says why there is nothing to export. */
-  private exportPlan(sampleRate?: number): RenderPlan {
-    const { project } = this.store.getState();
-    const plan = exportPlan(project);
-    if (plan.rhythms.length === 0) {
-      throw new Error(`rhythm track ${project.panel.selector + 1} is empty.`);
-    }
-    if (sampleRate === undefined) return plan;
+  /** What an export holds. Throws an error that says why when there is nothing to export. */
+  private exportPlan(wasm: SnareWasm, audio: boolean): ExportPlan {
+    const plan = this.machine.exportPlan(this.store.getState().project);
+    if ('error' in plan) throw new Error(plan.error);
+    if (!audio) return plan;
     // Audio is rendered in memory, so a long track is cut at a whole measure.
-    const limit = wholeMeasuresWithin(project, plan, MAX_WAV_SECONDS);
+    const limit = wholeMeasuresWithin(measureSeconds(wasm, this.setup(), plan), MAX_WAV_SECONDS);
     if (limit < plan.rhythms.length) {
       this.store.notify(
         'info',
@@ -478,9 +366,9 @@ export class EditorRuntime {
 
   async exportMidi(): Promise<void> {
     try {
-      const { project } = this.store.getState();
-      const bytes = exportSongMidi(await this.loadOfflineWasm(), project, this.exportPlan());
-      downloadBytes(`${exportBaseName(project)}.mid`, bytes, 'audio/midi');
+      const wasm = await this.loadOfflineWasm();
+      const bytes = exportSongMidi(wasm, this.setup(), this.exportPlan(wasm, false));
+      downloadBytes(`${exportBaseName(this.store.getState().project)}.mid`, bytes, 'audio/midi');
     } catch (error) {
       this.store.notify('error', `The MIDI export failed: ${describe(error)}`);
     }
@@ -488,12 +376,12 @@ export class EditorRuntime {
 
   exportProject(): void {
     const { project } = this.store.getState();
-    downloadBytes(projectFileName(project), projectFileContents(project), 'application/json');
+    downloadBytes(projectFileName(project), this.codec.serialize(project), 'application/json');
   }
 
   /** Imports a project file. An invalid file leaves the current beat alone. */
   async importProject(file: Blob, name = 'The file'): Promise<boolean> {
-    const result = await readProjectFile(file);
+    const result = await readProjectFile(file, this.codec);
     return this.adopt(result, `${name} was not imported.`, (beat) => `Imported “${beat}”.`) !== null;
   }
 
@@ -502,22 +390,23 @@ export class EditorRuntime {
    * imported file: checked first, and one undo step. Returns the project it
    * became, or null when it was not a project and nothing changed.
    */
-  loadSavedBeat(saved: unknown): Project | null {
+  loadSavedBeat(saved: unknown): Document | null {
     return this.adopt(
-      parseProject(saved),
+      this.codec.parse(saved),
       'That saved beat could not be read.',
       (beat) => `Loaded “${beat}” from your account.`,
     );
   }
 
   /** Replaces the project with one read from elsewhere, or says why not. */
-  private adopt(result: ParseResult, refused: string, done: (name: string) => string): Project | null {
+  private adopt(result: ParseResult<Document>, refused: string, done: (name: string) => string): Document | null {
     if (!result.ok) {
       this.store.notify('error', `${refused} Your current beat is unchanged.`, result.errors);
       return null;
     }
     this.store.replaceProject(result.project);
-    const earlier = result.changes.length > 0 ? ` It came from an earlier version. ${EARLIER_VERSION_NOTE}` : '';
+    const earlier =
+      result.changes.length > 0 ? ` It came from an earlier version. ${this.machine.messages.earlierVersion}` : '';
     this.store.notify(
       'info',
       `${done(result.project.name)} Undo brings back the previous beat.${earlier}`,
@@ -528,7 +417,7 @@ export class EditorRuntime {
 
   // ---- Diagnostics ---------------------------------------------------------
 
-  debug(): DebugSnapshot {
+  debug(): DebugSnapshot<Document> {
     const state = this.store.getState();
     return {
       audioStatus: state.audioStatus,
@@ -541,27 +430,19 @@ export class EditorRuntime {
   }
 }
 
-const EARLIER_VERSION_NOTE = 'Its pattern is now Basic Rhythm 1.';
-
 /** The longest WAV an export renders. */
 const MAX_WAV_SECONDS = 300;
 
-/** How many measures of a plan fit in a number of seconds, never fewer than one. */
-function wholeMeasuresWithin(project: Project, plan: RenderPlan, seconds: number): number {
-  const beatSeconds = 60 / tempoBpm(project.tempo);
+/** How many measures fit in a number of seconds, never fewer than one. */
+function wholeMeasuresWithin(measures: number[], seconds: number): number {
   let elapsed = 0;
   let count = 0;
-  for (const rhythm of plan.rhythms) {
-    const entry = project.rhythms[rhythm]!;
-    elapsed += (rhythmLength(entry) / stepsPerBeat(entry.preScale)) * beatSeconds;
+  for (const measure of measures) {
+    elapsed += measure;
     if (count > 0 && elapsed > seconds) break;
     count += 1;
   }
   return count;
-}
-
-function samePanel(a: EnginePanel, b: EnginePanel): boolean {
-  return (Object.keys(a) as Array<keyof EnginePanel>).every((key) => a[key] === b[key]);
 }
 
 async function fetchBytes(url: string): Promise<ArrayBuffer> {

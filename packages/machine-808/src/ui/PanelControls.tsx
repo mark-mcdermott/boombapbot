@@ -11,9 +11,8 @@ import {
   type PanelManifest,
   type PanelRect,
   type PreScale,
-} from '@boombapbot/contracts';
-import type { EditorRuntime } from '../runtime';
-import { useEditorState, useRuntime } from './context';
+} from '../document';
+import { useEditorState, useRuntime, type Runtime808 } from './context';
 import { DialHandle, PassiveKnob, box, circle, nearestPosition, pointerAngle } from './panelGeometry';
 
 interface ControlProps {
@@ -61,7 +60,7 @@ export function PowerSwitch({ panel }: ControlProps) {
 
 /** The mode selector: a label to press for each position, and the dial that follows. */
 export function ModeSelector({ panel, photo }: ControlProps & { photo: string | null }) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const mode = useEditorState((state) => state.project.panel.mode);
   const { knob, positions } = panel.modeSelect;
   const active = positions.find((position) => position.mode === mode);
@@ -73,7 +72,7 @@ export function ModeSelector({ panel, photo }: ControlProps & { photo: string | 
         knob={knob}
         degs={positions.map((position) => position.deg)}
         testId="panel-dial-mode"
-        onPick={(index) => store.setMode(positions[index]!.mode)}
+        onPick={(index) => session.setMode(positions[index]!.mode)}
       />
       <div className="sb-panel-layer" role="radiogroup" aria-label="Mode">
         {positions.map((position) => (
@@ -86,7 +85,7 @@ export function ModeSelector({ panel, photo }: ControlProps & { photo: string | 
             aria-checked={position.mode === mode}
             aria-label={position.label}
             data-testid={`panel-mode-${position.mode}`}
-            onClick={() => store.setMode(position.mode)}
+            onClick={() => session.setMode(position.mode)}
           >
             <span className="sb-panel-text">{position.label}</span>
           </button>
@@ -101,9 +100,9 @@ export function ModeSelector({ panel, photo }: ControlProps & { photo: string | 
  * stores the pre-scale and stays down until a step button sets the last step.
  */
 export function ClearButton({ panel }: ControlProps) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const mode = useEditorState((state) => state.project.panel.mode);
-  const armed = useEditorState((state) => state.clearArmed);
+  const armed = useEditorState((state) => state.transient.clearArmed);
   const track = useEditorState((state) => state.project.panel.selector + 1);
   const writing = writePart(mode) !== null;
   const label = writing
@@ -122,7 +121,7 @@ export function ClearButton({ panel }: ControlProps) {
       aria-label={label}
       aria-pressed={writing ? armed : undefined}
       disabled={!clears(mode)}
-      onClick={() => store.pressClear()}
+      onClick={() => session.pressClear()}
     >
       <span className="sb-panel-text">Clear</span>
     </button>
@@ -135,11 +134,11 @@ export function taps(mode: Mode): boolean {
 }
 
 /** TAP has to be in time, so it acts as the pointer goes down. Only the keyboard arrives as a click. */
-export function tapHandlers(runtime: EditorRuntime) {
+export function tapHandlers(runtime: Runtime808) {
   return {
-    onPointerDown: () => runtime.tap(),
+    onPointerDown: () => runtime.session.tap(),
     onClick: (event: MouseEvent) => {
-      if (event.detail === 0) runtime.tap();
+      if (event.detail === 0) runtime.session.tap();
     },
   };
 }
@@ -152,7 +151,7 @@ export function tapHandlers(runtime: EditorRuntime) {
 export function TapButton({ panel }: ControlProps) {
   const runtime = useRuntime();
   const playMode = useEditorState((state) => isPerformMode(state.project.panel.mode));
-  const armed = useEditorState((state) => state.fillArmed);
+  const armed = useEditorState((state) => state.transient.fillArmed);
   // TAP has no part in clearing a rhythm or in playing a rhythm track back.
   const idle = useEditorState((state) => !taps(state.project.panel.mode));
   return (
@@ -230,11 +229,11 @@ const AUTO_FILL_TEXT = AUTO_FILLS.map((every) => (every === 0 ? 'Manual' : `Ever
  * the nearest position; the arrow keys step through them.
  */
 export function AutoFillSelector({ panel, photo }: ControlProps & { photo: string | null }) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const index = useEditorState((state) => AUTO_FILLS.indexOf(state.project.panel.autoFill));
   const { knob, hit, degs } = panel.autoFill;
   const last = AUTO_FILLS.length - 1;
-  const move = (next: number) => store.setAutoFill(AUTO_FILLS[Math.min(last, Math.max(0, next))]!);
+  const move = (next: number) => session.setAutoFill(AUTO_FILLS[Math.min(last, Math.max(0, next))]!);
 
   const turnTo = (event: PointerEvent<HTMLDivElement>) => {
     const [x, y, width, height] = hit;
@@ -287,7 +286,7 @@ function slideLever([x, y, width, height]: PanelRect, index: number, count: numb
 const PRE_SCALE_TEXT = PRE_SCALES.map((preScale) => `${preScale}: ${stepsPerBeat(preScale)} steps to the beat`);
 
 export function PreScaleSwitch({ panel }: ControlProps) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const preScale = useEditorState((state) => state.project.panel.preScale);
   const index = PRE_SCALES.indexOf(preScale);
   return (
@@ -300,7 +299,7 @@ export function PreScaleSwitch({ panel }: ControlProps) {
         positions={PRE_SCALE_TEXT}
         index={index}
         axis="y"
-        onChange={(next) => store.setPreScale(PRE_SCALES[next] as PreScale)}
+        onChange={(next) => session.setPreScale(PRE_SCALES[next] as PreScale)}
       />
       <span
         className="sb-panel-lever"
@@ -337,7 +336,7 @@ const FILL_VARIATIONS = ['a', 'b'] as const;
 
 /** The two variation levers: A, AB and B for Basic Rhythms, A and B for Intro/Fill-ins. */
 export function VariationSwitches({ panel }: ControlProps) {
-  const { store } = useRuntime();
+  const { session } = useRuntime();
   const basic = useEditorState((state) => BASIC_VARIATIONS.indexOf(state.project.panel.basicVariation));
   const fill = useEditorState((state) => FILL_VARIATIONS.indexOf(state.project.panel.fillVariation));
   return (
@@ -350,7 +349,7 @@ export function VariationSwitches({ panel }: ControlProps) {
         positions={['A', 'A then B', 'B']}
         index={basic}
         axis="x"
-        onChange={(next) => store.setBasicVariation(BASIC_VARIATIONS[next]!)}
+        onChange={(next) => session.setBasicVariation(BASIC_VARIATIONS[next]!)}
       />
       <Lever panel={panel} slot={panel.basicVariation.slot} index={basic} count={BASIC_VARIATIONS.length} />
       <PositionSwitch
@@ -361,7 +360,7 @@ export function VariationSwitches({ panel }: ControlProps) {
         positions={['A', 'B']}
         index={fill}
         axis="x"
-        onChange={(next) => store.setFillVariation(FILL_VARIATIONS[next]!)}
+        onChange={(next) => session.setFillVariation(FILL_VARIATIONS[next]!)}
       />
       <Lever panel={panel} slot={panel.fillVariation.slot} index={fill} count={FILL_VARIATIONS.length} />
     </>

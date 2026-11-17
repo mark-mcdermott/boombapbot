@@ -1,5 +1,5 @@
 import type { CSSProperties, PointerEvent } from 'react';
-import type { PanelManifest, PanelRect } from '@boombapbot/contracts';
+import type { PanelManifest, PanelRect } from '../document';
 
 /** Positions a faceplate rectangle as percentages, so it scales with the image. */
 export function box(panel: PanelManifest, [x, y, w, h]: PanelRect): CSSProperties {

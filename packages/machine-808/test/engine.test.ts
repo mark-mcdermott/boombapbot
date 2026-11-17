@@ -16,21 +16,18 @@ import {
   tempoFromBpm,
   type Project,
   type Variation,
-} from '@boombapbot/contracts';
+} from '../src/document';
+import { applySetup, decodeWav, encodeWav, exportSongMidi, renderSong } from '@boombapbot/editor/engine';
 import {
-  applyProject,
-  decodeWav,
-  encodeWav,
   engineMix,
   enginePanel,
   enginePatterns,
+  engineSetup,
   engineTracks,
   exportMidi,
   midiVelocities,
   exportPlan,
-  exportSongMidi,
   renderLoop,
-  renderSong,
   synthSound,
   trackNotes,
 } from '../src/engine';
@@ -122,7 +119,7 @@ describe('what the panel asks the engine to play', () => {
   it('is followed by the engine measure by measure, and every measure is reported', () => {
     const engine = wasm.createEngine(44100, 1024);
     try {
-      applyProject(engine, fixture);
+      applySetup(engine, engineSetup(fixture));
       engine.setPanel({ rhythm: 0, variation: 'ab', fillRhythm: 12, fillVariation: 'a', autoFill: 4, firstBeatRule: true });
       engine.armFill(true);
       engine.playMeasures(6);
@@ -189,7 +186,7 @@ describe('rhythm tracks and what an export holds', () => {
 
   it('renders a track once through, measure after measure, and lets it ring', () => {
     const plan = exportPlan(panel({ mode: 'play', selector: 0 }));
-    const render = renderSong(wasm, fixture, plan, 44100);
+    const render = renderSong(wasm, engineSetup(fixture), plan, 44100);
     const patterns = wasm.songPatterns(plan.panel, plan.rhythms);
     const bank = enginePatterns(fixture.rhythms);
     const ticks = patterns.reduce((sum, pattern) => sum + wasm.patternTicks(bank[pattern]!), 0);
@@ -208,7 +205,7 @@ describe('rhythm tracks and what an export holds', () => {
 
   it('renders A then B as one loop of two measures', () => {
     const plan = exportPlan(panel({ basicVariation: 'ab' }));
-    const both = renderSong(wasm, fixture, plan, 44100);
+    const both = renderSong(wasm, engineSetup(fixture), plan, 44100);
     const a = renderLoop(wasm, fixture, 0, 44100);
     const b = renderLoop(wasm, fixture, 1, 44100);
     // Each length is rounded to a frame on its own, so the sum can be one out.
@@ -217,14 +214,14 @@ describe('rhythm tracks and what an export holds', () => {
       ...a.events.map(() => 0),
       ...b.events.map(() => 1),
     ]);
-    const midi = parseMidi(exportSongMidi(wasm, fixture, plan));
+    const midi = parseMidi(exportSongMidi(wasm, engineSetup(fixture), plan));
     expect(midi.trackEnds).toEqual([3840, 3840]);
     expect(midi.notes.filter((note) => note.on)).toHaveLength(a.events.length + b.events.length);
   });
 
   it('writes a track to MIDI with every measure in place', () => {
     const plan = exportPlan(panel({ mode: 'compose', selector: 0 }));
-    const midi = parseMidi(exportSongMidi(wasm, fixture, plan));
+    const midi = parseMidi(exportSongMidi(wasm, engineSetup(fixture), plan));
     expect(midi.trackEnds).toEqual([7 * 1920, 7 * 1920]);
     const hits = wasm
       .songPatterns(plan.panel, plan.rhythms)
@@ -235,7 +232,7 @@ describe('rhythm tracks and what an export holds', () => {
   it('follows a song in the engine, and says which of its measures each one is', () => {
     const engine = wasm.createEngine(44100, 1024);
     try {
-      applyProject(engine, fixture);
+      applySetup(engine, engineSetup(fixture));
       engine.setPanel(enginePanel(panel({ mode: 'play' })));
       engine.setSong(track, false);
       engine.play();

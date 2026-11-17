@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ROLES, createDefaultSound } from '@boombapbot/contracts';
-import { synthSound, type SynthSound } from '../src/engine';
+import type { SynthSound } from '@boombapbot/editor/engine';
+import { ROLES, createDefaultSound } from '../src/document';
+import { synthSound } from '../src/engine';
 import { loadWasm, nativeRenderPath, rms } from './helpers';
 
 const wasm = loadWasm();
