@@ -72,9 +72,10 @@ upgrade still opens a modal that says it is not open.
     code. The table was checked afterwards: its columns, the unique uuid
     and the cascading owner are as the migration has them, it is empty,
     and the existing users and orders were not touched.
-  - No beat has been saved on the live site, and nobody has saved on one
-    device and loaded on another outside the tests. Try both once this is
-    deployed.
+  - On 2026-11-17 the owner saved a beat on the live site from a computer
+    and loaded it on an iPhone and an Android phone. Deleting a saved beat,
+    the question about a newer cloud copy and the 20-beat limit have only
+    run in the tests.
   - The limit is counted and then the row is inserted, as two statements.
     Two saves sent at the same instant could both get in at 19. Harmless at
     this size; a paid tier with a hard quota would want it in one statement.
@@ -95,10 +96,11 @@ upgrade still opens a modal that says it is not open.
     page it was drafted from how the site behaves and nobody qualified has
     read it. Neon keeps its own history of the database for a while; the
     page does not go into that.
-- **Deleting an account.** There is no button. The Policies page says to
-  write in and it will be done by hand. Better Auth can do it
-  (`user.deleteUser`); it needs a confirmation step in the modal. Deleting
-  the user's row takes its saved beats with it.
+- **Deleting an account.** The account modal has a delete step that asks
+  for the password. The database takes the account's log-ins, credential and
+  saved beats with it and unties its orders, which are kept. It has only run
+  in the tests. A pending verification row for the address is left to
+  expire.
 - **Rate limiting.** Better Auth's limiter is on in production and counts in
   memory, which on Vercel means per instance. Move it to the database before
   relying on it.
@@ -234,9 +236,11 @@ the compile spike. Beyond it:
   - The site's own values, set in Vercel for Production (see
     `apps/site/.env.example`). A changed value needs a new deployment: run
     the workflow by hand. All of them are set there as of 2026-11-16.
-- **Browsers.** Only headless Chromium was exercised. Firefox, Safari and real
-  phones need a pass, in particular iOS Safari's audio unlock and the phone
-  layout on small screens.
+- **Browsers.** The tests run in headless Chromium. On 2026-11-17 the owner
+  logged in, loaded a beat and played it on an iPhone in Safari and in
+  Chrome and on a Samsung Galaxy S9 in Chrome, so audio starts on both
+  phone engines. Firefox and Safari on a Mac have not been tried, and
+  nobody has gone over the phone layout or long playing on a real phone.
 - **Work on the main thread.** A one-measure render and the synthesis of a
   sound each take a few milliseconds, so both happen on the main thread. The
   worst sound measured, a cymbal at its longest, took about 7 ms. A whole

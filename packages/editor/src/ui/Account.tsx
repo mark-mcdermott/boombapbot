@@ -10,6 +10,7 @@ import {
   explain,
   type Failure,
 } from '../account/client';
+import { deviceBeatLinks } from '../account/beat-links';
 import { takeParams } from './arrival';
 import { TextField } from './fields';
 import { Modal } from './Modal';
@@ -107,10 +108,12 @@ interface FormProps {
   busy: string;
   /** Returns what went wrong, or null once it worked. */
   submit(values: Record<FieldName, string>): Promise<Failure | null>;
+  /** For an action that cannot be taken back. */
+  danger?: boolean;
   children: ReactNode;
 }
 
-function Form({ testId, action, busy, submit, children }: FormProps) {
+function Form({ testId, action, busy, submit, danger = false, children }: FormProps) {
   const { waiting, problem, run } = useAttempt();
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -122,7 +125,12 @@ function Form({ testId, action, busy, submit, children }: FormProps) {
     <form className="sb-form" data-testid={testId} onSubmit={onSubmit}>
       {children}
       <Problem text={problem} />
-      <button className="sb-button sb-button-primary" type="submit" data-testid="account-submit" disabled={waiting}>
+      <button
+        className={`sb-button ${danger ? 'sb-button-danger' : 'sb-button-primary'}`}
+        type="submit"
+        data-testid="account-submit"
+        disabled={waiting}
+      >
         {waiting ? busy : action}
       </button>
     </form>
@@ -318,16 +326,59 @@ function NewPassword({ token, go }: { token: string; go: Go }) {
   );
 }
 
+interface DeleteAccountProps {
+  /** The account's public id. */
+  account: string;
+  cancel(): void;
+  deleted(): void;
+}
+
+/** The last step before an account goes: what goes with it, and the password once more. */
+function DeleteAccount({ account, cancel, deleted }: DeleteAccountProps) {
+  return (
+    <div data-testid="account-delete">
+      <p className="sb-modal-text">
+        This deletes your account and every beat saved in it, for good. I cannot bring them back. The beat on the
+        machine stays in this browser, and orders you placed stay on record without your account.
+      </p>
+      <Form
+        testId="account-delete-form"
+        action="Delete my account"
+        busy="Deleting…"
+        danger
+        submit={async ({ password }) => {
+          const failure = await attempt(() => authClient.deleteUser({ password }));
+          if (!failure) {
+            deviceBeatLinks().keepOnly(account, []);
+            deleted();
+          }
+          return failure;
+        }}
+      >
+        <Field name="password" label="Your password" autoComplete="current-password" />
+      </Form>
+      <p className="sb-account-links">
+        <LinkButton testId="account-delete-cancel" onClick={cancel}>
+          Keep my account
+        </LinkButton>
+      </p>
+    </div>
+  );
+}
+
 interface SignedInProps {
   email: string;
   /** The account's public id. */
   account: string;
   baseUrl: string;
   close(): void;
+  deleted(): void;
 }
 
-function SignedIn({ email, account, baseUrl, close }: SignedInProps) {
+function SignedIn({ email, account, baseUrl, close, deleted }: SignedInProps) {
   const { waiting, problem, run } = useAttempt();
+  const [deleting, setDeleting] = useState(false);
+  if (deleting) return <DeleteAccount account={account} cancel={() => setDeleting(false)} deleted={deleted} />;
   return (
     <div data-testid="account-signed-in">
       <p className="sb-modal-text">
@@ -347,6 +398,11 @@ function SignedIn({ email, account, baseUrl, close }: SignedInProps) {
           {waiting ? 'Logging out…' : 'Log out'}
         </button>
       </div>
+      <p className="sb-account-links">
+        <LinkButton testId="account-to-delete" onClick={() => setDeleting(true)}>
+          Delete my account
+        </LinkButton>
+      </p>
     </div>
   );
 }
@@ -374,7 +430,7 @@ interface AccountProps {
   container: RefObject<HTMLElement | null>;
 }
 
-/** The account button in the footer and its modal: log in, sign up, reset a password, saved beats, log out. */
+/** The account button in the footer and its modal: log in, sign up, reset a password, saved beats, log out, delete. */
 export function Account({ baseUrl, container }: AccountProps) {
   const session = authClient.useSession();
   const [open, setOpen] = useState(false);
@@ -398,7 +454,15 @@ export function Account({ baseUrl, container }: AccountProps) {
     if (view.name === 'new-password') return <NewPassword token={view.token} go={go} />;
     if (session.data) {
       const { email, id } = session.data.user;
-      return <SignedIn email={email} account={id} baseUrl={baseUrl} close={() => setOpen(false)} />;
+      return (
+        <SignedIn
+          email={email}
+          account={id}
+          baseUrl={baseUrl}
+          close={() => setOpen(false)}
+          deleted={() => go({ name: 'log-in' }, { kind: 'ok', text: 'Your account and its saved beats are deleted.' })}
+        />
+      );
     }
     if (session.error) return <Unreachable retry={() => void session.refetch()} />;
     if (session.isPending) {

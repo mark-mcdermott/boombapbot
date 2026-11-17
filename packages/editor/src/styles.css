@@ -281,6 +281,13 @@ a.sb-machine:hover {
   color: var(--color-danger);
 }
 
+/* The last step of something that cannot be taken back says so before it is
+   pointed at. */
+.sb-form .sb-button-danger {
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+  color: var(--color-danger);
+}
+
 .sb-button svg {
   font-size: 16px;
 }
