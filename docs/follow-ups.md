@@ -11,6 +11,23 @@ in this file has been built unless it says so.
    in desktop Chrome and on an iPhone in Safari and Firefox. Firefox and
    Safari on a Mac and an Android phone have not shown it, and nobody has
    played it for long on a phone.
+   A panel for a phone is being tried at `?panel=phone` (2026-11-18). What
+   it still needs before it is what a phone gets:
+   - The owner on a real phone: whether a thumb finds the keys (the step
+     keys are about 39px on a 390px screen), whether the knobs drag well,
+     and how much of it shows above the fold with the browser's bars.
+   - Its paint. The olive and the rust are drawn in CSS and are flatter than
+     the picture. One painted plate with no controls on it would replace
+     them.
+   - Choosing it by the screen's width, not by a link, and taking the
+     instrument strip, the fit button and the dock away with it. A phone on
+     its side and a tablet are not thought through: the picture's step keys
+     are about 26px on a 768px tablet.
+   - The phone app. `apps/mobile` does not load the lettering's typeface and
+     has no address to ask for this panel with.
+   - Decisions it made that are the owner's: step numbers on the keys,
+     МУТ on its key, one level knob for the selected voice where the picture
+     has eight, no level meter, and controls dimmed while the power is off.
 2. **A closer listen.** The owner has heard it and likes it. Its eight
    voices, how far each knob reaches and its four effects were set by
    measurement more than by ear, and nobody has gone through them one by
