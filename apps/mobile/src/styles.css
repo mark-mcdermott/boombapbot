@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* The face the panel is lettered in, carried in the app: it has no server to fetch it from. */
+@import '@fontsource-variable/sofia-sans-condensed/wght.css';
 @import '@boombapbot/editor/styles.css';
 
 /* The editor's classes live in the workspace package. */
