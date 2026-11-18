@@ -219,13 +219,13 @@ site its icon still opens a modal that says it is not open.
   VAT is collected, which is true of the site and is not a view on what the
   owner owes. Update it again before the upgrade is sold.
 - **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own position.
-  Their first text went in word for word on 2026-11-15. On 2026-11-18 they
-  asked for its wording to be gone over, and what is there now is that
-  rewrite: the same claims in the same order, in four short paragraphs. It
-  no longer speaks of a paid tier, which did not exist; it says the machine
-  has a shop, which it does. It ends on thinking about all this and names
-  nothing done about it; if there is something, that sentence is the
-  owner's to write.
+  Their first text went in word for word on 2026-11-15, and a rewrite of it
+  they asked for on 2026-11-18 followed. Later that day they gave a new text
+  of three paragraphs, and that is what is there now, word for word under
+  the same title. It says "I've added a small paid tier to this app". The
+  upgrade is built and not open, and About says upgrades are not here yet;
+  neither was changed to match. The page's description for search engines
+  still calls it a footnote to a drum machine, from the text before.
 - **The pages of words** were laid out again on 2026-11-17: a compact
   masthead that names the pages, headings in a rail, About opening on a
   still of the machine, and the manifesto as one narrow column. Left for the
