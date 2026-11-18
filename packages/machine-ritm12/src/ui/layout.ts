@@ -115,6 +115,24 @@ export const KNOBS = {
   volume: { x: 1123, y: 1152, r: 36, kind: 'volume', pivot: [0.5, 3] },
 } as const satisfies Record<string, KnobPlace>;
 
+/**
+ * The phone's panel lays its knobs out itself, each one a round cut of the
+ * picture about that knob's own centre, so its pointer line sits on it as on
+ * the plate. This is each cut's knob and its radius, as art/cut-phone-parts.py
+ * made it. `level` is the kick's level knob, used for whichever voice is selected.
+ */
+export const PHONE_KNOBS = {
+  tempo: { place: KNOBS.tempo, radius: 45 },
+  swing: { place: KNOBS.swing, radius: 45 },
+  accent: { place: KNOBS.accent, radius: 45 },
+  pitch: { place: KNOBS.pitch, radius: 43 },
+  decay: { place: KNOBS.decay, radius: 43 },
+  tone: { place: KNOBS.tone, radius: 43 },
+  mix: { place: KNOBS.mix, radius: 41 },
+  volume: { place: KNOBS.volume, radius: 43 },
+  level: { place: INSTRUMENTS[0]!.knob, radius: 33 },
+} as const satisfies Record<string, { place: KnobPlace; radius: number }>;
+
 /** A pointer line's picture is a square this wide, the line's inner end at its middle, pointing up. */
 export const POINTER_SIZE = 88;
 /** How long the painted line is, for the kinds whose line is stretched to an oval face. */

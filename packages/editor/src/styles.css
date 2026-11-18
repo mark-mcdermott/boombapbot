@@ -1932,6 +1932,18 @@ select.sb-input {
   }
 }
 
+/* A panel that has its own start button at hand on a phone says so with
+   data-own-transport, and the page then does without the dock. */
+.sb-app:has([data-own-transport]) .sb-dock {
+  display: none;
+}
+
+@media (max-width: 680px) {
+  .sb-app:has([data-own-transport]) {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sb-app * {
     transition: none !important;
