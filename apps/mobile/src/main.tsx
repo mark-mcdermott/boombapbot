@@ -1,9 +1,13 @@
 import { StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
+import { Share } from '@capacitor/share';
 import { BoombapbotEditor, type KeyValueStorage } from '@boombapbot/editor';
 import { machine } from '@boombapbot/machine-ritm12';
 import { openDeviceStorage } from './device-storage';
+import { shareThrough, type DeviceFiles } from './share-file';
 import './styles.css';
 
 interface AudioSessionNavigator {
@@ -42,6 +46,21 @@ function tools(settings: ReactNode): ReactNode {
   );
 }
 
+/** Exports are written where the device keeps what it may clear: the share sheet takes its own copy. */
+const exportFiles: DeviceFiles = {
+  write: ({ path, data, as }) =>
+    Filesystem.writeFile({
+      path,
+      data,
+      directory: Directory.Cache,
+      encoding: as === 'text' ? Encoding.UTF8 : undefined,
+      recursive: true,
+    }),
+};
+
+/** On a phone an export goes to the share sheet. In a browser it is a download, the editor's own way. */
+const save = Capacitor.isNativePlatform() ? shareThrough(exportFiles, Share) : undefined;
+
 const root = document.getElementById('machine');
 if (!root) throw new Error('the page has no place for the machine');
 
@@ -50,6 +69,12 @@ const storage = await draftStorage();
 
 createRoot(root).render(
   <StrictMode>
-    <BoombapbotEditor machine={machine} baseUrl={import.meta.env.BASE_URL} storage={storage} below={tools} />
+    <BoombapbotEditor
+      machine={machine}
+      baseUrl={import.meta.env.BASE_URL}
+      storage={storage}
+      save={save}
+      below={tools}
+    />
   </StrictMode>,
 );

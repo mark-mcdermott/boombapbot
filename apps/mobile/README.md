@@ -8,14 +8,20 @@ draft kept on the phone. It is not ready for either store.
 ## What is here
 
 - `src/main.tsx` mounts `BoombapbotEditor` with РИТМ-12, the same way
-  `apps/site/src/components/Machine.tsx` does, with two differences: the
-  draft goes to the device's own store, and under the machine there is only
-  the settings button.
+  `apps/site/src/components/Machine.tsx` does, with three differences: the
+  draft goes to the device's own store, an export goes to the phone's share
+  sheet, and under the machine there is only the settings button.
 - `src/device-storage.ts` puts the device's store (UserDefaults on iOS,
   SharedPreferences on Android, through `@capacitor/preferences`) behind the
   `KeyValueStorage` the editor asks for. A web view's own storage can be
   cleared by the system; this stays until the app is deleted. Its tests
   are `test/`.
+- `src/share-file.ts` is where an export goes. A web view inside an app
+  ignores a download, so the file is written to the app's cache folder
+  (`@capacitor/filesystem`) and handed to the share sheet
+  (`@capacitor/share`), from where it is saved to Files or sent to another
+  app. Closing the sheet without choosing is not an error, and the settings
+  sheet then does not say a WAV was exported.
 - `scripts/copy-assets.mjs` copies the engine, the worklet and the panel art
   from where `scripts/prepare-assets.mjs` put them for the site, so the app
   ships the files the site serves. `public/` is generated and ignored.
@@ -56,6 +62,12 @@ showing its playing indicator); a step added to the pattern is still there
 after the app is quit and opened again, and the draft is in the app's
 UserDefaults; the settings sheet opens.
 
+Export, on the same simulator: WAV loop opens the share sheet with the
+file, and "Save to Files" leaves a 24-bit stereo WAV of one measure in the
+Files app; the MIDI file and the project file open the sheet with theirs;
+closing the sheet without choosing leaves no "WAV exported" line and no
+error.
+
 `./gradlew assembleDebug` builds the Android app. It has not been run on
 an emulator or a phone.
 
@@ -65,11 +77,14 @@ taking the sound, the app coming back from the background, long playing.
 
 ## What is not right yet
 
-- **Export saves nothing.** The settings sheet's Export makes a download,
-  which a web view inside an app ignores, so no file reaches the phone. A
-  WAV export is rendered all the same, in its worker, and the sheet then
-  says "WAV exported", which is not true there. It needs the file handed to
-  the phone's share sheet. Import has not been tried.
+- **Export on Android is untried.** It is built on the same two plug-ins
+  and compiles, but no Android share sheet has shown a file from it.
+- **Exports pile up in the cache.** Each one is written to the app's cache
+  folder under its beat's name and left there. The system may clear that
+  folder, and a second export of the same beat writes over the first.
+- **While the share sheet is open** the settings sheet behind it still says
+  "Rendering the WAV… 100%".
+- **Import has not been tried.**
 - **Words written for the site.** The settings sheet says the draft is
   saved "in this browser" and lists keyboard keys.
 - **Sideways on a phone** the brand takes about a third of the screen and
