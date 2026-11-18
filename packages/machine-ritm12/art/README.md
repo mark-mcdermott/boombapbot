@@ -18,9 +18,10 @@ does not have.
 - **`phone/`** holds the parts of the phone's panel, which the page lays out
   itself: the frame of the screen, a blank key, the pattern, transport, dice
   and clear keys, the power rocker off and on, each knob's body and each
-  stepped control in every position cut round, a lamp, and what is lettered
+  stepped control in every position cut round, a lamp, what is lettered
   on the instrument keys, the nameplate and the maker's badge with the paint
-  or the key taken away. [`cut-phone-parts.py`](cut-phone-parts.py) cuts all
+  or the key taken away, and (`icon-*.png`) the small drawing the picture has
+  beside each label, in the lettering's cream. [`cut-phone-parts.py`](cut-phone-parts.py) cuts all
   of it from `plate.webp` and `patch/`, so it is this artwork and nothing
   else. Run it again when either changes.
 
