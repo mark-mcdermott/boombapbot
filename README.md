@@ -379,7 +379,8 @@ Two cross-checks worth knowing about:
 - **The phone's panel.** On 2026-11-18 the owner used it on the live site
   on an iPhone in Chrome and on an Android phone in Chrome, and said of both
   that it looks and sounds great. That was before its labels had drawings
-  beside them, which no real phone has shown. Nobody has played it for
+  beside them and before a touched control said what it is in English
+  under the screen; no real phone has shown that line. Nobody has played it for
   long, tried it in Safari or Firefox on a phone, or held a tablet. The
   tests run it in headless browsers (Chromium, and once in Playwright's
   WebKit and Firefox), in a 390 by 844 touch screen.

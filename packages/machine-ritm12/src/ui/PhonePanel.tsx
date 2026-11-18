@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { EFFECT_KINDS } from '../document';
 import { Hand, Key, Lamp, useTurning, type KnobWiring, type LampWiring } from './Controls';
 import { ReadoutContext, useReadout } from './context';
@@ -7,9 +7,9 @@ import { PhoneScreen } from './Screen';
 import { EFFECTS, useWiring } from './wiring';
 
 const TABS = [
-  { id: 'voice', lettered: 'ГОЛОС', spoken: 'Voice' },
-  { id: 'tempo', lettered: 'ТЕМП', spoken: 'Tempo' },
-  { id: 'effect', lettered: 'ЭФФЕКТ', spoken: 'Effect' },
+  { id: 'voice', lettered: 'ГОЛОС', spoken: 'Voice', holds: 'pitch, decay, tone and level' },
+  { id: 'tempo', lettered: 'ТЕМП', spoken: 'Tempo', holds: 'tempo, swing, accent and measure' },
+  { id: 'effect', lettered: 'ЭФФЕКТ', spoken: 'Effect', holds: 'the effect, its mix and the volume' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -31,6 +31,30 @@ function useGrowth(room: RefObject<HTMLElement | null>): number {
     return () => observer.disconnect();
   }, [room]);
   return growth;
+}
+
+/** How long what a control did stays under the screen in English, in milliseconds. */
+const CAPTION_MS = 2400;
+
+/**
+ * What a control just did, in English, under the screen for a moment. The
+ * lettering is Russian and is there to look at; this is for whoever can see
+ * it and cannot read it. A screen reader has the same words from the live
+ * line under the panel, so this is kept from it.
+ */
+function Caption({ text, said }: { text: string; said: number }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (said === 0) return undefined;
+    setShown(true);
+    const timer = window.setTimeout(() => setShown(false), CAPTION_MS);
+    return () => window.clearTimeout(timer);
+  }, [said]);
+  return (
+    <span className="rt-ph-caption" data-testid="caption" data-shown={shown || undefined}>
+      {text}
+    </span>
+  );
 }
 
 /** A knob's body is shown this wide, in the page's pixels, whatever size it was cut at. */
@@ -154,12 +178,16 @@ export function PhonePanel() {
     const src = readout.art(`phone/${file}`);
     return src ? `url(${src})` : 'none';
   };
+  const openTab = (next: (typeof TABS)[number]) => {
+    setTab(next.id);
+    readout.say(next.lettered, `${next.spoken}: ${next.holds}`);
+  };
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     const move = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
     if (!move) return;
     event.preventDefault();
     const next = TABS[(TABS.findIndex((each) => each.id === tab) + move + TABS.length) % TABS.length]!;
-    setTab(next.id);
+    openTab(next);
     wiring.frame.current?.querySelector<HTMLButtonElement>(`[data-tab="${next.id}"]`)?.focus();
   };
 
@@ -187,6 +215,7 @@ export function PhonePanel() {
             <div className="rt-ph-glass">
               <PhoneScreen line={wiring.line} />
             </div>
+            <Caption text={wiring.spoken} said={wiring.said} />
           </div>
 
           {/* Everything but the power switch: dark and out of reach while the machine is off. */}
@@ -269,7 +298,7 @@ export function PhonePanel() {
                     tabIndex={each.id === tab ? 0 : -1}
                     data-tab={each.id}
                     data-testid={`tab-${each.id}`}
-                    onClick={() => setTab(each.id)}
+                    onClick={() => openTab(each)}
                     onKeyDown={onTabKey}
                   >
                     <i />
