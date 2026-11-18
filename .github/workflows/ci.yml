@@ -86,16 +86,17 @@ jobs:
         run: pnpm test:e2e
 
       # The site is one machine a build. Everything above built and tested the
-      # one that is live; this builds and tests the other.
-      - name: Production build and build check, as the РИТМ-12
+      # one that is live, РИТМ-12; this builds the 808, which is not shipped,
+      # and runs the tests of its panel.
+      - name: Production build and build check, as the 808
         run: pnpm build
         env:
-          BOOMBAPBOT_MACHINE: ritm12
+          BOOMBAPBOT_MACHINE: '808'
 
-      - name: Browser tests of the РИТМ-12
+      - name: Browser tests of the 808
         run: pnpm test:e2e
         env:
-          BOOMBAPBOT_MACHINE: ritm12
+          BOOMBAPBOT_MACHINE: '808'
 
       - name: Upload Playwright report
         if: failure()

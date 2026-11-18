@@ -1,13 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { closeSettings, hitCount, openEditor, openSettings, project, stepButton } from './helpers';
+import { closeSettings, openEditor, openSettings } from './helpers';
+import { beat, hitCount, step } from './ritm12/helpers';
 
 test.beforeEach(async ({ page }) => {
   await openEditor(page);
 });
 
 const BURIED = ['beat-name', 'undo', 'redo', 'starter', 'clear', 'clear-everything', 'import', 'export-menu', 'draft-status'];
-// What settings no longer holds: the machine has its own tempo knob and no second editor.
-const GONE = ['bpm', 'swing', 'mode-modern', 'mode-hardware', 'kit-808', 'grid'];
 
 test('the page is the brand, the machine and a footer', async ({ page }) => {
   await expect(page.getByTestId('brand')).toBeVisible();
@@ -43,7 +42,6 @@ test('the cog opens settings, and Escape hands focus back to it', async ({ page 
   await expect(sheet).toBeVisible();
   await expect(sheet.getByRole('heading', { name: 'Settings' })).toBeVisible();
   for (const id of BURIED) await expect(page.getByTestId(id)).toBeVisible();
-  for (const id of GONE) await expect(page.getByTestId(id)).toHaveCount(0);
 
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
@@ -68,75 +66,64 @@ test('Space plays the beat after settings is closed with the mouse', async ({ pa
 test('Escape in the beat name reverts it without closing settings', async ({ page }) => {
   await openSettings(page);
   const name = page.getByTestId('beat-name');
-  const before = (await project(page)).name;
+  const before = (await beat(page)).name;
   await name.fill('Half typed');
   await name.press('Escape');
   await expect(name).toHaveValue(before);
-  expect((await project(page)).name).toBe(before);
+  expect((await beat(page)).name).toBe(before);
   await expect(page.getByTestId('settings-modal')).toBeVisible();
 });
 
-test('settings list what the panel does not model yet', async ({ page }) => {
+test('a pattern can be cleared, undone and reset to the starter patterns', async ({ page }) => {
+  const starter = await beat(page);
+  const hits = hitCount(starter.patterns[0]!);
   await openSettings(page);
-  const pending = page.getByTestId('panel-pending');
-  await pending.locator('summary').click();
-  await expect(pending.locator('li').first()).toBeVisible();
-});
-
-test('a rhythm can be cleared, undone and reset to the starter rhythms', async ({ page }) => {
-  const starter = await project(page);
-  const hits = hitCount(starter);
-  await openSettings(page);
-  await expect(page.getByTestId('hit-count')).toHaveText(`${hits} hits in 16 steps`);
+  await expect(page.getByTestId('hit-count')).toHaveText(`${hits} hits in pattern А`);
   await expect(page.getByTestId('undo')).toBeDisabled();
 
   await page.getByTestId('clear').click();
-  await expect(page.getByTestId('hit-count')).toHaveText('0 hits in 16 steps');
+  await expect(page.getByTestId('hit-count')).toHaveText('0 hits in pattern А');
   await expect(page.getByTestId('clear')).toBeDisabled();
-  expect(hitCount(await project(page))).toBe(0);
 
   await page.getByTestId('undo').click();
-  expect((await project(page)).rhythms).toEqual(starter.rhythms);
+  expect((await beat(page)).patterns).toEqual(starter.patterns);
   await page.getByTestId('redo').click();
-  expect(hitCount(await project(page))).toBe(0);
+  expect(hitCount((await beat(page)).patterns[0]!)).toBe(0);
 
   // Ctrl+Z works from the machine too.
   await closeSettings(page);
-  await stepButton(page, 5).click();
-  expect(hitCount(await project(page))).toBe(1);
-  await page.keyboard.press('Control+z');
-  expect(hitCount(await project(page))).toBe(0);
+  await step(page, 5).click();
+  expect(hitCount((await beat(page)).patterns[0]!)).toBe(1);
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(hitCount((await beat(page)).patterns[0]!)).toBe(0);
 
   await openSettings(page);
   await page.getByTestId('starter').click();
-  expect((await project(page)).rhythms).toEqual(starter.rhythms);
+  expect((await beat(page)).patterns).toEqual(starter.patterns);
 });
 
 test('everything can be cleared at once, stays cleared after a reload, and comes back with undo', async ({ page }) => {
-  const starter = await project(page);
-  const blank = (snapshot: Awaited<ReturnType<typeof project>>) =>
-    snapshot.rhythms.every((_, index) => hitCount(snapshot, index) === 0) &&
-    snapshot.rhythmTracks.every((track) => track.length === 0);
+  const starter = await beat(page);
+  const blank = (now: Awaited<ReturnType<typeof beat>>) => now.patterns.every((pattern) => hitCount(pattern) === 0);
   expect(blank(starter)).toBe(false);
 
   await openSettings(page);
   await page.getByTestId('clear-everything').click();
   await expect(page.getByTestId('clear-everything')).toBeDisabled();
-  await expect(page.getByTestId('hit-count')).toHaveText('0 hits in 16 steps');
-  const cleared = await project(page);
+  const cleared = await beat(page);
   expect(blank(cleared)).toBe(true);
   // The knobs and the tempo are not part of what it clears.
-  expect(cleared.sound).toEqual(starter.sound);
-  expect(cleared.tempo).toEqual(starter.tempo);
+  expect(cleared.mix).toEqual(starter.mix);
+  expect(cleared.voices).toEqual(starter.voices);
+  expect(cleared.tempo).toBe(starter.tempo);
 
   await page.getByTestId('undo').click();
-  expect((await project(page)).rhythms).toEqual(starter.rhythms);
-  expect((await project(page)).rhythmTracks).toEqual(starter.rhythmTracks);
+  expect((await beat(page)).patterns).toEqual(starter.patterns);
   await page.getByTestId('redo').click();
-  expect(blank(await project(page))).toBe(true);
+  expect(blank(await beat(page))).toBe(true);
 
   await expect(page.getByTestId('draft-status')).toContainText('Draft saved in this browser');
   await page.reload();
   await expect(page.getByTestId('editor')).toBeVisible();
-  expect(blank(await project(page))).toBe(true);
+  expect(blank(await beat(page))).toBe(true);
 });
