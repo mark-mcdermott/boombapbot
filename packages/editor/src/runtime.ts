@@ -13,7 +13,7 @@ import {
   type KeyValueStorage,
 } from './state/draft-storage';
 import { downloadFile, exportBaseName, projectFileName, readProjectFile, type SaveFile } from './state/project-io';
-import { EditorStore, newProjectId } from './state/store';
+import { EditorStore, newProjectId, wavExportUnderWay } from './state/store';
 
 /** Written by scripts/prepare-assets.mjs next to the built site. */
 export interface AssetManifest {
@@ -386,10 +386,10 @@ export class EditorRuntime<
 
   /**
    * Renders the beat as it stands now to a WAV, in a Worker, and saves it.
-   * One at a time: asked again while one renders, it does nothing.
+   * One at a time: asked again while one is under way, it does nothing.
    */
   async exportWav(bitDepth: WavBitDepth = 24, sampleRate = 44100): Promise<void> {
-    if (this.store.getState().wavExport?.state === 'rendering') return;
+    if (wavExportUnderWay(this.store.getState().wavExport)) return;
     this.store.setWavExport({ state: 'rendering', progress: 0 });
     try {
       const [wasm, engine] = await Promise.all([this.loadOfflineWasm(), this.loadWasmBytes()]);
@@ -405,6 +405,8 @@ export class EditorRuntime<
         },
         (progress) => this.store.setWavExport({ state: 'rendering', progress }),
       );
+      // Handing it over can take as long as the person does, where they are asked what to do with it.
+      this.store.setWavExport({ state: 'saving' });
       const saved = await this.save({ name: `${exportBaseName(project)}.wav`, data: bytes, type: 'audio/wav' });
       this.store.setWavExport(saved ? { state: 'done', at: Date.now() } : null);
     } catch (error) {

@@ -233,12 +233,13 @@ native engine instance.
 A first slice is built in `apps/mobile`: the editor with РИТМ-12 in a
 Capacitor shell, playing through the web view's own worklet and WASM
 engine, with the draft kept in the device's own store and no accounts,
-saved beats or shop. On 2026-11-17 it ran in an iPhone simulator (the
-machine shown, a beat playing, the draft back after a relaunch) and its
-Android debug build succeeded without being run. Nobody has listened to it
-or held it on a phone. `apps/mobile/README.md` lists what is not right yet
-(export is untried on Android, the words are the site's, the
-sideways layout, a stand-in icon) and what a store needs: signing, accounts
+saved beats or shop. On 2026-11-17 it ran in an iPhone simulator and in an
+Android emulator: the machine shown, a beat playing, the draft back after a
+relaunch, an export handed to the share sheet and a project file imported.
+Nobody has listened to it or held it on a phone. `apps/mobile/README.md`
+lists what is not right yet (Android's share sheet cannot save to the
+phone itself, the words are the site's, the sideways layout, a stand-in
+icon) and what a store needs: signing, accounts
 in the app with the delete step both stores require, Apple's rule on selling
 the upgrade, and Google Play's closed test of 12 testers for 14 days.
 

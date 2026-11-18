@@ -10,8 +10,20 @@ export interface Notice {
   details?: string[];
 }
 
-/** A WAV export: how far its render has come, from 0 to 1, or how the last one ended. */
-export type WavExport = { state: 'rendering'; progress: number } | { state: 'done'; at: number } | { state: 'error' };
+/**
+ * A WAV export: how far its render has come, from 0 to 1, that the rendered
+ * file is being handed over, or how the last one ended.
+ */
+export type WavExport =
+  | { state: 'rendering'; progress: number }
+  | { state: 'saving' }
+  | { state: 'done'; at: number }
+  | { state: 'error' };
+
+/** One is on its way: rendering, or rendered and not yet handed over. */
+export function wavExportUnderWay(wav: WavExport | null): boolean {
+  return wav?.state === 'rendering' || wav?.state === 'saving';
+}
 
 export interface EditorState<Document extends ProjectBase = ProjectBase, Transient extends object = object> {
   project: Document;

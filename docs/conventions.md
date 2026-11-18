@@ -226,7 +226,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   phone's share sheet, `src/share-file.ts`, because a web view inside an app
   ignores a download); and `below`, what sits under the machine in place of
   the cookie notice and the footer. A `save` answers false when the person
-  turned the file down, and an export then claims nothing.
+  turned the file down, and an export then claims nothing. It can take as
+  long as the person does, so a WAV export has a `saving` state between
+  `rendering` and `done`, and another WAV cannot be asked for in either.
   The app leaves accounts, saved beats and the shop out. Its engine, worklet
   and art are the site's, copied by `scripts/copy-assets.mjs` from what
   `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native
