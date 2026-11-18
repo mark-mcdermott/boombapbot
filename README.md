@@ -71,7 +71,7 @@ pnpm serve
 
 - **A page that is just the machine.** The brand along the top, the drum
   machine, and a footer 50px under it. The footer's icons lead to the About,
-  Docs, manifesto, Credits and Policies pages and open modals for upgrades,
+  Docs, manifesto and Policies pages and open modals for upgrades,
   the cart, settings and your account; each shows its name when pointed at.
   Settings holds the beat name, undo and redo, a reset to the starter
   patterns, a clear for one pattern and one for everything, import and
@@ -97,7 +97,8 @@ pnpm serve
   nothing has to be pointed at to find them. About opens on a still of the
   machine with its screen lit and a key that opens it. Docs goes through
   every control and says what its lettering means. The manifesto is one
-  narrow column. Credits is a blank page for now. They are set in two faces
+  narrow column. Credits is a blank page for now, at `/credits`, and nothing
+  leads to it until it has something on it. They are set in two faces
   the site serves itself, PT Serif and Sofia Sans Condensed.
 - **Eight sounds, synthesised.** Kick, snare, clap, closed and open hat, tom,
   rim and percussion. The engine builds each one from its pitch, decay and
