@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // The drum machine the build is meant to be.
-const machine = process.env.BOOMBAPBOT_MACHINE ?? '808';
+const machine = process.env.BOOMBAPBOT_MACHINE ?? 'ritm12';
 const machineDir = join(root, 'packages', `machine-${machine}`);
 const asked = process.argv[2];
 const candidates = asked

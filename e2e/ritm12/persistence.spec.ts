@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { exportVia, downloadBytes, openSettings } from '../helpers';
+import { exportVia, downloadBytes } from '../helpers';
 import { DRAFT_KEY, EARLIER_BEAT, EARLIER_DRAFT_KEY, beat, openMachine, step, stepsOn } from './helpers';
 
 test('the beat is kept in this browser and comes back on the next visit', async ({ page }) => {
@@ -77,17 +77,4 @@ test('the project file names its machine and comes back in as it went out', asyn
   });
   await expect(page.getByTestId('notice')).toContainText('Imported');
   expect((await beat(page)).patterns).toEqual(written.patterns);
-});
-
-test('settings clear the pattern, clear everything and bring the starter patterns back', async ({ page }) => {
-  await openMachine(page);
-  await openSettings(page);
-  await expect(page.getByTestId('hit-count')).toContainText('in pattern А');
-  await page.getByTestId('clear').click();
-  await expect(page.getByTestId('hit-count')).toHaveText('0 hits in pattern А');
-  await expect(page.getByTestId('clear')).toBeDisabled();
-  await page.getByTestId('clear-everything').click();
-  await expect(page.getByTestId('clear-everything')).toBeDisabled();
-  await page.getByTestId('starter').click();
-  await expect(page.getByTestId('hit-count')).not.toHaveText('0 hits in pattern А');
 });

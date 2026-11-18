@@ -5,29 +5,41 @@ in this file has been built unless it says so.
 
 ## Finishing the machine
 
-The editor now does what the 808's operation manual describes, short of what
-a browser cannot. What is left of that work:
+РИТМ-12 is the machine the site is. What is left of it:
 
-1. **A listen, and what it turns up.** The sounds, the reach of the level and
-   accent knobs, and the feel of TAP are the parts most likely to need it.
-2. **Long exports off the main thread.** A rhythm track renders in memory on
-   the main thread, so WAV export stops at five minutes. A Worker and
-   streamed encoding would lift that.
+1. **Try it where it has not been.** On the live site, on a real phone, in
+   Safari and in Firefox. It has only run in Chromium, and the phone layout
+   only in Chromium's device emulation.
+2. **A closer listen.** The owner has heard it once. Its eight voices, how
+   far each knob reaches and its four effects were set by measurement more
+   than by ear, and nobody has gone through them one by one.
+3. **Full-size art.** The picture is 2000 pixels wide. The owner's originals
+   are 3072 wide; put one picture for each state in `misc/assets/ritm12/`,
+   run `packages/machine-ritm12/art/cut-art.py` and update `ui/layout.ts`.
+   The pointer lines were lifted from an earlier picture, and the owner may
+   paint their own.
+4. **Real 808 beats.** A draft, a file and a stored beat from the 808 open
+   converted in the tests, from fixtures. Nobody has opened a real one. The
+   beats stored while the site was the 808 stay in the database as they
+   were; whether to convert or clear them later is the owner's call.
+5. **The settings sheet's wording.** Its "Rhythm" heading, "Press start" and
+   its closing note were written for the 808 and for a time before accounts.
 
-Left out for good, because a browser cannot do them: DIN sync, trigger
-outputs, separate instrument outputs, pedal jacks and memory protection.
+## Moving the 808 out
 
-Not settled by any of that:
+The 808 is not shipped and is to leave this repository. Before
+`packages/machine-808/` is deleted, what belongs to it has to go with it:
+its browser tests (`e2e/808/`), the VST3 spike (`plugins/vst3/`), the
+generated 606, 707 and 909 kits and their generator (`assets/kits/`,
+`scripts/gen_demo_kits.py`), the photographs in `assets/faceplates/`, the
+faceplate script and its check, and `scripts/bench-engine.mjs`, which still
+measures the 808's engine. The engine's test suites and render tool are
+written against the 808's project and track table
+(`engine/tools/project_io.h`), so they need a home too, or a machine of
+their own to test with, before the 808's package can go.
 
-- **РИТМ-12 is built but not live.** The site is still the 808. Before it
-  takes over: nobody has listened to its eight voices or its four effects,
-  whose levels and ranges were set by measurement and not by ear; its art is
-  2000 pixels wide and should be cut again from the owner's 3072-wide
-  pictures; its pointer lines were lifted from an earlier picture and the
-  owner may paint their own; it has been run in Chromium only, with no real
-  phone, Safari or Firefox; the pages of words (About, Docs, the policies)
-  still describe the 808; and the tests of the site, accounts, saved beats
-  and shop still run against the 808's build only.
+What was never settled about the 808, for whoever carries it on:
+
 - **How it sounds.** `packages/machine-808/engine/voices.cpp` is a model made by ear. It
   needs a listen beside a real machine, voice by voice and knob by knob.
 - **Composing over a written track.** The manual says a track can be edited

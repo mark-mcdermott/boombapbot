@@ -3,12 +3,12 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
 import { ROW_ID, UUID, signedUp, signedUpRequest } from './account';
 import { ACCOUNTS_URL } from './accounts-server';
-import { project, selectTrack, stepButton, stepsOn, type ProjectSnapshot } from './helpers';
+import { EARLIER_BEAT, beat as project, step, stepsOn, type Beat } from './ritm12/helpers';
 
 // Beats saved to an account. Like the accounts tests these run against the
 // built server, with its database in memory.
 
-const FIXTURE = 'packages/machine-808/fixtures/mixed-rhythms.project.json';
+const FIXTURE = 'packages/machine-ritm12/fixtures/four-patterns.project.json';
 const LIMIT = 20;
 const MAX_BYTES = 64 * 1024;
 
@@ -20,7 +20,7 @@ interface Saved {
   updatedAt: string;
 }
 
-const fixture = (name = 'Fixture beat') => ({ ...JSON.parse(readFileSync(FIXTURE, 'utf8')), name }) as ProjectSnapshot;
+const fixture = (name = 'Fixture beat') => ({ ...JSON.parse(readFileSync(FIXTURE, 'utf8')), name }) as Beat;
 
 const post = (request: APIRequestContext, body: unknown) => request.post('/api/beats', { data: body });
 
@@ -33,7 +33,7 @@ async function listed(request: APIRequestContext): Promise<Saved[]> {
   return ((await (await request.get('/api/beats')).json()) as { beats: Saved[] }).beats;
 }
 
-async function stored(request: APIRequestContext, id: string): Promise<{ beat: Saved; project: ProjectSnapshot }> {
+async function stored(request: APIRequestContext, id: string): Promise<{ beat: Saved; project: Beat }> {
   return (await request.get(`/api/beats/${id}`)).json();
 }
 
@@ -53,11 +53,15 @@ async function reopenAccount(page: Page): Promise<void> {
   await expect(page.getByTestId('beats')).toBeVisible();
 }
 
-/** Changes the beat on the machine: one more step on the high tom. */
-async function addHighTom(page: Page, step: number): Promise<void> {
-  await selectTrack(page, 'high_tom');
-  await stepButton(page, step).click();
+/** Changes the beat on the machine: a tom on a step of pattern В, which starts empty. */
+async function addTom(page: Page, number: number): Promise<void> {
+  await page.getByTestId('pattern-3').click();
+  await page.getByTestId('voice-tom').click();
+  await step(page, number).click();
 }
+
+/** The steps the tom plays on in pattern В. */
+const tomSteps = (now: Beat) => stepsOn(now.patterns[2]!.steps.tom);
 
 test('a beat is saved to the account, listed there, and loaded back onto the machine', async ({ page }) => {
   await signedUp(page);
@@ -76,13 +80,13 @@ test('a beat is saved to the account, listed there, and loaded back onto the mac
 
   // What the account holds is the project the machine had.
   const [beat] = await listed(page.request);
-  expect((await stored(page.request, beat!.id)).project.rhythms).toEqual(atSave.rhythms);
+  expect((await stored(page.request, beat!.id)).project.patterns).toEqual(atSave.patterns);
 
   // Change the machine, then load the saved copy over it.
   await closeAccount(page);
-  await addHighTom(page, 2);
+  await addTom(page, 2);
   const changed = await project(page);
-  expect(stepsOn(changed, 'high_tom')).toContain(2);
+  expect(tomSteps(changed)).toContain(2);
 
   await reopenAccount(page);
   await row.getByTestId('beat-load').click();
@@ -91,9 +95,9 @@ test('a beat is saved to the account, listed there, and loaded back onto the mac
     'Loaded “Starter beat” from your account. Undo brings back the previous beat.',
   );
   const loaded = await project(page);
-  expect(loaded.rhythms).toEqual(atSave.rhythms);
-  expect(loaded.rhythmTracks).toEqual(atSave.rhythmTracks);
-  expect(loaded.sound).toEqual(atSave.sound);
+  expect(loaded.patterns).toEqual(atSave.patterns);
+  expect(loaded.mix).toEqual(atSave.mix);
+  expect(loaded.voices).toEqual(atSave.voices);
 
   // Loading is one undo step, as an import is.
   await page.keyboard.press('Control+z');
@@ -114,7 +118,7 @@ test('saving again replaces the same beat, and asks first when the copy in the a
 
   // Saved again from this device, nothing asked: it is the same beat, changed.
   await closeAccount(page);
-  await addHighTom(page, 2);
+  await addTom(page, 2);
   await reopenAccount(page);
   await saveFromMachine(page);
   await expect(page.getByTestId('beats-conflict')).toHaveCount(0);
@@ -123,7 +127,7 @@ test('saving again replaces the same beat, and asks first when the copy in the a
   expect(second!.id).toBe(first!.id);
   expect(Date.parse(second!.updatedAt)).toBeGreaterThan(Date.parse(first!.updatedAt));
   const mine = await stored(page.request, second!.id);
-  expect(stepsOn(mine.project, 'high_tom')).toContain(2);
+  expect(tomSteps(mine.project)).toContain(2);
 
   // Another device saves over it.
   await saved(
@@ -153,7 +157,7 @@ test('saving again replaces the same beat, and asks first when the copy in the a
   await expect(question).toHaveCount(0);
   const replaced = await stored(page.request, second!.id);
   expect(replaced.beat.name).toBe('Starter beat');
-  expect(stepsOn(replaced.project, 'high_tom')).toContain(2);
+  expect(tomSteps(replaced.project)).toContain(2);
   await expect(page.getByTestId('beats-count')).toHaveText(`1 of ${LIMIT}`);
 
   // This device is up to date again, so the next save is not questioned.
@@ -262,7 +266,7 @@ test('a beat over 64 KB is refused, and so is anything that is not a project', a
 
   const notProjects: unknown[] = [
     { project: { format: 'something.else' } },
-    { project: { ...onMachine, rhythms: [] } },
+    { project: { ...onMachine, patterns: [] } },
     { project: 'a beat' },
     {},
     'not json at all',
@@ -288,6 +292,32 @@ test('a beat over 64 KB is refused, and so is anything that is not a project', a
   await expect(page.getByTestId('beat')).toHaveCount(0);
 });
 
+test('a beat the earlier machine saved loads as a new beat, and the one in the account stays as it was', async ({ page }) => {
+  await signedUp(page);
+  await saveFromMachine(page);
+  const [kept] = await listed(page.request);
+  // The account's row stands for one saved before this machine: asked for, it answers with that machine's beat.
+  await page.route(`**/api/beats/${kept!.id}`, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    await route.fulfill({ json: { beat: kept, project: JSON.parse(EARLIER_BEAT) } });
+  });
+
+  await page.getByTestId('beat').getByTestId('beat-load').click();
+  await expect(page.getByTestId('account-modal')).toHaveCount(0);
+  const notice = page.getByTestId('notice');
+  await expect(notice).toContainText('Loaded “Mixed rhythms fixture” from your account. The one in your account is as it was.');
+  await expect(notice).toContainText('is now a РИТМ-12 beat');
+  expect(await project(page)).toMatchObject({ machine: 'ritm12', name: 'Mixed rhythms fixture', tempo: 124 });
+
+  // It is a new beat here, so saving it adds one and replaces nothing.
+  await reopenAccount(page);
+  await expect(page.getByTestId('beats-save-hint')).toContainText('This puts a copy of “Mixed rhythms fixture” in your account');
+  await expect(page.getByTestId('beat')).not.toHaveAttribute('aria-current', 'true');
+  await saveFromMachine(page, 'Mixed rhythms fixture');
+  await expect(page.getByTestId('beats-count')).toHaveText(`2 of ${LIMIT}`);
+  expect((await listed(page.request)).find((other) => other.id === kept!.id)).toEqual(kept);
+});
+
 test('beats on a page of words point back to the machine', async ({ page }) => {
   await signedUp(page);
   await page.goto('/about');
@@ -310,7 +340,7 @@ test('the machine carries on when the account server stops answering', async ({ 
   await page.reload();
   await expect(page.getByTestId('editor')).toBeVisible();
   await expect(page.getByTestId('account')).toHaveAccessibleName('Account, logged in');
-  await addHighTom(page, 2);
+  await addTom(page, 2);
   expect(asked).toEqual([]);
 
   // The server goes away. The list says so and offers to try again.
@@ -321,15 +351,15 @@ test('the machine carries on when the account server stops answering', async ({ 
   await closeAccount(page);
 
   // The machine is untouched by any of it: it edits, keeps its draft and plays.
-  await addHighTom(page, 5);
+  await addTom(page, 5);
   const onMachine = await project(page);
-  expect(stepsOn(onMachine, 'high_tom')).toEqual(expect.arrayContaining([2, 5]));
+  expect(tomSteps(onMachine)).toEqual(expect.arrayContaining([2, 5]));
   await page.reload();
   await expect(page.getByTestId('editor')).toBeVisible();
-  expect((await project(page)).rhythms).toEqual(onMachine.rhythms);
-  await page.getByTestId('panel-toggle').click();
+  expect((await project(page)).patterns).toEqual(onMachine.patterns);
+  await page.getByTestId('play').click();
   await expect(page.getByTestId('editor')).toHaveAttribute('data-playing', 'true');
-  await page.getByTestId('panel-toggle').click();
+  await page.getByTestId('stop').click();
 
   // It comes back, and trying again shows the beats.
   await page.unroute('**/api/beats**');
@@ -398,6 +428,27 @@ test.describe('what the server answers about beats', () => {
       expect(answer.status(), answer.url()).toBe(401);
       expect(await answer.json()).toEqual({ code: 'signed_out', message: 'Log in to save beats to your account.' });
     }
+  });
+
+  test('a beat of the machine before this one is not saved: a page left open since then is told to reload', async ({ request }) => {
+    await signedUpRequest(request);
+    const earlier: unknown = JSON.parse(EARLIER_BEAT);
+    const reload = {
+      code: 'invalid',
+      message:
+        'I changed the machine after you opened this page, so I did not save this. Reload the page: your beat opens on the new machine, and you can save it from there.',
+    };
+    const refused = await post(request, { project: earlier });
+    expect([refused.status(), await refused.json()]).toEqual([400, reload]);
+
+    // The same when it would replace a beat already there.
+    const mine = await saved(await post(request, { project: fixture() }));
+    const replaced = await request.put(`/api/beats/${mine.id}`, {
+      data: { project: earlier, lastSeen: mine.updatedAt, overwrite: true },
+    });
+    expect([replaced.status(), await replaced.json()]).toEqual([400, reload]);
+    expect(await listed(request)).toEqual([mine]);
+    expect((await stored(request, mine.id)).project.machine).toBe('ritm12');
   });
 
   test('one account cannot read, change or delete another’s beats', async ({ playwright }) => {

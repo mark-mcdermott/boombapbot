@@ -17,6 +17,8 @@ export type DraftLoad<Document extends ProjectBase> =
       project: Document;
       /** What a draft from an earlier version lost on the way in. */
       changes: string[];
+      /** The draft was another machine's, and this one took it over. */
+      adopted: boolean;
     }
   | { status: 'unreadable'; errors: string[] }
   | { status: 'unavailable'; errors: string[] };
@@ -44,7 +46,9 @@ export function loadDraft<Document extends ProjectBase>(
   if (text === null) return { status: 'empty' };
 
   const result = codec.parseText(text);
-  if (result.ok) return { status: 'restored', project: result.project, changes: result.changes };
+  if (result.ok) {
+    return { status: 'restored', project: result.project, changes: result.changes, adopted: result.adopted === true };
+  }
 
   // A draft kept where an earlier version left it is never moved or removed.
   if (key === kind.draftKey) {

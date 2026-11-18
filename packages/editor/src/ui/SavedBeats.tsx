@@ -208,7 +208,10 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
       setProblem('That saved beat could not be read, so I left the machine as it was.');
       return;
     }
-    links.set(account, loaded.id, { beat: asked.answer.beat.id, seen: asked.answer.beat.updatedAt });
+    // A beat taken over from another machine is a new one. Saving it adds a beat; the one loaded stays.
+    if (!loaded.adopted) {
+      links.set(account, loaded.project.id, { beat: asked.answer.beat.id, seen: asked.answer.beat.updatedAt });
+    }
     close();
   };
 

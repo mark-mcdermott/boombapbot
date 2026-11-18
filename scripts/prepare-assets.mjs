@@ -20,7 +20,7 @@ const publicDir = join(root, 'apps/site/public');
 const dev = process.argv.includes('--dev');
 const includeLocalFaceplates = dev;
 // The drum machine this build is. The site imports the same one.
-const machine = process.env.BOOMBAPBOT_MACHINE ?? '808';
+const machine = process.env.BOOMBAPBOT_MACHINE ?? 'ritm12';
 const machineDir = join(root, 'packages', `machine-${machine}`);
 
 function fail(message) {
