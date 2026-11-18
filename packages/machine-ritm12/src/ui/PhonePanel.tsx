@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { EFFECT_KINDS } from '../document';
 import { Hand, Key, Lamp, useTurning, type KnobWiring, type LampWiring } from './Controls';
 import { ReadoutContext, useReadout } from './context';
@@ -12,6 +12,26 @@ const TABS = [
   { id: 'effect', lettered: 'ЭФФЕКТ', spoken: 'Effect' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+
+/** The panel is laid out for a screen up to this wide, in the page's pixels. */
+const PHONE_WIDTH = 430;
+/** Where there is more room than that, as on a tablet held upright, the whole panel grows, to no more than this. */
+const MOST_GROWN = 1.3;
+
+/** How much the panel grows to use the room it has. */
+function useGrowth(room: RefObject<HTMLElement | null>): number {
+  const [growth, setGrowth] = useState(1);
+  useLayoutEffect(() => {
+    const node = room.current;
+    if (!node) return undefined;
+    const measure = () => setGrowth(Math.round(Math.min(MOST_GROWN, Math.max(1, node.clientWidth / PHONE_WIDTH)) * 100) / 100);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [room]);
+  return growth;
+}
 
 /** A knob's body is shown this wide, in the page's pixels, whatever size it was cut at. */
 const KNOB_BODY = 44;
@@ -87,6 +107,8 @@ export function PhonePanel() {
   const wiring = useWiring();
   const { keys, knobs, power, readout } = wiring;
   const [tab, setTab] = useState<TabId>('voice');
+  const room = useRef<HTMLElement>(null);
+  const growth = useGrowth(room);
   const selected = wiring.voices.find((voice) => voice.voice === wiring.selected)!;
 
   const art = (file: string) => {
@@ -104,14 +126,14 @@ export function PhonePanel() {
 
   return (
     <ReadoutContext.Provider value={readout}>
-      <section className="rt-machine rt-phone" aria-label="РИТМ-12 drum machine" data-testid="machine" data-own-transport>
+      <section ref={room} className="rt-machine rt-phone" aria-label="РИТМ-12 drum machine" data-testid="machine" data-own-transport>
         <div
           ref={wiring.frame}
           className="rt-ph"
           data-testid="panel"
           data-view="phone"
           data-power={power ? 'on' : 'off'}
-          style={{ '--rt-bezel': art('bezel.webp'), '--rt-cap': art('key.webp'), '--rt-lamp': art('lamp.png') } as CSSProperties}
+          style={{ zoom: growth, '--rt-bezel': art('bezel.webp'), '--rt-cap': art('key.webp'), '--rt-lamp': art('lamp.png') } as CSSProperties}
         >
           <div className="rt-ph-top">
             <Part className="rt-ph-nameplate" file="nameplate.png" />
