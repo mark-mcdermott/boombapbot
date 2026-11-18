@@ -53,9 +53,16 @@ const WAV_ITEMS: Array<{ bitDepth: WavBitDepth; testId: string; label: string; n
   { bitDepth: 16, testId: 'export-wav-16', label: 'WAV loop, 16-bit', note: 'Stereo, one measure' },
 ];
 
+/** Why another WAV cannot be asked for yet, while one is under way. */
+function wavExportWait(wav: WavExport | null): string | null {
+  if (wav?.state === 'rendering') return 'One is rendering now';
+  if (wav?.state === 'saving') return 'One is being saved now';
+  return null;
+}
+
 function ExportMenu() {
   const runtime = useRuntime();
-  const rendering = useEditorState((state) => state.wavExport?.state === 'rendering');
+  const wait = useEditorState((state) => wavExportWait(state.wavExport));
   return (
     <Menu.Root>
       <Menu.Trigger className="sb-button" data-testid="export-menu">
@@ -71,11 +78,11 @@ function ExportMenu() {
                 key={testId}
                 className="sb-menu-item"
                 data-testid={testId}
-                disabled={rendering}
+                disabled={wait !== null}
                 onClick={() => void runtime.exportWav(bitDepth)}
               >
                 <span>{label}</span>
-                <span className="sb-menu-note">{rendering ? 'One is rendering now' : note}</span>
+                <span className="sb-menu-note">{wait ?? note}</span>
               </Menu.Item>
             ))}
             <Menu.Item className="sb-menu-item" data-testid="export-midi" onClick={() => void runtime.exportMidi()}>
@@ -97,6 +104,8 @@ function wavExportSaid(wav: WavExport): string {
   switch (wav.state) {
     case 'rendering':
       return 'Rendering the WAV…';
+    case 'saving':
+      return 'Saving the WAV…';
     case 'done':
       return `WAV exported at ${new Date(wav.at).toLocaleTimeString()}`;
     case 'error':
