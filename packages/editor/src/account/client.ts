@@ -1,7 +1,17 @@
 import { createAuthClient } from 'better-auth/react';
 
-/** Talks to /api/auth on this site. The session lives in a cookie the server sets. */
-export const authClient = createAuthClient();
+let client: ReturnType<typeof createAuthClient> | null = null;
+
+/**
+ * Talks to /api/auth on this site. The session lives in a cookie the server
+ * sets. It is made when first asked for, not when this file is read: it
+ * refuses a page whose address is not http or https, which a phone app's is
+ * not, and that page never asks.
+ */
+export function authClient(): ReturnType<typeof createAuthClient> {
+  client ??= createAuthClient();
+  return client;
+}
 
 export const MIN_PASSWORD_LENGTH = 8;
 

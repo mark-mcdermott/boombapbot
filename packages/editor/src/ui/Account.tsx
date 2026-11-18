@@ -157,7 +157,7 @@ function LogIn({ go }: { go: Go }) {
         action="Log in"
         busy="Logging in…"
         submit={async ({ email, password }) => {
-          const failure = await attempt(() => authClient.signIn.email({ email, password }));
+          const failure = await attempt(() => authClient().signIn.email({ email, password }));
           if (failure?.code === EMAIL_NOT_VERIFIED) {
             go({ name: 'check-inbox', email });
             return null;
@@ -197,7 +197,7 @@ function SignUp({ go, baseUrl }: { go: Go; baseUrl: string }) {
         busy="Making it…"
         submit={async ({ email, password }) => {
           const failure = await attempt(() =>
-            authClient.signUp.email({ email, password, name: '', callbackURL: `${baseUrl}?account=verified` }),
+            authClient().signUp.email({ email, password, name: '', callbackURL: `${baseUrl}?account=verified` }),
           );
           if (!failure) go({ name: 'check-inbox', email });
           return failure;
@@ -222,7 +222,7 @@ function CheckInbox({ email, go, baseUrl }: { email: string; go: Go; baseUrl: st
     run(async () => {
       setSentAgain(false);
       const failure = await attempt(() =>
-        authClient.sendVerificationEmail({ email, callbackURL: `${baseUrl}?account=verified` }),
+        authClient().sendVerificationEmail({ email, callbackURL: `${baseUrl}?account=verified` }),
       );
       if (failure?.code === EMAIL_ALREADY_VERIFIED) {
         go({ name: 'log-in' }, { kind: 'ok', text: 'That address is already confirmed. Log in.' });
@@ -268,7 +268,7 @@ function Forgot({ go, baseUrl }: { go: Go; baseUrl: string }) {
         busy="Sending…"
         submit={async ({ email }) => {
           const failure = await attempt(() =>
-            authClient.requestPasswordReset({ email, redirectTo: `${baseUrl}?account=reset` }),
+            authClient().requestPasswordReset({ email, redirectTo: `${baseUrl}?account=reset` }),
           );
           if (!failure) go({ name: 'reset-sent', email });
           return failure;
@@ -310,7 +310,7 @@ function NewPassword({ token, go }: { token: string; go: Go }) {
         action="Save the new password"
         busy="Saving…"
         submit={async ({ password }) => {
-          const failure = await attempt(() => authClient.resetPassword({ newPassword: password, token }));
+          const failure = await attempt(() => authClient().resetPassword({ newPassword: password, token }));
           if (!failure) go({ name: 'log-in' }, { kind: 'ok', text: 'Password changed. Log in with the new one.' });
           return failure;
         }}
@@ -347,7 +347,7 @@ function DeleteAccount({ account, cancel, deleted }: DeleteAccountProps) {
         busy="Deleting…"
         danger
         submit={async ({ password }) => {
-          const failure = await attempt(() => authClient.deleteUser({ password }));
+          const failure = await attempt(() => authClient().deleteUser({ password }));
           if (!failure) {
             deviceBeatLinks().keepOnly(account, []);
             deleted();
@@ -393,7 +393,7 @@ function SignedIn({ email, account, baseUrl, close, deleted }: SignedInProps) {
           type="button"
           data-testid="account-log-out"
           disabled={waiting}
-          onClick={() => run(() => attempt(() => authClient.signOut()))}
+          onClick={() => run(() => attempt(() => authClient().signOut()))}
         >
           {waiting ? 'Logging out…' : 'Log out'}
         </button>
@@ -432,7 +432,7 @@ interface AccountProps {
 
 /** The account button in the footer and its modal: log in, sign up, reset a password, saved beats, log out, delete. */
 export function Account({ baseUrl, container }: AccountProps) {
-  const session = authClient.useSession();
+  const session = authClient().useSession();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>({ name: 'log-in' });
   const [notice, setNotice] = useState<Notice | null>(null);
