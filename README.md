@@ -289,8 +289,9 @@ checks for it yet, and which features it will unlock is not decided.
 
 What has been checked: all of the above against the built server with its
 database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`). What
-has not: anything against real Stripe, a real email, or the live database,
-which does not have the table until the migration is run there.
+has not: anything against real Stripe or a real email, and nothing has
+written to the live database, which has had the empty `licenses` table
+since 2026-11-17, when the migration was run there.
 
 ## Tests
 
