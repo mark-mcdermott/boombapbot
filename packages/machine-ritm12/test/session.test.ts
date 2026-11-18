@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { loadDraft, type KeyValueStorage } from '@boombapbot/editor';
+import { loadDraft } from '@boombapbot/editor';
 import { countHits, documentRitm12, isEmptyPattern, voiceTrack } from '../src/document';
 import { remembersAnything, shownRow } from '../src/session';
-import { codec, earlier, makeMachine, newProject, row } from './helpers';
+import { MemoryStorage, codec, earlier, makeMachine, newProject, row } from './helpers';
 
 describe('the step keys', () => {
   it('put a hit of the selected voice on and take it off, each an undo step', () => {
@@ -206,19 +206,6 @@ describe('recording', () => {
 });
 
 describe('the draft', () => {
-  class MemoryStorage implements KeyValueStorage {
-    readonly items = new Map<string, string>();
-    getItem(key: string): string | null {
-      return this.items.get(key) ?? null;
-    }
-    setItem(key: string, value: string): void {
-      this.items.set(key, value);
-    }
-    removeItem(key: string): void {
-      this.items.delete(key);
-    }
-  }
-
   it('takes over a draft left by the earlier machine, and leaves that draft where it was', () => {
     const storage = new MemoryStorage();
     const left = JSON.stringify(earlier(2));
