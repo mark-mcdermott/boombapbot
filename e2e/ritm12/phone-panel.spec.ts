@@ -168,6 +168,40 @@ test('what is lettered on the phone’s panel has the picture’s drawing for it
   await expect.poll(() => loaded('')).toBe(true);
 });
 
+test('a control touched on the phone’s panel says in English what it is, under the screen, for a moment', async ({ page }) => {
+  await openPhonePanel(page);
+  const caption = page.getByTestId('caption');
+  await expect(caption).toBeHidden();
+
+  await page.getByTestId('voice-snare').click();
+  await expect(caption).toBeVisible();
+  await expect(caption).toHaveText('Snare selected');
+
+  // A tab says what is behind it.
+  await page.getByTestId('tab-tempo').click();
+  await expect(caption).toHaveText('Tempo: tempo, swing, accent and measure');
+
+  // A knob says where it stands when it is only touched, and nothing about the beat changes.
+  const before = (await beat(page)).tempo;
+  const knob = (await page.getByTestId('tempo').boundingBox())!;
+  await page.mouse.move(knob.x + knob.width / 2, knob.y + knob.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(caption).toHaveText(`Tempo: ${before} beats a minute`);
+  expect((await beat(page)).tempo).toBe(before);
+
+  // It sits on the screen's frame, inside the panel, and goes again.
+  const frame = (await page.locator('.rt-ph-crt').boundingBox())!;
+  const line = (await caption.boundingBox())!;
+  expect(line.y).toBeGreaterThan(frame.y + frame.height / 2);
+  expect(line.y + line.height).toBeLessThanOrEqual(frame.y + frame.height);
+  expect(line.x).toBeGreaterThanOrEqual(frame.x);
+  expect(line.x + line.width).toBeLessThanOrEqual(frame.x + frame.width);
+  await expect(caption).toBeHidden({ timeout: 6000 });
+  // The same words reach a screen reader from the live line, as before.
+  await expect(page.getByTestId('spoken')).toHaveText(`Tempo: ${before} beats a minute`);
+});
+
 test('the phone’s power switch puts everything else out of reach', async ({ page }) => {
   await openPhonePanel(page);
   await page.getByTestId('power').click();
