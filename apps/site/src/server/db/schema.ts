@@ -142,3 +142,32 @@ export const beat = pgTable(
   },
   (table) => [index('beats_user_id_idx').on(table.userId)],
 );
+
+/**
+ * A paid upgrade and its key. A row is made only when Stripe says the money
+ * arrived, so every row is a license somebody bought, and `stripeSessionId`
+ * is what keeps one payment to one key however often Stripe reports it. The
+ * buyer need not have an account: `userId` is empty until the key is
+ * entered in one, and empty again if that account is deleted, when the key
+ * can go onto another. An account holds one license at most.
+ */
+export const license = pgTable(
+  'licenses',
+  {
+    id: rowId(),
+    uuid: publicId(),
+    userId: integer('user_id')
+      .unique()
+      .references(() => user.id, { onDelete: 'set null' }),
+    /** Where the key was sent, in lower case. It can be sent there again. */
+    email: text('email').notNull(),
+    key: text('key').notNull().unique(),
+    stripeSessionId: text('stripe_session_id').notNull().unique(),
+    stripePaymentIntentId: text('stripe_payment_intent_id'),
+    /** When the key last went out by email. Empty until the first one has. */
+    emailedAt: moment('emailed_at'),
+    createdAt: moment('created_at').notNull().defaultNow(),
+    updatedAt: moment('updated_at').notNull().defaultNow(),
+  },
+  (table) => [index('licenses_email_idx').on(table.email)],
+);

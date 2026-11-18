@@ -1,3 +1,4 @@
 export * from './document';
 export * from './shop';
 export * from './beats';
+export * from './upgrade';

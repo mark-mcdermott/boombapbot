@@ -34,6 +34,7 @@ export default defineConfig({
       STRIPE_SECRET_KEY: atRunTime(),
       STRIPE_WEBHOOK_SECRET: atRunTime(),
       STRIPE_API_URL: atRunTime(),
+      UPGRADE_OPEN: atRunTime(),
       PRINTFUL_API_KEY: atRunTime(),
       PRINTFUL_STORE_ID: atRunTime(),
       PRINTFUL_WEBHOOK_SECRET: atRunTime(),

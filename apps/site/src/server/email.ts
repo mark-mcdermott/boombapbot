@@ -62,6 +62,11 @@ interface LinkEmail {
 }
 
 const SIGN_OFF = 'boombapbot is one person and a lot of coffee.';
+const BODY_STYLE =
+  "font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.6;color:#171513;max-width:480px";
+const NOTE_STYLE = 'font-size:14px;color:#5c554d';
+const KEY_STYLE =
+  'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;letter-spacing:0.04em;background:#f4efe8;padding:12px 16px;border-radius:8px';
 
 function linkEmail({ to, subject, lead, action, url, otherwise }: LinkEmail): EmailMessage {
   const href = escapeHtml(url);
@@ -69,11 +74,11 @@ function linkEmail({ to, subject, lead, action, url, otherwise }: LinkEmail): Em
     to,
     subject,
     text: `${lead}\n\n${url}\n\nThe link works for an hour. ${otherwise}\n\n${SIGN_OFF}\n`,
-    html: `<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;line-height:1.6;color:#171513;max-width:480px">
+    html: `<div style="${BODY_STYLE}">
   <p>${escapeHtml(lead)}</p>
   <p><a href="${href}" style="display:inline-block;background:#171513;color:#f4efe8;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">${escapeHtml(action)}</a></p>
-  <p style="font-size:14px;color:#5c554d">The link works for an hour. ${escapeHtml(otherwise)}</p>
-  <p style="font-size:14px;color:#5c554d">${SIGN_OFF}</p>
+  <p style="${NOTE_STYLE}">The link works for an hour. ${escapeHtml(otherwise)}</p>
+  <p style="${NOTE_STYLE}">${SIGN_OFF}</p>
 </div>`,
   };
 }
@@ -100,6 +105,53 @@ export async function sendPasswordResetEmail(to: string, url: string): Promise<v
       action: 'Choose a new password',
       url,
       otherwise: 'If you did not ask for it, ignore this and your password stays as it is.',
+    }),
+  );
+}
+
+interface KeyEmail {
+  to: string;
+  /** Why the key is being sent. */
+  lead: string;
+  key: string;
+  /** What to do with the email. */
+  note: string;
+}
+
+function keyEmail({ to, lead, key, note }: KeyEmail): EmailMessage {
+  return {
+    to,
+    subject: 'Your boombapbot license key',
+    text: `${lead}\n\n${key}\n\n${note}\n\n${SIGN_OFF}\n`,
+    html: `<div style="${BODY_STYLE}">
+  <p>${escapeHtml(lead)}</p>
+  <p style="${KEY_STYLE}">${escapeHtml(key)}</p>
+  <p style="${NOTE_STYLE}">${escapeHtml(note)}</p>
+  <p style="${NOTE_STYLE}">${SIGN_OFF}</p>
+</div>`,
+  };
+}
+
+/** The key, to the address that paid for it. */
+export async function sendLicenseKeyEmail(to: string, key: string): Promise<void> {
+  await sendEmail(
+    keyEmail({
+      to,
+      lead: 'Thank you for buying the boombapbot upgrade. This is your license key.',
+      key,
+      note: 'Keep this email so you can find the key again.',
+    }),
+  );
+}
+
+/** The key again, to the address it was bought with, because somebody asked. */
+export async function sendLicenseKeyReminder(to: string, key: string): Promise<void> {
+  await sendEmail(
+    keyEmail({
+      to,
+      lead: 'Someone, hopefully you, asked for the boombapbot license key bought with this address. Here it is.',
+      key,
+      note: 'If that was not you, ignore this. The key went nowhere but here.',
     }),
   );
 }
