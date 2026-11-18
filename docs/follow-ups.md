@@ -18,8 +18,8 @@ in this file has been built unless it says so.
      both, and likes how it looks and sounds (2026-11-18). They could not
      tell what the Russian meant, so every label now has the picture's own
      drawing beside it, and a touched control says what it is in English
-     under the screen for a moment. The owner has seen the drawings on a
-     phone; the English line has not been on one yet. The step keys, play
+     under the screen for a moment. Both went in after the owner's
+     two trials, and neither has been reported back from a real phone. The step keys, play
      and stop say nothing there, and the picture has no such line. Still to
      find out there: whether the step keys (about 39px on a 390px screen)
      are large enough over a long session, and how much of the panel shows
