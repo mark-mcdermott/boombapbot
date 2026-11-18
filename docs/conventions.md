@@ -177,8 +177,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `apps/site/` is an Astro site that mounts the editor as a client-only
   island. Its pages are prerendered. The one thing that runs on a server is
   `src/pages/api/`, backed by `src/server/`: accounts (`api/auth`, Better
-  Auth, Drizzle on Neon Postgres, Resend), saved beats (`api/beats`) and the
-  shop (`api/store`, `api/webhooks`, Stripe and Printful). The modals that
+  Auth, Drizzle on Neon Postgres, Resend), saved beats (`api/beats`), the
+  shop (`api/store`, `api/webhooks`, Stripe and Printful) and the upgrade
+  (`api/upgrade`, the same Stripe webhook). The modals that
   talk to it are `packages/editor/src/ui/Account.tsx` (with
   `SavedBeats.tsx`) and `Shop.tsx`.
 
@@ -315,8 +316,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   icon keeps its `aria-label`. The moves are CSS that picks shapes inside
   lucide's icons by their order, so look at all nine after changing an icon
   or upgrading `lucide-react`.
-- The upgrade has no backend. Its modal says so and offers no form. Do not
-  add a form, a price or a feature list until the real thing exists. The
+- The upgrade has a server (see Upgrade below) and nothing on the page: its
+  modal says it is not open and offers no form. Which features are paid is
+  not decided, so do not add a feature list or a promise to it. The
   cart is the shop (`ui/Shop.tsx`); it shows products only when the server
   says the shop is open.
 - The cookie notice (`ui/CookieNotice.tsx`) is on the machine's page only and
@@ -355,8 +357,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   always offers to send it again. Keep that.
 - An account is deleted from the modal with its password
   (`user.deleteUser` in `src/server/auth.ts`). The schema does the rest:
-  sessions, the credential and saved beats cascade, and orders keep their
-  rows with the user unset. A new table that hangs off a user has to choose
+  sessions, the credential and saved beats cascade, and orders and licenses
+  keep their rows with the user unset. A new table that hangs off a user has to choose
   one of those two on purpose. Both app stores require this button.
 - Who is logged in is read by `signedInAccount` (`account/session.ts`),
   never straight from the session answer. A host with no account server can
@@ -437,6 +439,50 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `SHOP_CATALOG`, `STRIPE_API_URL` and `PRINTFUL_API_URL` exist for the
   browser tests, which run against `e2e/fake-shop-services.mjs`. Nothing else
   sets them.
+
+**Upgrade**
+
+- The owner decided: a flat one-time 5 dollars, a license key the buyer is
+  given and can get back, no account needed to buy, and a license that
+  outlives its account. The price and the shape of a key are in
+  `packages/contracts/src/upgrade.ts`; the server is `src/server/upgrade.ts`
+  and the routes under `api/upgrade`.
+- This is the entitlement, not the gating. Nothing calls `isUpgraded` yet,
+  and which features are paid is not decided. Do not gate a feature, or
+  tell a visitor what the upgrade unlocks, until the owner says which.
+- It is closed until `UPGRADE_OPEN` is `on`, and without Stripe's key or the
+  webhook's secret (`upgradeOpen`). Closed, checkout refuses. A payment
+  already made is still honoured: the webhook does not ask whether it is
+  open. Do not set the switch for the owner; the Policies page has to
+  cover the upgrade before it is sold.
+- A row in `licenses` is a license somebody paid for. Checkout records
+  nothing; only the signed Stripe webhook makes a row (`issueLicense`).
+  `stripe_session_id` is unique and the insert steps aside for a row that
+  is already there, so one payment is one key however often, or however
+  close together, Stripe reports it. Keep it one statement: the database
+  driver on Vercel has no transactions.
+- The key is emailed until one send has succeeded, and an error is meant
+  to reach Stripe so it tries again. Two deliveries that cross can both
+  send the email; they send the same key.
+- A checkout says it is the upgrade in its metadata (`purpose`), and names
+  the buyer's account by uuid when there is one. The webhook route sends a
+  session to `issueLicense` or to the shop's `fulfil` on that alone.
+- An account holds one license (`user_id` is unique) and a key goes onto
+  one account. Someone who pays twice gets a second key on no account.
+  `redeemKey` claims a free key in one statement.
+- A server route asks `isUpgraded` (`src/server/session.ts`) about the
+  account `resolveUser` gave it. It is a question of its own on purpose:
+  `resolveUser` never reads `licenses`, so accounts, saved beats and the
+  shop run the same whether or not that table exists yet. The page asks
+  `GET /api/upgrade`. Like everything else, the machine must not wait on
+  the answer.
+- Asking for a key by email (`remindKeys`) answers the same whether or not
+  the address bought anything, and marks a key as sent before sending it,
+  so each goes out once in ten minutes. `AUTH_RATE_LIMIT=off`, which only
+  the browser tests set, takes that wait away too.
+- The tests keep the fake's upgrade checkouts in a log of their own
+  (`/calls/upgrade`), so they and the shop's tests can run side by side.
+  The closed switch is tested on a second server the spec starts itself.
 
 **Written copy**
 

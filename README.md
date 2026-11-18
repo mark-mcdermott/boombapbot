@@ -75,8 +75,9 @@ pnpm serve
   the cart, settings and your account; each shows its name when pointed at.
   Settings holds the beat name, undo and redo, a reset to the starter
   patterns, a clear for one pattern and one for everything, import and
-  export, and the save and audio status. The upgrade is not built: its modal
-  says so. The cart is a shop (see [Shop](#shop)).
+  export, and the save and audio status. The upgrade is not for sale: its
+  modal says so, and the server behind it is switched off (see
+  [Upgrade](#upgrade)). The cart is a shop (see [Shop](#shop)).
 - **Accounts, if you want one.** The account button opens a modal to make an
   account, confirm the address from an emailed link, log in and out, and
   reset a forgotten password. Logged in, it saves the beat on the machine
@@ -265,6 +266,32 @@ paid at Stripe, accepted from Stripe's webhook, and placed with Printful.
 The shop has been open on the live site since 2026-11-16, with both
 webhooks registered (Printful's by `pnpm shop:webhook --register`).
 
+## Upgrade
+
+A one-time payment of 5 dollars that gives a license key. Only the server
+side exists, and it is switched off: nothing on the page offers it, nothing
+checks for it yet, and which features it will unlock is not decided.
+
+- It sells nothing until `UPGRADE_OPEN` is `on` and Stripe's key and webhook
+  secret are set. Until then `/api/upgrade/checkout` refuses.
+- `POST /api/upgrade/checkout` sends the buyer to Stripe Checkout. No account
+  is needed. The same Stripe webhook as the shop's hears that it was paid,
+  makes one license and emails its key, however often Stripe says so.
+- A key looks like `BOOM-7K3QF-9XW2M-HT4RD-6VNPA`. Someone logged in when
+  they paid has it on their account at once; anyone else enters it in an
+  account later (`POST /api/upgrade/redeem`). One key, one account.
+- `GET /api/upgrade` says whether it is open, the price, and whether the
+  account asking is upgraded. `GET /api/upgrade/key` gives an account its
+  key, and `POST /api/upgrade/key` emails the keys bought with an address
+  to that address again, each at most once in ten minutes.
+- Licenses live in a `licenses` table (`apps/site/drizzle/0003_licenses.sql`).
+  A deleted account leaves its license behind with its key free to use again.
+
+What has been checked: all of the above against the built server with its
+database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`). What
+has not: anything against real Stripe, a real email, or the live database,
+which does not have the table until the migration is run there.
+
 ## Tests
 
 Run in this order; later steps use what earlier ones build.
@@ -276,7 +303,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -394,10 +421,10 @@ it, and play and the tempo are docked at the bottom of the screen.
 | Path | Contents |
 | --- | --- |
 | `engine/` | C++20 core with no voices of its own, C ABI, the CMake function that builds it for a machine, CTest suites with their test machine, and a render tool that plays an engine setup |
-| `packages/contracts/` | What every project document carries, and the saved-beat and shop schemas |
+| `packages/contracts/` | What every project document carries, and the saved-beat, shop and upgrade schemas |
 | `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
 | `packages/machine-ritm12/` | РИТМ-12, the machine the site is: its project schema, voices, panel, art, and the reader that opens the earlier machine's beats |
-| `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
+| `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats, the shop and the upgrade |
 | `e2e/` | Playwright tests: the site's, and РИТМ-12's own in `e2e/ritm12/` |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |
 | `misc/assets/` | The owner's unedited pictures (ignored by git) |
