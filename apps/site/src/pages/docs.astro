@@ -7,157 +7,150 @@ const base = import.meta.env.BASE_URL;
 
 <Base
   title="Docs · boombapbot"
-  description="How to use the boombapbot 808: writing rhythms, playing them by hand, rhythm tracks, the knobs and switches, and exporting."
+  description="How to use РИТМ-12, the boombapbot drum machine: writing patterns, accents, recording by tapping, swing, the sound knobs, the effect and exporting."
 >
   <SitePage client:load baseUrl={base} current="docs">
-    <h1>How to use the 808</h1>
+    <h1>How to use РИТМ-12</h1>
     <p class="sb-lede">
-      Press <strong>START/STOP</strong> and it plays. Everything else on the faceplate changes what it plays or
-      how it sounds.
+      Press the play key and it plays. Everything else on the panel changes what it plays or how it sounds. The
+      lettering is Russian, so this page gives each control as it is lettered and says what it is.
     </p>
 
     <h2>The idea</h2>
     <p>
-      The machine remembers sixteen <strong>rhythms</strong>, one for each step button: twelve Basic Rhythms and
-      four Intro/Fill-ins. Each rhythm is one measure and has two versions, A and B. A rhythm is made of twelve
-      <strong>tracks</strong>, one for the accent and one for each of eleven instruments, and each track is a row
-      of steps that are on or off.
-    </p>
-    <p>
-      The <strong>mode selector</strong>, top left, decides what the sixteen step buttons do. In the two write
-      modes they are the steps of the instrument you have selected. In the others they choose which rhythm
-      plays.
+      The machine remembers four <strong>patterns</strong>: А, Б, В and Г. A pattern is one measure of sixteen
+      steps. It has a row for each of the eight instruments and one row of accents, and each step in a row is on
+      or off.
     </p>
 
-    <h2>Writing a rhythm</h2>
+    <h2>Writing a pattern</h2>
     <ol>
-      <li>Turn the mode selector to <strong>1st PART</strong>.</li>
-      <li>Press <strong>START/STOP</strong>. The lamps run across the steps.</li>
-      <li>Turn the instrument selector to an instrument, such as BD for the bass drum.</li>
-      <li>Press the step buttons where it should play. A lit lamp is a step that is on; press it again to turn it off.</li>
-      <li>Choose another instrument and carry on. The buttons always show the instrument the selector is on.</li>
+      <li>Press the play key, the first of the three under <strong>УПРАВЛЕНИЕ</strong>. The pattern goes round.</li>
+      <li>
+        Press an instrument key on the left, under <strong>ИНСТРУМЕНТЫ</strong>. It plays the sound and selects
+        it, and its lamp stays lit.
+      </li>
+      <li>
+        Press the step keys, the row of sixteen under <strong>СЕКВЕНСЕР</strong>, where it should play. A lit
+        key is a step that is on; press it again to turn it off.
+      </li>
+      <li>Choose another instrument and carry on. The step keys always show the instrument that is selected.</li>
     </ol>
-    <p>
-      <strong>AC</strong> on the selector is the accent. Every instrument that plays on an accented step is
-      louder, by as much as the accent's level knob says.
-    </p>
-    <p>
-      <strong>TAP</strong> writes too: while the rhythm runs, press it in time and the selected instrument is
-      written on the step that is playing.
-    </p>
 
-    <h3>Choosing which rhythm to write</h3>
-    <p>
-      Turn the mode selector to <strong>PATTERN CLEAR</strong> and press a step button: 1 to 12 for a Basic
-      Rhythm, the last four for an Intro/Fill-in. Its lamp lights. Pressing <strong>CLEAR</strong> there empties
-      it. Then go back to 1st PART to write it.
-    </p>
-    <p>
-      The <strong>BASIC VARIATION</strong> lever chooses version A or B of a Basic Rhythm, and the
-      <strong>I/F VARIATION</strong> lever does the same for an Intro/Fill-in. With the lever on AB, CLEAR empties
-      both versions.
-    </p>
-
-    <h3>Length and step size</h3>
+    <h3>The instruments</h3>
     <dl>
-      <dt>A shorter measure</dt>
+      <dt>БАС</dt>
+      <dd>Kick.</dd>
+      <dt>МАЛЫЙ</dt>
+      <dd>Snare.</dd>
+      <dt>ХЛОП</dt>
+      <dd>Clap.</dd>
+      <dt>ХЭТ З and ХЭТ О</dt>
+      <dd>Closed hat and open hat. Each one cuts the other off.</dd>
+      <dt>ТОМ</dt>
+      <dd>Tom.</dd>
+      <dt>РИМ</dt>
+      <dd>Rim.</dd>
+      <dt>ПЕРК</dt>
+      <dd>Percussion.</dd>
+    </dl>
+
+    <h3>Accents</h3>
+    <p>
+      The <strong>РЕЖИМ ЗАПИСИ</strong> switch decides what the step keys write. On <strong>УДАРЫ</strong> they
+      write hits of the selected instrument. On <strong>АКЦЕНТЫ</strong> they write the pattern's accents. Every
+      instrument that plays on an accented step is louder, by as much as the <strong>АКЦЕНТ</strong> knob says.
+    </p>
+
+    <h3>Recording by tapping</h3>
+    <p>
+      Press the record key, the one with the red dot, while the pattern plays. Now each instrument key you
+      press in time is written on the step it lands on. Press record again to stop. Everything tapped in one go
+      is one undo step.
+    </p>
+
+    <h3>Mute, dice and clear</h3>
+    <ul>
+      <li><strong>МУТ</strong> silences the selected instrument and leaves its steps where they are.</li>
+      <li>The key with the die writes a new row for the selected instrument, by chance.</li>
+      <li><strong>СБРОС</strong> empties the pattern you are on. Undo brings it back.</li>
+    </ul>
+
+    <h2>Patterns, measure and tempo</h2>
+    <dl>
+      <dt>ПАТТЕРН</dt>
       <dd>
-        In a write mode, press <strong>CLEAR</strong> so it glows, then press the step button that should be the
-        last step. Press CLEAR again, or <kbd>Esc</kbd>, to let it up without changing anything.
+        The keys А, Б, В and Г choose the pattern you see and hear. Pressed while the machine plays, the new one
+        takes over at the end of the measure.
       </dd>
-      <dt>Steps to the beat</dt>
+      <dt>РАЗМЕР</dt>
       <dd>
-        Set the <strong>PRE-SCALE</strong> switch, then press CLEAR in a write mode to store it in the rhythm.
-        Positions 1 to 4 give three, six, four and eight steps to the beat. Twelve steps at position 1 is a bar
-        of triplets.
+        The length of a measure, for all four patterns. <strong>16</strong> is sixteen steps, four to the beat.
+        <strong>12</strong> is twelve steps of triplets, three to the beat, and the last four step keys sit out.
       </dd>
-      <dt>More than sixteen steps</dt>
-      <dd>
-        Turn the mode selector to <strong>2nd PART</strong> and set its last step the same way. The 2nd part
-        plays after the 1st, and the same sixteen buttons write it while the selector is there. Sixteen steps and
-        four more is a bar of five beats.
-      </dd>
+      <dt>ТЕМП</dt>
+      <dd>From 40 to 300 beats a minute. The screen shows the number.</dd>
+      <dt>СВИНГ</dt>
+      <dd>Plays every second step late, from not at all up to a hard shuffle. Triplets do not swing.</dd>
     </dl>
 
     <h2>The sounds</h2>
     <ul>
-      <li>Each column has a <strong>LEVEL</strong> knob. Some have TONE, DECAY, TUNING or SNAPPY as well.</li>
+      <li>The knob beside each instrument key is that instrument's level.</li>
       <li>
-        The five small switches swap an instrument for another: the three toms for congas, the rim shot for
-        claves, and the hand clap for maracas. The steps stay where they are.
+        The three knobs under <strong>ОБРАБОТКА ГОЛОСА</strong> work on the selected instrument:
+        <strong>ПИТЧ</strong> is its pitch, <strong>ЗАТУХАНИЕ</strong> how long it rings, and
+        <strong>ТОН</strong> how bright it is. Each instrument keeps its own settings.
       </li>
-      <li><strong>MASTER VOLUME</strong>, bottom right, is the whole machine.</li>
-      <li>
-        <strong>TEMPO</strong> turns in forty clicks from 40 to 300 beats a minute, and <strong>FINE</strong>
-        moves it up to one click either way.
-      </li>
+      <li><strong>ГРОМКОСТЬ</strong> is the volume of the whole machine, and the <strong>УРОВЕНЬ</strong> meter shows how loud it is.</li>
     </ul>
     <p>
-      Drag a knob up or down to turn it, or focus it and use the arrow keys. The dials with fixed positions, such
-      as the mode and instrument selectors, turn to wherever you press around them; you can also press their
-      labels.
+      Drag a knob up or down to turn it, or focus it and use the arrow keys. The screen says what the control
+      you just touched did.
     </p>
 
-    <h2>Playing by hand</h2>
-    <p>Turn the mode selector to <strong>MANUAL PLAY</strong>.</p>
-    <ul>
-      <li>The Basic Rhythm that will play flashes. Press another to choose it, then START/STOP.</li>
-      <li>
-        Choose another while it plays and it takes over at the end of the measure. If you choose it during the
-        first beat, it takes over on the second beat of the same measure.
-      </li>
-      <li>The BASIC VARIATION lever plays version A, version B, or the two in turn on AB.</li>
-      <li>
-        <strong>TAP</strong> brings in the selected Intro/Fill-in once. Before you start, it is the intro. While
-        it plays, it follows the measure that is running. Its button flashes while it waits; press TAP again to
-        take it back.
-      </li>
-      <li>
-        The <strong>AUTO FILL IN</strong> dial plays the fill-in by itself every 2, 4, 8, 12 or 16 measures.
-      </li>
-    </ul>
-
-    <h2>Rhythm tracks</h2>
+    <h2>The effect</h2>
     <p>
-      A rhythm track is a recording of which rhythm played in each measure. There are twelve, and in the two
-      track modes the instrument selector chooses one of them.
-    </p>
-    <ol>
-      <li>Turn the mode selector to <strong>COMPOSE</strong> and the instrument selector to a track.</li>
-      <li>Press <strong>CLEAR</strong> to empty it.</li>
-      <li>
-        Press START/STOP and play as you would by hand, choosing rhythms and tapping in fill-ins. Every measure
-        is remembered.
-      </li>
-      <li>Press START/STOP in the measure that should be the last.</li>
-      <li>Turn the mode selector to <strong>PLAY</strong> and press START/STOP to hear it. It starts over at the end.</li>
-    </ol>
-    <p>
-      A track remembers rhythms, not versions, so the variation levers still work while it plays. A track holds
-      64 measures and runs on into the next one when it is full. To change a track without starting again,
-      compose over it without pressing CLEAR: it plays back, and the rhythm you choose replaces what was there
-      from that measure on.
+      There is one effect on the whole machine. Press the <strong>ЭФФЕКТ</strong> selector to step to the next
+      of four: <strong>ДИЛЭЙ</strong> is an echo, <strong>РЕВЕРБ</strong> a reverb, <strong>ФЛЭНЖЕР</strong> a
+      flanger and <strong>ХОР</strong> a chorus. The <strong>СМЕСЬ</strong> knob sets how much of it you hear.
+      At 0 there is none.
     </p>
 
     <h2>Keeping what you make</h2>
     <p>
       Everything is saved in this browser as you go. The cog in the footer opens settings, where you can name
-      your beat, undo and redo, put the starter rhythms back, clear one rhythm or everything, and import or
+      your beat, undo and redo, put the starter patterns back, clear one pattern or everything, and import or
       export. With a free account you can also save up to 20 beats to it from the account button in the footer,
       and load them on another device.
     </p>
     <ul>
       <li><strong>Project file</strong> holds everything the machine remembers, and opens here again.</li>
       <li>
-        <strong>WAV and MIDI</strong> hold the rhythm the panel is on, as a loop: one measure, or A then B with
-        its lever on AB. With the mode selector on PLAY or COMPOSE they hold the rhythm track instead.
+        <strong>WAV and MIDI</strong> hold the pattern you are on, as a loop of one measure. The WAV has the
+        effect in it.
       </li>
     </ul>
 
     <h2>What comes with it</h2>
+    <p>A new machine has a beat on А and a busier turn of it on Б. В and Г are empty.</p>
+
+    <h2>Beats from the earlier machine</h2>
     <p>
-      A new machine has Basic Rhythms 1 to 8 written, Basic Rhythm 12 with every sound at once for setting
-      levels, the four Intro/Fill-ins, and a rhythm track in track 1. Basic Rhythms 9 to 11 are empty.
+      boombapbot used to be a different machine. A beat made on it opens here as a РИТМ-12 beat, whether it is
+      the draft in this browser, a project file or a beat saved to your account. The rhythm that machine was on
+      becomes pattern А, and a notice lists what did not fit.
+    </p>
+    <p>
+      Nothing old is written over. The earlier draft stays in this browser, and a beat in your account stays as
+      it was: saving the one that opened here adds a new beat beside it.
+    </p>
+
+    <h2>On a phone</h2>
+    <p>
+      The picture is wider than the screen, so scroll it sideways, or press <strong>Fit to screen</strong> under
+      it to see the whole machine at once. A strip under the picture chooses the instrument, and a play button
+      stays docked at the bottom.
     </p>
 
     <h2>Keyboard</h2>
@@ -165,19 +158,19 @@ const base = import.meta.env.BASE_URL;
       <dt><kbd>Space</kbd></dt>
       <dd>Start or stop.</dd>
       <dt>Arrow keys</dt>
-      <dd>Move between step buttons, and turn the knob or switch that has focus.</dd>
+      <dd>Move between step keys, and turn the knob that has focus.</dd>
       <dt><kbd>Enter</kbd></dt>
-      <dd>Press the button that has focus.</dd>
+      <dd>Press the key that has focus.</dd>
       <dt><kbd>Esc</kbd></dt>
-      <dd>Let CLEAR up, or close a window.</dd>
+      <dd>Close a window.</dd>
       <dt><kbd>Ctrl</kbd> or <kbd>Cmd</kbd> + <kbd>Z</kbd></dt>
       <dd>Undo. Add <kbd>Shift</kbd> to redo.</dd>
     </dl>
 
     <h2>The power switch</h2>
     <p>
-      It turns the machine off: the lamps go dark, it stops, and nothing else on it answers until you switch it
-      back on. Nothing it remembers is lost.
+      <strong>СЕТЬ</strong> turns the machine off: it goes dark, it stops, and nothing else on it answers until
+      you switch it back on. Nothing it remembers is lost.
     </p>
   </SitePage>
 </Base>

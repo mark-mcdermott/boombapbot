@@ -18,22 +18,20 @@ const base = import.meta.env.BASE_URL;
 
     <h2>What it is</h2>
     <p>
-      The page is one machine, the 808: sixteen sounds, sixteen step buttons, and the knobs and switches that
-      shape them. It works the way the original's operation manual describes. You pick an instrument, press the
-      steps it should play, and the machine remembers thirty-two patterns that you can play by hand or string
-      into a track.
+      The page is one machine, РИТМ-12. I made it up: a rhythm computer from a factory that never existed,
+      lettered in Russian. It has eight instruments, sixteen step keys, four patterns and one effect. You pick
+      an instrument, press the steps it should play, and press play.
     </p>
     <p>
-      The <a href={`${base}docs`}>docs</a> go through every control. Or just open <a href={base}>the machine</a>
-      and press start.
+      The <a href={`${base}docs`}>docs</a> go through every control and say what the lettering means. Or just
+      open <a href={base}>the machine</a> and press play.
     </p>
 
     <h2>How it is made</h2>
     <ul>
       <li>
-        <strong>The sounds are synthesised.</strong> Each one is built from its knob settings as you turn them,
-        the way the circuits did it. Nothing is a recording. I tuned it by ear and haven't compared it with a
-        real machine, so treat it as a tribute, not a copy.
+        <strong>The sounds are synthesised.</strong> Each one is built from its knob settings as you turn them.
+        Nothing is a recording, and none of them copies a real machine. I made them by ear.
       </li>
       <li>
         <strong>One engine keeps the time.</strong> The sequencer and the sounds are a single program that runs
@@ -41,28 +39,32 @@ const base = import.meta.env.BASE_URL;
         else the page is doing.
       </li>
       <li>
-        <strong>The faceplate is drawn.</strong> It is original artwork, generated from the same layout the
-        controls use. It is not a photograph.
+        <strong>The panel is a picture.</strong> It is my own artwork, and every key, knob and switch in it is
+        live. The screen and the meter are drawn by the page while it plays.
       </li>
     </ul>
 
     <h2>What it keeps, and where</h2>
     <p>
-      Your rhythms, tracks and knob positions are saved in this browser every time you change something, and
-      they are there when you come back. They are not sent anywhere unless you save a beat to an account. To keep
-      a copy or move to another device, export the project file from settings, or save the beat to a free account
-      and load it there; you can also export audio and MIDI.
+      Your patterns and knob positions are saved in this browser every time you change something, and they are
+      there when you come back. They are not sent anywhere unless you save a beat to an account. To keep a copy
+      or move to another device, export the project file from settings, or save the beat to a free account and
+      load it there; you can also export audio and MIDI.
     </p>
     <p>
       The site loads its own files and nothing else. There are no analytics and no ads. Making an account is
       optional, and logging in sets the site's one cookie.
     </p>
 
-    <h2>What is not here yet</h2>
+    <h2>What came before</h2>
     <p>
-      I haven't built the other three machines in the header yet. Same for upgrades, which is why that button
-      in the footer only says so for now.
+      boombapbot started out as a different machine. If you made a beat on it, it opens here as a РИТМ-12 beat,
+      and the page lists what did not come across: that machine had more instruments and more rhythms than this
+      one has room for. A beat you saved to an account back then is still there as it was.
     </p>
+
+    <h2>What is not here yet</h2>
+    <p>Upgrades. That button in the footer only says so for now.</p>
 
     <h2>Who made it</h2>
     <p>
@@ -71,8 +73,8 @@ const base = import.meta.env.BASE_URL;
       build it in my spare time, on a little too much coffee and a little too much stress.
     </p>
     <p>
-      It's an independent project, and it isn't affiliated with or endorsed by the makers of the machines it's
-      modelled on. The <a href={`${base}policies`}>policies</a> page has the rest. If something's broken, or you
+      It's an independent project. РИТМ-12 and the maker's name on its panel are invented, and it copies no
+      real machine. The <a href={`${base}policies`}>policies</a> page has the rest. If something's broken, or you
       just want to say hi, I'm at
       <a href="https://mm.coffee" target="_blank" rel="noreferrer noopener">mm.coffee</a>.
     </p>
