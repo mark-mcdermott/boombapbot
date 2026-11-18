@@ -21,6 +21,8 @@ export interface AssetManifest {
   engine: { worklet: string; wasm: string };
   /** The faceplate image in this build, if it has one. */
   faceplate: string | null;
+  /** Where the machine's panel art is served from, ending in a slash, if it has any. */
+  art?: string;
 }
 
 export interface RuntimeOptions<

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import {
   BASIC_RHYTHMS,
   KNOB_PARAM_LABELS,
@@ -24,7 +24,7 @@ import {
   type PanelSwitch,
 } from '../document';
 import { trackLabel } from '../engine';
-import { Segmented, type AssetManifest } from '@boombapbot/editor';
+import { Segmented, useAssetManifest, useKnob } from '@boombapbot/editor';
 import { editTarget } from '../session';
 import { useEditorState, useRuntime } from './context';
 import {
@@ -42,24 +42,6 @@ import {
   taps,
 } from './PanelControls';
 import { DialHandle, KnobFace, PassiveKnob, box, circle, knobLighting } from './panelGeometry';
-
-function useAssetManifest(): AssetManifest | null {
-  const runtime = useRuntime();
-  const [manifest, setManifest] = useState<AssetManifest | null>(null);
-  useEffect(() => {
-    let live = true;
-    runtime
-      .loadManifest()
-      .then((loaded) => {
-        if (live) setManifest(loaded);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [runtime]);
-  return manifest;
-}
 
 interface KnobProps {
   panel: PanelManifest;
@@ -80,62 +62,18 @@ interface KnobProps {
 
 /** A knob on the faceplate: drag up and down, or use the arrow keys. */
 function Knob(props: KnobProps) {
-  const { panel, photo, geometry, value, min, max, step, onChange } = props;
-  const drag = useRef<{ y: number; value: number } | null>(null);
+  const { panel, photo, geometry, value, min, max } = props;
+  const knob = useKnob(props);
   const turn = (value - min) / (max - min);
   const deg = geometry.minDeg + turn * (geometry.maxDeg - geometry.minDeg);
-  const set = (next: number) => onChange(Math.min(max, Math.max(min, next)));
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const steps: Record<string, number> = {
-      ArrowUp: step,
-      ArrowRight: step,
-      ArrowDown: -step,
-      ArrowLeft: -step,
-      PageUp: step * 10,
-      PageDown: -step * 10,
-    };
-    const change = steps[event.key];
-    if (change !== undefined) {
-      event.preventDefault();
-      set(value + change);
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      set(min);
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      set(max);
-    }
-  };
 
   return (
     <div
       className="sb-panel-knob"
       style={circle(panel, geometry.cx, geometry.cy, geometry.r)}
-      role="slider"
-      tabIndex={0}
       data-testid={props.testId}
       data-lighting={knobLighting(panel, photo)}
-      aria-label={props.label}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={value}
-      aria-valuetext={props.valueText}
-      onKeyDown={onKeyDown}
-      onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
-        drag.current = { y: event.clientY, value };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        if (!drag.current) return;
-        set(drag.current.value + (drag.current.y - event.clientY) * props.perPixel);
-      }}
-      onPointerUp={() => {
-        drag.current = null;
-      }}
-      onPointerCancel={() => {
-        drag.current = null;
-      }}
+      {...knob}
     >
       <KnobFace
         panel={panel}

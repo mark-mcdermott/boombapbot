@@ -1,5 +1,5 @@
-import { createContext, useContext, useRef, useSyncExternalStore } from 'react';
-import type { EditorRuntime } from '../runtime';
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { AssetManifest, EditorRuntime } from '../runtime';
 import type { EditorState } from '../state/store';
 
 export const RuntimeContext = createContext<EditorRuntime | null>(null);
@@ -24,4 +24,23 @@ export function useEditorState<T>(selector: (state: EditorState) => T, same?: (a
     return value;
   };
   return useSyncExternalStore(store.subscribe, read, read);
+}
+
+/** What the build put where the site serves it, once it has been fetched. Null until then, and if it cannot be. */
+export function useAssetManifest(): AssetManifest | null {
+  const runtime = useRuntime();
+  const [manifest, setManifest] = useState<AssetManifest | null>(null);
+  useEffect(() => {
+    let live = true;
+    runtime
+      .loadManifest()
+      .then((loaded) => {
+        if (live) setManifest(loaded);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [runtime]);
+  return manifest;
 }
