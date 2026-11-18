@@ -608,15 +608,6 @@
   transform: rotate(60deg);
 }
 
-/* Manifesto: the fist goes up. */
-.sb-ico-manifesto svg {
-  transition-timing-function: var(--ease-spring);
-}
-
-.sb-ico-manifesto:is(:hover, :focus-visible) svg {
-  transform: translateY(-3px) rotate(-10deg);
-}
-
 /* Cart: it rolls off on its back wheel. */
 .sb-ico-cart svg {
   transform-origin: 33% 83%;
@@ -662,12 +653,12 @@
   }
 }
 
-/* Credits: the lines roll up and off, the way credits do. */
-.sb-ico-credits:is(:hover, :focus-visible) svg :is(:nth-child(1), :nth-child(2)) {
+/* Manifesto: the lines on the scroll roll up and off, as a scroll is read. */
+.sb-ico-manifesto:is(:hover, :focus-visible) svg :is(:nth-child(1), :nth-child(2)) {
   animation: sb-ico-roll 700ms ease-in-out;
 }
 
-.sb-ico-credits:is(:hover, :focus-visible) svg :nth-child(1) {
+.sb-ico-manifesto:is(:hover, :focus-visible) svg :nth-child(1) {
   animation-delay: 90ms;
 }
 
@@ -1914,7 +1905,7 @@ select.sb-input {
     flex-direction: column;
   }
 
-  /* Nine icons do not fit one row of a phone at a size a thumb can hit, so
+  /* Eight icons do not fit one row of a phone at a size a thumb can hit, so
      the pages take a row of their own above the credit and the buttons. */
   .sb-footer-pages {
     order: -1;
