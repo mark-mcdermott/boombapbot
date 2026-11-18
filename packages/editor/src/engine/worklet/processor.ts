@@ -19,6 +19,8 @@ declare class AudioWorkletProcessor {
 
 const MAX_QUANTUM = 2048;
 const STATS_SECONDS = 0.1;
+/** A meter is drawn about this often. */
+const LEVEL_SECONDS = 1 / 30;
 
 class BoombapbotProcessor extends AudioWorkletProcessor {
   private engine: WasmEngine | null = null;
@@ -29,6 +31,8 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
   private peak = 0;
   private peakEver = 0;
   private framesSinceStats = 0;
+  private framesSinceLevel = 0;
+  private lastLevel = 0;
   private readonly scratch = new Float32Array(MAX_QUANTUM);
 
   constructor(options: { processorOptions: ProcessorOptions }) {
@@ -71,6 +75,12 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
           break;
         case 'panel':
           engine.setPanel(command.panel);
+          break;
+        case 'cue':
+          engine.cuePattern(command.pattern);
+          break;
+        case 'effect':
+          engine.setEffect(command.effect);
           break;
         case 'fill':
           engine.armFill(command.armed);
@@ -128,6 +138,16 @@ class BoombapbotProcessor extends AudioWorkletProcessor {
       this.lastPattern = pattern;
       this.lastPlaying = playing;
       this.report({ type: 'position', step, pattern, playing });
+    }
+
+    this.framesSinceLevel += frames;
+    if (this.framesSinceLevel >= sampleRate * LEVEL_SECONDS) {
+      this.framesSinceLevel = 0;
+      const level = engine.outputLevel;
+      if (level !== this.lastLevel) {
+        this.lastLevel = level;
+        this.report({ type: 'level', level });
+      }
     }
 
     this.framesSinceStats += frames;

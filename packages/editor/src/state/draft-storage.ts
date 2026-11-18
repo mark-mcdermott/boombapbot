@@ -23,7 +23,8 @@ export type DraftLoad<Document extends ProjectBase> =
 
 /**
  * Reads the saved draft, falling back to one left by an earlier version. An
- * invalid draft is set aside, not deleted.
+ * invalid draft is set aside, not deleted; one from an earlier version stays
+ * where it is.
  */
 export function loadDraft<Document extends ProjectBase>(
   storage: KeyValueStorage,
@@ -45,11 +46,14 @@ export function loadDraft<Document extends ProjectBase>(
   const result = codec.parseText(text);
   if (result.ok) return { status: 'restored', project: result.project, changes: result.changes };
 
-  try {
-    storage.setItem(UNREADABLE_DRAFT_KEY, text);
-    storage.removeItem(key);
-  } catch {
-    // Keeping the unreadable copy is best effort.
+  // A draft kept where an earlier version left it is never moved or removed.
+  if (key === kind.draftKey) {
+    try {
+      storage.setItem(UNREADABLE_DRAFT_KEY, text);
+      storage.removeItem(key);
+    } catch {
+      // Keeping the unreadable copy is best effort.
+    }
   }
   return { status: 'unreadable', errors: result.errors };
 }

@@ -81,10 +81,27 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   The engine's test suites and render tool are still written against the
   808's project and track table, so the 808's `engine/CMakeLists.txt` builds
   them (`boombapbot-render-808 --project FILE --machine packages/machine-808`).
-- `packages/machine-ritm12/` is РИТМ-12. So far it is its eight voices
-  (`engine/voices.cpp`: pitch, tone and decay; their place in the table is
-  their sound number, never reorder) and their tests. What voices are built
-  from is shared in `engine/include/boombapbot/dsp.h`.
+- `packages/machine-ritm12/` is РИТМ-12, everything but its panel so far.
+  Its eight voices are `engine/voices.cpp` (pitch, tone and decay; their
+  place in the table is their sound number, never reorder); what voices are
+  built from is shared in `engine/include/boombapbot/dsp.h`. Its project
+  document is `src/document/` (schema version 3, `machine: 'ritm12'`: a tempo
+  in beats a minute, four patterns of eight sixteen-step rows and an accent
+  row, the mix, the voices' knobs, the effect and where the panel stands),
+  with the voice table in `data/ritm12.machine.json`. `src/engine.ts` turns
+  a project into an `EngineSetup` that cues the pattern the panel is on, and
+  `src/session.ts` is what its controls do, recording by tapping included.
+- `src/document/legacy.ts` in that package is the only thing that reads the
+  beats of the machine before it (schema versions 1 and 2). It turns one
+  into a РИТМ-12 beat and lists what was lost; it never writes those
+  formats. It must stay self-contained: it may not import the 808's package.
+  A machine's draft has its own storage key, and a draft found under an
+  earlier key is read and left exactly where it was.
+- A setup follows either what a panel's switches ask for (`follow.panel`,
+  the 808) or one pattern round and round (`follow.cue`). A render plan is a
+  song of rhythms (`SongPlan`) or one cued pattern (`PatternPlan`). The
+  worklet takes `cue` and `effect` and reports `level` while it changes;
+  `EditorRuntime.outputLevel()` is what a meter reads as it draws.
 - Swing is a byte of the pattern (`SnarePattern.swing`, 0 to
   `SNARE_SWING_MAX`): every second step of a measure of four or eight steps
   to the beat plays late by `swing / 256` of a step, in the engine and in a

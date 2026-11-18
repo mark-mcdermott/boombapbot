@@ -1,0 +1,15 @@
+{
+  "format": "boombapbot.machine",
+  "schemaVersion": 1,
+  "id": "ritm12",
+  "voices": [
+    { "id": "kick", "label": "БАС", "name": "Kick", "gmNote": 36, "trim": 0.9, "pan": 0, "chokeGroup": 0 },
+    { "id": "snare", "label": "МАЛЫЙ", "name": "Snare", "gmNote": 38, "trim": 0.75, "pan": 0, "chokeGroup": 0 },
+    { "id": "clap", "label": "ХЛОП", "name": "Clap", "gmNote": 39, "trim": 0.7, "pan": 0, "chokeGroup": 0 },
+    { "id": "closed_hat", "label": "ХЭТ З", "name": "Closed hat", "gmNote": 42, "trim": 0.4, "pan": 0.2, "chokeGroup": 1 },
+    { "id": "open_hat", "label": "ХЭТ О", "name": "Open hat", "gmNote": 46, "trim": 0.4, "pan": 0.2, "chokeGroup": 1 },
+    { "id": "tom", "label": "ТОМ", "name": "Tom", "gmNote": 45, "trim": 0.7, "pan": -0.2, "chokeGroup": 0 },
+    { "id": "rim", "label": "РИМ", "name": "Rim", "gmNote": 37, "trim": 0.6, "pan": 0.15, "chokeGroup": 0 },
+    { "id": "perc", "label": "ПЕРК", "name": "Perc", "gmNote": 56, "trim": 0.55, "pan": -0.15, "chokeGroup": 0 }
+  ]
+}

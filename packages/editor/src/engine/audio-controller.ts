@@ -4,7 +4,7 @@ import {
   type EngineReport,
   type ProcessorOptions,
 } from './messages';
-import type { EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
+import type { EngineEffect, EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
 
 export type AudioState = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
 
@@ -26,6 +26,8 @@ export interface AudioControllerEvents {
   onEnded(): void;
   /** The worklet has taken the sound last sent for this slot. */
   onSound(slot: number): void;
+  /** How loud the output is now, from 0. */
+  onLevel(level: number): void;
 }
 
 export interface EngineAssets {
@@ -155,6 +157,9 @@ export class AudioController {
       case 'sound':
         this.events.onSound(report.slot);
         break;
+      case 'level':
+        this.events.onLevel(report.level);
+        break;
       case 'error':
         this.setState('error', report.message);
         break;
@@ -191,6 +196,15 @@ export class AudioController {
   /** What the panel asks the engine to play. A change is read at the next bar line. */
   setPanel(panel: EnginePanel): void {
     this.post({ type: 'panel', panel });
+  }
+
+  /** One pattern of the bank, round and round. A change is read at the next bar line. */
+  cue(pattern: number): void {
+    this.post({ type: 'cue', pattern });
+  }
+
+  setEffect(effect: EngineEffect): void {
+    this.post({ type: 'effect', effect });
   }
 
   /** The rhythm of each measure of a rhythm track. Empty goes back to what the panel asks for. */
