@@ -111,6 +111,50 @@ test.describe('the page around the machine', () => {
     expect(lastTool.x + lastTool.width).toBeGreaterThanOrEqual(footer.x + footer.width);
   });
 
+  test('on a phone the brand is the mascot and the wordmark, and the footer is words', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openEditor(page);
+    const view = 375;
+    const gutter = (await page.locator('.sb-header').boundingBox())!.x;
+
+    // The mascot on the left, the wordmark against the right edge, about as tall as each other, and no tagline.
+    const mascot = (await page.getByTestId('brand-mascot').boundingBox())!;
+    const mark = (await page.locator('.sb-wordmark').boundingBox())!;
+    expect(mascot.x).toBeCloseTo(gutter, 0);
+    expect(mark.x + mark.width).toBeCloseTo(view - gutter, 0);
+    expect(Math.abs(mascot.height - mark.height)).toBeLessThan(1);
+    await expect(page.getByTestId('tagline')).toBeHidden();
+
+    // One row of names across the page, the pages and then the buttons, with no icon among them.
+    const names = ['About', 'Docs', 'Manifesto', 'Policies', 'Upgrade', 'Cart', 'Settings', 'Account'];
+    const words = page.locator('.sb-footer-word');
+    await expect(words).toHaveText(names);
+    await expect(page.locator('.sb-footer-icon svg:visible')).toHaveCount(0);
+    const boxes = await page.locator('.sb-footer-icon').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON() as DOMRect));
+    for (const [index, box] of boxes.entries()) {
+      expect(box.top).toBeCloseTo(boxes[0]!.top, 0);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      if (index > 0) expect(box.left).toBeGreaterThanOrEqual(boxes[index - 1]!.right + 2);
+    }
+    expect(boxes[0]!.left).toBeCloseTo(gutter, 0);
+    expect(boxes.at(-1)!.right).toBeCloseTo(view - gutter, 0);
+
+    // Under it the credit, on the right, as "by" and the link alone.
+    const made = page.getByTestId('made-by');
+    await expect(page.locator('.sb-made-with')).toBeHidden();
+    expect((await made.innerText()).trim().replace(/\s+/g, ' ')).toBe('by mm.coffee');
+    const credit = (await made.boundingBox())!;
+    expect(credit.y).toBeGreaterThanOrEqual(boxes[0]!.bottom - 1);
+    expect(credit.x + credit.width).toBeCloseTo(view - gutter, 0);
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.getByTestId('cookie-notice-ok').click();
+    expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+    // A name opens what its icon opens.
+    await page.getByTestId('account').click();
+    await expect(page.getByTestId('account-modal')).toBeVisible();
+  });
+
   test('pointing at a footer icon shows its name over it', async ({ page }) => {
     await openEditor(page);
     const tip = page.getByTestId('tip');

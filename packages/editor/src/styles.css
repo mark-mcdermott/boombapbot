@@ -530,6 +530,13 @@
   padding-right: 14px;
 }
 
+/* "built with" and its heart, which a phone leaves out. */
+.sb-made-with {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* The mascot's orange. */
 .sb-heart {
   width: 15px;
@@ -554,6 +561,17 @@
 
 /* Two groups of icons side by side: the links to pages, then the buttons.
    The last icon's drawing lines up with the edge of the page. */
+.sb-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* An icon's name in words. Only a phone shows it, in place of the icon. */
+.sb-footer-word {
+  display: none;
+}
+
 .sb-footer-icons {
   display: flex;
   align-items: center;
@@ -1948,21 +1966,115 @@ select.sb-input {
     flex-direction: column;
   }
 
-  /* Eight icons do not fit one row of a phone at a size a thumb can hit, so
-     the pages take a row of their own above the credit and the buttons. */
-  .sb-footer-pages {
+  /* The brand on a phone: the mascot a quarter larger and the wordmark a
+     tenth smaller than the lockup makes them, with no tagline, the mascot on
+     the left and the wordmark against the right edge. The compact masthead
+     of a page of words is its own arrangement and is left as it is. */
+  .sb-header:not(.sb-masthead) .sb-brand-link {
+    flex: 1;
+  }
+
+  .sb-header:not(.sb-masthead) .sb-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sb-header:not(.sb-masthead) .sb-mascot {
+    height: calc(var(--wordmark-height) * 0.714 * 1.25);
+  }
+
+  .sb-header:not(.sb-masthead) .sb-wordmark {
+    height: calc(var(--wordmark-height) * 0.9);
+  }
+
+  .sb-header:not(.sb-masthead) .sb-tagline {
+    display: none;
+  }
+
+  /* The footer on a phone. There is no pointing at an icon to learn its
+     name, so each is its name in words: one row of them across the page,
+     the pages and then the buttons, and the credit under it on the right. */
+  .sb-footer {
+    gap: 0;
+  }
+
+  /* The words keep at least a sliver between them, the two groups a little
+     more where there is room, and on a screen too narrow for one row the
+     buttons go under the pages. */
+  .sb-footer-links {
+    --word-gap: clamp(3px, 1.7vw, 12px);
     order: -1;
-    width: calc(100% + 10px);
-    margin-right: -10px;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 var(--word-gap);
+  }
+
+  .sb-footer-icons {
+    gap: var(--word-gap);
+  }
+
+  .sb-footer-tools {
+    margin-right: 0;
+  }
+
+  /* The editor sets every button's type; these, links and buttons alike, keep one. */
+  .sb-app .sb-footer-icon {
+    display: inline-flex;
+    align-items: center;
+    width: auto;
+    border-radius: 6px;
+    font-family: var(--font-plate);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .sb-footer-icon svg {
+    display: none;
+  }
+
+  .sb-footer-word {
+    display: inline;
+  }
+
+  .sb-footer-icon:hover,
+  .sb-footer-icon[data-popup-open],
+  .sb-footer-icon[aria-current='page'] {
+    background: none;
+  }
+
+  .sb-footer-icon[aria-current='page'] {
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 5px;
+  }
+
+  /* What rode on an icon's corner follows its name instead. */
+  .sb-footer-badge,
+  .sb-footer-icon.sb-signed-in::after {
+    position: static;
+    margin-left: 4px;
+    box-shadow: none;
+  }
+
+  .sb-footer-badge {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 16px;
   }
 
   .sb-made {
+    margin: 0 0 0 auto;
     padding-right: 0;
   }
 
-  /* Touching, so the credit and four buttons share a row on a 375px phone. */
-  .sb-footer-icons {
-    gap: 0;
+  .sb-made-with {
+    display: none;
   }
 }
 
