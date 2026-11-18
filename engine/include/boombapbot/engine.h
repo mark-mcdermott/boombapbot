@@ -29,7 +29,7 @@
 extern "C" {
 #endif
 
-#define SNARE_ABI_VERSION 2
+#define SNARE_ABI_VERSION 3
 /* Sound slots. A slot's number is also its sound number and role index. */
 #define SNARE_SOUNDS 16
 /* Rows of a pattern: track 0 is the accent, 1 to 11 are instruments. */
@@ -47,6 +47,14 @@ extern "C" {
 /* The timeline counts in ticks. Every step length is a whole number of them. */
 #define SNARE_TICKS_PER_BEAT 24
 #define SNARE_MIDI_PPQ 480
+#define SNARE_SWING_MAX 128
+
+/* The one effect on the mix. */
+#define SNARE_EFFECT_NONE 0
+#define SNARE_EFFECT_DELAY 1
+#define SNARE_EFFECT_REVERB 2
+#define SNARE_EFFECT_FLANGER 3
+#define SNARE_EFFECT_CHORUS 4
 #define SNARE_BPM_MIN 40.0
 #define SNARE_BPM_MAX 300.0
 
@@ -61,13 +69,16 @@ typedef struct SnareEngine SnareEngine;
 typedef struct SnareSound SnareSound;
 
 /* One measure. Bit n of rows[t] is step n of track t. The 1st part plays its
- * len1 steps, then the 2nd part its len2 steps (step 16 onwards). */
+ * len1 steps, then the 2nd part its len2 steps (step 16 onwards). With swing,
+ * every second step plays late by swing/256 of a step, so SNARE_SWING_MAX
+ * puts it three quarters of the way through its pair. Only measures of four
+ * or eight steps to the beat swing; triplets already do. */
 typedef struct SnarePattern {
   uint32_t rows[SNARE_TRACKS];
   uint8_t len1;           /* 1..16 */
   uint8_t len2;           /* 0..16 */
   uint8_t steps_per_beat; /* 3, 4, 6 or 8 */
-  uint8_t reserved;
+  uint8_t swing;          /* 0..SNARE_SWING_MAX */
 } SnarePattern;
 
 /* A scheduled or auditioned hit, as recorded by the optional event log. */
@@ -205,6 +216,13 @@ int32_t snare_engine_set_accent(SnareEngine* engine, double plain_gain,
 /* Output volume from 0 to 1, applied after the limiter. The first setting
  * applies at once; later changes are smoothed. */
 int32_t snare_engine_set_master_volume(SnareEngine* engine, double volume);
+/* The effect added to the mix ahead of the limiter, and how much of it, from
+ * 0 to 1. SNARE_EFFECT_NONE is the dry mix alone, and costs nothing. A change
+ * of effect fades the old one out before the new one begins. The echo keeps
+ * time with the tempo. */
+int32_t snare_engine_set_effect(SnareEngine* engine, int32_t effect, double wet);
+/* How long an effect rings on after its last hit, in seconds. */
+double snare_effect_tail_seconds(int32_t effect, double bpm);
 
 /* ---- Queued control messages: the pattern bank --------------------------- */
 
@@ -270,6 +288,9 @@ double snare_engine_frames_rendered(const SnareEngine* engine);
 double snare_engine_stop_frame(const SnareEngine* engine);
 int32_t snare_engine_active_voices(const SnareEngine* engine);
 uint32_t snare_engine_stolen_voices(const SnareEngine* engine);
+/* How loud the output is now, for a meter: its root mean square over about
+ * a third of a second, from 0. Updated at the end of each render. */
+double snare_engine_output_level(const SnareEngine* engine);
 
 /* ---- Event log, for tests and alignment checks (control thread) ---------- */
 

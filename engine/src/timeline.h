@@ -6,6 +6,7 @@
 // to the beat. Positions are integers; only the conversion to frames rounds.
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
@@ -30,6 +31,13 @@ inline int stepTicks(int stepsPerBeat) {
     default:
       return 0;
   }
+}
+
+// How late a step plays, in ticks: every second step of a measure of four or
+// eight steps to the beat, by swing/256 of a step.
+inline double swingTicks(int played, int ticksPerStep, int stepsPerBeat, int swing) {
+  if (swing <= 0 || (played & 1) == 0 || (stepsPerBeat != 4 && stepsPerBeat != 8)) return 0.0;
+  return static_cast<double>(ticksPerStep) * std::min(swing, SNARE_SWING_MAX) / 256.0;
 }
 
 inline bool validShape(int len1, int len2, int stepsPerBeat) {

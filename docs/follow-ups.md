@@ -109,8 +109,8 @@ upgrade still opens a modal that says it is not open.
   Paid features are the stranger effects (delay, compression and the like),
   perhaps a place to show beats, and AI add-ons that are not defined yet;
   ordinary effects (distortion, a flanger and the like) stay free. None of it
-  exists. The engine has no effects at all yet, and the exact split is still
-  loose.
+  exists. The engine now has an echo, a reverb, a flanger and a chorus, made
+  for РИТМ-12 and tuned by ear by nobody yet; which are paid is still loose.
 - **The shop** has been open on the live site since 2026-11-16. The catalog
   holds the two products in the Printful store, a hoodie and a sticker, and
   ships wherever Printful does, at Printful's live rate for the address.

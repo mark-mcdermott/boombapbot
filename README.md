@@ -135,7 +135,7 @@ pnpm serve
 - **One engine everywhere.** A C++20 drum machine core (`engine/`) with a C
   ABI: a bank of 32 one-measure patterns of up to 32 steps at three, four,
   six or eight steps to the beat, a sequencer that picks the pattern for each
-  measure, a fixed pool of voices with deterministic stealing, and step times
+  measure, swing by pattern, one effect on the mix, a fixed pool of voices with deterministic stealing, and step times
   computed from the audio sample clock on a 24-ticks-per-beat timeline. The browser runs its WebAssembly build inside
   an AudioWorklet; export uses a second instance of the same engine. There is
   no separate JavaScript engine.

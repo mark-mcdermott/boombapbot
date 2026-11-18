@@ -28,29 +28,48 @@ export function measureSeconds(wasm: SnareWasm, setup: EngineSetup, plan: Render
   );
 }
 
+/** The most passes a loop is played to let an effect's tail settle. */
+const MAX_LOOP_PASSES = 8;
+
+/**
+ * How many times a loop is played before its last pass is kept: twice with
+ * nothing ringing on, and once more for every loop length an effect's tail
+ * lasts, up to a limit.
+ */
+export function loopPasses(tailSeconds: number, loopSeconds: number): number {
+  return Math.min(MAX_LOOP_PASSES, 1 + Math.max(1, Math.ceil(tailSeconds / loopSeconds)));
+}
+
 /**
  * Renders measures of a setup with a separate engine instance, using the
  * same sequencer, scheduler and voices as live playback.
  *
- * A loop is played twice and the second pass is returned, so tails from its
- * end wrap into its start. Anything else is played once from silence and
- * given time to ring out.
+ * A loop is played at least twice and its last pass is returned, so tails
+ * from its end wrap into its start; with an effect on, it is played often
+ * enough for the effect's tail to have settled. Anything else is played once
+ * from silence and given time to ring out, the effect's tail included.
  */
 export function renderSong(wasm: SnareWasm, setup: EngineSetup, plan: RenderPlan, sampleRate: number): LoopRender {
   const blockSize = 1024;
   const engine = wasm.createEngine(sampleRate, blockSize);
   try {
-    const passes = plan.loop ? 2 : 1;
-    const song = plan.loop ? [...plan.rhythms, ...plan.rhythms] : plan.rhythms;
+    const ticks = planPatterns(wasm, plan).reduce((sum, pattern) => sum + wasm.patternTicks(setup.patterns[pattern]!), 0);
+    const tail = setup.effect ? wasm.effectTailSeconds(setup.effect.kind, setup.tempo) : 0;
+    const loopSeconds = wasm.tickFrame(ticks, setup.tempo, TIMING_RATE) / TIMING_RATE;
+    const passes = plan.loop ? loopPasses(tail, loopSeconds) : 1;
+    const song = Array.from({ length: passes }, () => plan.rhythms).flat();
     engine.enableEventLog(song.length * setup.tracks.length * STEPS_PER_MEASURE);
     applySetup(engine, setup);
     engine.setPanel(plan.panel);
     engine.setSong(song, false);
     engine.play();
 
-    const ticks = planPatterns(wasm, plan).reduce((sum, pattern) => sum + wasm.patternTicks(setup.patterns[pattern]!), 0);
-    const start = plan.loop ? wasm.tickFrame(ticks, setup.tempo, sampleRate) : 0;
-    const end = wasm.tickFrame(ticks * passes, setup.tempo, sampleRate) + (plan.loop ? 0 : Math.round(TAIL_SECONDS * sampleRate));
+    // A loop is as long whichever pass of it is kept, so an effect cannot change its length.
+    const loopFrames = wasm.tickFrame(ticks * 2, setup.tempo, sampleRate) - wasm.tickFrame(ticks, setup.tempo, sampleRate);
+    const start = plan.loop ? wasm.tickFrame(ticks * (passes - 1), setup.tempo, sampleRate) : 0;
+    const end = plan.loop
+      ? start + loopFrames
+      : wasm.tickFrame(ticks, setup.tempo, sampleRate) + Math.round(Math.max(TAIL_SECONDS, tail) * sampleRate);
     const left = new Float32Array(end - start);
     const right = new Float32Array(end - start);
     const blockLeft = new Float32Array(blockSize);
@@ -69,7 +88,7 @@ export function renderSong(wasm: SnareWasm, setup: EngineSetup, plan: RenderPlan
 
     const events = engine
       .readEvents()
-      .filter((event) => event.frame >= start)
+      .filter((event) => event.frame >= start && event.frame < end)
       .map((event) => ({ ...event, frame: event.frame - start }));
     return { left, right, sampleRate, events };
   } finally {

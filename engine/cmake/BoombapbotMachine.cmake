@@ -24,7 +24,7 @@ set(SNARE_WASM_EXPORTS
   snare_sound_create snare_sound_data snare_sound_destroy
   snare_engine_create snare_engine_destroy snare_engine_set_sound snare_engine_synth_sound snare_engine_collect
   snare_engine_set_tempo snare_engine_set_track snare_engine_set_track_level snare_engine_set_accent
-  snare_engine_set_master_volume
+  snare_engine_set_master_volume snare_engine_set_effect snare_effect_tail_seconds
   snare_engine_set_pattern snare_engine_set_step
   snare_engine_cue_pattern snare_engine_set_panel snare_engine_arm_fill
   snare_engine_set_song snare_song_patterns
@@ -32,7 +32,7 @@ set(SNARE_WASM_EXPORTS
   snare_engine_render
   snare_engine_is_playing snare_engine_current_step snare_engine_current_pattern snare_engine_current_measure
   snare_engine_frames_rendered snare_engine_stop_frame
-  snare_engine_active_voices snare_engine_stolen_voices
+  snare_engine_active_voices snare_engine_stolen_voices snare_engine_output_level
   snare_engine_enable_event_log snare_engine_event_count snare_engine_read_events
   snare_engine_read_measures
   snare_midi_export)

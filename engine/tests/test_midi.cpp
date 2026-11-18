@@ -184,4 +184,28 @@ SNARE_TEST(bad_arguments_are_refused) {
   CHECK_EQ(out[0], 0xaa);
 }
 
+SNARE_TEST(swung_steps_are_written_late_like_the_engine_plays_them) {
+  SnarePattern pattern = shape(16);
+  pattern.rows[1] = 0xffff;
+  pattern.swing = SNARE_SWING_MAX;
+  const Parsed midi = parse(exportFile({pattern}, {0}, kNotes, 120.0));
+  std::vector<int> ons;
+  for (const Note& note : midi.notes) {
+    if (note.on) ons.push_back(note.tick);
+  }
+  CHECK_EQ(ons.size(), 16u);
+  // A sixteenth is 120 ticks; an off-beat one lands 60 late.
+  for (std::size_t i = 0; i < ons.size(); ++i) CHECK_EQ(ons[i], static_cast<int>(i) * 120 + (i % 2 == 1 ? 60 : 0));
+  CHECK(midi.trackEnds == (std::vector<int>{1920, 1920}));
+
+  SnarePattern triplets = shape(12, 0, 3);
+  triplets.rows[1] = 0xfff;
+  triplets.swing = SNARE_SWING_MAX;
+  const Parsed straight = parse(exportFile({triplets}, {0}, kNotes, 120.0));
+  int index = 0;
+  for (const Note& note : straight.notes) {
+    if (note.on) CHECK_EQ(note.tick, index++ * 160);
+  }
+}
+
 SNARE_TEST_MAIN()

@@ -20,6 +20,7 @@ _Static_assert(offsetof(SnarePattern, rows) == 0, "SnarePattern.rows");
 _Static_assert(offsetof(SnarePattern, len1) == 48, "SnarePattern.len1");
 _Static_assert(offsetof(SnarePattern, len2) == 49, "SnarePattern.len2");
 _Static_assert(offsetof(SnarePattern, steps_per_beat) == 50, "SnarePattern.steps_per_beat");
+_Static_assert(offsetof(SnarePattern, swing) == 51, "SnarePattern.swing");
 
 _Static_assert(sizeof(SnarePanel) == 8, "SnarePanel is written as 8 bytes by wasm-engine.ts");
 _Static_assert(offsetof(SnarePanel, rhythm) == 0, "SnarePanel.rhythm");

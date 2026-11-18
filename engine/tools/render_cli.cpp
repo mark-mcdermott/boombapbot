@@ -4,6 +4,7 @@
 //   boombapbot-render --project beat.json --machine packages/machine-808
 //       [--rhythm 0] [--version a|b] [--rate 44100] [--bits 24]
 //       [--out loop.wav] [--midi beat.mid] [--events events.json]
+//       [--swing 0..128] [--effect delay|reverb|flanger|chorus] [--wet 0..1]
 //
 // It renders one measure of one rhythm as a seamless loop. It also writes one
 // synthesised sound as raw little-endian float samples:
@@ -42,6 +43,14 @@ int writeSound(std::map<std::string, std::string>& options) {
   return out ? 0 : 1;
 }
 
+int effectNamed(const std::string& name) {
+  if (name == "delay") return SNARE_EFFECT_DELAY;
+  if (name == "reverb") return SNARE_EFFECT_REVERB;
+  if (name == "flanger") return SNARE_EFFECT_FLANGER;
+  if (name == "chorus") return SNARE_EFFECT_CHORUS;
+  throw std::runtime_error("no such effect: " + name);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -52,7 +61,8 @@ int main(int argc, char** argv) {
     std::fprintf(stderr,
                  "usage: boombapbot-render --project FILE --machine DIR [--rhythm N] [--version a|b]\n"
                  "         [--rate HZ] [--bits 16|24] [--out FILE.wav] [--midi FILE.mid]\n"
-                 "         [--events FILE.json]\n");
+                 "         [--events FILE.json] [--swing 0..128]\n"
+                 "         [--effect delay|reverb|flanger|chorus] [--wet 0..1]\n");
     return 2;
   }
 
@@ -73,8 +83,20 @@ int main(int argc, char** argv) {
     if (!engine) throw std::runtime_error("unsupported sample rate");
     snare_engine_enable_event_log(engine, 8192);
     snare::io::applyProject(engine, machine, project);
-    const snare::io::Rendered loop =
-        snare::io::renderLoop(engine, project.patterns[index], index, project.bpm, rate);
+    // Swing and an effect are not the 808's; they are here so the engine's
+    // own features can be rendered and compared from the command line.
+    SnarePattern pattern = project.patterns[index];
+    if (options.count("--swing")) {
+      pattern.swing = static_cast<std::uint8_t>(std::atoi(options["--swing"].c_str()));
+      if (snare_engine_set_pattern(engine, index, &pattern) != SNARE_OK) throw std::runtime_error("no such swing");
+    }
+    if (options.count("--effect")) {
+      const double wet = options.count("--wet") ? std::atof(options["--wet"].c_str()) : 1.0;
+      if (snare_engine_set_effect(engine, effectNamed(options["--effect"]), wet) != SNARE_OK) {
+        throw std::runtime_error("no such effect setting");
+      }
+    }
+    const snare::io::Rendered loop = snare::io::renderLoop(engine, pattern, index, project.bpm, rate);
 
     if (options.count("--out")) {
       snare::wav::writeFile(options["--out"],
