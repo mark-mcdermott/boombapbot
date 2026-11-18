@@ -19,9 +19,9 @@ swing, a measure of sixteen steps or twelve, three sound knobs for each
 instrument and one effect. It models no real machine: its sounds, its panel
 and the maker's name on it were made for boombapbot.
 
-The site had another machine first, the 808, built from a real machine's
-operation manual. It is still in this repository as a second machine package
-and is no longer shipped. [The 808](#the-808) says what is left of it here.
+The site had another machine first, modelled on a real one from its
+operation manual. It is no longer in this repository. Beats made on it still
+open here, as РИТМ-12 beats.
 
 ## Run it
 
@@ -127,12 +127,12 @@ pnpm serve
 - **Saving.** The project is saved to this browser on every edit and restored
   on reload. A draft that fails validation is set aside, not deleted.
 - **Beats from the earlier machine.** A draft, a project file or a saved
-  beat made on the 808 opens as a РИТМ-12 beat: the rhythm that machine was
+  beat made on the machine the site had first opens as a РИТМ-12 beat: the rhythm that machine was
   on becomes pattern А, and the page lists what did not come across. It is a
   new beat here. The earlier draft stays in the browser where it was, and a
   beat in an account is never written over: saving the converted one adds a
   beat. The server stores only РИТМ-12 beats. A page left open since before
-  the change, which would still send an 808 beat, is told to reload.
+  the change, which would still send the earlier kind, is told to reload.
 - **Import and export.** Project JSON (validated with Zod; an invalid file is
   rejected and never replaces the current beat), PCM WAV (24 or 16-bit
   stereo, 44.1 kHz) and a Type 1 Standard MIDI File with a tempo track and
@@ -158,22 +158,6 @@ pnpm serve
 | Screen and level meter | Working |
 | Power switch | Working |
 | The picture | 2000 pixels wide. The owner's originals are 3072 wide and the art should be cut again from those |
-
-## The 808
-
-The machine the site had first is `packages/machine-808/`, with its voices,
-its drawn faceplate, its project format (schema version 2) and its tests. It
-does what its operation manual describes: sixteen sounds, twelve tracks and
-an accent, thirty-two patterns with two write modes, manual play with intros
-and fill-ins, and twelve rhythm tracks.
-
-No build that is deployed includes it. `BOOMBAPBOT_MACHINE=808` in front of
-`pnpm dev`, `pnpm build` or `pnpm test:e2e` runs it, and CI still builds it
-and runs its panel's browser tests (`e2e/808/`). The tests of accounts,
-saved beats and the shop no longer run against it. It is on its way out of
-this repository, together with the generated 606, 707 and 909 kits, the
-photographs in `assets/faceplates/` and the VST3 spike, which all belong to
-it.
 
 ## Accounts
 
@@ -228,8 +212,8 @@ by the server.
   /api/beats/<uuid>`. Each needs a session and only reaches the caller's
   own rows. What is stored is the project after the project codec has checked
   it, and only a РИТМ-12 beat is stored.
-- Beats saved while the site was the 808 are still in the table as they
-  were; nothing was migrated. Loading one converts it on the page, as a new
+- Beats saved while the site was the earlier machine are still in the table
+  as they were; nothing was migrated. Loading one converts it on the page, as a new
   beat that is not tied to the stored one, so saving it adds a beat and the
   original stays until it is deleted.
 - The table is `beats` (`apps/site/drizzle/0002_beats.sql`). It has been in
@@ -238,11 +222,11 @@ by the server.
 What has been checked: all of the above in a browser against the built
 server with the in-process database, and that the migration applied to the
 real Neon database, leaving an empty `beats` table and the existing rows as
-they were. On 2026-11-17, while the site was the 808, the owner saved a
-beat on the live site from a computer and loaded it on an iPhone and an
-Android phone. Deleting a saved beat, the newer-copy question and the limit
-have only run in the tests, and so has loading an 808 beat on РИТМ-12:
-nobody has opened a real stored one yet.
+they were. On 2026-11-18 the owner saved a РИТМ-12 beat on the live site
+from desktop Chrome and loaded it in Firefox on an iPhone. Deleting a saved
+beat, the newer-copy question and the limit have only run in the tests, and
+so has loading a beat of the earlier machine: nobody has opened a real
+stored one, and the owner had saved none.
 
 ## Shop
 
@@ -281,15 +265,12 @@ Run in this order; later steps use what earlier ones build.
 
 | Command | What it checks |
 | --- | --- |
-| `pnpm kits:check` | The committed demo WAVs match their generator script |
-| `pnpm faceplates:check` | The committed faceplate drawing matches its generator script, and carries no brand names |
-| `pnpm build:engine` | Builds the native engine for both machines and runs CTest: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, songs and the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, every synthesised sound across its knobs, swing, each effect, РИТМ-12's eight voices, the contract files, no allocation inside the render call, and the header compiling as C |
-| `pnpm build:wasm` | Builds the engine to WebAssembly, one module for each machine |
+| `pnpm build:engine` | Builds the native engine and runs CTest, the engine's own suites with a test machine of two plain voices: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, songs and the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, the synthesis calls, swing, each effect, no allocation inside the render call, and the header compiling as C; then РИТМ-12's eight voices across their knobs |
+| `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
-| `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store, the limits and the conflict rule for saved beats, what a device remembers about them; and for РИТМ-12 its project schema, what its controls do, its engine setup, and its reader for 808 beats, which become new beats |
+| `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; WAV and MIDI contents; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, exports, the draft, an 808 draft and an 808 file opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words. Against the built server with its database in memory: accounts, the shop, and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, an 808 beat loading as a new beat, and an 808 beat refused on save) |
-| `BOOMBAPBOT_MACHINE=808 pnpm build`, then the same in front of `pnpm test:e2e` | The 808's build and its panel's browser tests: every selector position, knob and switch, the write modes, manual play, rhythm tracks, the power switch, dials, lamps, keyboard, touch layout, exports, its draft and an accessibility scan |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, exports, the draft, a draft and a file of the earlier machine opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words and the spaces a line break must not swallow. Against the built server with its database in memory: accounts, the shop, and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -301,31 +282,27 @@ Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
 
 | Step | Result |
 | --- | --- |
-| `pnpm kits:check` | 24 of 24 files match |
-| `pnpm faceplates:check` | 1 of 1 drawing matches |
-| `pnpm build:engine` | 15 CTest suites, all pass with Apple clang 21 |
-| `pnpm build:wasm` | 68,940 bytes for РИТМ-12 and 71,396 for the 808, one import each, no threads or shared memory |
+| `pnpm build:engine` | 14 CTest suites, all pass with Apple clang 21 |
+| `pnpm build:wasm` | 68,940-byte module, one import, no threads or shared memory |
 | `pnpm typecheck` | 0 errors |
-| `pnpm test:unit` | 215 of 215 pass |
+| `pnpm test:unit` | 117 of 117 pass |
 | `pnpm build` | Build check passes |
 | `pnpm test:e2e` | 78 of 78 pass |
-| The 808: `BOOMBAPBOT_MACHINE=808 pnpm build`, then `pnpm test:e2e` | Build check passes; 54 of 54 pass |
 
-The VST3 spike and the engine under Clang, AddressSanitizer and
-UndefinedBehaviorSanitizer were not run for this version on this machine. CI
-runs them.
+The engine under Clang, AddressSanitizer and UndefinedBehaviorSanitizer was
+not run for this version on this machine. CI runs it.
 
 CI runs the same list on Linux x86-64 with GCC and Clang.
 
 Two cross-checks worth knowing about:
 
-- **Native versus WASM.** For six rhythms of the 808's fixture, at four
-  pre-scales and with a 2nd part, event frames are identical, audio agrees to
-  within two 24-bit steps (four with an effect on) and the MIDI files are
-  the same byte for byte. Each synthesised sound agrees to within one 24-bit
-  step. The remaining
-  difference is the last bit of `exp`, `tanh`, `sin` and `cos` between the
-  native C library and the WASM one.
+- **Native versus WASM.** Given the same engine setup for every pattern of
+  РИТМ-12's fixture, straight, swung and in triplets, event frames are
+  identical, audio agrees to within two 24-bit steps (four with an effect
+  fully in) and the MIDI files are the same byte for byte. Each synthesised
+  sound agrees to within one 24-bit step. The remaining difference is the
+  last bit of the C library's maths between the native build and the WASM
+  one.
 - **Buffer size.** Output is bit-identical whether rendered in one call, one
   frame at a time, or in blocks of 17, 64, 128, 441, 1024 or 4096 frames.
 
@@ -336,27 +313,26 @@ Two cross-checks worth knowing about:
   reach or its four effects one by one. Otherwise audio is checked
   numerically: the worklet reports nonzero output, the meter rises, exported
   WAVs contain audio at the right length, and native and WASM renders agree.
-- **РИТМ-12 on the live site.** Everything the owner has done on
-  boombapbot.com was done while it was the 808. Nobody has opened РИТМ-12
-  there, opened a real 808 draft or a real stored 808 beat on it, or saved
-  from a page left open across the change. Those run in the tests only.
-- **Browsers other than headless Chromium.** РИТМ-12's panel has been run in
-  Chromium only. No real phone, Safari or Firefox has shown it; the phone
-  layout was checked in Chromium's device emulation. On 2026-11-17, on the
-  808, the owner logged in, loaded a beat and played it on an iPhone in
-  Safari and in Chrome and on a Samsung Galaxy S9 in Chrome.
+- **Beats of the earlier machine.** Opening one converted, from a draft, a
+  file or an account, runs in the tests only. Nobody has opened a real one.
+- **Browsers.** On 2026-11-18 the owner used РИТМ-12 on the live site on an
+  iPhone in Safari and in Firefox, and in desktop Chrome. Firefox and Safari
+  on a Mac and an Android phone have not shown it. Everything automated runs
+  in headless Chromium, the phone layout in its device emulation.
 - **Deployment.** `.github/workflows/deploy.yml` builds the site and hands it
   to Vercel after CI passes on `main`. It ran for the first time on
   2026-11-16, and the live site was checked by hand afterwards: the machine
   plays, the pages load and the server answers. The owner signed up there
   the same day and reset a password, and both emails worked. The first real
   order went through that day too: paid at Stripe, accepted from Stripe's
-  webhook and placed with Printful. A real Printful shipping event, a
-  refund and a purchase without an account have not been tried there.
+  webhook and placed with Printful. When Printful sent the parcel, its own
+  event reached the site and the order was marked shipped with its tracking
+  number. A refund and a purchase without an account have not been tried
+  there.
 - **Saved beats on the live site.** The tests use a Postgres inside the
   server process, built from the same migrations. On the live site the
-  owner has saved and loaded across three devices; deleting a saved beat,
-  the newer-copy question and the limit have not been tried there.
+  owner has saved and loaded across devices; deleting a saved beat, the
+  newer-copy question and the limit have not been tried there.
 - **Deleting an account.** Built and tested against the in-process
   database. Nobody has deleted an account through the page on the live
   site.
@@ -368,12 +344,12 @@ play key.
 
 ### Engine load
 
-`pnpm bench` renders a worst case through the 808's WASM engine: every track on
-every step of a 32-step measure of thirty-second notes at 300 BPM, with every
-decay knob fully right, in 128-frame blocks. On the machine above that ran
-about 200 times faster than real time, with the slowest block taking 0.3 ms
-of its 2.67 ms budget and output bounded. A track has one voice, so the pool
-of 64 is never full in normal use. This is a desktop number.
+`pnpm bench` renders a worst case through РИТМ-12's WASM engine: every voice
+on every step of a 32-step measure of thirty-second notes at 300 BPM, with
+every decay knob fully right and the reverb fully in, in 128-frame blocks.
+On the machine above that ran about 150 times faster than real time, with
+the slowest block taking 0.5 ms of its 2.67 ms budget and output bounded.
+The machine itself never asks for that much. This is a desktop number.
 
 ## Sounds: provenance
 
@@ -383,12 +359,6 @@ each built from its pitch, decay and tone knobs. They were written for
 boombapbot and copy no real machine; nothing in them is sampled. The browser
 synthesises each sound on its main thread at the device's sample rate and
 hands the samples to the audio thread; no sound files ship.
-
-The 808's sixteen sounds
-([`packages/machine-808/engine/voices.cpp`](packages/machine-808/engine/voices.cpp))
-are a model made by ear, never compared with a real machine. `assets/kits/`
-still holds generated sample kits for the 606, 707 and 909, made by
-[`scripts/gen_demo_kits.py`](scripts/gen_demo_kits.py). Nothing loads them.
 
 ## The panel
 
@@ -409,27 +379,18 @@ On a phone the picture keeps a size that can be worked and scrolls sideways,
 or fits the screen at the press of a button. An instrument strip sits under
 it, and play and the tempo are docked at the bottom of the screen.
 
-The 808's faceplate is a drawing made by
-`packages/machine-808/art/draw-faceplate.mjs`. `assets/faceplates/` keeps
-the owner's edits of Creative Commons photographs of the 606, 707, 808 and
-909 with the brand names removed. No build ships them.
-
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `engine/` | C++20 core with no voices of its own, C ABI, the CMake function that builds it for a machine, CTest suites, render tool |
+| `engine/` | C++20 core with no voices of its own, C ABI, the CMake function that builds it for a machine, CTest suites with their test machine, and a render tool that plays an engine setup |
 | `packages/contracts/` | What every project document carries, and the saved-beat and shop schemas |
 | `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
-| `packages/machine-ritm12/` | РИТМ-12, the machine the site is: its project schema, voices, panel, art, and the reader that opens the 808's beats |
-| `packages/machine-808/` | The 808, not shipped: its project schema, data files and fixtures, voices, panel art and styles, and what its controls do. Run it with `BOOMBAPBOT_MACHINE=808 pnpm dev` |
+| `packages/machine-ritm12/` | РИТМ-12, the machine the site is: its project schema, voices, panel, art, and the reader that opens the earlier machine's beats |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
-| `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
-| `assets/faceplates/` | Cleared photographs of the classic machines and their provenance, not shipped |
-| `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |
-| `e2e/` | Playwright tests: the site's, and each machine's own in `e2e/ritm12/` and `e2e/808/` |
+| `e2e/` | Playwright tests: the site's, and РИТМ-12's own in `e2e/ritm12/` |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |
-| `misc/assets/` | The owner's unedited faceplate originals (ignored by git) |
+| `misc/assets/` | The owner's unedited pictures (ignored by git) |
 
 ## File formats
 
@@ -438,9 +399,9 @@ the owner's edits of Creative Commons photographs of the 606, 707, 808 and
   remembers. The tempo in beats a minute, swing, the size of a measure, four
   patterns of eight sixteen-step rows and an accent row, the volume, accent
   strength, levels and mutes, each instrument's pitch, decay and tone, the
-  effect and its mix, and where the panel stands. Version 2 files (the 808)
-  and version 1 files (the one-pattern editor before it) still open, as a
-  new РИТМ-12 beat. This is the draft and interchange file. It is **not**
+  effect and its mix, and where the panel stands. Version 2 files (the
+  machine the site had first) and version 1 files (the one-pattern editor
+  before it) still open, as a new РИТМ-12 beat. This is the draft and interchange file. It is **not**
   the future portable `.boombapbot` bundle.
 - **WAV**: the pattern the panel is on as a loop of one measure, with swing
   and the effect in it. It is played often enough for the effect's tail to
@@ -451,35 +412,6 @@ the owner's edits of Creative Commons photographs of the 606, 707, 808 and
   An accented step is written at a higher velocity. It holds the same
   measure as the WAV.
 
-## VST3 compile spike
-
-`plugins/vst3/` is a small JUCE VST3 instrument that links the same engine,
-synthesises the 808's sounds at the host's sample rate and plays them from
-MIDI notes, placing each hit on its sample offset inside the block. It is a
-separate CMake project and is not part of the web build. JUCE 8.0.9 is
-fetched at configure time, not vendored.
-
-```bash
-cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
-```
-
-```bash
-cmake --build build/vst3
-```
-
-```bash
-ctest --test-dir build/vst3 --output-on-failure
-```
-
-On macOS this compiles and produces an Apple silicon `.vst3` bundle that
-exports the VST3 entry points and contains the engine, and the processor
-self-test passes. That is all it shows. An earlier version was built the same
-way on Linux; this one has not been. **Scanning in a host, the Steinberg validator, transport sync and
-state recall in a host are all pending**, as is a Windows build. JUCE 8 is
-AGPLv3 or commercial, and a licence path has to be chosen before anything
-built from it is distributed. Details and the full not-verified list:
-[`plugins/vst3/README.md`](plugins/vst3/README.md).
-
 ## Next milestone
 
 In the build spec's sequence, v0.1 covers the web half of "prove the platform
@@ -489,8 +421,7 @@ stack" and most of "build one end-to-end beat". Next:
    Firefox, and listen to it voice by voice and effect by effect. What the
    build guesses at is listed in [`docs/follow-ups.md`](docs/follow-ups.md).
 2. Cut its art again from the owner's full-size pictures.
-3. Move the 808 and what belongs to it out of this repository.
-4. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
+3. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
    AVAudioEngine and Oboe on mobile.
 
 Saving beats to an account is built. Sync in the background, billing,
