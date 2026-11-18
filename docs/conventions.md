@@ -7,8 +7,10 @@ that plugs into a core that knows no machine, so another machine can be
 built elsewhere on the same core. `README.md` says what is built and how it
 was verified, and `docs/follow-ups.md` has what is left and in what order. Accounts exist and
 are optional: sign-up, log-in and password reset, and a free account can
-hold up to 20 saved beats. The rest of the build spec's wider scope
-(background sync, native shells, billing) is not started.
+hold up to 20 saved beats. `apps/mobile` is a first slice of the phone
+apps: it runs in a simulator and is not ready for a store. The rest of the
+build spec's wider scope (background sync, native audio, a desktop shell,
+billing) is not started.
 
 ## Commands
 
@@ -181,6 +183,21 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   shop (`api/store`, `api/webhooks`, Stripe and Printful). The modals that
   talk to it are `packages/editor/src/ui/Account.tsx` (with
   `SavedBeats.tsx`) and `Shop.tsx`.
+- `apps/mobile/` is the same editor with РИТМ-12 in a Capacitor shell for
+  iOS and Android, a Vite page with no server behind it. Its sound is the
+  web view's own worklet and WASM engine. `BoombapbotEditor` takes two
+  things for a shell like it: `storage`, where the draft is kept (the app
+  hands in the device's own store, `src/device-storage.ts`), and `below`,
+  what sits under the machine in place of the cookie notice and the footer.
+  The app leaves accounts, saved beats and the shop out. Its engine, worklet
+  and art are the site's, copied by `scripts/copy-assets.mjs` from what
+  `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native
+  projects and are committed; `cap sync` rewrites parts of them. Its
+  `README.md` says how to run it, what was checked and what is left.
+- Nothing the editor imports may need the page's address to be http or
+  https when the file is read: an app's page is `capacitor://localhost`.
+  The account client is made on first use for that reason (`authClient()`
+  in `account/client.ts`).
 
 ## Rules that are easy to break
 
