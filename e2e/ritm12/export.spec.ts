@@ -1,0 +1,101 @@
+import { expect, test, type Page, type Route } from '@playwright/test';
+import { downloadBytes, exportVia, openSettings, parseMidi, parseWav } from '../helpers';
+import { beat, hitCount, openMachine } from './helpers';
+
+test.beforeEach(async ({ page }) => {
+  await openMachine(page);
+});
+
+const status = (page: Page) => page.getByTestId('wav-export-status');
+const said = (page: Page) => page.getByTestId('wav-export-said');
+
+/**
+ * Takes hold of every script the page asks for from now on. By the time
+ * settings is open the page has all of its own, so the one script left to
+ * ask for is the Worker a WAV renders in.
+ */
+async function holdScripts(page: Page, held: (route: Route) => Promise<void>): Promise<void> {
+  await openSettings(page);
+  await page.route('**/*.js', held);
+}
+
+test('a WAV export is the pattern on the panel, rendered in a Worker', async ({ page }) => {
+  let workers = 0;
+  page.on('worker', () => {
+    workers += 1;
+  });
+  const onThePage = await page.evaluate(() => window.__boombapbot!.renderLoop(44100));
+  expect(workers).toBe(0);
+
+  const download = await exportVia(page, 'export-wav');
+  expect(download.suggestedFilename()).toMatch(/\.wav$/);
+  const wav = parseWav(await downloadBytes(download));
+  expect(wav).toMatchObject({ channels: 2, sampleRate: 44100, bits: 24, frames: onThePage.frames });
+  expect(wav.rms).toBeGreaterThan(0.02);
+  expect(wav.peak).toBeLessThanOrEqual(1);
+  expect(workers).toBe(1);
+
+  await expect(status(page)).toHaveText(/^WAV exported at /);
+  await expect(said(page)).toHaveText(/^WAV exported at /);
+  await expect(said(page)).toHaveRole('status');
+});
+
+test('the 16-bit WAV and the MIDI file hold the same measure', async ({ page }) => {
+  const now = await beat(page);
+  const wav = parseWav(await downloadBytes(await exportVia(page, 'export-wav-16')));
+  expect(wav).toMatchObject({ channels: 2, sampleRate: 44100, bits: 16, frames: Math.round((44100 * 240) / now.tempo) });
+  expect(wav.rms).toBeGreaterThan(0.02);
+
+  const midi = parseMidi(await downloadBytes(await exportVia(page, 'export-midi')));
+  expect(midi.notes.filter((note) => note.on)).toHaveLength(hitCount(now.patterns[0]!));
+  expect(midi.notes.every((note) => note.channel === 10)).toBe(true);
+  expect(Math.round(60_000_000 / midi.tempoMicros)).toBe(now.tempo);
+});
+
+test('a render under way says so, to the eye and to a screen reader, and a second one waits', async ({ page }) => {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await holdScripts(page, async (route) => {
+    await released;
+    await route.continue();
+  });
+
+  await page.getByTestId('export-menu').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-wav').click();
+  await expect(status(page)).toHaveText('Rendering the WAV… 0%');
+  await expect(status(page)).toHaveAttribute('data-state', 'rendering');
+  await expect(said(page)).toHaveText('Rendering the WAV…');
+
+  // The sheet still answers while the render is out, and the menu says why a WAV cannot be asked for.
+  await page.getByTestId('export-menu').click();
+  for (const item of ['export-wav', 'export-wav-16']) {
+    await expect(page.getByTestId(item)).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByTestId(item)).toContainText('One is rendering now');
+  }
+  await expect(page.getByTestId('export-midi')).not.toHaveAttribute('aria-disabled', 'true');
+  await page.keyboard.press('Escape');
+
+  release();
+  expect(parseWav(await downloadBytes(await download)).frames).toBeGreaterThan(0);
+  await expect(status(page)).toHaveText(/^WAV exported at /);
+  await page.getByTestId('export-menu').click();
+  await expect(page.getByTestId('export-wav')).toContainText('24-bit stereo, one measure');
+});
+
+test('a render that cannot start says it failed, and the next one works', async ({ page }) => {
+  await holdScripts(page, (route) => route.abort());
+  await page.getByTestId('export-menu').click();
+  await page.getByTestId('export-wav').click();
+  await expect(status(page)).toHaveText('The WAV export failed');
+  await expect(status(page)).toHaveAttribute('data-state', 'error');
+  await expect(said(page)).toHaveText('The WAV export failed');
+  await expect(page.getByTestId('notice')).toContainText('The WAV export failed');
+
+  await page.unroute('**/*.js');
+  const wav = parseWav(await downloadBytes(await exportVia(page, 'export-wav')));
+  expect(wav.frames).toBeGreaterThan(0);
+  await expect(status(page)).toHaveText(/^WAV exported at /);
+});
