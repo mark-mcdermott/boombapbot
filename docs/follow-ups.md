@@ -39,8 +39,8 @@ in this file has been built unless it says so.
 
 Accounts are built: sign-up with a confirmed address, log-in, log-out and
 password reset, in the account modal, and saving beats to an account. The
-upgrade's server side is built and switched off; its icon still opens a
-modal that says it is not open.
+upgrade's server side and its modal are built and switched off; on the live
+site its icon still opens a modal that says it is not open.
 
 - **Accounts are live.** The Neon database has its tables, and Vercel has
   the Resend key, the sending address and its own `BETTER_AUTH_SECRET`. On
@@ -118,16 +118,31 @@ modal that says it is not open.
     `isUpgraded` yet. To settle with it: whether a key alone unlocks a device
     with nobody logged in, and how a paid feature behaves with no server,
     since the machine has to work without one.
-  - **The modal.** The upgrade icon's modal needs its real contents: the
-    price from `GET /api/upgrade`, a button that posts to
-    `/api/upgrade/checkout` and follows the address it answers, the way
-    back from Stripe (`/?upgrade=paid` and `/?upgrade=open`, which nothing
-    reads yet), somewhere to enter a key, a way to ask for a lost one, and
-    the key shown to an upgraded account. All of its words are the owner's
-    to write, and so is the wording of the key's two emails
-    (`src/server/email.ts`), the name Stripe shows (`PRODUCT_NAME` in
-    `api/upgrade/checkout.ts`) and the refusals in `src/server/upgrade.ts`,
-    which are plain stand-ins.
+  - **The modal is built**, on 2026-11-18, and shows only while the server
+    says the upgrade is open: the price from `GET /api/upgrade`, a button
+    that goes to Stripe, the way back (`/?upgrade=paid` and
+    `/?upgrade=open`), a key to enter, a lost key to ask for, and the key
+    shown to an upgraded account. It has run in the tests and by hand
+    against the stand-in for Stripe, never against Stripe itself. What is
+    left of it:
+    - **Its words.** What it says while the upgrade is open is a stand-in,
+      and nothing in it says what the five dollars unlocks, because that is
+      not decided. All of it is the owner's to write
+      (`packages/editor/src/ui/Upgrade.tsx`), and so is the wording of the
+      key's two emails (`src/server/email.ts`), the name Stripe shows
+      (`PRODUCT_NAME` in `api/upgrade/checkout.ts`) and the refusals in
+      `src/server/upgrade.ts`, which the modal shows as they are.
+    - Entering a key needs an account, so the modal sends somebody with no
+      account to the account modal and they have to come back to it
+      themselves. If a key alone is to unlock a device, this changes.
+    - While the upgrade is closed the modal offers nothing, so a key bought
+      earlier could not be entered or asked for again there. That only
+      matters if the upgrade is ever closed after it has sold.
+    - A logged-in buyer back from Stripe is looked up for half a minute. If
+      Stripe's webhook takes longer, the modal says to open it again later;
+      the key still arrives by email.
+    - About still says of the upgrade that its button "only says so for
+      now". Change it when the upgrade opens.
   - **Policies.** Before it is sold the page has to say what the upgrade
     costs, how a refund for it works, and that a license keeps the buyer's
     email and its Stripe payment's id, and stays after the account is

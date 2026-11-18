@@ -1,10 +1,10 @@
-import { BookOpen, HandFist, Heart, Info, Scale, ScrollText, Sparkles } from 'lucide-react';
-import type { ReactNode, RefObject } from 'react';
+import { BookOpen, HandFist, Heart, Info, Scale, ScrollText } from 'lucide-react';
+import { useState, type ReactNode, type RefObject } from 'react';
 import { Account } from './Account';
-import { Modal } from './Modal';
 import { SITE_PAGES, type SitePageId } from './pages';
 import { Shop } from './Shop';
 import { Tip, TipGroup } from './Tip';
+import { Upgrade } from './Upgrade';
 
 const PAGE_ICONS: Record<SitePageId, ReactNode> = {
   about: <Info />,
@@ -31,6 +31,7 @@ interface FooterProps {
  * account).
  */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {
+  const [accountOpen, setAccountOpen] = useState(false);
   return (
     <footer className="sb-footer">
       <p className="sb-made" data-testid="made-by">
@@ -56,23 +57,10 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
           ))}
         </nav>
         <div className="sb-footer-icons sb-footer-tools">
-          <Modal
-            label="Upgrade"
-            title="Upgrade"
-            testId="upgrade"
-            className="sb-ico-upgrade"
-            icon={<Sparkles />}
-            container={container}
-          >
-            <p className="sb-modal-text">
-              A one-time upgrade is planned: extra effects beyond the free ones, and a place to show your beats. It
-              is not open yet, and nothing can be bought here for now.
-            </p>
-            <p className="sb-modal-text">Everything on the machine today is free to use, and stays that way.</p>
-          </Modal>
+          <Upgrade baseUrl={baseUrl} container={container} logIn={() => setAccountOpen(true)} />
           <Shop baseUrl={baseUrl} container={container} />
           {settings}
-          <Account baseUrl={baseUrl} container={container} />
+          <Account baseUrl={baseUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />
         </div>
       </TipGroup>
     </footer>

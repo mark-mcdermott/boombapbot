@@ -7,12 +7,12 @@ import {
   MIN_PASSWORD_LENGTH,
   attempt,
   authClient,
-  explain,
   type Failure,
 } from '../account/client';
 import { deviceBeatLinks } from '../account/beat-links';
 import { signedInAccount } from '../account/session';
 import { takeParams } from './arrival';
+import { LinkButton, Problem as SharedProblem, useAttempt } from './attempt';
 import { TextField } from './fields';
 import { Modal } from './Modal';
 import { SavedBeats } from './SavedBeats';
@@ -57,27 +57,7 @@ function arrivalView({ kind, token, failed }: Arrival): [View, Notice?] {
     : [{ name: 'forgot' }, { kind: 'error', text: 'That reset link has expired or was already used. Ask for a new one.' }];
 }
 
-/** One call to the server at a time, with what went wrong kept for showing. */
-function useAttempt() {
-  const [waiting, setWaiting] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const run = async (call: () => Promise<Failure | null>) => {
-    setWaiting(true);
-    setProblem(null);
-    const failure = await call();
-    setWaiting(false);
-    setProblem(failure ? explain(failure) : null);
-  };
-  return { waiting, problem, run };
-}
-
-function Problem({ text }: { text: string | null }) {
-  return (
-    <p className="sb-form-problem" role="alert" data-testid="account-problem">
-      {text}
-    </p>
-  );
-}
+const Problem = ({ text }: { text: string | null }) => <SharedProblem text={text} testId="account-problem" />;
 
 type FieldName = 'email' | 'password';
 
@@ -135,14 +115,6 @@ function Form({ testId, action, busy, submit, danger = false, children }: FormPr
         {waiting ? busy : action}
       </button>
     </form>
-  );
-}
-
-function LinkButton({ testId, onClick, children }: { testId: string; onClick(): void; children: ReactNode }) {
-  return (
-    <button className="sb-link" type="button" data-testid={testId} onClick={onClick}>
-      {children}
-    </button>
   );
 }
 
@@ -429,13 +401,15 @@ interface AccountProps {
   baseUrl: string;
   /** Where the modal mounts, so it inherits the page's theme. */
   container: RefObject<HTMLElement | null>;
+  /** The footer keeps whether it is open, so that another modal can send somebody here to log in. */
+  open: boolean;
+  setOpen(open: boolean): void;
 }
 
 /** The account button in the footer and its modal: log in, sign up, reset a password, saved beats, log out, delete. */
-export function Account({ baseUrl, container }: AccountProps) {
+export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
   const session = authClient().useSession();
   const account = signedInAccount(session.data);
-  const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>({ name: 'log-in' });
   const [notice, setNotice] = useState<Notice | null>(null);
   const go: Go = (next, said) => {
@@ -450,7 +424,7 @@ export function Account({ baseUrl, container }: AccountProps) {
     setView(next);
     setNotice(said ?? null);
     setOpen(true);
-  }, []);
+  }, [setOpen]);
 
   const body = () => {
     if (view.name === 'new-password') return <NewPassword token={view.token} go={go} />;

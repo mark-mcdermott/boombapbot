@@ -1315,6 +1315,37 @@ select.sb-input {
   border-top: 1px solid var(--color-line-soft);
 }
 
+/* ---- Upgrade --------------------------------------------------------------- */
+
+/* A license key and the button that copies it, set like a field that is
+   already filled in. A click on the key takes all of it. */
+.sb-license {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
+.sb-license-key {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.sb-license svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* ---- Pages of words ------------------------------------------------------ */
 
 /* About, Docs, the manifesto, Credits and Policies. They borrow from the

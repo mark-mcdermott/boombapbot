@@ -8,6 +8,7 @@ import {
   type BeatSummary,
   type ProjectBase,
 } from '@boombapbot/contracts';
+import { ANY_ANSWER, ask as askServer, type Asked as AskedOf, type Reader } from './ask';
 import { UNREACHABLE, type Failure } from './client';
 
 // The saved beats of the account that is logged in. Every call here is
@@ -19,32 +20,10 @@ export interface BeatFailure extends Failure {
   updatedAt?: string;
 }
 
-export type Asked<Answer> = { ok: true; answer: Answer } | { ok: false; failure: BeatFailure };
+export type Asked<Answer> = AskedOf<Answer, BeatFailure>;
 
-/** Anything that can check an answer's shape, as the contracts' schemas do. */
-interface Reader<Answer> {
-  safeParse(value: unknown): { success: true; data: Answer } | { success: false };
-}
-
-async function ask<Answer>(url: string, reader: Reader<Answer>, method = 'GET', body?: unknown): Promise<Asked<Answer>> {
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method,
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    return { ok: false, failure: UNREACHABLE };
-  }
-  const said: unknown = await response.json().catch(() => null);
-  if (response.ok) {
-    const answer = reader.safeParse(said);
-    return answer.success ? { ok: true, answer: answer.data } : { ok: false, failure: { status: response.status } };
-  }
-  const refusal = BeatRefusalSchema.safeParse(said);
-  return { ok: false, failure: { status: response.status, ...(refusal.success ? refusal.data : {}) } };
-}
+const ask = <Answer>(url: string, reader: Reader<Answer>, method?: string, body?: unknown): Promise<Asked<Answer>> =>
+  askServer(url, reader, BeatRefusalSchema, method, body);
 
 const address = (baseUrl: string, id?: string) => `${baseUrl}api/beats${id ? `/${encodeURIComponent(id)}` : ''}`;
 
@@ -76,5 +55,5 @@ export function fetchBeat(baseUrl: string, id: string): Promise<Asked<{ beat: Be
 }
 
 export function deleteBeat(baseUrl: string, id: string): Promise<Asked<unknown>> {
-  return ask(address(baseUrl, id), { safeParse: (value) => ({ success: true, data: value }) }, 'DELETE');
+  return ask(address(baseUrl, id), ANY_ANSWER, 'DELETE');
 }
