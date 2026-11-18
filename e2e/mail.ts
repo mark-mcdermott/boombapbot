@@ -19,6 +19,7 @@ export const newAddress = () => `drummer-${randomUUID()}@example.com`;
 export function mailTo(address: string, subject: RegExp): Mail[] {
   if (!existsSync(OUTBOX)) return [];
   return readdirSync(OUTBOX)
+    .filter((file) => file.endsWith('.json'))
     .sort()
     .map((file) => JSON.parse(readFileSync(join(OUTBOX, file), 'utf8')) as Mail)
     .filter((mail) => mail.to === address && subject.test(mail.subject));
