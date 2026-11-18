@@ -12,7 +12,7 @@ import {
   saveDraft,
   type KeyValueStorage,
 } from './state/draft-storage';
-import { downloadBytes, exportBaseName, projectFileName, readProjectFile } from './state/project-io';
+import { downloadFile, exportBaseName, projectFileName, readProjectFile, type SaveFile } from './state/project-io';
 import { EditorStore, newProjectId } from './state/store';
 
 /** Written by scripts/prepare-assets.mjs next to the built site. */
@@ -35,6 +35,8 @@ export interface RuntimeOptions<
   baseUrl: string;
   machine: Machine<Document, Transient, Session>;
   storage?: KeyValueStorage | null;
+  /** Where an exported file goes. A download when not given. */
+  save?: SaveFile;
 }
 
 export interface DebugSnapshot<Document extends ProjectBase = ProjectBase> {
@@ -63,6 +65,7 @@ export class EditorRuntime<
   private readonly codec: ProjectCodec<Document>;
   private readonly baseUrl: string;
   private readonly storage: KeyValueStorage | null;
+  private readonly save: SaveFile;
   private readonly audio: AudioController;
   private manifest: Promise<AssetManifest> | null = null;
   private wasmBytes: Promise<ArrayBuffer> | null = null;
@@ -85,6 +88,7 @@ export class EditorRuntime<
     this.codec = createProjectCodec([machine.document]);
     this.baseUrl = options.baseUrl.endsWith('/') ? options.baseUrl : `${options.baseUrl}/`;
     this.storage = options.storage === undefined ? browserStorage() : options.storage;
+    this.save = options.save ?? downloadFile;
 
     const draft = this.storage ? loadDraft(this.storage, machine.document, this.codec) : { status: 'empty' as const };
     this.store = new EditorStore({
@@ -401,8 +405,8 @@ export class EditorRuntime<
         },
         (progress) => this.store.setWavExport({ state: 'rendering', progress }),
       );
-      downloadBytes(`${exportBaseName(project)}.wav`, bytes, 'audio/wav');
-      this.store.setWavExport({ state: 'done', at: Date.now() });
+      const saved = await this.save({ name: `${exportBaseName(project)}.wav`, data: bytes, type: 'audio/wav' });
+      this.store.setWavExport(saved ? { state: 'done', at: Date.now() } : null);
     } catch (error) {
       this.store.setWavExport({ state: 'error' });
       this.store.notify('error', `The WAV export failed: ${describe(error)}`);
@@ -414,15 +418,19 @@ export class EditorRuntime<
       const wasm = await this.loadOfflineWasm();
       const { project } = this.store.getState();
       const bytes = exportSongMidi(wasm, this.machine.setup(project), this.exportPlan(wasm, project, false));
-      downloadBytes(`${exportBaseName(project)}.mid`, bytes, 'audio/midi');
+      await this.save({ name: `${exportBaseName(project)}.mid`, data: bytes, type: 'audio/midi' });
     } catch (error) {
       this.store.notify('error', `The MIDI export failed: ${describe(error)}`);
     }
   }
 
-  exportProject(): void {
+  async exportProject(): Promise<void> {
     const { project } = this.store.getState();
-    downloadBytes(projectFileName(project), this.codec.serialize(project), 'application/json');
+    try {
+      await this.save({ name: projectFileName(project), data: this.codec.serialize(project), type: 'application/json' });
+    } catch (error) {
+      this.store.notify('error', `The project export failed: ${describe(error)}`);
+    }
   }
 
   /** Imports a project file. An invalid file leaves the current beat alone. */

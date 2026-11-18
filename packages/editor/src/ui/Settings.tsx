@@ -82,7 +82,7 @@ function ExportMenu() {
               <span>MIDI file</span>
               <span className="sb-menu-note">Tempo and drum notes, channel 10</span>
             </Menu.Item>
-            <Menu.Item className="sb-menu-item" data-testid="export-project" onClick={() => runtime.exportProject()}>
+            <Menu.Item className="sb-menu-item" data-testid="export-project" onClick={() => void runtime.exportProject()}>
               <span>Project file</span>
               <span className="sb-menu-note">Editable JSON, reopens here</span>
             </Menu.Item>

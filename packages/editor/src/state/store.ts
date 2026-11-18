@@ -188,7 +188,7 @@ export class EditorStore<Document extends ProjectBase = ProjectBase, Transient e
     });
   }
 
-  setWavExport(wavExport: WavExport): void {
+  setWavExport(wavExport: WavExport | null): void {
     this.set({ wavExport });
   }
 

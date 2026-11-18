@@ -186,10 +186,14 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `SavedBeats.tsx`) and `Shop.tsx`.
 - `apps/mobile/` is the same editor with РИТМ-12 in a Capacitor shell for
   iOS and Android, a Vite page with no server behind it. Its sound is the
-  web view's own worklet and WASM engine. `BoombapbotEditor` takes two
+  web view's own worklet and WASM engine. `BoombapbotEditor` takes three
   things for a shell like it: `storage`, where the draft is kept (the app
-  hands in the device's own store, `src/device-storage.ts`), and `below`,
-  what sits under the machine in place of the cookie notice and the footer.
+  hands in the device's own store, `src/device-storage.ts`); `save`, where
+  an exported file goes (a download when not given; the app hands it to the
+  phone's share sheet, `src/share-file.ts`, because a web view inside an app
+  ignores a download); and `below`, what sits under the machine in place of
+  the cookie notice and the footer. A `save` answers false when the person
+  turned the file down, and an export then claims nothing.
   The app leaves accounts, saved beats and the shop out. Its engine, worklet
   and art are the site's, copied by `scripts/copy-assets.mjs` from what
   `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native

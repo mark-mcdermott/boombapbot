@@ -3,6 +3,7 @@ import type { ProjectBase } from '@boombapbot/contracts';
 import type { Machine, MachineSession } from '../machine';
 import { EditorRuntime } from '../runtime';
 import type { KeyValueStorage } from '../state/draft-storage';
+import type { SaveFile } from '../state/project-io';
 import { RuntimeContext, useEditorState, useRuntime } from './context';
 import { CookieNotice } from './CookieNotice';
 import { Footer } from './Footer';
@@ -22,6 +23,8 @@ export interface BoombapbotEditorProps<
   baseUrl?: string;
   /** Where the draft is kept. The browser's own storage when not given. */
   storage?: KeyValueStorage | null;
+  /** Where an exported file goes. A download when not given. */
+  save?: SaveFile;
   /**
    * What sits under the machine in place of the site's notice and footer,
    * handed the settings button. For a shell with no site behind it, which
@@ -143,8 +146,8 @@ export function BoombapbotEditor<
   Document extends ProjectBase,
   Transient extends object,
   Session extends MachineSession<Document, Transient>,
->({ machine, baseUrl = '/', storage, below }: BoombapbotEditorProps<Document, Transient, Session>) {
-  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine, storage }));
+>({ machine, baseUrl = '/', storage, save, below }: BoombapbotEditorProps<Document, Transient, Session>) {
+  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine, storage, save }));
 
   useEffect(() => {
     runtime.attach();
