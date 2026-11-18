@@ -374,11 +374,13 @@ Two cross-checks worth knowing about:
   in headless Chromium, the phone layout in its device emulation. The same
   tests passed once, on 2026-11-18, in Playwright's builds of WebKit and
   Firefox on a Mac, which are not Safari or Firefox on a phone.
-- **The phone's panel.** It has run only in headless browsers (Chromium,
-  and once in Playwright's WebKit and Firefox), in a 390 by 844 touch
-  screen and in screenshots at 360 and 430 wide. No real
-  phone has shown it, nobody has dragged its knobs with a thumb, and nobody
-  has listened through it. The phone app in `apps/mobile` now gets it,
+- **The phone's panel.** On 2026-11-18 the owner used it on the live site
+  on an iPhone in Chrome and on an Android phone in Chrome, and said of both
+  that it looks and sounds great. That was before its labels had drawings
+  beside them, which no real phone has shown. Nobody has played it for
+  long, tried it in Safari or Firefox on a phone, or held a tablet. The
+  tests run it in headless browsers (Chromium, and once in Playwright's
+  WebKit and Firefox), in a 390 by 844 touch screen. The phone app in `apps/mobile` now gets it,
   being as narrow as a phone. With it the app has run once, in an iPhone
   simulator on 2026-11-18 (shown, a beat playing), and not on Android; the
   app does not load the lettering's typeface.
