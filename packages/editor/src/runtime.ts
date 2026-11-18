@@ -1,9 +1,10 @@
 import { createProjectCodec, type ParseResult, type ProjectBase, type ProjectCodec } from '@boombapbot/contracts';
 import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
 import { exportSongMidi, measureSeconds, renderSong, type LoopRender } from './engine/offline';
+import { renderWav } from './engine/wav-render';
 import { NO_EFFECT, samePattern, sameValues, type EngineSetup, type ExportPlan } from './engine/setup';
 import { SnareWasm } from './engine/wasm-engine';
-import { encodeWav, type WavBitDepth } from './engine/wav';
+import type { WavBitDepth } from './engine/wav';
 import type { Machine, MachineHost, MachineSession } from './machine';
 import {
   browserStorage,
@@ -352,20 +353,24 @@ export class EditorRuntime<
 
   // ---- Import and export ---------------------------------------------------
 
-  /** Renders what an export holds, offline, with a separate engine instance. */
+  /**
+   * Renders what a WAV export holds, here on the main thread, and hands back
+   * the samples. For tests and diagnostics: an export renders in a Worker.
+   */
   async renderLoop(sampleRate: number): Promise<LoopRender> {
     const wasm = await this.loadOfflineWasm();
-    return renderSong(wasm, this.setup(), this.exportPlan(wasm, true), sampleRate);
+    const { project } = this.store.getState();
+    return renderSong(wasm, this.machine.setup(project), this.exportPlan(wasm, project, true), sampleRate);
   }
 
-  /** What an export holds. Throws an error that says why when there is nothing to export. */
-  private exportPlan(wasm: SnareWasm, audio: boolean): ExportPlan {
-    const plan = this.machine.exportPlan(this.store.getState().project);
+  /** What an export of a project holds. Throws an error that says why when there is nothing to export. */
+  private exportPlan(wasm: SnareWasm, project: Document, audio: boolean): ExportPlan {
+    const plan = this.machine.exportPlan(project);
     if ('error' in plan) throw new Error(plan.error);
     if (!audio) return plan;
     // Audio is rendered in memory, so a long track is cut at a whole measure.
     if (!('rhythms' in plan)) return plan;
-    const limit = wholeMeasuresWithin(measureSeconds(wasm, this.setup(), plan), MAX_WAV_SECONDS);
+    const limit = wholeMeasuresWithin(measureSeconds(wasm, this.machine.setup(project), plan), MAX_WAV_SECONDS);
     if (limit < plan.rhythms.length) {
       this.store.notify(
         'info',
@@ -375,12 +380,31 @@ export class EditorRuntime<
     return { ...plan, rhythms: plan.rhythms.slice(0, limit) };
   }
 
+  /**
+   * Renders the beat as it stands now to a WAV, in a Worker, and saves it.
+   * One at a time: asked again while one renders, it does nothing.
+   */
   async exportWav(bitDepth: WavBitDepth = 24, sampleRate = 44100): Promise<void> {
+    if (this.store.getState().wavExport?.state === 'rendering') return;
+    this.store.setWavExport({ state: 'rendering', progress: 0 });
     try {
-      const render = await this.renderLoop(sampleRate);
-      const bytes = encodeWav(render.left, render.right, sampleRate, bitDepth);
-      downloadBytes(`${exportBaseName(this.store.getState().project)}.wav`, bytes, 'audio/wav');
+      const [wasm, engine] = await Promise.all([this.loadOfflineWasm(), this.loadWasmBytes()]);
+      const { project } = this.store.getState();
+      const bytes = await renderWav(
+        {
+          // The Worker takes its own copy; this one stays for the next render.
+          wasm: engine.slice(0),
+          setup: this.machine.setup(project),
+          plan: this.exportPlan(wasm, project, true),
+          sampleRate,
+          bitDepth,
+        },
+        (progress) => this.store.setWavExport({ state: 'rendering', progress }),
+      );
+      downloadBytes(`${exportBaseName(project)}.wav`, bytes, 'audio/wav');
+      this.store.setWavExport({ state: 'done', at: Date.now() });
     } catch (error) {
+      this.store.setWavExport({ state: 'error' });
       this.store.notify('error', `The WAV export failed: ${describe(error)}`);
     }
   }
@@ -388,8 +412,9 @@ export class EditorRuntime<
   async exportMidi(): Promise<void> {
     try {
       const wasm = await this.loadOfflineWasm();
-      const bytes = exportSongMidi(wasm, this.setup(), this.exportPlan(wasm, false));
-      downloadBytes(`${exportBaseName(this.store.getState().project)}.mid`, bytes, 'audio/midi');
+      const { project } = this.store.getState();
+      const bytes = exportSongMidi(wasm, this.machine.setup(project), this.exportPlan(wasm, project, false));
+      downloadBytes(`${exportBaseName(project)}.mid`, bytes, 'audio/midi');
     } catch (error) {
       this.store.notify('error', `The MIDI export failed: ${describe(error)}`);
     }

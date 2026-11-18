@@ -48,8 +48,17 @@ export function loopPasses(tailSeconds: number, loopSeconds: number): number {
  * from its end wrap into its start; with an effect on, it is played often
  * enough for the effect's tail to have settled. Anything else is played once
  * from silence and given time to ring out, the effect's tail included.
+ *
+ * `onProgress` hears how far the render has come, from 0 to 1, at most once
+ * for every hundredth.
  */
-export function renderSong(wasm: SnareWasm, setup: EngineSetup, plan: RenderPlan, sampleRate: number): LoopRender {
+export function renderSong(
+  wasm: SnareWasm,
+  setup: EngineSetup,
+  plan: RenderPlan,
+  sampleRate: number,
+  onProgress?: (fraction: number) => void,
+): LoopRender {
   const blockSize = 1024;
   const engine = wasm.createEngine(sampleRate, blockSize);
   try {
@@ -79,6 +88,7 @@ export function renderSong(wasm: SnareWasm, setup: EngineSetup, plan: RenderPlan
     const right = new Float32Array(end - start);
     const blockLeft = new Float32Array(blockSize);
     const blockRight = new Float32Array(blockSize);
+    let hundredths = 0;
     for (let done = 0; done < end; ) {
       const count = Math.min(blockSize, end - done);
       engine.render(blockLeft, blockRight, count);
@@ -89,6 +99,11 @@ export function renderSong(wasm: SnareWasm, setup: EngineSetup, plan: RenderPlan
         right.set(blockRight.subarray(skip, count), from - start);
       }
       done += count;
+      const reached = Math.floor((done / end) * 100);
+      if (onProgress && reached > hundredths) {
+        hundredths = reached;
+        onProgress(reached / 100);
+      }
     }
 
     const events = engine

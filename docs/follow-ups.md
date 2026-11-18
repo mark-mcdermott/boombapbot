@@ -24,9 +24,10 @@ in this file has been built unless it says so.
    the machine the site had first open converted in the tests, from
    fixtures. Nobody has opened a real one, and the owner had saved none.
    Any stored by someone else stay in the database as they were.
-5. **The settings sheet's wording.** Its "Rhythm" heading, "Press start" and
-   its closing note were written for the earlier machine and for a time
-   before accounts.
+5. **One line in the settings sheet.** Its heading, its audio lines and its
+   closing note were rewritten for РИТМ-12 and for accounts, and the owner
+   has read them. One line there still predates accounts: "This browser is
+   not saving drafts. Export the project to keep it."
 6. **The pages of words.** The owner wants a design pass on About, Docs, the
    manifesto, Credits and Policies.
 7. **Names left in the engine's header.** `engine.h` still names sixteen
@@ -240,11 +241,14 @@ Unverified: everything. No Tauri project exists yet.
   used РИТМ-12 on the live site on an iPhone in Safari and in Firefox, and
   loaded there a beat saved from desktop Chrome. Firefox and Safari on a Mac
   and an Android phone have not been tried on it.
-- **Work on the main thread.** A one-measure render and the synthesis of a
-  sound each take a few milliseconds, so both happen on the main thread. The
-  longest sound of a machine can take several. An export longer than a
-  measure or two should render in a Worker; `renderSong` has no DOM
-  dependencies.
+- **Work on the main thread.** The synthesis of a sound takes a few
+  milliseconds, the longest of a machine several, and happens on the main
+  thread. A WAV export renders in a Worker. Two things are left of that:
+  the settings sheet shows where a render stands, so nobody sees it once
+  the sheet is closed; and a menu item that is switched off has no look of
+  its own, because the editor's `styles.css` has no rule for
+  `.sb-menu-item[data-disabled]` (dimmed, no pointer). Until it has one, the
+  WAV items say "One is rendering now" and look as they always do.
 - **Draft storage.** One draft in `localStorage`, written whole on every
   change, knob moves included. Multiple projects want IndexedDB. Two tabs
   editing at once overwrite each other. An account now holds several beats,

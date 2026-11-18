@@ -10,6 +10,9 @@ export interface Notice {
   details?: string[];
 }
 
+/** A WAV export: how far its render has come, from 0 to 1, or how the last one ended. */
+export type WavExport = { state: 'rendering'; progress: number } | { state: 'done'; at: number } | { state: 'error' };
+
 export interface EditorState<Document extends ProjectBase = ProjectBase, Transient extends object = object> {
   project: Document;
   /** What the machine holds between gestures and does not save, such as a button held down. */
@@ -28,6 +31,8 @@ export interface EditorState<Document extends ProjectBase = ProjectBase, Transie
   draftState: 'saved' | 'error';
   draftSavedAt: number | null;
   notice: Notice | null;
+  /** Null until a WAV has been asked for. */
+  wavExport: WavExport | null;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -80,6 +85,7 @@ export class EditorStore<Document extends ProjectBase = ProjectBase, Transient e
       draftState: 'saved',
       draftSavedAt: null,
       notice: null,
+      wavExport: null,
       canUndo: false,
       canRedo: false,
     };
@@ -180,6 +186,10 @@ export class EditorStore<Document extends ProjectBase = ProjectBase, Transient e
       draftState: ok ? 'saved' : 'error',
       draftSavedAt: ok ? this.now().getTime() : this.state.draftSavedAt,
     });
+  }
+
+  setWavExport(wavExport: WavExport): void {
+    this.set({ wavExport });
   }
 
   notify(kind: Notice['kind'], message: string, details?: string[]): void {

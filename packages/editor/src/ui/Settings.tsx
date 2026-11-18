@@ -2,6 +2,8 @@ import { Menu } from '@base-ui/react/menu';
 import { Settings as SettingsIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
+import type { WavBitDepth } from '../engine/wav';
+import type { WavExport } from '../state/store';
 import { useEditorState, useRuntime } from './context';
 import { ChevronIcon, DownloadIcon, UploadIcon } from './icons';
 import { Modal } from './Modal';
@@ -46,8 +48,14 @@ function NameField() {
   );
 }
 
+const WAV_ITEMS: Array<{ bitDepth: WavBitDepth; testId: string; label: string; note: string }> = [
+  { bitDepth: 24, testId: 'export-wav', label: 'WAV loop', note: '24-bit stereo, one measure' },
+  { bitDepth: 16, testId: 'export-wav-16', label: 'WAV loop, 16-bit', note: 'Stereo, one measure' },
+];
+
 function ExportMenu() {
   const runtime = useRuntime();
+  const rendering = useEditorState((state) => state.wavExport?.state === 'rendering');
   return (
     <Menu.Root>
       <Menu.Trigger className="sb-button" data-testid="export-menu">
@@ -58,14 +66,18 @@ function ExportMenu() {
       <Menu.Portal>
         <Menu.Positioner className="sb-menu-positioner" sideOffset={6} align="end">
           <Menu.Popup className="sb-menu">
-            <Menu.Item className="sb-menu-item" data-testid="export-wav" onClick={() => void runtime.exportWav(24)}>
-              <span>WAV loop</span>
-              <span className="sb-menu-note">24-bit stereo, one measure</span>
-            </Menu.Item>
-            <Menu.Item className="sb-menu-item" data-testid="export-wav-16" onClick={() => void runtime.exportWav(16)}>
-              <span>WAV loop, 16-bit</span>
-              <span className="sb-menu-note">Stereo, one measure</span>
-            </Menu.Item>
+            {WAV_ITEMS.map(({ bitDepth, testId, label, note }) => (
+              <Menu.Item
+                key={testId}
+                className="sb-menu-item"
+                data-testid={testId}
+                disabled={rendering}
+                onClick={() => void runtime.exportWav(bitDepth)}
+              >
+                <span>{label}</span>
+                <span className="sb-menu-note">{rendering ? 'One is rendering now' : note}</span>
+              </Menu.Item>
+            ))}
             <Menu.Item className="sb-menu-item" data-testid="export-midi" onClick={() => void runtime.exportMidi()}>
               <span>MIDI file</span>
               <span className="sb-menu-note">Tempo and drum notes, channel 10</span>
@@ -78,6 +90,42 @@ function ExportMenu() {
         </Menu.Positioner>
       </Menu.Portal>
     </Menu.Root>
+  );
+}
+
+function wavExportSaid(wav: WavExport): string {
+  switch (wav.state) {
+    case 'rendering':
+      return 'Rendering the WAV…';
+    case 'done':
+      return `WAV exported at ${new Date(wav.at).toLocaleTimeString()}`;
+    case 'error':
+      return 'The WAV export failed';
+  }
+}
+
+/**
+ * Where a WAV export stands. A screen reader is told when one starts and how
+ * it ends; the line on the sheet also counts the render up, which would be
+ * too much to have read out.
+ */
+function WavExportStatus() {
+  const wav = useEditorState((state) => state.wavExport);
+  const said = wav ? wavExportSaid(wav) : '';
+  return (
+    <>
+      <span className="sb-visually-hidden" role="status" data-testid="wav-export-said">
+        {said}
+      </span>
+      {wav && (
+        <div className="sb-status" aria-hidden="true">
+          <span data-testid="wav-export-status" data-state={wav.state}>
+            {said}
+            {wav.state === 'rendering' ? ` ${Math.round(wav.progress * 100)}%` : ''}
+          </span>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -140,7 +188,7 @@ export function Settings({ container }: SettingsProps) {
         <Group label="Beat name" labelFor={NAME_FIELD_ID}>
           <NameField />
         </Group>
-        <Group label="Rhythm">
+        <Group label="Patterns">
           <PatternActions />
         </Group>
         <Group label="File">
@@ -156,6 +204,7 @@ export function Settings({ container }: SettingsProps) {
             </button>
             <ExportMenu />
           </div>
+          <WavExportStatus />
         </Group>
         <Group>
           <runtime.machine.Notes />
@@ -166,9 +215,9 @@ export function Settings({ container }: SettingsProps) {
         <Group>
           <p className="sb-footnote">{runtime.machine.keysHelp}</p>
           <p className="sb-hint">
-            v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not
-            recordings of any hardware. Your beat is saved only in this browser; export the project file to keep
-            a copy.
+            v0.1 preview. The drum sounds are made from the knobs; none of them is a recording. Your beat is
+            saved in this browser as you go. To keep a copy or move to another device, export the project file
+            here, or save the beat to a free account from the account button in the footer.
           </p>
         </Group>
       </Modal>
