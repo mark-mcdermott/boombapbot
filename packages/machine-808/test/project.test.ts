@@ -59,7 +59,7 @@ import {
 } from '../src/document';
 
 function read(name: string): string {
-  return readFileSync(new URL(`../../contracts/fixtures/${name}`, import.meta.url), 'utf8');
+  return readFileSync(new URL(`../fixtures/${name}`, import.meta.url), 'utf8');
 }
 
 const fixtureText = read('mixed-rhythms.project.json');

@@ -1,4 +1,4 @@
-import type { EnginePanel, EnginePattern, EngineTrack, SynthSound, WasmEngine } from './wasm-engine';
+import type { EngineEffect, EnginePanel, EnginePattern, EngineTrack, SynthSound, WasmEngine } from './wasm-engine';
 
 /**
  * Everything a machine asks of the engine for one project. Live playback and
@@ -15,6 +15,8 @@ export interface EngineSetup {
   master: number;
   /** The pattern bank, in engine order. */
   patterns: EnginePattern[];
+  /** The effect on the mix, for a machine that has one. */
+  effect?: EngineEffect;
   /** What the engine plays, measure by measure. */
   panel: EnginePanel;
 }
@@ -45,6 +47,7 @@ export function samePattern(a: EnginePattern, b: EnginePattern): boolean {
     a.firstLength === b.firstLength &&
     a.secondLength === b.secondLength &&
     a.stepsPerBeat === b.stepsPerBeat &&
+    a.swing === b.swing &&
     a.rows.length === b.rows.length &&
     a.rows.every((row, index) => row === b.rows[index])
   );
@@ -58,4 +61,5 @@ export function applySetup(engine: WasmEngine, setup: EngineSetup): void {
   engine.setMasterVolume(setup.master);
   engine.setTempo(setup.tempo);
   setup.patterns.forEach((pattern, index) => engine.setPattern(index, pattern));
+  if (setup.effect) engine.setEffect(setup.effect);
 }

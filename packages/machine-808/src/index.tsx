@@ -4,6 +4,7 @@ import { engineSetup, exportPlan } from './engine';
 import { RESTING, Session808, memoryOf, type Transient808 } from './session';
 import { HardwarePanel, PanelNotes } from './ui/HardwarePanel';
 import { KeysHelp, SettingsActions, StatusLines } from './ui/SettingsParts';
+import './styles.css';
 
 export * from './engine';
 export * from './session';

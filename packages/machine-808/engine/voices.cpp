@@ -1,4 +1,4 @@
-// Drum sounds for the 808 panel, built from their knob settings.
+// The 808's voices, built from their knob settings.
 //
 // This is a model made by ear from general descriptions of analogue drum
 // circuits: decaying tuned oscillators, filtered noise and a bank of six
@@ -9,139 +9,23 @@
 //   - all arithmetic is double, cast to float once per sample at the end;
 //   - the C library's sin, cos, tan and exp are used only to work out
 //     coefficients, never inside a per-sample loop;
-//   - noise comes from an integer generator defined here;
-//   - a sound's length comes from plain arithmetic and its tail is faded out.
+//   - noise comes from the integer generator in dsp.h;
+//   - a sound's length comes from plain arithmetic; the engine fades its tail.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 
+#include "boombapbot/dsp.h"
 #include "boombapbot/engine.h"
+#include "boombapbot/voices.h"
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-constexpr double kFadeSeconds = 0.006;
-constexpr double kMaxSeconds = 6.0;
-constexpr double kMinRate = 8000.0;
-constexpr double kMaxRate = 192000.0;
+using boombapbot::Knobs;
+using boombapbot::Voice;
 
-double clamp01(double value) { return std::min(1.0, std::max(0.0, value)); }
-
-double lerp(double from, double to, double amount) { return from + (to - from) * amount; }
-
-// Geometric interpolation, for frequencies and times.
-double sweep(double from, double to, double amount) { return from * std::pow(to / from, amount); }
-
-// Per-sample multiplier for an exponential decay with time constant `seconds`.
-double decayCoefficient(double seconds, double rate) { return std::exp(-1.0 / (seconds * rate)); }
-
-// sin(2*pi*phase) from a polynomial, so every platform computes the same value.
-double sine(double phase) {
-  double turn = phase - std::floor(phase + 0.5);         // [-0.5, 0.5)
-  if (turn > 0.25) turn = 0.5 - turn;
-  if (turn < -0.25) turn = -0.5 - turn;
-  const double x = 2.0 * kPi * turn;                     // [-pi/2, pi/2]
-  const double x2 = x * x;
-  return x * (1.0 - x2 / 6.0 * (1.0 - x2 / 20.0 * (1.0 - x2 / 42.0 * (1.0 - x2 / 72.0 * (1.0 - x2 / 110.0)))));
-}
-
-// A soft limiter with the shape of tanh, from a rational approximation.
-double saturate(double x) {
-  const double limited = std::min(3.0, std::max(-3.0, x));
-  const double squared = limited * limited;
-  return limited * (27.0 + squared) / (27.0 + 9.0 * squared);
-}
-
-class Noise {
- public:
-  explicit Noise(std::uint32_t seed) : state_(seed == 0 ? 0x9e3779b9u : seed) {}
-  double next() {
-    state_ ^= state_ << 13;
-    state_ ^= state_ >> 17;
-    state_ ^= state_ << 5;
-    return static_cast<double>(state_) / 2147483648.0 - 1.0;
-  }
-
- private:
-  std::uint32_t state_;
-};
-
-class Biquad {
- public:
-  static Biquad lowpass(double hz, double q, double rate) { return make(Kind::Low, hz, q, rate); }
-  static Biquad highpass(double hz, double q, double rate) { return make(Kind::High, hz, q, rate); }
-  static Biquad bandpass(double hz, double q, double rate) { return make(Kind::Band, hz, q, rate); }
-
-  double process(double input) {
-    const double output = b0_ * input + z1_;
-    z1_ = b1_ * input - a1_ * output + z2_;
-    z2_ = b2_ * input - a2_ * output;
-    return output;
-  }
-
- private:
-  enum class Kind { Low, High, Band };
-
-  static Biquad make(Kind kind, double hz, double q, double rate) {
-    const double w = 2.0 * kPi * std::min(hz, rate * 0.45) / rate;
-    const double cosine = std::cos(w);
-    const double alpha = std::sin(w) / (2.0 * q);
-    const double a0 = 1.0 + alpha;
-    Biquad filter;
-    if (kind == Kind::Low) {
-      filter.b0_ = (1.0 - cosine) / 2.0 / a0;
-      filter.b1_ = (1.0 - cosine) / a0;
-      filter.b2_ = filter.b0_;
-    } else if (kind == Kind::High) {
-      filter.b0_ = (1.0 + cosine) / 2.0 / a0;
-      filter.b1_ = -(1.0 + cosine) / a0;
-      filter.b2_ = filter.b0_;
-    } else {
-      filter.b0_ = alpha / a0;
-      filter.b1_ = 0.0;
-      filter.b2_ = -alpha / a0;
-    }
-    filter.a1_ = -2.0 * cosine / a0;
-    filter.a2_ = (1.0 - alpha) / a0;
-    return filter;
-  }
-
-  double b0_ = 1.0, b1_ = 0.0, b2_ = 0.0, a1_ = 0.0, a2_ = 0.0;
-  double z1_ = 0.0, z2_ = 0.0;
-};
-
-// A square wave with its edges rounded just enough not to alias.
-class Square {
- public:
-  Square(double hz, double rate) : step_(hz / rate) {}
-  double next() {
-    double value = phase_ < 0.5 ? 1.0 : -1.0;
-    value += edge(phase_);
-    double half = phase_ + 0.5;
-    if (half >= 1.0) half -= 1.0;
-    value -= edge(half);
-    phase_ += step_;
-    if (phase_ >= 1.0) phase_ -= 1.0;
-    return value;
-  }
-
- private:
-  double edge(double t) const {
-    if (t < step_) {
-      const double x = t / step_;
-      return x + x - x * x - 1.0;
-    }
-    if (t > 1.0 - step_) {
-      const double x = (t - 1.0) / step_;
-      return x * x + x + x + 1.0;
-    }
-    return 0.0;
-  }
-
-  double step_;
-  double phase_ = 0.0;
-};
+using namespace boombapbot::dsp;
 
 // The six detuned squares shared by the cymbal, both hi-hats and the cowbell.
 class MetalBank {
@@ -158,15 +42,6 @@ class MetalBank {
  private:
   Square squares_[6];
 };
-
-struct Knobs {
-  double tune;
-  double tone;
-  double decay;
-  double snappy;
-};
-
-using Renderer = void (*)(const Knobs&, double rate, std::uint32_t seed, float* out, int frames);
 
 // ---- Voices ----------------------------------------------------------------
 
@@ -419,14 +294,8 @@ double lowCongaSeconds(const Knobs&) { return drumSeconds(kLowConga); }
 double midCongaSeconds(const Knobs&) { return drumSeconds(kMidConga); }
 double highCongaSeconds(const Knobs&) { return drumSeconds(kHighConga); }
 
-struct Sound {
-  double (*seconds)(const Knobs&);
-  Renderer render;
-  std::uint32_t seed;
-};
-
 // Indexed by SNARE_SOUND_*, which is also the sound slot and the role index.
-constexpr Sound kSounds[SNARE_SOUNDS] = {
+constexpr Voice kVoices[SNARE_SOUNDS] = {
     {kickSeconds, renderKick, 0x0808'0001u},
     {snareSeconds, renderSnare, 0x0808'0002u},
     {closedHatSeconds, renderClosedHat, 0x0808'0003u},
@@ -445,42 +314,9 @@ constexpr Sound kSounds[SNARE_SOUNDS] = {
     {maracasSeconds, renderMaracas, 0x0808'0010u},
 };
 
-bool valid(const SnareSoundParams* params, double rate) {
-  return params != nullptr && params->sound >= 0 && params->sound < SNARE_SOUNDS &&
-         rate >= kMinRate && rate <= kMaxRate;
-}
-
-Knobs knobsOf(const SnareSoundParams& params) {
-  return {clamp01(params.tune), clamp01(params.tone), clamp01(params.decay), clamp01(params.snappy)};
-}
-
-int framesOf(const SnareSoundParams& params, double rate) {
-  const double seconds = std::min(kMaxSeconds, kSounds[params.sound].seconds(knobsOf(params)));
-  return static_cast<int>(seconds * rate);
-}
-
 }  // namespace
 
-extern "C" {
-
-int32_t snare_synth_frames(const SnareSoundParams* params, double sample_rate) {
-  if (!valid(params, sample_rate)) return SNARE_ERR_BAD_ARGUMENT;
-  return framesOf(*params, sample_rate);
+const boombapbot::VoiceTable& boombapbot::machineVoices() {
+  static constexpr VoiceTable table{kVoices, SNARE_SOUNDS};
+  return table;
 }
-
-int32_t snare_synth_render(const SnareSoundParams* params, double sample_rate, float* out,
-                           int32_t capacity) {
-  if (!valid(params, sample_rate) || out == nullptr) return SNARE_ERR_BAD_ARGUMENT;
-  const int frames = framesOf(*params, sample_rate);
-  if (capacity < frames) return SNARE_ERR_TOO_LARGE;
-  const Sound& sound = kSounds[params->sound];
-  sound.render(knobsOf(*params), sample_rate, params->seed == 0 ? sound.seed : params->seed, out, frames);
-  // Every sound ends at exactly zero, whatever its envelope was doing.
-  const int fade = std::min(frames, static_cast<int>(kFadeSeconds * sample_rate));
-  for (int i = 0; i < fade; ++i) {
-    out[frames - 1 - i] = static_cast<float>(static_cast<double>(out[frames - 1 - i]) * i / fade);
-  }
-  return frames;
-}
-
-}  // extern "C"

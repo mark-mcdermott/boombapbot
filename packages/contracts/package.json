@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Project schema, drum roles, kit manifests, panel geometry and cross-client fixtures.",
+  "description": "What every project document carries, and the saved-beat and shop schemas.",
   "exports": {
     ".": "./src/index.ts",
-    "./data/*": "./data/*",
-    "./fixtures/*": "./fixtures/*"
+    "./data/*": "./data/*"
   },
   "dependencies": {
     "zod": "4.6.7"

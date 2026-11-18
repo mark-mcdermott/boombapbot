@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the native engine, its tests and the boombapbot-render tool, then runs
+# Builds the native engine for every machine, with its tests and render tool, then runs
 # CTest. Output: build/native
 set -euo pipefail
 

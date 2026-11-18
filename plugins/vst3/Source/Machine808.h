@@ -1,7 +1,7 @@
 // The 808's instrument tracks as the plugin plays them: each track's sound,
 // the MIDI note that triggers it and where it sits in the mix.
 //
-// Mirrors packages/contracts/data/machine-808.json and roles.json, which are
+// Mirrors packages/machine-808/data/machine-808.json and roles.json, which are
 // the source of truth. The self-test compares this table with those files.
 #pragma once
 
@@ -38,7 +38,7 @@ inline constexpr std::array<TrackSpec, SNARE_TRACKS - 1> kTracks{{
 
 // The panel as a new project leaves it: every sound knob at its centre, the
 // accent and master volume knobs at three quarters. The gains follow
-// packages/contracts/src/machine.ts.
+// packages/machine-808/src/document/machine.ts.
 inline constexpr float kKnobCentre = 0.5f;
 inline constexpr double kPlainGain = 0.6;
 inline constexpr double kAccentGain = 0.9;

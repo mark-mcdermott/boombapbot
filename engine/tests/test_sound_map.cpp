@@ -13,7 +13,7 @@ using namespace snare::test;
 
 namespace {
 
-const std::string kContracts = SNARE_CONTRACTS_DIR;
+const std::string kContracts = SNARE_MACHINE_DIR;
 const std::string kFixture = kContracts + "/fixtures/mixed-rhythms.project.json";
 
 }  // namespace

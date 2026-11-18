@@ -19,7 +19,7 @@ outputs, separate instrument outputs, pedal jacks and memory protection.
 
 Not settled by any of that:
 
-- **How it sounds.** `engine/src/synth808.cpp` is a model made by ear. It
+- **How it sounds.** `packages/machine-808/engine/voices.cpp` is a model made by ear. It
   needs a listen beside a real machine, voice by voice and knob by knob.
 - **Composing over a written track.** The manual says a track can be edited
   "from a certain point onward" without changing its length, and little
@@ -109,8 +109,8 @@ upgrade still opens a modal that says it is not open.
   Paid features are the stranger effects (delay, compression and the like),
   perhaps a place to show beats, and AI add-ons that are not defined yet;
   ordinary effects (distortion, a flanger and the like) stay free. None of it
-  exists. The engine has no effects at all yet, and the exact split is still
-  loose.
+  exists. The engine now has an echo, a reverb, a flanger and a chorus, made
+  for РИТМ-12 and tuned by ear by nobody yet; which are paid is still loose.
 - **The shop** has been open on the live site since 2026-11-16. The catalog
   holds the two products in the Printful store, a hoodie and a sticker, and
   ships wherever Printful does, at Printful's live rate for the address.
@@ -210,7 +210,7 @@ the compile spike. Beyond it:
 - Freeze plugin and parameter IDs before a public beta.
 - The voice switches, knobs and pattern memory as plugin parameters and state.
 - A native JUCE editor sharing the panel manifest in
-  `packages/contracts/data/panels`.
+  `packages/machine-808/data`.
 
 ## Web
 
@@ -260,7 +260,7 @@ the compile spike. Beyond it:
 - **A grid view.** The earlier build had a second editor showing every track
   at once. It was removed so that the panel is the whole machine; one may
   come back as a view of the same project.
-- **Faceplates.** The 808 is a drawing made by `scripts/draw-faceplates.mjs`.
+- **Faceplates.** The 808 is a drawing made by `packages/machine-808/art/draw-faceplate.mjs`.
   Its own licence is not chosen, and the manufacturer's rights in the look of
   the machine need advice before a public release.
 

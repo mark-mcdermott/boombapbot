@@ -1,13 +1,11 @@
 # Faceplate images
 
-Images in this folder are cleared for distribution. A build ships the one
-the panel manifest names in `faceplate.file`: the editor is the 808 alone at
-the moment, so that is `808.svg`. The 606, 707 and 909 photographs are kept
-for when those machines come back; no build ships them. Each image is listed here with
-where it came from, who made it, its licence and what was changed.
-`scripts/check-build.mjs` fails a build that ships a faceplate without an
-entry here, and without either a credit in its panel manifest or
-`faceplate.original` for artwork drawn in this repository.
+Images in this folder are cleared for distribution, and no build ships them:
+the photographs of the 606, 707, 808 and 909 are kept for when those machines
+come back. Each image is listed here with where it came from, who made it,
+its licence and what was changed. The panel a build does ship lives with its
+machine, in the machine package's `art/` folder, with its own record there
+(for the 808, `packages/machine-808/art/README.md`).
 
 The owner's unedited originals are not in the repository. They live in the
 git-ignored `misc/assets/` folder and are used for local development only.
@@ -40,29 +38,6 @@ git-ignored `misc/assets/` folder and are used for local development only.
 - **Licence of this file:** [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/),
   as an adaptation of a share-alike work. Credit Speculos and note the
   changes above.
-
-### `808.svg`
-
-- **Original work:** drawn for boombapbot by
-  [`scripts/draw-faceplates.mjs`](../../scripts/draw-faceplates.mjs). Every
-  shape in the file is produced by that script. No photograph is traced or
-  embedded, so there is nobody to credit, and `808.panel.json` sets
-  `faceplate.original` in place of a credit.
-- **Where the layout comes from:** the controls the editor makes live (step
-  keys and lamps, instrument selector, start/stop, the tempo and fine knobs,
-  every knob of the instrument columns, master volume and the voice
-  switches) are placed from `808.panel.json`. A live switch is drawn as its
-  slot only; the editor draws the lever, and the raised half of the power
-  rocker. Those coordinates were measured on the photograph below.
-  The fixed controls and lettering were placed by eye against the same
-  photograph, as a record of where things are on the machine.
-- **Licence of this file:** the owner's own artwork. No licence has been
-  chosen for it.
-- **Changing it:** edit the script and run `pnpm faceplates:draw`. Do not edit
-  the SVG by hand; `pnpm faceplates:check` fails if the two differ.
-- **What a drawing does not settle:** it avoids the photograph's copyright
-  and its credit. It says nothing about the manufacturer's rights in the look
-  of the machine itself. That needs advice before a public release.
 
 ### `808.webp`
 

@@ -140,7 +140,9 @@ int32_t snare_midi_export(const SnarePattern* patterns, int32_t pattern_count,
 
     for (int played = 0; played < steps; ++played) {
       const std::uint32_t bit = 1u << stepPosition(played, pattern.len1);
-      const std::int32_t tick = measureStart + played * stepLength;
+      const std::int32_t tick =
+          measureStart + played * stepLength +
+          static_cast<std::int32_t>(std::lround(swingTicks(played, stepLength, pattern.steps_per_beat, pattern.swing)));
       const std::uint8_t velocity =
           velocityOf((pattern.rows[0] & bit) != 0 ? accent_velocity : plain_velocity);
       for (int track = 1; track < SNARE_TRACKS; ++track) {

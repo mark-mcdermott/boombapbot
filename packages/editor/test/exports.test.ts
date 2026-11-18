@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { repoRoot, wasmPath } from './helpers';
+import { repoRoot } from './helpers';
 
 /**
  * The engine's C ABI is written down in three places: the header, the list
@@ -19,7 +19,9 @@ function sorted(names: Iterable<string>): string[] {
 }
 
 const header = read('engine/include/boombapbot/engine.h');
-const cmake = read('engine/CMakeLists.txt');
+const cmake = read('engine/cmake/BoombapbotMachine.cmake');
+/** Every engine the WebAssembly build made, one for each machine. */
+const built = readdirSync(resolve(repoRoot, 'build/wasm')).filter((name) => /^boombapbot-engine-.+\.wasm$/.test(name));
 const bridge = read('packages/editor/src/engine/wasm-engine.ts');
 
 const declared = sorted([...header.matchAll(/\b(snare_[a-z0-9_]+)\s*\(/g)].map((match) => match[1]!));
@@ -37,14 +39,17 @@ describe('engine exports', () => {
     expect(exportList).toEqual(declared);
   });
 
-  it('builds a module that exports exactly that list', () => {
-    const module = new WebAssembly.Module(readFileSync(wasmPath));
-    const built = sorted(
-      WebAssembly.Module.exports(module)
-        .filter((entry) => entry.kind === 'function' && entry.name.startsWith('snare_'))
-        .map((entry) => entry.name),
-    );
-    expect(built).toEqual(exportList);
+  it('builds a module for each machine that exports exactly that list', () => {
+    expect(built.length).toBeGreaterThan(0);
+    for (const name of built) {
+      const module = new WebAssembly.Module(readFileSync(resolve(repoRoot, 'build/wasm', name)));
+      const exported = sorted(
+        WebAssembly.Module.exports(module)
+          .filter((entry) => entry.kind === 'function' && entry.name.startsWith('snare_'))
+          .map((entry) => entry.name),
+      );
+      expect(exported, name).toEqual(exportList);
+    }
   });
 
   it('declares in the bridge every function the module exports', () => {

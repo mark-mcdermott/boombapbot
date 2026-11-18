@@ -22,8 +22,8 @@ struct Roles {
   std::vector<std::uint8_t> gmNotes;  // by index
 };
 
-inline Roles loadRoles(const std::string& contractsDir) {
-  const json::Value doc = json::parseFile(contractsDir + "/data/roles.json");
+inline Roles loadRoles(const std::string& machineDir) {
+  const json::Value doc = json::parseFile(machineDir + "/data/roles.json");
   Roles roles;
   const auto& list = doc.at("roles").array;
   roles.ids.resize(list.size());
@@ -57,8 +57,8 @@ struct Machine {
   std::map<std::string, int> indexById;
 };
 
-inline Machine loadMachine(const std::string& contractsDir, const Roles& roles) {
-  const json::Value doc = json::parseFile(contractsDir + "/data/machine-808.json");
+inline Machine loadMachine(const std::string& machineDir, const Roles& roles) {
+  const json::Value doc = json::parseFile(machineDir + "/data/machine-808.json");
   Machine machine;
   const auto slot = [&roles](const json::Value& value) {
     const auto found = roles.indexById.find(value.string);
@@ -167,7 +167,7 @@ inline double levelGain(const Track& track, double level) {
 }
 
 // Gains of a hit on a plain step and on an accented one, for the accent level
-// knob. packages/contracts/src/machine.ts holds the same model.
+// knob. packages/machine-808/src/document/machine.ts holds the same model.
 constexpr double kPlainHit = 0.6;
 inline double accentedHit(double accentLevel) { return kPlainHit + (1.0 - kPlainHit) * accentLevel; }
 

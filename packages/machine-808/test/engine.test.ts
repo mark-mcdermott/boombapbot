@@ -17,7 +17,15 @@ import {
   type Project,
   type Variation,
 } from '../src/document';
-import { applySetup, decodeWav, encodeWav, exportSongMidi, renderSong } from '@boombapbot/editor/engine';
+import {
+  applySetup,
+  decodeWav,
+  encodeWav,
+  exportSongMidi,
+  loopPasses,
+  renderSong,
+  type EngineSetup,
+} from '@boombapbot/editor/engine';
 import {
   engineMix,
   enginePanel,
@@ -31,10 +39,17 @@ import {
   synthSound,
   trackNotes,
 } from '../src/engine';
-import { contractsPath, fixturePath, loadFixture, loadWasm, nativeRenderPath, parseMidi, rms } from './helpers';
+import { fixturePath, loadFixture, loadWasm, machinePath, nativeRenderPath, parseMidi, rms } from './helpers';
 
 const wasm = loadWasm();
 const fixture = loadFixture();
+/**
+ * The most an effect may differ between the native and WebAssembly builds, in
+ * steps of 24-bit audio. An effect feeds its own output back, so the last-bit
+ * differences of the dry mix can add up a little before they die away.
+ */
+const EFFECT_STEPS = 4;
+const BLOCK = 1024;
 /** Every version of a rhythm in the fixture that has hits: [rhythm, version]. */
 const WRITTEN: Array<[number, Variation]> = [
   [0, 'a'],
@@ -346,7 +361,7 @@ describe('WebAssembly engine', () => {
       const midiPath = join(dir, `${name}.mid`);
       execFileSync(nativeRenderPath, [
         '--project', fixturePath,
-        '--contracts', contractsPath,
+        '--machine', machinePath,
         '--rhythm', String(rhythm),
         '--version', variation,
         '--out', wavPath,
@@ -385,6 +400,108 @@ describe('WebAssembly engine', () => {
       // The MIDI file is the same, byte for byte.
       expect(Buffer.from(exportMidi(wasm, fixture, [pattern])).equals(readFileSync(midiPath))).toBe(true);
     }
+  });
+});
+
+describe('the engine\'s swing and effects, native against WebAssembly', () => {
+  /** Two measures of a pattern from silence, as the native tool plays them; the second is returned. */
+  function secondMeasure(pattern: number, prepare: (setup: EngineSetup) => EngineSetup) {
+    const setup = prepare(engineSetup(fixture));
+    const engine = wasm.createEngine(44100, BLOCK);
+    try {
+      engine.enableEventLog(8192);
+      applySetup(engine, setup);
+      const ticks = wasm.patternTicks(setup.patterns[pattern]!);
+      const first = wasm.tickFrame(ticks, setup.tempo, 44100);
+      const both = wasm.tickFrame(ticks * 2, setup.tempo, 44100);
+      const left = new Float32Array(both);
+      const right = new Float32Array(both);
+      engine.cuePattern(pattern);
+      engine.playMeasures(2);
+      for (let done = 0; done < both; done += BLOCK) {
+        const count = Math.min(BLOCK, both - done);
+        engine.render(left.subarray(done, done + count), right.subarray(done, done + count), count);
+      }
+      const events = engine.readEvents().filter((event) => event.frame >= first);
+      return { left: left.subarray(first), right: right.subarray(first), events, first };
+    } finally {
+      engine.destroy();
+    }
+  }
+
+  function nativeMeasure(pattern: number, flags: string[]) {
+    const dir = mkdtempSync(join(tmpdir(), 'boombapbot-fx-'));
+    const wavPath = join(dir, 'loop.wav');
+    const eventsPath = join(dir, 'events.json');
+    execFileSync(nativeRenderPath, [
+      '--project', fixturePath,
+      '--machine', machinePath,
+      '--rhythm', String(pattern >> 1),
+      '--version', pattern % 2 === 1 ? 'b' : 'a',
+      '--out', wavPath,
+      '--events', eventsPath,
+      ...flags,
+    ]);
+    return {
+      audio: decodeWav(new Uint8Array(readFileSync(wavPath)).buffer as ArrayBuffer),
+      events: JSON.parse(readFileSync(eventsPath, 'utf8')) as Array<{ frame: number; step: number }>,
+    };
+  }
+
+  /** The most two renders differ by, in steps of 24-bit audio. */
+  function worstSteps(native: Float32Array, left: Float32Array, right: Float32Array): number {
+    const encoded = decodeWav(encodeWav(left, right, 44100, 24).buffer as ArrayBuffer);
+    let worst = 0;
+    for (let i = 0; i < native.length; i += 1) worst = Math.max(worst, Math.abs(native[i]! - encoded.pcm[i]!));
+    return worst * 8388608;
+  }
+
+  it('plays swung steps on the same frames', () => {
+    if (!existsSync(nativeRenderPath)) return;
+    const pattern = patternIndex(0, 'a');
+    for (const swing of [48, 128]) {
+      const built = secondMeasure(pattern, (setup) => ({
+        ...setup,
+        patterns: setup.patterns.map((entry, index) => (index === pattern ? { ...entry, swing } : entry)),
+      }));
+      const native = nativeMeasure(pattern, ['--swing', String(swing)]);
+      const frames = native.events.filter((event) => event.frame >= built.first).map((event) => event.frame);
+      expect(frames, `swing ${swing}`).toEqual(built.events.map((event) => event.frame));
+      // Some step is late: the measure is not the straight one.
+      const straight = secondMeasure(pattern, (setup) => setup);
+      expect(built.events.map((event) => event.frame)).not.toEqual(straight.events.map((event) => event.frame));
+      expect(worstSteps(native.audio.pcm, built.left, built.right), `swing ${swing}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('renders each effect the same, to within a few steps of 24-bit audio', () => {
+    if (!existsSync(nativeRenderPath)) return;
+    const pattern = patternIndex(0, 'a');
+    const dry = secondMeasure(pattern, (setup) => setup);
+    for (const kind of ['delay', 'reverb', 'flanger', 'chorus'] as const) {
+      const built = secondMeasure(pattern, (setup) => ({ ...setup, effect: { kind, wet: 1 } }));
+      const native = nativeMeasure(pattern, ['--effect', kind, '--wet', '1']);
+      expect(native.audio.frames).toBe(built.left.length);
+      expect(built.left, kind).not.toEqual(dry.left);
+      expect(worstSteps(native.audio.pcm, built.left, built.right), kind).toBeLessThanOrEqual(EFFECT_STEPS);
+    }
+  });
+
+  it('plays a loop often enough for an effect to settle, and the plain loop as before', () => {
+    const plan = exportPlan(fixture);
+    const plain = renderSong(wasm, engineSetup(fixture), plan, 44100);
+    const echoed = renderSong(wasm, { ...engineSetup(fixture), effect: { kind: 'delay', wet: 0.8 } }, plan, 44100);
+    expect(echoed.left.length).toBe(plain.left.length);
+    expect(echoed.events.map((event) => [event.step, event.track])).toEqual(
+      plain.events.map((event) => [event.step, event.track]),
+    );
+    expect(echoed.left).not.toEqual(plain.left);
+    // Twice with nothing ringing on, and a pass more for every loop length the tail lasts.
+    expect(loopPasses(0, 2)).toBe(2);
+    expect(loopPasses(1.9, 2)).toBe(2);
+    expect(loopPasses(2.1, 2)).toBe(3);
+    expect(loopPasses(5.4, 2)).toBe(4);
+    expect(loopPasses(60, 0.5)).toBe(8);
   });
 });
 

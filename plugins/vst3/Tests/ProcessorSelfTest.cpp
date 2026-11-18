@@ -397,8 +397,8 @@ void testState() {
 void testTracksMatchTheContracts() {
   const std::string context = "contracts";
   try {
-    const snare::io::Roles roles = snare::io::loadRoles(SNARE_CONTRACTS_DIR);
-    const snare::io::Machine machine = snare::io::loadMachine(SNARE_CONTRACTS_DIR, roles);
+    const snare::io::Roles roles = snare::io::loadRoles(SNARE_MACHINE_DIR);
+    const snare::io::Machine machine = snare::io::loadMachine(SNARE_MACHINE_DIR, roles);
     check(machine.tracks.size() == snare::plugin::kTracks.size() + 1, context,
           "the machine has an accent track and one track for each of the plugin's");
     for (const snare::plugin::TrackSpec& spec : snare::plugin::kTracks) {

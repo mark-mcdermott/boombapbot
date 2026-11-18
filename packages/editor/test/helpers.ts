@@ -4,14 +4,17 @@ import { fileURLToPath } from 'node:url';
 import { SnareWasm } from '../src/engine';
 
 export const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-export const wasmPath = resolve(repoRoot, 'build/wasm/boombapbot-engine.wasm');
-export const nativeRenderPath = resolve(repoRoot, 'build/native/boombapbot-render');
+/** The engine built for a machine, as WebAssembly. */
+export const wasmPath = (machine: string) => resolve(repoRoot, `build/wasm/boombapbot-engine-${machine}.wasm`);
+/** The native render tool built for a machine. */
+export const renderToolPath = (machine: string) => resolve(repoRoot, `build/native/boombapbot-render-${machine}`);
 
-export function loadWasm(): SnareWasm {
-  if (!existsSync(wasmPath)) {
-    throw new Error(`${wasmPath} is missing. Run "pnpm build:wasm" first.`);
+export function loadWasm(machine: string): SnareWasm {
+  const path = wasmPath(machine);
+  if (!existsSync(path)) {
+    throw new Error(`${path} is missing. Run "pnpm build:wasm" first.`);
   }
-  return SnareWasm.fromBytes(readFileSync(wasmPath));
+  return SnareWasm.fromBytes(readFileSync(path));
 }
 
 export function rms(signal: Float32Array): number {

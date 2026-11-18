@@ -18,7 +18,7 @@ const seconds = Number(process.argv[2] ?? 60);
 const sampleRate = Number(process.argv[3] ?? 48000);
 const block = 128;
 
-const module = new WebAssembly.Module(readFileSync(join(root, 'build/wasm/boombapbot-engine.wasm')));
+const module = new WebAssembly.Module(readFileSync(join(root, 'build/wasm/boombapbot-engine-808.wasm')));
 const imports = {};
 for (const entry of WebAssembly.Module.imports(module)) {
   (imports[entry.module] ??= {})[entry.name] = () => 0;

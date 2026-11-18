@@ -14,6 +14,7 @@
 #include "sequencer.h"
 #include "boombapbot/engine.h"
 #include "spsc_queue.h"
+#include "fx.h"
 #include "timeline.h"
 
 namespace snare {
@@ -42,6 +43,10 @@ constexpr float kSettled = 1e-5f;
 constexpr int kChunk = 128;
 // Room for a few loud voices landing on one step before the limiter acts.
 constexpr float kHeadroom = 0.9f;
+// The meter reads the output averaged over about this long.
+constexpr double kMeterSeconds = 0.3;
+// Below this the meter reads nothing, and stops decaying into tiny numbers.
+constexpr float kQuiet = 1e-12f;
 
 constexpr int kMaxSampleFrames = 192000 * 30;
 
@@ -70,6 +75,7 @@ enum class CommandType : std::int32_t {
   SetTrackLevel,
   SetAccent,
   SetMasterVolume,
+  SetEffect,
   SetPattern,
   SetStep,
   CuePattern,
@@ -138,17 +144,18 @@ inline float softLimit(float x) {
 }
 
 inline bool validPattern(const SnarePattern& pattern) {
-  return validShape(pattern.len1, pattern.len2, pattern.steps_per_beat);
+  return validShape(pattern.len1, pattern.len2, pattern.steps_per_beat) && pattern.swing <= SNARE_SWING_MAX;
 }
 
 }  // namespace
 }  // namespace snare
 
 struct SnareEngine {
-  explicit SnareEngine(double rate) : sampleRate(rate) {
+  explicit SnareEngine(double rate) : sampleRate(rate), effect(rate) {
     chokeStep = static_cast<float>(1.0 / std::max(1.0, snare::kChokeSeconds * rate));
     declickFrames = std::max(1, static_cast<int>(snare::kDeclickSeconds * rate));
     smoothing = static_cast<float>(1.0 - std::exp(-1.0 / (snare::kSmoothSeconds * rate)));
+    meterCoefficient = static_cast<float>(1.0 - std::exp(-1.0 / (snare::kMeterSeconds * rate)));
     for (SnarePattern& empty : bank) {
       empty.len1 = SNARE_PART_STEPS;
       empty.steps_per_beat = 4;
@@ -177,6 +184,7 @@ struct SnareEngine {
   std::atomic<double> stopFrame{-1.0};
   std::atomic<int> activeVoices{0};
   std::atomic<std::uint32_t> stolenVoices{0};
+  std::atomic<float> outputMeanSquare{0.0f};
 
   // ---- control thread ----------------------------------------------------
   std::vector<SnareSound*> draining;  // replaced sounds that still have tails
@@ -194,6 +202,9 @@ struct SnareEngine {
   float masterVolume = 1.0f;
   float masterSmoothed = 1.0f;
   bool masterSet = false;
+  snare::Effect effect;
+  float meterCoefficient = 1.0f;
+  float meanSquare = 0.0f;
   float levelRamp[SNARE_TRACKS][snare::kChunk];
 
   double bpm = 120.0;
@@ -223,6 +234,8 @@ struct SnareEngine {
   int measureFirst = SNARE_PART_STEPS;  // steps in its 1st part, its length and
   int measureSteps = SNARE_PART_STEPS;  // its step size, all fixed for the
   int measureStepTicks = 6;             // measure when it began
+  int measureStepsPerBeat = 4;
+  int measureSwing = 0;
   int nextStep = 0;              // steps played so far; measureSteps is the bar line
   std::int64_t nextEventFrame = 0;
   std::int64_t measures = 0;     // measures started since play
@@ -239,14 +252,22 @@ struct SnareEngine {
   int eventCapacity = 0;
   std::atomic<int> eventCount{0};
 
-  void updateTempo() { tickFrames = snare::framesPerTick(bpm, sampleRate); }
+  void updateTempo() {
+    tickFrames = snare::framesPerTick(bpm, sampleRate);
+    effect.setTempo(snare::clampBpm(bpm));
+  }
 
   std::int64_t tickToFrame(std::int64_t tick) const {
     return anchorFrame + snare::roundFrame((static_cast<double>(tick) - anchorTick) * tickFrames);
   }
 
+  // The next step, late by its swing, or the bar line, which never swings.
   void scheduleNextEvent() {
-    nextEventFrame = tickToFrame(measureTick + static_cast<std::int64_t>(nextStep) * measureStepTicks);
+    const std::int64_t tick = measureTick + static_cast<std::int64_t>(nextStep) * measureStepTicks;
+    const double late = nextStep < measureSteps
+                            ? snare::swingTicks(nextStep, measureStepTicks, measureStepsPerBeat, measureSwing)
+                            : 0.0;
+    nextEventFrame = anchorFrame + snare::roundFrame((static_cast<double>(tick) + late - anchorTick) * tickFrames);
   }
 
   // Moves the anchor to `at` so a tempo change does not shift past events.
@@ -261,6 +282,8 @@ struct SnareEngine {
     measureFirst = shape.len1;
     measureSteps = shape.len1 + shape.len2;
     measureStepTicks = snare::stepTicks(shape.steps_per_beat);
+    measureStepsPerBeat = shape.steps_per_beat;
+    measureSwing = shape.swing;
   }
 
   std::int64_t measureTicks() const { return static_cast<std::int64_t>(measureSteps) * measureStepTicks; }
@@ -506,6 +529,9 @@ struct SnareEngine {
         if (!masterSet) masterSmoothed = masterVolume;
         masterSet = true;
         break;
+      case CommandType::SetEffect:
+        effect.set(command.a, static_cast<float>(command.value));
+        break;
       case CommandType::SetPattern:
         bank[command.a] = command.pattern;
         // Stopped, a new shape is taken at once. Playing, it waits for the
@@ -714,11 +740,16 @@ struct SnareEngine {
       offset = segmentEnd;
     }
 
+    effect.process(left, right, frames, smoothing);
+
     for (int i = 0; i < frames; ++i) {
       masterSmoothed = snare::approach(masterSmoothed, masterVolume, smoothing);
       left[i] = snare::softLimit(left[i] * snare::kHeadroom) * masterSmoothed;
       right[i] = snare::softLimit(right[i] * snare::kHeadroom) * masterSmoothed;
+      meanSquare += (0.5f * (left[i] * left[i] + right[i] * right[i]) - meanSquare) * meterCoefficient;
     }
+    if (meanSquare < snare::kQuiet) meanSquare = 0.0f;
+    outputMeanSquare.store(meanSquare, std::memory_order_relaxed);
 
     frame += frames;
     int active = 0;
@@ -894,6 +925,19 @@ int32_t snare_engine_set_master_volume(SnareEngine* engine, double volume) {
   return engine->enqueue(command);
 }
 
+int32_t snare_engine_set_effect(SnareEngine* engine, int32_t effect, double wet) {
+  if (!engine || effect < SNARE_EFFECT_NONE || effect > SNARE_EFFECT_CHORUS || !(wet >= 0.0 && wet <= 1.0)) {
+    return SNARE_ERR_BAD_ARGUMENT;
+  }
+  snare::Command command;
+  command.type = snare::CommandType::SetEffect;
+  command.a = effect;
+  command.value = wet;
+  return engine->enqueue(command);
+}
+
+double snare_effect_tail_seconds(int32_t effect, double bpm) { return snare::effectTailSeconds(effect, bpm); }
+
 int32_t snare_engine_set_pattern(SnareEngine* engine, int32_t index, const SnarePattern* pattern) {
   if (!engine || !pattern || !validPatternIndex(index) || !snare::validPattern(*pattern)) {
     return SNARE_ERR_BAD_ARGUMENT;
@@ -1050,6 +1094,10 @@ int32_t snare_engine_active_voices(const SnareEngine* engine) {
 
 uint32_t snare_engine_stolen_voices(const SnareEngine* engine) {
   return engine ? engine->stolenVoices.load(std::memory_order_relaxed) : 0;
+}
+
+double snare_engine_output_level(const SnareEngine* engine) {
+  return engine ? std::sqrt(static_cast<double>(engine->outputMeanSquare.load(std::memory_order_relaxed))) : 0.0;
 }
 
 int32_t snare_engine_read_measures(SnareEngine* engine, SnareMeasure* out, int32_t max_measures) {

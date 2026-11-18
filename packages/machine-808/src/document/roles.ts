@@ -1,4 +1,4 @@
-import rolesDocument from '@boombapbot/contracts/data/roles.json';
+import rolesDocument from '../../data/roles.json';
 
 /**
  * A role is one sound the engine can play. Its `index` is the engine's sound

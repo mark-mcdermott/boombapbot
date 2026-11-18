@@ -10,16 +10,15 @@
 // editor also draws each switch's lever and lights the lamps, so only a
 // switch's slot is drawn here, and every lamp is drawn unlit.
 //
-//   node scripts/draw-faceplates.mjs           write assets/faceplates/*.svg
-//   node scripts/draw-faceplates.mjs --check   fail if a committed file differs
+//   node packages/machine-808/art/draw-faceplate.mjs           write 808.svg beside this file
+//   node packages/machine-808/art/draw-faceplate.mjs --check   fail if the committed file differs
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const panelDir = join(root, 'packages/contracts/data/panels');
-const outDir = join(root, 'assets/faceplates');
+const outDir = dirname(fileURLToPath(import.meta.url));
+const panelDir = join(outDir, '../data');
 
 // ---- SVG helpers -----------------------------------------------------------
 
@@ -587,20 +586,20 @@ for (const [id, draw] of Object.entries(DRAWINGS)) {
   const panel = JSON.parse(readFileSync(join(panelDir, `${id}.panel.json`), 'utf8'));
   const svg = draw(panel);
   if (BRANDING.test(svg)) {
-    console.error(`draw-faceplates: the ${id} drawing contains a brand or product name.`);
+    console.error(`draw-faceplate: the ${id} drawing contains a brand or product name.`);
     process.exit(1);
   }
   const target = join(outDir, `${id}.svg`);
   if (check) {
     const ok = existsSync(target) && readFileSync(target, 'utf8') === svg;
-    console.log(`${ok ? 'ok      ' : 'differs '} assets/faceplates/${id}.svg`);
+    console.log(`${ok ? 'ok      ' : 'differs '} packages/machine-808/art/${id}.svg`);
     if (!ok) stale += 1;
   } else {
     writeFileSync(target, svg);
-    console.log(`wrote    assets/faceplates/${id}.svg (${svg.length} bytes)`);
+    console.log(`wrote    packages/machine-808/art/${id}.svg (${svg.length} bytes)`);
   }
 }
 if (stale > 0) {
-  console.error('draw-faceplates: run pnpm faceplates:draw and commit the result.');
+  console.error('draw-faceplate: run pnpm faceplates:draw and commit the result.');
   process.exit(1);
 }
