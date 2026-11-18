@@ -11,6 +11,27 @@ in this file has been built unless it says so.
    in desktop Chrome and on an iPhone in Safari and Firefox. Firefox and
    Safari on a Mac and an Android phone have not shown it, and nobody has
    played it for long on a phone.
+   A phone, and a tablet held upright, get a panel of their own since
+   2026-11-18 (`?panel=picture` brings the picture back). What it still
+   needs:
+   - The owner on a real phone: whether a thumb finds the keys (the step
+     keys are about 39px on a 390px screen), whether the knobs drag well,
+     and how much of it shows above the fold with the browser's bars.
+   - Its paint. The olive and the rust are drawn in CSS and are flatter than
+     the picture. One painted plate with no controls on it would replace
+     them.
+   - A phone on its side. It is wider than 900px on the largest phones and
+     narrower on the rest, so some get the picture and some get a column
+     taller than the screen. Neither was designed for it.
+   - The instrument strip, the fit button and the dock are still in the
+     code, for a small screen that asks for the picture. They can go if
+     nobody wants the picture there.
+   - The phone app. `apps/mobile` is as narrow as a phone, so it gets this
+     panel, and nobody has run it that way. It does not load the
+     lettering's typeface, so the lettering falls back to another face.
+   - Decisions it made that are the owner's: step numbers on the keys,
+     МУТ on its key, one level knob for the selected voice where the picture
+     has eight, no level meter, and controls dimmed while the power is off.
 2. **A closer listen.** The owner has heard it and likes it. Its eight
    voices, how far each knob reaches and its four effects were set by
    measurement more than by ear, and nobody has gone through them one by
@@ -28,8 +49,8 @@ in this file has been built unless it says so.
    closing note were rewritten for РИТМ-12 and for accounts, and the owner
    has read them. One line there still predates accounts: "This browser is
    not saving drafts. Export the project to keep it."
-6. **The pages of words.** The owner wants a design pass on About, Docs, the
-   manifesto, Credits and Policies.
+6. **The pages of words.** Their design pass was done on 2026-11-17. What it
+   left for the owner to decide is under "Accounts, upgrades and the shop".
 7. **Names left in the engine's header.** `engine.h` still names sixteen
    sound slots after the earlier machine's sounds (`SNARE_SOUND_KICK` and
    the rest). Nothing here needs more than their numbers; they can go once
@@ -189,9 +210,14 @@ site its icon still opens a modal that says it is not open.
   not legal advice; nobody qualified has read it. It says no sales tax or
   VAT is collected, which is true of the site and is not a view on what the
   owner owes. Update it again before the upgrade is sold.
-- **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own text, put
-  in word for word on 2026-11-15, "for now". It mentions a small paid tier,
-  which does not exist yet; the shop is the only thing with a price.
+- **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own position.
+  Their first text went in word for word on 2026-11-15. On 2026-11-18 they
+  asked for its wording to be gone over, and what is there now is that
+  rewrite: the same claims in the same order, in four short paragraphs. It
+  no longer speaks of a paid tier, which did not exist; it says the machine
+  has a shop, which it does. It ends on thinking about all this and names
+  nothing done about it; if there is something, that sentence is the
+  owner's to write.
 - **The pages of words** were laid out again on 2026-11-17: a compact
   masthead that names the pages, headings in a rail, About opening on a
   still of the machine, and the manifesto as one narrow column. Left for the
@@ -205,8 +231,6 @@ site its icon still opens a modal that says it is not open.
     and "Who made it" moved up to third. No claim was added.
   - Whether "Docs" should be called "Manual".
   - Whether the manifesto is signed. It is not.
-  - The manifesto speaks of a small paid tier while About says upgrades are
-    not here yet. Neither was changed.
   - Credits is still blank.
 
 ## Native shells
@@ -224,12 +248,13 @@ native engine instance.
 A first slice is built in `apps/mobile`: the editor with РИТМ-12 in a
 Capacitor shell, playing through the web view's own worklet and WASM
 engine, with the draft kept in the device's own store and no accounts,
-saved beats or shop. On 2026-11-17 it ran in an iPhone simulator (the
-machine shown, a beat playing, the draft back after a relaunch) and its
-Android debug build succeeded without being run. Nobody has listened to it
-or held it on a phone. `apps/mobile/README.md` lists what is not right yet
-(export is untried on Android, the words are the site's, the
-sideways layout, a stand-in icon) and what a store needs: signing, accounts
+saved beats or shop. On 2026-11-17 it ran in an iPhone simulator and in an
+Android emulator: the machine shown, a beat playing, the draft back after a
+relaunch, an export handed to the share sheet and a project file imported.
+Nobody has listened to it or held it on a phone. `apps/mobile/README.md`
+lists what is not right yet (Android's share sheet cannot save to the
+phone itself, the words are the site's, the sideways layout, a stand-in
+icon) and what a store needs: signing, accounts
 in the app with the delete step both stores require, Apple's rule on selling
 the upgrade, and Google Play's closed test of 12 testers for 14 days.
 
@@ -295,7 +320,24 @@ Unverified: everything. No Tauri project exists yet.
   - The site's own values, set in Vercel for Production (see
     `apps/site/.env.example`). A changed value needs a new deployment: run
     the workflow by hand. All of them are set there as of 2026-11-16.
-- **Browsers.** The tests run in headless Chromium. On 2026-11-18 the owner
+- **Browsers.** The tests run in headless Chromium. On 2026-11-18 the whole
+  browser suite also passed in Playwright's builds of WebKit and Firefox on a
+  Mac (`BOOMBAPBOT_E2E_BROWSER`), the pages of words and the phone's panel
+  with it. That is not Safari or Firefox on a phone, and nobody listened: it
+  says the pages lay out and the controls answer. Two things it turned up:
+  - In Safari the delete question on a saved beat never took focus. Safari
+    does not focus a button when it is clicked, and the question had only
+    looked right in Chromium because the clicked button was reused for it.
+    Fixed; it now takes focus by hand.
+  - In Safari the library the modals are made with (`@base-ui/react`) gives
+    the focus guard at each end of an open modal the role of a button and
+    no name, so VoiceOver can land on an unnamed button there. It is the
+    library's own doing for Safari. The scans leave the guards out
+    (`scanner` in `e2e/helpers.ts`); nobody has listened to a modal with
+    VoiceOver.
+  Safari also keeps Tab for form controls and reaches a link with Option
+  and Tab unless its own setting says otherwise, so the footer's links are
+  not on the plain Tab key there. That is Safari, not the site. On 2026-11-18 the owner
   used РИТМ-12 on the live site on an iPhone in Safari and in Firefox, and
   loaded there a beat saved from desktop Chrome. Firefox and Safari on a Mac
   and an Android phone have not been tried on it.

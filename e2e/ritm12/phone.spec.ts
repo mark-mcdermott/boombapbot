@@ -1,8 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { beat, openMachine } from './helpers';
+import { beat } from './helpers';
 
-test('on a phone the picture keeps a workable size and scrolls sideways, or fits the screen', async ({ page }) => {
-  await openMachine(page);
+// A phone gets the phone's panel, which phone-panel.spec.ts covers. These hold
+// what a phone gets when its address asks for the picture instead.
+
+async function openPicture(page: import('@playwright/test').Page): Promise<void> {
+  await page.goto('/?panel=picture');
+  await expect(page.getByTestId('editor')).toBeVisible();
+  await expect(page.getByTestId('plate')).toBeVisible();
+}
+
+test('a phone that asks for the picture gets it at a workable size, scrolling sideways or fitted to the screen', async ({ page }) => {
+  await openPicture(page);
   const scroll = page.locator('.rt-scroll');
   const widths = () => scroll.evaluate((node) => ({ inner: node.scrollWidth, outer: node.clientWidth }));
   const zoomed = await widths();
@@ -16,8 +25,8 @@ test('on a phone the picture keeps a workable size and scrolls sideways, or fits
   await expect(page.getByTestId('fit')).toHaveText('Zoom in');
 });
 
-test('on a phone an instrument is chosen from the strip, and the dock starts the machine', async ({ page }) => {
-  await openMachine(page);
+test('with the picture on a phone an instrument is chosen from the strip, and the dock starts the machine', async ({ page }) => {
+  await openPicture(page);
   await expect(page.locator('.rt-touch')).toBeVisible();
   await page.getByTestId('strip-open_hat').click();
   expect((await beat(page)).panel.selected).toBe('open_hat');

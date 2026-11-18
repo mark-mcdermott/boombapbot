@@ -1,6 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { openEditor } from './helpers';
+import { openEditor, scanner } from './helpers';
 
 test.describe('the page around the machine', () => {
   test('on the machine’s page the header is the brand alone, with no machines to choose from for now', async ({ page }) => {
@@ -11,16 +10,17 @@ test.describe('the page around the machine', () => {
     await expect(page.locator('[data-testid^="machine-"]')).toHaveCount(0);
   });
 
-  test('the footer has about, docs, manifesto, credits, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
+  test('the footer has about, docs, manifesto, policies, upgrade, cart, settings and account, in that order', async ({ page }) => {
     await openEditor(page);
-    const ids = ['nav-about', 'nav-docs', 'nav-manifesto', 'nav-credits', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
+    const ids = ['nav-about', 'nav-docs', 'nav-manifesto', 'nav-policies', 'upgrade', 'cart', 'settings', 'account'];
     const xs: number[] = [];
     for (const id of ids) xs.push((await page.getByTestId(id).boundingBox())!.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-docs')).toHaveAccessibleName('Docs');
     await expect(page.getByTestId('nav-manifesto')).toHaveAccessibleName('Manifesto');
-    await expect(page.getByTestId('nav-credits')).toHaveAccessibleName('Credits');
+    // Credits has nothing on it yet, so nothing leads to it.
+    await expect(page.getByTestId('nav-credits')).toHaveCount(0);
     await expect(page.getByTestId('nav-policies')).toHaveAccessibleName('Policies');
     await expect(page.getByTestId('upgrade')).toHaveAccessibleName('Upgrade');
     await expect(page.getByTestId('cart')).toHaveAccessibleName('Cart');
@@ -43,7 +43,7 @@ test.describe('the page around the machine', () => {
         .toBeLessThan(2);
       // It fades in; a scan of half-faded text would see contrast that is not there.
       await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
-      const results = await new AxeBuilder({ page }).analyze();
+      const results = await scanner(page).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
       await page.keyboard.press('Escape');
       await expect(modal).toHaveCount(0);
@@ -119,7 +119,6 @@ test.describe('the page around the machine', () => {
       ['nav-about', 'About'],
       ['nav-docs', 'Docs'],
       ['nav-manifesto', 'Manifesto'],
-      ['nav-credits', 'Credits'],
       ['nav-policies', 'Policies'],
       ['upgrade', 'Upgrade'],
       ['cart', 'Cart'],
@@ -141,11 +140,12 @@ test.describe('the page around the machine', () => {
     await expect(tip).toHaveCount(0);
   });
 
-  test('a tip shows for the keyboard too, and goes when its modal opens', async ({ page }) => {
+  test('a tip shows for the keyboard too, and goes when its modal opens', async ({ page, browserName }) => {
     await openEditor(page);
     const tip = page.getByTestId('tip');
     await page.locator('.sb-made a').focus();
-    await page.keyboard.press('Tab');
+    // Safari moves to a link with Option and Tab, unless a setting of its own says Tab alone will do.
+    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByTestId('nav-about')).toBeFocused();
     await expect(tip).toHaveText('About');
 
@@ -159,7 +159,7 @@ test.describe('the page around the machine', () => {
   test('each footer icon moves when it is pointed at', async ({ page }) => {
     await openEditor(page);
     // These hold a pose for as long as the pointer stays.
-    for (const id of ['nav-manifesto', 'cart', 'settings']) {
+    for (const id of ['cart', 'settings']) {
       const drawing = page.getByTestId(id).locator('svg');
       expect(await drawing.evaluate((node) => getComputedStyle(node).transform)).toBe('none');
       await page.getByTestId(id).hover();
@@ -169,7 +169,7 @@ test.describe('the page around the machine', () => {
     const played: [string, number][] = [
       ['nav-about', 3],
       ['nav-docs', 2],
-      ['nav-credits', 1],
+      ['nav-manifesto', 1],
       ['nav-policies', 3],
       ['upgrade', 1],
       ['account', 2],
@@ -192,7 +192,7 @@ test.describe('the page around the machine', () => {
     const footer = (await page.locator('.sb-footer').boundingBox())!;
     expect(box.y).toBeGreaterThanOrEqual(panel.y + panel.height);
     expect(footer.y).toBeGreaterThanOrEqual(box.y + box.height);
-    expect((await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+    expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
 
     await page.getByTestId('cookie-notice-ok').click();
     await expect(notice).toHaveCount(0);
@@ -201,13 +201,15 @@ test.describe('the page around the machine', () => {
     await expect(notice).toHaveCount(0);
   });
 
+  // The pages the footer and the masthead lead to.
   const wordPages = [
     ['about', 'РИТМ-12 is a rhythm computer from a factory that never existed.'],
     ['docs', 'How to use РИТМ-12'],
     ['manifesto', 'Stay Stoked, Stay Woke'],
-    ['credits', 'Credits'],
     ['policies', 'Policies'],
   ] as const;
+  // Credits is a page too, though nothing leads to it until it has something on it.
+  const everyPage = [...wordPages, ['credits', 'Credits']] as const;
 
   for (const [id, heading] of wordPages) {
     test(`the ${id} page is a page of its own with the same header and footer`, async ({ page }) => {
@@ -223,7 +225,9 @@ test.describe('the page around the machine', () => {
       await page.getByTestId('account').click();
       await expect(page.getByTestId('account-modal')).toBeVisible();
       await page.keyboard.press('Escape');
-      const results = await new AxeBuilder({ page }).analyze();
+      // It fades out; a scan while it is going would see contrast that is not there.
+      await expect(page.getByTestId('account-modal')).toHaveCount(0);
+      const results = await scanner(page).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
       // A line break in the page's source must not swallow the space before a link or a bold word.
       expect(await page.locator('main').innerText()).not.toMatch(/[a-z,.:;](mm\.coffee|[А-ЯЁ]{3,})/);
@@ -236,7 +240,7 @@ test.describe('the page around the machine', () => {
 
     test(`the ${id} page names the pages beside a small brand, and its own heading is the largest thing on it`, async ({ page }) => {
       await page.goto(`/${id}`);
-      const names = ['Machine', 'About', 'Docs', 'Manifesto', 'Credits', 'Policies'];
+      const names = ['Machine', 'About', 'Docs', 'Manifesto', 'Policies'];
       const links = page.getByRole('navigation', { name: 'Pages' }).getByRole('link');
       await expect(links).toHaveText(names);
       // Each is read without pointing at anything, and the one for this page is marked.
@@ -255,6 +259,9 @@ test.describe('the page around the machine', () => {
       await expect(page.getByTestId('editor')).toBeVisible();
     });
 
+  }
+
+  for (const [id, heading] of everyPage) {
     test(`the ${id} page fits a phone`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.goto(`/${id}`);
@@ -262,14 +269,14 @@ test.describe('the page around the machine', () => {
       await expect(page.locator('h1')).toHaveCount(1);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
-      // All six names are on the screen, each large enough for a thumb.
+      // Every name is on the screen, each large enough for a thumb.
       for (const link of await page.getByRole('navigation', { name: 'Pages' }).getByRole('link').all()) {
         const box = (await link.boundingBox())!;
         expect(box.x).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width).toBeLessThanOrEqual(375);
         expect(box.height).toBeGreaterThanOrEqual(40);
       }
-      const results = await new AxeBuilder({ page }).analyze();
+      const results = await scanner(page).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
     });
   }
@@ -312,9 +319,12 @@ test.describe('the page around the machine', () => {
     expect(footer.y - (column.y + column.height)).toBeLessThanOrEqual(120);
   });
 
-  test('the credits page is still blank, and ends where it does', async ({ page }) => {
+  test('the credits page is still blank, stands at its address, and ends where it does', async ({ page }) => {
     await page.goto('/credits');
     await expect(page.locator('main')).toHaveText('Credits');
+    // It has the same masthead and footer as the others, with no name lit in either.
+    await expect(page.getByRole('navigation', { name: 'Pages' }).getByRole('link')).toHaveCount(5);
+    await expect(page.locator('[aria-current="page"]')).toHaveCount(0);
     const blank = (await page.getByTestId('credits-blank').boundingBox())!;
     const footer = (await page.locator('.sb-footer').boundingBox())!;
     expect(footer.y - (blank.y + blank.height)).toBeLessThanOrEqual(120);

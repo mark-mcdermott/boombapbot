@@ -37,6 +37,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 - `pnpm test:e2e` tests the production build, so run `pnpm build` first.
   It needs `pnpm exec playwright install chromium` once on a new machine.
+  CI runs Chromium only. To try another engine, install it once
+  (`pnpm exec playwright install webkit firefox`) and name it:
+  `BOOMBAPBOT_E2E_BROWSER=webkit pnpm test:e2e`. That is Playwright's own
+  build of WebKit or Firefox on this computer, not Safari on a phone.
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
   `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`,
   `realtime`, `synthesis`, `swing`, `fx`, and `test_ritm12_voices`).
@@ -114,9 +118,38 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   control's accessible name is English, and a control that moves says what
   it did in an `aria-live` line as well as on the machine's screen. The
   mouse wheel must not turn a knob: it would hijack scrolling the page.
+- The panel has two views of one wiring. `ui/wiring.ts` (`useWiring`) reads
+  the machine's state once and makes every control's name, state and action
+  from it; `PicturePanel` (in `ui/Panel.tsx`) and `ui/PhonePanel.tsx` only
+  draw it, through the same `Key`, `Lamp` and knob code in `ui/Controls.tsx`.
+  A control is added or changed in the wiring, never in one view alone, and
+  a control keeps one test id in both.
+- Which view shows is decided in `ui/Panel.tsx` (`usePanelView`): the phone's
+  panel on a screen up to 900px wide, which is a phone or a tablet held
+  upright, and the picture on anything wider. It follows the width as it
+  changes, and nothing is lost in between, because the beat is in the store.
+  A page's address can ask for either by name, `?panel=phone` or
+  `?panel=picture`, at any width. The phone's panel is not the
+  picture shrunk. The page lays out parts cut from the picture
+  (`art/phone/`) in a column: nameplate, screen, the eight voices, the step
+  keys with the write switch, patterns with dice and clear, the transport
+  and mute, and three tabs (voice, tempo, effect) that hold the knobs. Its
+  styles are the `.rt-ph` part of `src/styles.css`, in the page's own
+  pixels; a knob's body and pointer line are a piece of the picture shrunk
+  about the knob's centre (`PHONE_KNOBS` in `ui/layout.ts`). Its paint and
+  rust are drawn in CSS until the owner paints a blank plate. The lettering
+  is drawn by the stylesheet (`Lettered`), as paint is, so it is not text of
+  the page; names stay English, with the lettering after a tab's name as it
+  is after a key's. The screen is the same drawing in a second shape
+  (`PHONE_SCREEN` in `ui/Screen.tsx`); keep `PICTURE_SCREEN` as it is
+  painted. It sets `data-own-transport`, which tells the editor to leave the
+  docked start button out. It is laid out for a screen up to 430px wide and
+  grows as a whole, by up to 1.3 times, where there is more room
+  (`useGrowth`).
 - Its art is `art/` in its package: `plate.webp`, `patch/` and `pointer/`,
   with where it comes from in `art/README.md`. `art/cut-art.py` cuts it
-  from the owner's pictures in the git-ignored `misc/assets/ritm12/`; do not
+  from the owner's pictures in the git-ignored `misc/assets/ritm12/`, and
+  `art/cut-phone-parts.py` cuts `phone/` from what that made; do not
   edit the cut files by hand. A build ships every image in the machine's
   `art/` folder, served under `machines/<id>/` and named by
   `art` in the asset manifest; `check-build` fails a build whose art is not
@@ -198,7 +231,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   phone's share sheet, `src/share-file.ts`, because a web view inside an app
   ignores a download); and `below`, what sits under the machine in place of
   the cookie notice and the footer. A `save` answers false when the person
-  turned the file down, and an export then claims nothing.
+  turned the file down, and an export then claims nothing. It can take as
+  long as the person does, so a WAV export has a `saving` state between
+  `rendering` and `done`, and another WAV cannot be asked for in either.
   The app leaves accounts, saved beats and the shop out. Its engine, worklet
   and art are the site's, copied by `scripts/copy-assets.mjs` from what
   `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native
@@ -298,7 +333,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   (`packages/editor/src/ui/Settings.tsx`).
 - `Header` (the brand: mascot over the tagline, together as tall as the
   wordmark beside them) and
-  `Footer` (About, Docs, manifesto, credits, policies, upgrade, cart,
+  `Footer` (About, Docs, manifesto, policies, upgrade, cart,
   settings, account) are shared. On the machine's page the header is the
   brand alone.
 - `SitePage` wraps a page of words; About, Docs, the manifesto, Credits and
@@ -329,7 +364,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   they were taken; take them again if the panel's art changes. The words on
   About are the owner's to edit.
 - Credits is blank until the owner writes it. The ruled outline on it
-  (`.sb-blank`) is drawn in CSS and holds no words.
+  (`.sb-blank`) is drawn in CSS and holds no words. Nothing leads to it
+  while it is blank: it is left out of `SITE_PAGES`, so neither the
+  masthead nor the footer names it, and its page stands at `/credits`. Put
+  it back in that list, with an icon in `Footer.tsx`, when it has words.
 - On the machine's page the footer sits 50px under the machine
   (`--footer-drop`, `.sb-below-machine`). On a page of words it follows the
   words, so a short page ends where its words do. Keep
@@ -340,7 +378,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
   and a move of its own when pointed at. The tip is for the eye only: the
   icon keeps its `aria-label`. The moves are CSS that picks shapes inside
-  lucide's icons by their order, so look at all nine after changing an icon
+  lucide's icons by their order, so look at all eight after changing an icon
   or upgrading `lucide-react`.
 - The upgrade's modal is `ui/Upgrade.tsx` (see Upgrade below). While the
   server says it is closed, which the live site does, it says it is not open
@@ -356,6 +394,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument strip, the fit button and the docked start button.
+  Those three are now only for a small screen whose address asks for the
+  picture: the phone's panel has keys of its own for all three and shows
+  none of them.
 - A panel's power switch makes everything else on it `inert`.
 - Browser tests reach buried controls through `openSettings`
   (`e2e/helpers.ts`), and РИТМ-12 through `beat`, `step` and its test ids

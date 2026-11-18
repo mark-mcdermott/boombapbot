@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Download, type Page } from '@playwright/test';
 
 // What every browser test shares, whichever machine the build is. A machine's
@@ -11,6 +12,17 @@ export interface DebugSnapshot<Project = unknown> {
   soundsSent: number;
   soundsTaken: number;
   project: Project;
+}
+
+/**
+ * An accessibility scan of the page as it stands. The library the modals
+ * are made with puts a focus guard at each end of an open one. In Safari it
+ * gives them the role of a button, so that VoiceOver can land on them, and
+ * no name, which a scan there reports for every modal. That is the
+ * library's doing and is left out; docs/follow-ups.md records it.
+ */
+export function scanner(page: Page): AxeBuilder {
+  return new AxeBuilder({ page }).exclude('[data-base-ui-focus-guard]');
 }
 
 export async function openEditor(page: Page): Promise<void> {

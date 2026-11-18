@@ -1,9 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
 import { PASSWORD, ROW_ID, UUID, signedUp, signedUpRequest } from './account';
 import { ACCOUNTS_URL, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL, serverEnv } from './accounts-server';
-import { openEditor } from './helpers';
+import { openEditor, scanner } from './helpers';
 import { mailTo, newAddress } from './mail';
 import { checkoutEvent } from './stripe';
 
@@ -326,7 +325,7 @@ test('the modal sells it: the price, the way to Stripe and the way back', async 
   await expect(page.getByTestId('upgrade-price')).toHaveText('$5.00');
   await expect(page.getByTestId('upgrade-buy')).toHaveText('Pay $5.00 on Stripe');
   await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
-  expect((await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+  expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
 
   // Nobody is logged in, so Stripe is told of no account and asks for the address itself.
   const checkout = await buyInModal(page, request);
@@ -351,8 +350,10 @@ test('coming back from Stripe without paying opens the offer again', async ({ pa
   expect(new URL(page.url()).search).toBe('');
 });
 
-test('someone logged in buys it in the modal, and the key shows there once Stripe says so', async ({ page, request, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+test('someone logged in buys it in the modal, and the key shows there once Stripe says so', async ({ page, request, context, browserName }) => {
+  // Only Chromium lets a test read the clipboard back.
+  const readsClipboard = browserName === 'chromium';
+  if (readsClipboard) await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const address = await signedUp(page);
   await page.getByTestId('account-close').click();
   await openUpgrade(page);
@@ -373,9 +374,9 @@ test('someone logged in buys it in the modal, and the key shows there once Strip
 
   await page.getByTestId('upgrade-copy').click();
   await expect(page.getByTestId('upgrade-copied')).toHaveText('Copied.');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(key);
+  if (readsClipboard) expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(key);
   const modal = page.getByTestId('upgrade-modal');
-  expect((await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+  expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
 
   // It is still there on another visit, with nothing to buy and nothing to thank.
   await page.reload();

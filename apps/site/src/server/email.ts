@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { EMAIL_FROM, EMAIL_OUTBOX, RESEND_API_KEY } from 'astro:env/server';
 import { Resend } from 'resend';
@@ -21,7 +21,10 @@ export interface EmailMessage {
  */
 async function fileInOutbox(folder: string, message: EmailMessage): Promise<void> {
   await mkdir(folder, { recursive: true });
-  await writeFile(join(folder, `${Date.now()}-${randomUUID()}.json`), JSON.stringify(message, null, 2));
+  // Written under another name and then renamed, so whoever reads the folder never finds half a message.
+  const file = join(folder, `${Date.now()}-${randomUUID()}.json`);
+  await writeFile(`${file}.part`, JSON.stringify(message, null, 2));
+  await rename(`${file}.part`, file);
 }
 
 /**

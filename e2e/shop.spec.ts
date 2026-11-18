@@ -1,7 +1,6 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { ACCOUNTS_URL, FAKE_SERVICES_URL, PRINTFUL_WEBHOOK_SECRET } from './accounts-server';
-import { openEditor } from './helpers';
+import { openEditor, scanner } from './helpers';
 import { linkIn, newAddress } from './mail';
 import { checkoutEvent } from './stripe';
 
@@ -85,7 +84,7 @@ const forOrder = (all: FakeCall[], order: string) => {
 async function violations(page: Page): Promise<string[]> {
   const modal = page.getByTestId('cart-modal');
   await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
-  const found = (await new AxeBuilder({ page }).analyze()).violations;
+  const found = (await scanner(page).analyze()).violations;
   return found.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`);
 }
 

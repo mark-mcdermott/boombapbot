@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { PATTERN_NAMES, VOICES, isStepOn, type Project } from '../document';
 import { useRuntime } from './context';
 import { INSTRUMENTS, METER, SCREEN, meterAngle } from './layout';
@@ -26,16 +26,66 @@ interface ScreenProps {
   line: { current: ScreenLine };
 }
 
+/** How the screen is laid out, in pixels of its own. The picture's screen and the phone's are two shapes of one drawing. */
+export interface ScreenShape {
+  width: number;
+  height: number;
+  /** Canvas pixels to each of the shape's own. */
+  density: number;
+  /** How far the glow of the green spreads, against the picture's. */
+  glow: number;
+  /** The line along the top: the pattern on the left, the tempo on the right, and the rule under them. */
+  head: { font: string; left: number; right: number; base: number; rule: number };
+  /** The grid of steps. `text` is how far under a row's top its name stands; a cell is drawn `inset` from its sides and `trim` short of the row. */
+  grid: { font: string; label: number; left: number; top: number; width: number; row: number; text: number; inset: number; trim: number };
+  /** The marks under the grid for accented steps. */
+  accent: { drop: number; inset: number; height: number };
+  /** The line along the bottom. */
+  foot: { font: string; left: number; base: number };
+  /** The lines typed out when the machine is switched on. */
+  boot: { left: number; top: number; gap: number };
+}
+
+/** The screen as it is painted on the picture. */
+export const PICTURE_SCREEN: ScreenShape = {
+  width: SCREEN.width,
+  height: SCREEN.height,
+  density: 2,
+  glow: 1,
+  head: { font: `600 15px ${MONO}`, left: 38, right: 432, base: 44, rule: 52 },
+  grid: { font: `600 12px ${MONO}`, label: 36, left: 88, top: 62, width: 344, row: 20, text: 13, inset: 2, trim: 5 },
+  accent: { drop: 3, inset: 5, height: 3 },
+  foot: { font: `600 13px ${MONO}`, left: 48, base: 251 },
+  boot: { left: 40, top: 62, gap: 24 },
+};
+
+/** The phone's screen: wider for its height, and sized in the phone's own pixels. */
+export const PHONE_SCREEN: ScreenShape = {
+  width: 304,
+  height: 128,
+  density: 3,
+  glow: 0.6,
+  head: { font: `700 9px ${MONO}`, left: 12, right: 292, base: 15, rule: 20 },
+  grid: { font: `700 8px ${MONO}`, label: 11, left: 44, top: 25, width: 248, row: 10.5, text: 7.5, inset: 1.5, trim: 3.5 },
+  accent: { drop: 1.5, inset: 3.5, height: 2 },
+  foot: { font: `700 9px ${MONO}`, left: 12, base: 122 },
+  boot: { left: 14, top: 24, gap: 14.5 },
+};
+
 /**
- * The machine's screen and its level meter. Both are drawn a frame at a time
- * from the store and the engine's output level, outside React: nothing here
- * re-renders as the machine plays.
+ * Draws the screen on a canvas a frame at a time, from the store, outside
+ * React: nothing re-renders as the machine plays. `each` is called on every
+ * frame with whether the power is on, for whatever else moves with it.
  */
-export function ScreenAndMeter({ line }: ScreenProps) {
+export function useScreen(
+  canvas: RefObject<HTMLCanvasElement | null>,
+  line: { current: ScreenLine },
+  shape: ScreenShape,
+  each?: (power: boolean) => void,
+): void {
   const runtime = useRuntime();
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const needle = useRef<HTMLDivElement>(null);
-  const shadow = useRef<HTMLDivElement>(null);
+  const onFrame = useRef(each);
+  onFrame.current = each;
 
   useEffect(() => {
     const context = canvas.current?.getContext('2d');
@@ -44,7 +94,6 @@ export function ScreenAndMeter({ line }: ScreenProps) {
     let power = runtime.store.getState().power;
     // Someone who asked for less motion gets the screen already on.
     let switchedAt = still ? -Infinity : performance.now();
-    let decibels = -40;
     let frame = 0;
 
     const draw = (now: number) => {
@@ -53,7 +102,7 @@ export function ScreenAndMeter({ line }: ScreenProps) {
         power = state.power;
         switchedAt = still ? -Infinity : now;
       }
-      drawScreen(context, state.project, {
+      drawScreen(context, shape, state.project, {
         power,
         since: (now - switchedAt) / 1000,
         step: state.currentStep,
@@ -62,21 +111,34 @@ export function ScreenAndMeter({ line }: ScreenProps) {
         line: now < line.current.until ? line.current.text : null,
       });
       if (canvas.current && !still) canvas.current.style.opacity = String(power ? 0.93 + Math.random() * 0.07 : 1);
-
-      // The needle rises quickly and falls back slowly, as a meter's does.
-      const target = power ? 20 * Math.log10(runtime.outputLevel() + 1e-6) + METER_REFERENCE : -40;
-      decibels += (target - decibels) * (target > decibels ? 0.4 : 0.07);
-      const turn = `rotate(${meterAngle(decibels)}deg)`;
-      if (needle.current) needle.current.style.transform = turn;
-      if (shadow.current) shadow.current.style.transform = turn;
+      onFrame.current?.(power);
       frame = requestAnimationFrame(draw);
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [runtime, line]);
+  }, [runtime, canvas, line, shape]);
+}
+
+/** The picture's screen and its level meter. */
+export function ScreenAndMeter({ line }: ScreenProps) {
+  const runtime = useRuntime();
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const needle = useRef<HTMLDivElement>(null);
+  const shadow = useRef<HTMLDivElement>(null);
+  const decibels = useRef(-40);
+
+  useScreen(canvas, line, PICTURE_SCREEN, (power) => {
+    // The needle rises quickly and falls back slowly, as a meter's does.
+    const target = power ? 20 * Math.log10(runtime.outputLevel() + 1e-6) + METER_REFERENCE : -40;
+    decibels.current += (target - decibels.current) * (target > decibels.current ? 0.4 : 0.07);
+    const turn = `rotate(${meterAngle(decibels.current)}deg)`;
+    if (needle.current) needle.current.style.transform = turn;
+    if (shadow.current) shadow.current.style.transform = turn;
+  });
 
   const { left, bottom, width, length } = METER.needle;
   const needleBox = { left: left - width / 2, bottom, width, height: length };
+  const shape = PICTURE_SCREEN;
   return (
     <>
       <div className="rt-meter" style={boxOf(METER.rect)} aria-hidden="true">
@@ -85,12 +147,20 @@ export function ScreenAndMeter({ line }: ScreenProps) {
         <div ref={needle} className="rt-needle" style={needleBox} data-testid="meter-needle" />
       </div>
       <div className="rt-screen" style={boxOf(SCREEN.rect)} aria-hidden="true">
-        <canvas ref={canvas} width={SCREEN.width * 2} height={SCREEN.height * 2} data-testid="screen" />
+        <canvas ref={canvas} width={shape.width * shape.density} height={shape.height * shape.density} data-testid="screen" />
         <div className="rt-screen-lines" />
         <div className="rt-screen-glass" />
       </div>
     </>
   );
+}
+
+/** The phone's screen: the same drawing in the phone's shape, to sit inside the frame the page lays out. */
+export function PhoneScreen({ line }: ScreenProps) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useScreen(canvas, line, PHONE_SCREEN);
+  const shape = PHONE_SCREEN;
+  return <canvas ref={canvas} width={shape.width * shape.density} height={shape.height * shape.density} data-testid="screen" />;
 }
 
 interface ScreenState {
@@ -104,10 +174,10 @@ interface ScreenState {
   line: string | null;
 }
 
-function drawScreen(g: CanvasRenderingContext2D, project: Project, state: ScreenState): void {
-  const { width, height } = SCREEN;
+function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Project, state: ScreenState): void {
+  const { width, height, glow, head, grid, accent, foot, boot } = shape;
   const middle = { x: width / 2, y: height / 2 };
-  g.setTransform(2, 0, 0, 2, 0, 0);
+  g.setTransform(shape.density, 0, 0, shape.density, 0, 0);
   g.clearRect(0, 0, width, height);
   g.shadowColor = '#35ff7c';
   g.shadowBlur = 0;
@@ -119,13 +189,14 @@ function drawScreen(g: CanvasRenderingContext2D, project: Project, state: Screen
     // Switched off, the picture collapses to a line and is gone.
     if (state.since > 0.35) return;
     const left = 1 - state.since / 0.35;
+    const across = width * 0.86 * left * left;
     g.fillStyle = `rgba(190, 255, 215, ${left})`;
-    g.shadowBlur = 18;
-    g.fillRect(middle.x - 200 * left * left, middle.y, 400 * left * left, 2);
+    g.shadowBlur = 18 * glow;
+    g.fillRect(middle.x - across / 2, middle.y, across, 2 * glow);
     return;
   }
 
-  const bloom = g.createRadialGradient(middle.x, middle.y, 20, middle.x, middle.y, 300);
+  const bloom = g.createRadialGradient(middle.x, middle.y, width * 0.04, middle.x, middle.y, width * 0.64);
   bloom.addColorStop(0, '#07220f');
   bloom.addColorStop(1, '#020a05');
   g.fillStyle = bloom;
@@ -134,73 +205,74 @@ function drawScreen(g: CanvasRenderingContext2D, project: Project, state: Screen
   if (state.since < WARM) {
     // Switched on, a line opens out into the picture.
     const done = state.since / WARM;
+    const across = width * 0.9 * Math.min(1, done * 2);
     g.fillStyle = 'rgba(200, 255, 220, .95)';
-    g.shadowBlur = 22;
-    const tall = done < 0.5 ? 2 : 2 + (done - 0.5) * 2 * 240;
-    g.fillRect(middle.x - 210 * Math.min(1, done * 2), middle.y - tall / 2, 420 * Math.min(1, done * 2), tall);
+    g.shadowBlur = 22 * glow;
+    const tall = done < 0.5 ? 2 * glow : 2 * glow + (done - 0.5) * 2 * height * 0.88;
+    g.fillRect(middle.x - across / 2, middle.y - tall / 2, across, tall);
     return;
   }
 
   g.fillStyle = GREEN;
-  g.shadowBlur = 7;
-  g.font = `600 15px ${MONO}`;
+  g.shadowBlur = 7 * glow;
+  g.font = head.font;
   if (state.since < BOOTED) {
     let typed = Math.floor((state.since - WARM) * 62);
     BOOT_LINES.forEach((text, index) => {
-      g.fillText(text.slice(0, Math.max(0, typed)), 40, 62 + index * 24);
+      g.fillText(text.slice(0, Math.max(0, typed)), boot.left, boot.top + index * boot.gap);
       typed -= text.length;
     });
     return;
   }
 
   const shown = project.patterns[project.panel.pattern]!;
-  g.fillText(`ПАТТЕРН ${PATTERN_NAMES[project.panel.pattern]}`, 38, 44);
+  g.fillText(`ПАТТЕРН ${PATTERN_NAMES[project.panel.pattern]}`, head.left, head.base);
   g.textAlign = 'right';
-  g.fillText(`ТЕМП ${project.tempo}`, 432, 44);
+  g.fillText(`ТЕМП ${project.tempo}`, head.right, head.base);
   g.textAlign = 'left';
   g.globalAlpha = 0.5;
-  g.fillRect(38, 52, 394, 1);
+  g.fillRect(head.left, head.rule, head.right - head.left, glow);
   g.globalAlpha = 1;
 
-  const left = 88;
-  const top = 62;
-  const cell = 344 / project.size;
-  const rowHeight = 20;
+  const { left, top } = grid;
+  const cell = grid.width / project.size;
+  const rowHeight = grid.row;
+  const under = top + VOICES.length * rowHeight;
   // The running step is shown only while the pattern on the screen is the one playing.
   if (state.step >= 0 && state.playing === project.panel.pattern) {
     g.globalAlpha = 0.16;
     g.shadowBlur = 0;
-    g.fillRect(left + state.step * cell, top - 2, cell, VOICES.length * rowHeight + 12);
+    g.fillRect(left + state.step * cell, top - grid.inset, cell, under - top + accent.drop + accent.height + 3 * grid.inset);
     g.globalAlpha = 1;
   }
-  g.font = `600 12px ${MONO}`;
+  g.font = grid.font;
   INSTRUMENTS.forEach((instrument, index) => {
     const y = top + index * rowHeight;
     const selected = instrument.voice === project.panel.selected;
     const quiet = project.mix.mutes[instrument.voice] ? 0.3 : 1;
-    g.shadowBlur = 6;
+    g.shadowBlur = 6 * glow;
     g.globalAlpha = (selected ? 1 : 0.55) * quiet;
-    g.fillText(`${selected ? '▸' : ' '}${instrument.short}`, 36, y + 13);
+    g.fillText(`${selected ? '▸' : ' '}${instrument.short}`, grid.label, y + grid.text);
     for (let step = 0; step < project.size; step += 1) {
       const on = isStepOn(shown.steps[instrument.voice], step);
       g.globalAlpha = (on ? 1 : 0.2) * quiet;
-      g.shadowBlur = on ? 9 : 0;
+      g.shadowBlur = on ? 9 * glow : 0;
       if (on) {
-        g.fillRect(left + step * cell + 2, y + 2, cell - 4, rowHeight - 5);
+        g.fillRect(left + step * cell + grid.inset, y + grid.inset, cell - 2 * grid.inset, rowHeight - grid.trim);
       } else {
         g.strokeStyle = GREEN;
-        g.lineWidth = 1;
-        g.strokeRect(left + step * cell + 2.5, y + 2.5, cell - 5, rowHeight - 6);
+        g.lineWidth = glow;
+        g.strokeRect(left + step * cell + grid.inset + glow / 2, y + grid.inset + glow / 2, cell - 2 * grid.inset - glow, rowHeight - grid.trim - glow);
       }
     }
   });
   g.globalAlpha = 1;
-  g.shadowBlur = 6;
+  g.shadowBlur = 6 * glow;
   for (let step = 0; step < project.size; step += 1) {
-    if (isStepOn(shown.accents, step)) g.fillRect(left + step * cell + 5, top + VOICES.length * rowHeight + 3, cell - 10, 3);
+    if (isStepOn(shown.accents, step)) g.fillRect(left + step * cell + accent.inset, under + accent.drop, cell - 2 * accent.inset, accent.height);
   }
 
-  g.font = `600 13px ${MONO}`;
+  g.font = foot.font;
   const resting = `${project.size === 16 ? '16 ПРЯМОЙ' : '12 ТРИОЛИ'}  ${EFFECT_NAMES[project.effect.kind]}${state.recording ? '  ● ЗАПИСЬ' : ''}`;
-  g.fillText(state.line ?? resting, 48, 251);
+  g.fillText(state.line ?? resting, foot.left, foot.base);
 }
