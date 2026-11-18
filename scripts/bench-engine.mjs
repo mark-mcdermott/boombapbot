@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Worst-case load on the WebAssembly engine: every track hits on every step of
-// a 32-step measure of thirty-second notes at the fastest tempo, with every
-// decay knob fully right, rendered in 128-frame blocks as an AudioWorklet
-// would. Reports how much faster than real time it runs.
+// Worst-case load on РИТМ-12's WebAssembly engine: every voice hits on every
+// step of a 32-step measure of thirty-second notes at the fastest tempo, with
+// every decay knob fully right and the reverb fully in, rendered in 128-frame
+// blocks as an AudioWorklet would. Reports how much faster than real time it
+// runs. The machine itself never asks for this much: its measure is sixteen
+// steps.
 //
 //   node scripts/bench-engine.mjs [seconds] [sampleRate]
 //
@@ -18,7 +20,7 @@ const seconds = Number(process.argv[2] ?? 60);
 const sampleRate = Number(process.argv[3] ?? 48000);
 const block = 128;
 
-const module = new WebAssembly.Module(readFileSync(join(root, 'build/wasm/boombapbot-engine-808.wasm')));
+const module = new WebAssembly.Module(readFileSync(join(root, 'build/wasm/boombapbot-engine-ritm12.wasm')));
 const imports = {};
 for (const entry of WebAssembly.Module.imports(module)) {
   (imports[entry.module] ??= {})[entry.name] = () => 0;
@@ -26,8 +28,11 @@ for (const entry of WebAssembly.Module.imports(module)) {
 const x = new WebAssembly.Instance(module, imports).exports;
 x._initialize?.();
 
-const TRACKS = 12;
-const SOUNDS = 16;
+// The accent and the machine's eight voices.
+const TRACKS = 9;
+const SOUNDS = 8;
+const PATTERN_TRACKS = 12;
+const EFFECT_REVERB = 2;
 const engine = x.snare_engine_create(sampleRate);
 
 // Every sound at its longest. A sound's number is also its slot.
@@ -46,12 +51,15 @@ for (let track = 1; track < TRACKS; track += 1) x.snare_engine_set_track(engine,
 
 const pattern = x.malloc(52);
 const view = new DataView(x.memory.buffer);
-for (let track = 0; track < TRACKS; track += 1) view.setUint32(pattern + track * 4, 0xffffffff, true);
+for (let track = 0; track < PATTERN_TRACKS; track += 1) {
+  view.setUint32(pattern + track * 4, track < TRACKS ? 0xffffffff : 0, true);
+}
 view.setUint8(pattern + 48, 16);
 view.setUint8(pattern + 49, 16);
 view.setUint8(pattern + 50, 8);
 view.setUint8(pattern + 51, 0);
 if (x.snare_engine_set_pattern(engine, 0, pattern) !== 0) throw new Error('the pattern was rejected');
+x.snare_engine_set_effect(engine, EFFECT_REVERB, 1);
 x.snare_engine_set_tempo(engine, 300);
 x.snare_engine_play(engine);
 

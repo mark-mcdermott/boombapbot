@@ -4,7 +4,7 @@
 #include <cstring>
 #include <vector>
 
-#include "../tools/project_io.h"
+#include "../tools/render.h"
 #include "test_util.h"
 
 using namespace snare::test;

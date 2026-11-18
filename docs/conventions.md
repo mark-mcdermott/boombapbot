@@ -1,12 +1,11 @@
 # boombapbot
 
 A drums-only beat maker. This repo holds v0.1: a web editor that is one drum
-machine, РИТМ-12, running entirely locally, plus a VST3 compile spike.
-РИТМ-12 is invented for boombapbot and is the machine the site ships. The
-808, the machine the site had first, is still here as a second machine
-package and is not shipped; it is on its way out of this repository, so do
-not build anything new on it. `README.md` says what is built and how it was
-verified, and `docs/follow-ups.md` has what is left and in what order. Accounts exist and
+machine, РИТМ-12, running entirely locally. РИТМ-12 is invented for
+boombapbot. It is the only machine in this repository, and it is a package
+that plugs into a core that knows no machine, so another machine can be
+built elsewhere on the same core. `README.md` says what is built and how it
+was verified, and `docs/follow-ups.md` has what is left and in what order. Accounts exist and
 are optional: sign-up, log-in and password reset, and a free account can
 hold up to 20 saved beats. The rest of the build spec's wider scope
 (background sync, native shells, billing) is not started.
@@ -26,8 +25,6 @@ pnpm dev                   # http://localhost:4321
 Checks, in the order CI runs them:
 
 ```bash
-pnpm kits:check            # committed 606/707/909 WAVs match their generator
-pnpm faceplates:check      # committed faceplate drawing matches its generator
 pnpm build:engine          # also runs the engine tests
 pnpm build:wasm
 pnpm typecheck
@@ -36,18 +33,14 @@ pnpm build                 # production build, then scripts/check-build.mjs
 pnpm test:e2e              # Playwright, against apps/site/dist
 ```
 
-CI then builds the 808 and runs its panel's tests, with
-`BOOMBAPBOT_MACHINE=808` in front of `pnpm build` and `pnpm test:e2e`.
-
 - `pnpm test:e2e` tests the production build, so run `pnpm build` first.
   It needs `pnpm exec playwright install chromium` once on a new machine.
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
-  `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
-  `realtime`, `synth`, `swing`, `fx`, and `test_ritm12_voices`).
-- One Vitest file: `pnpm exec vitest run packages/machine-808/test/engine.test.ts`.
+  `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`,
+  `realtime`, `synthesis`, `swing`, `fx`, and `test_ritm12_voices`).
+- One Vitest file: `pnpm exec vitest run packages/machine-ritm12/test/native.test.ts`.
 - One Playwright file: `pnpm exec playwright test e2e/ritm12/panel.spec.ts`.
-- VST3 spike: `cmake -S plugins/vst3 -B build/vst3 -G Ninja`, then
-  `cmake --build build/vst3`, then `ctest --test-dir build/vst3`.
+- `pnpm bench` measures the WebAssembly engine at its worst case.
 
 ## How it fits together
 
@@ -58,23 +51,17 @@ CI then builds the 808 and runs its panel's tests, with
   output level for a meter. It builds natively and to WebAssembly from the
   same sources. Do not add a second engine in JavaScript, even to work
   around a failing WASM build.
-- A machine is one package, and the rest is core that knows no machine.
-  `packages/machine-808/` is the 808: its project document
-  (`src/document/`: `project.ts`, version 2, with the move from version 1 in
-  `legacy.ts`; the tracks, tempo and level model in `machine.ts`; the sounds
-  in `roles.ts`; the panel geometry in `hardware.ts`), what its controls do
-  and how it plays and composes (`src/session.ts`), what it asks of the
-  engine (`src/engine.ts`) and its panel (`src/ui/`). `src/index.tsx` puts
-  those together as a `Machine`. Core must never import a machine package.
+- A machine is one package, and the rest is core that knows no machine. A
+  machine package holds its project document (`src/document/`), what its
+  controls do (`src/session.ts`), what it asks of the engine
+  (`src/engine.ts`), its panel (`src/ui/`, with `src/styles.css`), its
+  voices (`engine/voices.cpp`), its data, fixtures and art, and
+  `src/index.tsx`, which puts those together as a `Machine`. Core must never
+  import a machine package, and the editor's own `styles.css` has no machine
+  in it.
 - `packages/contracts/` holds what every machine shares: what any project
   document carries and the codec a build makes from its machines
   (`document.ts`), saved beats and the shop.
-- A machine package also holds its data and what the engine needs from it:
-  for the 808, its JSON data files (`data/`) and fixtures (`fixtures/`),
-  which the C++ tests read by path, so a change there is checked on both
-  sides; its voices (`engine/voices.cpp`); its panel art and the script that
-  draws it (`art/`); and its panel's styles (`src/styles.css`, imported by
-  its `index.tsx`). The editor's own `styles.css` has no machine in it.
 - The engine is only ever built for a machine. The core
   (`engine/src/engine.cpp`, `midi.cpp`, `synth.cpp`) has no voices; a
   machine's sources define `boombapbot::machineVoices()`
@@ -83,9 +70,18 @@ CI then builds the 808 and runs its panel's tests, with
   That gives `boombapbot-engine-<id>.wasm` and, natively,
   `boombapbot_engine_<id>`. A plain `cmake -S engine` builds every machine
   package in the repository; `BOOMBAPBOT_MACHINE_DIRS` names them otherwise.
-  The engine's test suites and render tool are still written against the
-  808's project and track table, so the 808's `engine/CMakeLists.txt` builds
-  them (`boombapbot-render-808 --project FILE --machine packages/machine-808`).
+- The engine's own tests (`engine/tests/`) are built with a test machine of
+  two plain voices, `test_machine.cpp`, so they need no real one. A real
+  machine's voices are tested in its own package, as
+  `packages/machine-ritm12/engine/test_voices.cpp` does.
+- The render tool (`engine/tools/render_cli.cpp`) knows no machine either.
+  It is built once for each (`boombapbot-render-<id>`) and plays an engine
+  setup, written as JSON, through the native engine: `--setup run.json`
+  with `--out`, `--events` and `--midi`. `engine/tools/setup_io.h` applies a
+  setup with the same calls, in the same order, as `applySetup` in the
+  editor; keep the two in step. A unit test gives both builds the same
+  setup and compares what comes out
+  (`packages/machine-ritm12/test/native.test.ts`).
 - `packages/machine-ritm12/` is РИТМ-12.
   Its eight voices are `engine/voices.cpp` (pitch, tone and decay; their
   place in the table is their sound number, never reorder); what voices are
@@ -99,7 +95,8 @@ CI then builds the 808 and runs its panel's tests, with
 - `src/document/legacy.ts` in that package is the only thing that reads the
   beats of the machine before it (schema versions 1 and 2). It turns one
   into a РИТМ-12 beat and lists what was lost; it never writes those
-  formats. It must stay self-contained: it may not import the 808's package.
+  formats. It is self-contained: the machine it reads is not in this
+  repository.
   A machine's draft has its own storage key, and a draft found under an
   earlier key is read and left exactly where it was.
 - РИТМ-12's panel (`src/ui/`) is one picture with every control live on top
@@ -118,22 +115,24 @@ CI then builds the 808 and runs its panel's tests, with
 - Its art is `art/` in its package: `plate.webp`, `patch/` and `pointer/`,
   with where it comes from in `art/README.md`. `art/cut-art.py` cuts it
   from the owner's pictures in the git-ignored `misc/assets/ritm12/`; do not
-  edit the cut files by hand. A machine with no panel manifest ships every
-  image in its `art/` folder, served under `machines/<id>/` and named by
+  edit the cut files by hand. A build ships every image in the machine's
+  `art/` folder, served under `machines/<id>/` and named by
   `art` in the asset manifest; `check-build` fails a build whose art is not
   byte for byte what is committed, or that carries another machine's.
-- РИТМ-12 is what `pnpm dev`, `pnpm build` and `pnpm test:e2e` are when
-  `BOOMBAPBOT_MACHINE` is unset. To run the 808: `BOOMBAPBOT_MACHINE=808
-  pnpm dev`, or the same variable in front of `pnpm build` and
-  `pnpm test:e2e`. A machine's browser tests of its own panel are in its
-  folder, `e2e/ritm12/` and `e2e/808/`, each with its `helpers.ts`. The
-  tests in `e2e/` itself are the site's: the page, settings, accounts, saved
-  beats and the shop. They drive РИТМ-12 and run only on its build.
+- The site is one machine a build, named by `BOOMBAPBOT_MACHINE`; РИТМ-12
+  when it is unset, which is always, here. РИТМ-12's browser tests of its
+  own panel are in `e2e/ritm12/`, with its `helpers.ts`. The tests in `e2e/`
+  itself are the site's: the page, settings, accounts, saved beats and the
+  shop. They drive РИТМ-12.
 - Shared between panels, in the editor: `useKnob` (a slider to a screen
   reader, dragged up and down, turned with the keys) and `useAssetManifest`.
-- A setup follows either what a panel's switches ask for (`follow.panel`,
-  the 808) or one pattern round and round (`follow.cue`). A render plan is a
-  song of rhythms (`SongPlan`) or one cued pattern (`PatternPlan`). The
+- A setup follows either one pattern round and round (`follow.cue`, which
+  is what РИТМ-12 asks for) or what a panel's switches ask for
+  (`follow.panel`: A, AB and B versions, intros, fill-ins and songs). A
+  render plan is one cued pattern (`PatternPlan`) or a song of rhythms
+  (`SongPlan`). No machine here uses the panel and song side; it is core
+  all the same, and `packages/editor/test/offline.test.ts` tests it with a
+  setup written out by hand. The
   worklet takes `cue` and `effect` and reports `level` while it changes;
   `EditorRuntime.outputLevel()` is what a meter reads as it draws.
 - Swing is a byte of the pattern (`SnarePattern.swing`, 0 to
@@ -144,14 +143,15 @@ CI then builds the 808 and runs its panel's tests, with
   echo, a reverb, a flanger or a chorus, added ahead of the limiter. It keeps
   the engine's promises: every buffer is allocated when the engine is made,
   state moves a sample at a time, and nothing calls the C library's maths
-  per sample. With no effect set it does not touch the samples, which is what
-  keeps the 808's output as it was. An offline loop is played often enough
+  per sample. With no effect set it does not touch the samples. An offline loop is played often enough
   for the effect's tail to settle (`loopPasses`), without changing its length.
 - `snare_engine_output_level` is the root mean square of the output over
   about a third of a second, after the volume: what a meter shows.
 - `scripts/prepare-assets.mjs` and `scripts/check-build.mjs` work for one
   machine, named by `BOOMBAPBOT_MACHINE` like the site's alias (РИТМ-12 when
-  unset). The asset manifest says which machine the build is.
+  unset). The asset manifest says which machine the build is. Its
+  `faceplate` entry is for a machine whose panel is one drawn faceplate; no
+  machine here has one, and `check-build` fails a build that names one.
 - `packages/editor/` is the React editor core. `EditorStore` holds the
   project and undo; `EditorRuntime` connects it to audio, local storage and
   the exporters and hosts the machine; `AudioController` is the only thing
@@ -194,11 +194,11 @@ CI then builds the 808 and runs its panel's tests, with
 - `test_realtime` counts heap calls inside `snare_engine_render` and
   `test_abi.c` pins struct layouts; a unit test compares the header, the
   export list and the TypeScript bridge. Keep all three passing.
-- `packages/machine-808/engine/voices.cpp` builds the 808's sounds from knob settings. Do
+- A machine's `engine/voices.cpp` builds its sounds from knob settings. Do
   its arithmetic in double, use the C library's maths for coefficients only,
-  and keep its own noise generator: that is what holds native and WASM to
-  one 24-bit step per sound. Never synthesise on the audio thread; render
-  the sound elsewhere and hand over PCM.
+  and take noise from the integer generator in `dsp.h`: that is what holds
+  native and WASM to one 24-bit step per sound. Never synthesise on the
+  audio thread; render the sound elsewhere and hand over PCM.
 - Each sound slot holds its own sound (`snare_engine_set_sound`). A replaced
   sound is freed on the control thread by `snare_engine_collect`, never in
   render. When a sound knob moves, `EditorRuntime.sendSound` re-synthesises
@@ -206,81 +206,50 @@ CI then builds the 808 and runs its panel's tests, with
   flight at a time and the newest setting follows when the worklet
   acknowledges.
 - A track has one voice: its new hit fades the old one. The engine takes
-  linear gains; the knob tapers live in `packages/machine-808/src/document/machine.ts`
-  and are mirrored in `engine/tools/project_io.h` and
-  `plugins/vst3/Source/Machine808.h`. Track level and master volume are
-  smoothed per sample, in a way that does not depend on buffer size.
+  linear gains; a machine's knob tapers live in its `src/document/machine.ts`
+  and nowhere else. Track level and master volume are smoothed per sample,
+  in a way that does not depend on buffer size.
 - The engine, not TypeScript, decides what plays at a bar line.
-  `engine/src/sequencer.h` is pure and holds those rules: A, AB and B, intro,
-  tapped and automatic fill-ins, and songs. The 808's `engine.ts`
-  (`enginePanel`) only tells the engine where the panel's switches stand. A
-  rhythm track is handed over whole as a song (`snare_engine_set_song`), and
-  an export asks the engine which version each measure plays
+  `engine/src/sequencer.h` is pure and holds those rules: a cued pattern
+  taking over at the bar line, A, AB and B, intro, tapped and automatic
+  fill-ins, and songs. A machine only tells the engine what it asks for. An
+  export of a song asks the engine which version each measure plays
   (`snare_song_patterns`) so it cannot disagree with what is heard.
 - The page learns what played from the measure log, which the worklet drains
   after every render and never skips. A measure whose rhythm changed on its
-  second beat is reported twice under one ordinal. Compose records from it:
-  the 808's `Session808` keeps the take and stores it when the machine stops,
-  as one undo step.
+  second beat is reported twice under one ordinal.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.
 
 **The project and the machine**
 
-- A track's position in `TRACK_IDS` is its engine track (the accent is 0), and
-  a role's `index` in `packages/machine-808/data/roles.json` is its sound slot
-  and the synthesiser's sound number. Never reorder or reuse either.
-- A step is on or off. Loudness comes from the accent track and the level
+- A voice's place in `VOICE_IDS` and in `data/ritm12.machine.json` is its
+  sound number, its sound slot and, plus one, its engine track (the accent
+  is track 0). Never reorder or reuse them.
+- A step is on or off. Loudness comes from the accent row and the level
   knobs. There is no per-step velocity; do not bring it back as a
-  convenience. The 808 has no swing either: its patterns leave the engine's
-  swing at 0.
-- The engine's pattern for a rhythm is `rhythm * 2`, plus one for its B
-  version (`patternIndex`).
-- The instrument selector chooses a rhythm track in play and compose, and a
-  track runs on into the next only when it is full (`composition`,
-  `withComposition`).
-- The step buttons do three jobs: steps in the two write modes, the last step
-  of a part while CLEAR is down, and the choice of rhythm in pattern clear,
-  manual play and compose. Playing a track back they do nothing. `Session808.pressStep` is the one place that decides which.
-  `panelTarget` says which rhythm and version the panel is on.
-- Undo covers what the machine remembers (its `memory`: for the 808,
-  `rhythms` and `rhythmTracks`) and a
-  whole-project import. Knobs, switches, tempo and the name are not undo
-  steps.
-- An older project is brought up to date in `parseProject`, which also
-  reports what was lost; the page shows that list. Add a step there for every
-  schema change, with a fixture.
-- A new project gets the starter rhythms and starter track
-  (`packages/machine-808/src/document/starter.ts`). They are written for boombapbot; do
-  not copy the hardware's factory rhythms into them. Browser tests that need
-  an empty rhythm use Basic Rhythm 10.
+  convenience.
+- Undo covers what the machine remembers (its `memory`: for РИТМ-12, the
+  four patterns) and a whole-project import. Knobs, switches, tempo and the
+  name are not undo steps. Notes tapped in one take of recording are one
+  step.
+- A change to the project schema needs a step in `parseProject` that brings
+  an older project up to date and reports what was lost, and a fixture.
+  `fixtures/four-patterns.project.json` is the current format; a unit test
+  reads it and writes it back unchanged.
+- A new project gets the starter patterns (`src/document/starter.ts`). They
+  are written for boombapbot. Browser tests that need an empty pattern use
+  В or Г.
 - An invalid project import must never replace the current draft, and an
   unreadable saved draft is set aside, not deleted.
-- `assets/kits/` holds generated sample kits for the 606, 707 and 909, made by
-  `scripts/gen_demo_kits.py`. Nothing loads them at the moment. Do not
-  hand-edit the WAVs, and do not describe them as recordings of hardware.
 
-**Naming and faceplates**
+**Naming and art**
 
 - The owner does not want manufacturer or product brand names in the app or
-  its images. The machine is the "808". The one exception would be a photo
-  credit line, which has to name the original work.
-- The faceplate is a drawing made by `packages/machine-808/art/draw-faceplate.mjs`. Its
-  manifest sets `faceplate.original` and has no credit. Change the script and
-  run `pnpm faceplates:draw`; do not hand-edit the SVG. The script places live
-  controls from the panel manifest, so keep reading positions from there.
-  `check-build` fails a build whose faceplate is not the committed one, or has
-  no entry in the machine's `art/README.md`, or is a photograph without a
-  `faceplate.credit`.
-- The 606, 707, 808 and 909 photographs in `assets/faceplates/` are the owner's
-  debranded edits of Creative Commons works, kept for later. If one ships
-  again it needs its credit shown under the panel; that is a licence
-  requirement.
+  its images. РИТМ-12 and the maker's name on its panel are invented.
 - `misc/assets/` is git-ignored and is for the owner's unedited originals.
   Nothing from it may reach a production build or a commit.
-- Panel coordinates are in the image's own pixel space (`faceplate.width`
-  and `height`). `packages/machine-808/art/README.md` records how it was fitted.
 - The header mascot (`packages/editor/src/assets/mascot.svg`) is the owner's
   artwork and is used unaltered. Its cream outline on the dark background is
   CSS, in `.sb-mascot`.
@@ -288,7 +257,7 @@ CI then builds the 808 and runs its panel's tests, with
 **Page layout**
 
 - The machine's page is the header, the machine and the footer, nothing else.
-  A control the machine has belongs on its faceplate. Anything else about the
+  A control the machine has belongs on its panel. Anything else about the
   machine lives in the settings modal behind the footer's cog
   (`packages/editor/src/ui/Settings.tsx`).
 - `Header` (the brand: mascot over the tagline, together as tall as the
@@ -319,10 +288,8 @@ CI then builds the 808 and runs its panel's tests, with
   so the footer sits lower until it is closed. Do not make it an overlay: it
   must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
-  a phone the instrument and mode strips and the docked start button.
-- A panel's power switch makes everything else on it `inert`. On the 808
-  that is the `sb-panel-controls` wrapper, and a dial with fixed positions
-  there gets a `DialHandle` so it can be turned by hand.
+  a phone the instrument strip, the fit button and the docked start button.
+- A panel's power switch makes everything else on it `inert`.
 - Browser tests reach buried controls through `openSettings`
   (`e2e/helpers.ts`), and РИТМ-12 through `beat`, `step` and its test ids
   (`e2e/ritm12/helpers.ts`). The ones that need an account share
@@ -445,7 +412,7 @@ CI then builds the 808 and runs its panel's tests, with
 **Build output**
 
 - These are generated and git-ignored; never commit them:
-  `apps/site/public/engine/`, `public/faceplates/`,
+  `apps/site/public/engine/`, `public/machines/`,
   `public/boombapbot-assets.json`, `build/`, `.tools/`.
 - The worklet is bundled separately by `scripts/prepare-assets.mjs`. After
   changing `engine/worklet/processor.ts` or `wasm-engine.ts`, restart
@@ -463,38 +430,32 @@ CI then builds the 808 and runs its panel's tests, with
   creates the `AudioContext` synchronously inside the click for that reason.
 - `window.__boombapbot` exposes `debug()` and `renderLoop()` for tests. The
   browser tests use it to check that the worklet really rendered sound.
-- A control is live only if the panel manifest lists it. The drawing reads
-  the same entries, and draws a live knob without its light and a live switch
-  without its lever, because the editor supplies those.
-- The panel manifest has a `pending` list of what is not modelled yet. It is
-  shown in settings, so keep it true as controls are connected.
 - `pnpm dev` serves the Astro dev server; the browser tests and `pnpm serve`
   use the production build, so run `pnpm build` before either.
 
 ## Not verified yet
 
-The owner has listened to РИТМ-12 once, on a local build, and said it
-sounds good; nobody has gone through it voice by voice or effect by effect.
-Its panel has only been run in Chromium: no real phone, Safari or Firefox
-has shown it. What follows about the live site was done while the site was
-the 808, so the accounts, saved beats and shop behind it are proven there
-and РИТМ-12 on the live site is not, until someone tries it. Untested:
-Firefox, Safari on a Mac, Windows builds, and the VST3 in any host. The site is
-deployed at `boombapbot.com`, and the owner has done these on it: signed up
-and reset a password (the emails arrived and their links worked), bought a
-sticker (paid at Stripe, accepted from Stripe's webhook, placed with
-Printful), saved a beat from a computer and loaded it on two phones, and
-logged in, loaded a beat and played it on an iPhone in Safari and in Chrome
-and on a Samsung Galaxy S9 in Chrome. Never tried there: deleting an
-account or a saved beat, the newer-copy question, the beat limit, a real
-Printful shipping event, a refund, and a purchase without an account.
-Nobody has gone over the phone layout or long playing on a real phone.
+The owner has listened to РИТМ-12 on a local build and said it sounds good;
+nobody has gone through it voice by voice or effect by effect. On the live
+site, `boombapbot.com`, the owner has used РИТМ-12 on an iPhone in Safari
+and in Firefox, and saved a beat to an account from desktop Chrome and
+loaded it in Firefox on the iPhone. Before that, while the site was an
+earlier machine, they signed up and reset a password (the emails arrived and
+their links worked) and bought a sticker: paid at Stripe, accepted from
+Stripe's webhook, placed with Printful, and marked shipped with its tracking
+number when Printful's own event arrived. Untested: Firefox and Safari on a
+Mac, an Android phone on РИТМ-12, and Windows. Never tried there: deleting an
+account or a saved beat, the newer-copy question, the beat limit, a beat
+from the earlier machine opening converted, a refund, and a purchase without
+an account.
+Nobody has tried long playing on a phone.
 Say so rather than assuming these work.
 
 ## Working in this repo
 
 - Work goes on a feature branch and lands through a pull request. CI
-  (`.github/workflows/ci.yml`) runs every check above plus the VST3 spike.
+  (`.github/workflows/ci.yml`) runs every check above, with the engine also
+  built by Clang and under the sanitizers.
 - Production is deployed by `.github/workflows/deploy.yml` once CI passes on
   `main`: it builds the engine and the site and hands Vercel the finished
   output, because Vercel cannot build the engine. `apps/site/vercel.json`

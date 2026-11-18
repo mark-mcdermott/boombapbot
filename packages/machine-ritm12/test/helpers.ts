@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createProjectCodec } from '@boombapbot/contracts';
-import { EditorStore, type MachineHost } from '@boombapbot/editor';
+import { EditorStore, type KeyValueStorage, type MachineHost } from '@boombapbot/editor';
 import { createProject, documentRitm12, type Project, type VoiceId } from '../src/document';
 import { RESTING, SessionRitm12, memoryOf, type StoreRitm12, type TransientRitm12 } from '../src/session';
 
@@ -9,6 +10,31 @@ export const codec = createProjectCodec([documentRitm12]);
 /** A beat from before РИТМ-12, as it was saved. */
 export function earlier(version: 1 | 2): unknown {
   return JSON.parse(readFileSync(new URL(`../fixtures/earlier-v${version}.project.json`, import.meta.url), 'utf8'));
+}
+
+export const fixturePath = fileURLToPath(new URL('../fixtures/four-patterns.project.json', import.meta.url));
+
+/** The committed beat with something on every pattern and every setting away from its default. */
+export function loadFixture(): Project {
+  const result = codec.parseText(readFileSync(fixturePath, 'utf8'));
+  if (!result.ok) throw new Error(result.errors.join('; '));
+  return result.project;
+}
+
+/** Storage that lives for one test, and can be told to refuse writes. */
+export class MemoryStorage implements KeyValueStorage {
+  readonly items = new Map<string, string>();
+  failWrites = false;
+  getItem(key: string): string | null {
+    return this.items.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    if (this.failWrites) throw new Error('quota exceeded');
+    this.items.set(key, value);
+  }
+  removeItem(key: string): void {
+    this.items.delete(key);
+  }
 }
 
 export function newProject(): Project {

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Checks the production build of the site: the page, the engine and the
 // worklet must resolve from the built output, the engine must not need
-// shared memory (so no cross-origin isolation headers), and only the
-// committed faceplate image may be present.
+// shared memory (so no cross-origin isolation headers), and the panel art
+// must be exactly what is committed.
 //
 //   node scripts/check-build.mjs                          the local build
 //   node scripts/check-build.mjs .vercel/output/static    what `vercel build` made
@@ -86,9 +86,6 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
     notes.push(`worklet ${manifest.engine.worklet}: ${source.length} bytes`);
   }
 
-  // Sounds are synthesised by the engine, so no sample files may ship.
-  check(!existsSync(join(dist, 'kits')), 'the build has a kits folder; sounds are synthesised, not shipped');
-
   // Panel art in the build must be, byte for byte, what is committed in the
   // machine's art folder, and nothing else may sit beside it.
   const artDir = join(machineDir, 'art');
@@ -114,43 +111,9 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
     }
   }
 
-  // A faceplate in the build must be the one committed in the machine's art folder.
-  // The owner's local originals in misc/assets must never ship.
-  const path = manifest.faceplate;
-  if (path) {
-    const name = path.split('/').pop();
-    // A faceplate is either artwork drawn for boombapbot, or a Creative Commons
-    // photograph that must be credited.
-    const panelFile = `${machine}.panel.json`;
-    const panel = JSON.parse(readFileSync(join(machineDir, 'data', panelFile), 'utf8'));
-    const credit = panel.faceplate.credit;
-    check(name === panel.faceplate.file, `the build ships ${name}, which is not the panel's faceplate`);
-    check(
-      panel.faceplate.original === true ||
-        (credit && credit.author && credit.title && credit.source && credit.licence && credit.licenceUrl),
-      `the faceplate ships without a credit. Add faceplate.credit to ${panelFile}, ` +
-        'or set faceplate.original if it was drawn in this repository.',
-    );
-    const record = join(machineDir, 'art/README.md');
-    check(
-      existsSync(record) && readFileSync(record, 'utf8').includes(name),
-      `the machine's art/README.md has no provenance entry for ${name}`,
-    );
-    const committed = join(machineDir, 'art', name);
-    const built = join(dist, path);
-    check(existsSync(built), `faceplate ${path} is listed but missing from the build`);
-    check(
-      existsSync(committed) && existsSync(built) && readFileSync(committed).equals(readFileSync(built)),
-      `the faceplate in the build is not the committed art/${name} of the machine. ` +
-        'Local originals from misc/assets must not ship; rebuild with pnpm build.',
-    );
-  }
-  if (existsSync(join(dist, 'faceplates'))) {
-    for (const name of readdirSync(join(dist, 'faceplates'))) {
-      check(path === `faceplates/${name}`, `faceplates/${name} is in the build but not in the asset manifest`);
-    }
-  }
-  if (!manifest.art) notes.push(path ? `faceplate ${path}` : 'no faceplate');
+  check(!manifest.faceplate, `the build names a faceplate, ${manifest.faceplate}, and no machine here has one`);
+  check(!existsSync(join(dist, 'faceplates')), 'the build has a faceplates folder, and no machine here has a faceplate');
+  if (!manifest.art) notes.push('no panel art');
 }
 
 if (problems.length > 0) {

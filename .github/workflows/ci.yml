@@ -45,12 +45,6 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Demo kits match their generator
-        run: pnpm kits:check
-
-      - name: Drawn faceplates match their generator
-        run: pnpm faceplates:check
-
       - name: Build the native engine and run CTest
         run: pnpm build:engine
 
@@ -85,19 +79,6 @@ jobs:
       - name: Browser tests (Playwright, against the production build)
         run: pnpm test:e2e
 
-      # The site is one machine a build. Everything above built and tested the
-      # one that is live, РИТМ-12; this builds the 808, which is not shipped,
-      # and runs the tests of its panel.
-      - name: Production build and build check, as the 808
-        run: pnpm build
-        env:
-          BOOMBAPBOT_MACHINE: '808'
-
-      - name: Browser tests of the 808
-        run: pnpm test:e2e
-        env:
-          BOOMBAPBOT_MACHINE: '808'
-
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -107,29 +88,3 @@ jobs:
             playwright-report
             test-results
           retention-days: 7
-
-  vst3:
-    name: VST3 compile spike (Linux)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install JUCE build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            ninja-build pkg-config libx11-dev libxext-dev libxrandr-dev \
-            libxinerama-dev libxcursor-dev libfreetype-dev libfontconfig-dev \
-            libasound2-dev libgl1-mesa-dev
-
-      # Compilation and the processor self-test only. Host scanning, the
-      # validator and Windows and macOS builds are not covered here.
-      - name: Configure (fetches JUCE)
-        run: cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build/vst3
-
-      - name: Processor self-test
-        run: ctest --test-dir build/vst3 --output-on-failure
