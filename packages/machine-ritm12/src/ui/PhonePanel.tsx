@@ -43,12 +43,42 @@ const MARKS = Array.from({ length: 11 }, (_, mark) => {
 });
 
 /**
+ * The small drawing the picture has beside a label. The lettering is there
+ * to look at; these say what a control is for to someone who cannot read it.
+ */
+type IconName =
+  | 'sequencer'
+  | 'hits'
+  | 'accents'
+  | 'mute'
+  | 'voice'
+  | 'pitch'
+  | 'decay'
+  | 'tone'
+  | 'level'
+  | 'tempo'
+  | 'swing'
+  | 'accent'
+  | 'size'
+  | 'effect'
+  | 'delay'
+  | 'reverb'
+  | 'flanger'
+  | 'chorus'
+  | 'volume';
+
+/**
  * Words as they are lettered on the machine. Like the paint on the picture
  * they are for the eye and are not text of the page: the stylesheet draws
- * them, and every control has an English name of its own.
+ * them, and every control has an English name of its own. A label can have
+ * the picture's drawing for it in front.
  */
-function Lettered({ text, dim }: { text: string; dim?: boolean }) {
-  return <span className="rt-ph-let" aria-hidden="true" data-let={text} data-dim={dim || undefined} />;
+function Lettered({ text, dim, icon }: { text: string; dim?: boolean; icon?: IconName }) {
+  return (
+    <span className="rt-ph-let" aria-hidden="true" data-let={text} data-dim={dim || undefined}>
+      {icon ? <Part className="rt-ph-icon" file={`icon-${icon}.png`} /> : null}
+    </span>
+  );
 }
 
 /** A picture cut from the panel's art. */
@@ -69,16 +99,19 @@ function PhoneLamp(lamp: LampWiring) {
 interface PhoneKnobProps {
   name: keyof typeof PHONE_KNOBS;
   lettered: string;
+  icon?: IconName;
+  /** What the picture letters at the two ends of the knob's travel, if anything. */
+  ends?: readonly [string, string];
   wiring: KnobWiring;
 }
 
 /** A knob the page lays out: its painted body, the marks round it, and its pointer line turned to where it stands. */
-function PhoneKnob({ name, lettered, wiring }: PhoneKnobProps) {
+function PhoneKnob({ name, lettered, icon, ends, wiring }: PhoneKnobProps) {
   const { place, radius } = PHONE_KNOBS[name];
   const { bind } = useTurning(wiring);
   return (
     <div className="rt-ph-ctl">
-      <Lettered text={lettered} />
+      <Lettered text={lettered} icon={icon} />
       <div className="rt-ph-knob" {...bind}>
         <svg viewBox="0 0 64 64" aria-hidden="true">
           {MARKS.map((mark, index) => (
@@ -92,6 +125,12 @@ function PhoneKnob({ name, lettered, wiring }: PhoneKnobProps) {
           <Part file={`knob-${name}.png`} />
           <Hand place={place} value={wiring.value} />
         </div>
+        {ends ? (
+          <span className="rt-ph-ends" aria-hidden="true">
+            <i data-let={ends[0]} />
+            <i data-let={ends[1]} />
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -168,11 +207,11 @@ export function PhonePanel() {
 
             <div className="rt-ph-group">
               <div className="rt-ph-head">
-                <Lettered text="СЕКВЕНСЕР" />
+                <Lettered text="СЕКВЕНСЕР" icon="sequencer" />
                 <Key className="rt-ph-key rt-ph-switch" {...keys.write}>
-                  <Lettered text="УДАРЫ" dim={wiring.write !== 'hits'} />
+                  <Lettered text="УДАРЫ" icon="hits" dim={wiring.write !== 'hits'} />
                   <Part file={`write-${wiring.write}.png`} />
-                  <Lettered text="АКЦЕНТЫ" dim={wiring.write !== 'accents'} />
+                  <Lettered text="АКЦЕНТЫ" icon="accents" dim={wiring.write !== 'accents'} />
                 </Key>
               </div>
               <div className="rt-ph-steps">
@@ -211,7 +250,7 @@ export function PhonePanel() {
               </Key>
               <span className="rt-ph-rule" />
               <Key className="rt-ph-key rt-ph-cap rt-ph-mute" {...keys.mute}>
-                <Lettered text="МУТ" />
+                <Lettered text="МУТ" icon="mute" />
               </Key>
             </div>
 
@@ -234,26 +273,26 @@ export function PhonePanel() {
                     onKeyDown={onTabKey}
                   >
                     <i />
-                    <Lettered text={each.lettered} />
+                    <Lettered text={each.lettered} icon={each.id} />
                   </button>
                 ))}
               </div>
               <div className="rt-ph-deck" role="tabpanel" id="rt-deck" aria-labelledby={`rt-tab-${tab}`} data-tab={tab}>
                 {tab === 'voice' ? (
                   <>
-                    <PhoneKnob name="pitch" lettered="ПИТЧ" wiring={knobs.pitch} />
-                    <PhoneKnob name="decay" lettered="ЗАТУХАНИЕ" wiring={knobs.decay} />
-                    <PhoneKnob name="tone" lettered="ТОН" wiring={knobs.tone} />
-                    <PhoneKnob name="level" lettered="УРОВЕНЬ" wiring={selected.level} />
+                    <PhoneKnob name="pitch" lettered="ПИТЧ" icon="pitch" ends={['−12', '+12']} wiring={knobs.pitch} />
+                    <PhoneKnob name="decay" lettered="ЗАТУХАНИЕ" icon="decay" wiring={knobs.decay} />
+                    <PhoneKnob name="tone" lettered="ТОН" icon="tone" wiring={knobs.tone} />
+                    <PhoneKnob name="level" lettered="УРОВЕНЬ" icon="level" wiring={selected.level} />
                   </>
                 ) : null}
                 {tab === 'tempo' ? (
                   <>
-                    <PhoneKnob name="tempo" lettered="ТЕМП" wiring={knobs.tempo} />
-                    <PhoneKnob name="swing" lettered="СВИНГ" wiring={knobs.swing} />
-                    <PhoneKnob name="accent" lettered="АКЦЕНТ" wiring={knobs.accent} />
+                    <PhoneKnob name="tempo" lettered="ТЕМП" icon="tempo" wiring={knobs.tempo} />
+                    <PhoneKnob name="swing" lettered="СВИНГ" icon="swing" wiring={knobs.swing} />
+                    <PhoneKnob name="accent" lettered="АКЦЕНТ" icon="accent" wiring={knobs.accent} />
                     <div className="rt-ph-ctl">
-                      <Lettered text="РАЗМЕР" />
+                      <Lettered text="РАЗМЕР" icon="size" />
                       <Key className="rt-ph-key rt-ph-pick" {...keys.size}>
                         <Part file={`size-${wiring.size === 16 ? 16 : 12}.png`} />
                         <span className="rt-ph-names">
@@ -273,14 +312,14 @@ export function PhonePanel() {
                           {EFFECT_KINDS.map((kind) => (
                             <span key={kind} className="rt-ph-name" data-on={kind === wiring.effect || undefined}>
                               <i />
-                              <Lettered text={EFFECTS[kind].shown} dim={kind !== wiring.effect} />
+                              <Lettered text={EFFECTS[kind].shown} icon={kind} dim={kind !== wiring.effect} />
                             </span>
                           ))}
                         </span>
                       </Key>
                     </div>
-                    <PhoneKnob name="mix" lettered="СМЕСЬ" wiring={knobs.mix} />
-                    <PhoneKnob name="volume" lettered="ГРОМКОСТЬ" wiring={knobs.volume} />
+                    <PhoneKnob name="mix" lettered="СМЕСЬ" ends={['0', '100%']} wiring={knobs.mix} />
+                    <PhoneKnob name="volume" lettered="ГРОМКОСТЬ" icon="volume" wiring={knobs.volume} />
                   </>
                 ) : null}
               </div>
