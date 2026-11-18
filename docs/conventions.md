@@ -37,6 +37,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 - `pnpm test:e2e` tests the production build, so run `pnpm build` first.
   It needs `pnpm exec playwright install chromium` once on a new machine.
+  CI runs Chromium only. To try another engine, install it once
+  (`pnpm exec playwright install webkit firefox`) and name it:
+  `BOOMBAPBOT_E2E_BROWSER=webkit pnpm test:e2e`. That is Playwright's own
+  build of WebKit or Firefox on this computer, not Safari on a phone.
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
   `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`,
   `realtime`, `synthesis`, `swing`, `fx`, and `test_ritm12_voices`).
