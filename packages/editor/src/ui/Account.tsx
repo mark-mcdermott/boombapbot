@@ -11,6 +11,7 @@ import {
   type Failure,
 } from '../account/client';
 import { deviceBeatLinks } from '../account/beat-links';
+import { signedInAccount } from '../account/session';
 import { takeParams } from './arrival';
 import { TextField } from './fields';
 import { Modal } from './Modal';
@@ -433,6 +434,7 @@ interface AccountProps {
 /** The account button in the footer and its modal: log in, sign up, reset a password, saved beats, log out, delete. */
 export function Account({ baseUrl, container }: AccountProps) {
   const session = authClient.useSession();
+  const account = signedInAccount(session.data);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>({ name: 'log-in' });
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -452,12 +454,11 @@ export function Account({ baseUrl, container }: AccountProps) {
 
   const body = () => {
     if (view.name === 'new-password') return <NewPassword token={view.token} go={go} />;
-    if (session.data) {
-      const { email, id } = session.data.user;
+    if (account) {
       return (
         <SignedIn
-          email={email}
-          account={id}
+          email={account.email}
+          account={account.id}
           baseUrl={baseUrl}
           close={() => setOpen(false)}
           deleted={() => go({ name: 'log-in' }, { kind: 'ok', text: 'Your account and its saved beats are deleted.' })}
@@ -488,13 +489,13 @@ export function Account({ baseUrl, container }: AccountProps) {
 
   return (
     <Modal
-      label={session.data ? 'Account, logged in' : 'Account'}
+      label={account ? 'Account, logged in' : 'Account'}
       tip="Account"
       title="Your account"
       testId="account"
       icon={<CircleUserRound />}
       container={container}
-      className={session.data ? 'sb-ico-account sb-signed-in' : 'sb-ico-account'}
+      className={account ? 'sb-ico-account sb-signed-in' : 'sb-ico-account'}
       open={open}
       onOpenChange={setOpen}
     >
