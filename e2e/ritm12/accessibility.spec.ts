@@ -1,6 +1,6 @@
-import AxeBuilder from '@axe-core/playwright';
+import type AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { openSettings } from '../helpers';
+import { openSettings, scanner } from '../helpers';
 import { openMachine } from './helpers';
 
 function summarize(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['violations']) {
@@ -24,14 +24,14 @@ async function settingsSettled(page: Page): Promise<void> {
 
 test('the machine has no detectable accessibility violations, stopped, playing or in settings', async ({ page }) => {
   await openMachine(page);
-  expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
+  expect(summarize((await scanner(page).analyze()).violations)).toEqual([]);
   await page.getByTestId('write').click();
   await page.getByTestId('play').click();
-  expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
+  expect(summarize((await scanner(page).analyze()).violations)).toEqual([]);
   await page.getByTestId('stop').click();
   await openSettings(page);
   await settingsSettled(page);
-  expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
+  expect(summarize((await scanner(page).analyze()).violations)).toEqual([]);
 });
 
 test('every control has an accessible name in English, whatever is lettered on the picture', async ({ page }) => {

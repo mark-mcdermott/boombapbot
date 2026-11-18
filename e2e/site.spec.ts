@@ -1,6 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { openEditor } from './helpers';
+import { openEditor, scanner } from './helpers';
 
 test.describe('the page around the machine', () => {
   test('on the machine’s page the header is the brand alone, with no machines to choose from for now', async ({ page }) => {
@@ -43,7 +42,7 @@ test.describe('the page around the machine', () => {
         .toBeLessThan(2);
       // It fades in; a scan of half-faded text would see contrast that is not there.
       await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
-      const results = await new AxeBuilder({ page }).analyze();
+      const results = await scanner(page).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
       await page.keyboard.press('Escape');
       await expect(modal).toHaveCount(0);
@@ -141,11 +140,12 @@ test.describe('the page around the machine', () => {
     await expect(tip).toHaveCount(0);
   });
 
-  test('a tip shows for the keyboard too, and goes when its modal opens', async ({ page }) => {
+  test('a tip shows for the keyboard too, and goes when its modal opens', async ({ page, browserName }) => {
     await openEditor(page);
     const tip = page.getByTestId('tip');
     await page.locator('.sb-made a').focus();
-    await page.keyboard.press('Tab');
+    // Safari moves to a link with Option and Tab, unless a setting of its own says Tab alone will do.
+    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     await expect(page.getByTestId('nav-about')).toBeFocused();
     await expect(tip).toHaveText('About');
 
@@ -192,7 +192,7 @@ test.describe('the page around the machine', () => {
     const footer = (await page.locator('.sb-footer').boundingBox())!;
     expect(box.y).toBeGreaterThanOrEqual(panel.y + panel.height);
     expect(footer.y).toBeGreaterThanOrEqual(box.y + box.height);
-    expect((await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+    expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
 
     await page.getByTestId('cookie-notice-ok').click();
     await expect(notice).toHaveCount(0);
@@ -223,7 +223,9 @@ test.describe('the page around the machine', () => {
       await page.getByTestId('account').click();
       await expect(page.getByTestId('account-modal')).toBeVisible();
       await page.keyboard.press('Escape');
-      const results = await new AxeBuilder({ page }).analyze();
+      // It fades out; a scan while it is going would see contrast that is not there.
+      await expect(page.getByTestId('account-modal')).toHaveCount(0);
+      const results = await scanner(page).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
       // A line break in the page's source must not swallow the space before a link or a bold word.
       expect(await page.locator('main').innerText()).not.toMatch(/[a-z,.:;](mm\.coffee|[А-ЯЁ]{3,})/);
@@ -269,7 +271,7 @@ test.describe('the page around the machine', () => {
         expect(box.x + box.width).toBeLessThanOrEqual(375);
         expect(box.height).toBeGreaterThanOrEqual(40);
       }
-      const results = await new AxeBuilder({ page }).analyze();
+      const results = await scanner(page).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
     });
   }
