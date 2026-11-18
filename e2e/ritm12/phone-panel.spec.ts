@@ -147,6 +147,27 @@ test('the knobs of the phone’s panel are behind three tabs', async ({ page }) 
   await expect(page.getByTestId('volume')).toHaveAttribute('aria-valuetext', `${Math.round(wet.mix.volume * 100)}%`);
 });
 
+test('what is lettered on the phone’s panel has the picture’s drawing for it beside it', async ({ page }) => {
+  await openPhonePanel(page);
+  const drawn = (within: string) => page.getByTestId('panel').locator(`${within} .rt-ph-icon`);
+  const loaded = async (within: string) =>
+    (await drawn(within).evaluateAll((nodes) => nodes.map((node) => (node as HTMLImageElement).naturalWidth > 0))).every(Boolean);
+
+  // The step keys' heading and both positions of the write switch, mute, and each tab.
+  await expect(drawn('.rt-ph-head')).toHaveCount(3);
+  await expect(drawn('[data-testid="mute"]')).toHaveCount(1);
+  for (const tab of ['voice', 'tempo', 'effect']) await expect(drawn(`[data-testid="tab-${tab}"]`)).toHaveCount(1);
+
+  // Every knob and switch behind the tabs, but for the mix, which the picture marks 0 to 100%.
+  await expect(drawn('.rt-ph-deck')).toHaveCount(4);
+  await page.getByTestId('tab-tempo').click();
+  await expect(drawn('.rt-ph-deck')).toHaveCount(4);
+  await page.getByTestId('tab-effect').click();
+  await expect(drawn('.rt-ph-deck')).toHaveCount(5);
+  await expect(page.getByTestId('mix').locator('.rt-ph-ends i')).toHaveCount(2);
+  await expect.poll(() => loaded('')).toBe(true);
+});
+
 test('the phone’s power switch puts everything else out of reach', async ({ page }) => {
   await openPhonePanel(page);
   await page.getByTestId('power').click();
