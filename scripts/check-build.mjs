@@ -12,6 +12,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// The drum machine the build is meant to be.
+const machine = process.env.BOOMBAPBOT_MACHINE ?? '808';
+const machineDir = join(root, 'packages', `machine-${machine}`);
 const asked = process.argv[2];
 const candidates = asked
   ? [resolve(asked)]
@@ -38,7 +41,14 @@ const manifestPath = join(dist, 'boombapbot-assets.json');
 if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the build')) {
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 
-  // Engine: a valid module that exports the render call and imports no memory.
+  check(manifest.machine === machine, `the build is the ${manifest.machine} but ${machine} was asked for`);
+
+  // Engine: the one built for this machine, a valid module that exports the
+  // render call and imports no memory.
+  check(
+    manifest.engine.wasm.startsWith(`engine/boombapbot-engine-${machine}.`),
+    `engine file ${manifest.engine.wasm} was not built for the ${machine}`,
+  );
   const wasmPath = join(dist, manifest.engine.wasm);
   if (check(existsSync(wasmPath), `engine file ${manifest.engine.wasm} is missing`)) {
     const module = new WebAssembly.Module(readFileSync(wasmPath));
@@ -67,33 +77,34 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
   // Sounds are synthesised by the engine, so no sample files may ship.
   check(!existsSync(join(dist, 'kits')), 'the build has a kits folder; sounds are synthesised, not shipped');
 
-  // A faceplate in the build must be the one committed under assets/faceplates.
+  // A faceplate in the build must be the one committed in the machine's art folder.
   // The owner's local originals in misc/assets must never ship.
   const path = manifest.faceplate;
   if (path) {
     const name = path.split('/').pop();
     // A faceplate is either artwork drawn for boombapbot, or a Creative Commons
     // photograph that must be credited.
-    const panel = JSON.parse(readFileSync(join(root, 'packages/contracts/data/panels/808.panel.json'), 'utf8'));
+    const panelFile = `${machine}.panel.json`;
+    const panel = JSON.parse(readFileSync(join(machineDir, 'data', panelFile), 'utf8'));
     const credit = panel.faceplate.credit;
     check(name === panel.faceplate.file, `the build ships ${name}, which is not the panel's faceplate`);
     check(
       panel.faceplate.original === true ||
         (credit && credit.author && credit.title && credit.source && credit.licence && credit.licenceUrl),
-      'the faceplate ships without a credit. Add faceplate.credit to 808.panel.json, ' +
-        'or set faceplate.original if it was drawn by scripts/draw-faceplates.mjs.',
+      `the faceplate ships without a credit. Add faceplate.credit to ${panelFile}, ` +
+        'or set faceplate.original if it was drawn in this repository.',
     );
-    const record = join(root, 'assets/faceplates/README.md');
+    const record = join(machineDir, 'art/README.md');
     check(
       existsSync(record) && readFileSync(record, 'utf8').includes(name),
-      `assets/faceplates/README.md has no provenance entry for ${name}`,
+      `the machine's art/README.md has no provenance entry for ${name}`,
     );
-    const committed = join(root, 'assets/faceplates', name);
+    const committed = join(machineDir, 'art', name);
     const built = join(dist, path);
     check(existsSync(built), `faceplate ${path} is listed but missing from the build`);
     check(
       existsSync(committed) && existsSync(built) && readFileSync(committed).equals(readFileSync(built)),
-      `the faceplate in the build is not the committed assets/faceplates/${name}. ` +
+      `the faceplate in the build is not the committed art/${name} of the machine. ` +
         'Local originals from misc/assets must not ship; rebuild with pnpm build.',
     );
   }

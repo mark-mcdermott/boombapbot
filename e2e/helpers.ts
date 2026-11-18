@@ -20,7 +20,7 @@ export type TrackId = (typeof TRACK_IDS)[number];
 
 export const DRAFT_KEY = 'boombapbot.draft.v2';
 export const LEGACY_DRAFT_KEY = 'boombapbot.draft.v1';
-export const LEGACY_FIXTURE = 'packages/contracts/fixtures/v1-kick-snare-hat.project.json';
+export const LEGACY_FIXTURE = 'packages/machine-808/fixtures/v1-kick-snare-hat.project.json';
 
 export interface RhythmSnapshot {
   preScale: number;
@@ -96,7 +96,7 @@ export async function faceplate(page: Page): Promise<string | null> {
 
 /** Whether the faceplate is a credited photograph or our own drawing. */
 export function faceplateIsCredited(): boolean {
-  const manifest = JSON.parse(readFileSync('packages/contracts/data/panels/808.panel.json', 'utf8')) as {
+  const manifest = JSON.parse(readFileSync('packages/machine-808/data/808.panel.json', 'utf8')) as {
     faceplate: { credit?: unknown };
   };
   return manifest.faceplate.credit !== undefined;

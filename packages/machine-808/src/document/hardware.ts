@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import panel808 from '@boombapbot/contracts/data/panels/808.panel.json';
+import panel808 from '../../data/808.panel.json';
 import { KNOB_PARAMS, PART_STEPS, SWITCHED_IDS, TRACK_IDS, getTrack } from './machine';
 import { AUTO_FILLS, MODES } from './project';
 
@@ -47,7 +47,7 @@ export const panelManifestSchema = z.object({
   id: z.literal('808'),
   name: z.string().min(1).max(40),
   faceplate: z.object({
-    /** File name in assets/faceplates, or in misc/assets during development. */
+    /** File name in the machine's art folder, or in misc/assets during development. */
     file: z.string().regex(/^[a-z0-9_-]+\.(jpg|png|webp|svg)$/),
     /**
      * Size of the coordinate space every rectangle below is measured in. A
@@ -56,7 +56,7 @@ export const panelManifestSchema = z.object({
     width: z.number().positive(),
     height: z.number().positive(),
     /**
-     * True for artwork drawn for boombapbot by scripts/draw-faceplates.mjs. It
+     * True for artwork drawn for boombapbot by art/draw-faceplate.mjs. It
      * needs no credit; any other image needs one before it may ship.
      */
     original: z.boolean().optional(),

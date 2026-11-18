@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the engine to WebAssembly with the pinned Emscripten.
-# Output: build/wasm/boombapbot-engine.wasm
+# Output: build/wasm/boombapbot-engine-<machine>.wasm, one for each machine
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,4 +25,4 @@ fi
 
 emcmake cmake -S "$ROOT/engine" -B "$ROOT/build/wasm" -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build "$ROOT/build/wasm"
-ls -l "$ROOT/build/wasm/boombapbot-engine.wasm"
+ls -l "$ROOT"/build/wasm/boombapbot-engine-*.wasm

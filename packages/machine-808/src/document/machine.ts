@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import machineDocument from '@boombapbot/contracts/data/machine-808.json';
+import machineDocument from '../../data/machine-808.json';
 import { ROLE_IDS, getRole, type Role, type RoleId } from './roles';
 
 /**

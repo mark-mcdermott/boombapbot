@@ -8,7 +8,7 @@ import { project, selectTrack, stepButton, stepsOn, type ProjectSnapshot } from 
 // Beats saved to an account. Like the accounts tests these run against the
 // built server, with its database in memory.
 
-const FIXTURE = 'packages/contracts/fixtures/mixed-rhythms.project.json';
+const FIXTURE = 'packages/machine-808/fixtures/mixed-rhythms.project.json';
 const LIMIT = 20;
 const MAX_BYTES = 64 * 1024;
 

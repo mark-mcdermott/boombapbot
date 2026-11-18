@@ -16,6 +16,8 @@ import { EditorStore, newProjectId } from './state/store';
 
 /** Written by scripts/prepare-assets.mjs next to the built site. */
 export interface AssetManifest {
+  /** The drum machine the build is. */
+  machine: string;
   engine: { worklet: string; wasm: string };
   /** The faceplate image in this build, if it has one. */
   faceplate: string | null;

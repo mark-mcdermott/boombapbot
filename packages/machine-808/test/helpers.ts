@@ -4,13 +4,17 @@ import { createProjectCodec } from '@boombapbot/contracts';
 import { EditorStore, type MachineHost } from '@boombapbot/editor';
 import { document808, parseProject, type Project } from '../src/document';
 import { RESTING, Session808, memoryOf, type Store808, type Transient808 } from '../src/session';
-import { repoRoot } from '../../editor/test/helpers';
+import { loadWasm as loadMachineWasm, renderToolPath, repoRoot } from '../../editor/test/helpers';
 
-export * from '../../editor/test/helpers';
+export { parseMidi, repoRoot, rms, type ParsedMidi } from '../../editor/test/helpers';
 
-export const contractsPath = resolve(repoRoot, 'packages/contracts');
-export const fixturePath = resolve(contractsPath, 'fixtures/mixed-rhythms.project.json');
-export const legacyFixturePath = resolve(contractsPath, 'fixtures/v1-kick-snare-hat.project.json');
+export const nativeRenderPath = renderToolPath('808');
+export const loadWasm = () => loadMachineWasm('808');
+
+/** The 808's package: its data files and fixtures are what the native tool reads too. */
+export const machinePath = resolve(repoRoot, 'packages/machine-808');
+export const fixturePath = resolve(machinePath, 'fixtures/mixed-rhythms.project.json');
+export const legacyFixturePath = resolve(machinePath, 'fixtures/v1-kick-snare-hat.project.json');
 
 export function loadFixture(): Project {
   const result = parseProject(JSON.parse(readFileSync(fixturePath, 'utf8')));

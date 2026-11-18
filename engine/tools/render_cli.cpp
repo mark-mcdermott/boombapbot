@@ -1,7 +1,7 @@
 // boombapbot-render: renders a project through the native engine. It gives the
 // reference output that the WebAssembly build is compared against.
 //
-//   boombapbot-render --project beat.json --contracts packages/contracts
+//   boombapbot-render --project beat.json --machine packages/machine-808
 //       [--rhythm 0] [--version a|b] [--rate 44100] [--bits 24]
 //       [--out loop.wav] [--midi beat.mid] [--events events.json]
 //
@@ -48,16 +48,16 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> options;
   for (int i = 1; i + 1 < argc; i += 2) options[argv[i]] = argv[i + 1];
   if (options.count("--synth") && options.count("--raw")) return writeSound(options);
-  if (!options.count("--project") || !options.count("--contracts")) {
+  if (!options.count("--project") || !options.count("--machine")) {
     std::fprintf(stderr,
-                 "usage: boombapbot-render --project FILE --contracts DIR [--rhythm N] [--version a|b]\n"
+                 "usage: boombapbot-render --project FILE --machine DIR [--rhythm N] [--version a|b]\n"
                  "         [--rate HZ] [--bits 16|24] [--out FILE.wav] [--midi FILE.mid]\n"
                  "         [--events FILE.json]\n");
     return 2;
   }
 
   try {
-    const std::string contracts = options["--contracts"];
+    const std::string machineDir = options["--machine"];
     const double rate = options.count("--rate") ? std::atof(options["--rate"].c_str()) : 44100.0;
     const int bits = options.count("--bits") ? std::atoi(options["--bits"].c_str()) : 24;
     const int rhythm = options.count("--rhythm") ? std::atoi(options["--rhythm"].c_str()) : 0;
@@ -65,8 +65,8 @@ int main(int argc, char** argv) {
     if (rhythm < 0 || rhythm * 2 >= SNARE_PATTERNS) throw std::runtime_error("no such rhythm");
     const int index = rhythm * 2 + version;
 
-    const snare::io::Roles roles = snare::io::loadRoles(contracts);
-    const snare::io::Machine machine = snare::io::loadMachine(contracts, roles);
+    const snare::io::Roles roles = snare::io::loadRoles(machineDir);
+    const snare::io::Machine machine = snare::io::loadMachine(machineDir, roles);
     const snare::io::Project project = snare::io::loadProject(options["--project"], machine);
 
     SnareEngine* engine = snare_engine_create(rate);

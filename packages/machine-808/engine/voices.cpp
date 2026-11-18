@@ -1,4 +1,4 @@
-// Drum sounds for the 808 panel, built from their knob settings.
+// The 808's voices, built from their knob settings.
 //
 // This is a model made by ear from general descriptions of analogue drum
 // circuits: decaying tuned oscillators, filtered noise and a bank of six
@@ -10,23 +10,21 @@
 //   - the C library's sin, cos, tan and exp are used only to work out
 //     coefficients, never inside a per-sample loop;
 //   - noise comes from an integer generator defined here;
-//   - a sound's length comes from plain arithmetic and its tail is faded out.
+//   - a sound's length comes from plain arithmetic; the engine fades its tail.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 
 #include "boombapbot/engine.h"
+#include "boombapbot/voices.h"
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-constexpr double kFadeSeconds = 0.006;
-constexpr double kMaxSeconds = 6.0;
-constexpr double kMinRate = 8000.0;
-constexpr double kMaxRate = 192000.0;
+using boombapbot::Knobs;
+using boombapbot::Voice;
 
-double clamp01(double value) { return std::min(1.0, std::max(0.0, value)); }
+constexpr double kPi = 3.14159265358979323846;
 
 double lerp(double from, double to, double amount) { return from + (to - from) * amount; }
 
@@ -158,15 +156,6 @@ class MetalBank {
  private:
   Square squares_[6];
 };
-
-struct Knobs {
-  double tune;
-  double tone;
-  double decay;
-  double snappy;
-};
-
-using Renderer = void (*)(const Knobs&, double rate, std::uint32_t seed, float* out, int frames);
 
 // ---- Voices ----------------------------------------------------------------
 
@@ -419,14 +408,8 @@ double lowCongaSeconds(const Knobs&) { return drumSeconds(kLowConga); }
 double midCongaSeconds(const Knobs&) { return drumSeconds(kMidConga); }
 double highCongaSeconds(const Knobs&) { return drumSeconds(kHighConga); }
 
-struct Sound {
-  double (*seconds)(const Knobs&);
-  Renderer render;
-  std::uint32_t seed;
-};
-
 // Indexed by SNARE_SOUND_*, which is also the sound slot and the role index.
-constexpr Sound kSounds[SNARE_SOUNDS] = {
+constexpr Voice kVoices[SNARE_SOUNDS] = {
     {kickSeconds, renderKick, 0x0808'0001u},
     {snareSeconds, renderSnare, 0x0808'0002u},
     {closedHatSeconds, renderClosedHat, 0x0808'0003u},
@@ -445,42 +428,9 @@ constexpr Sound kSounds[SNARE_SOUNDS] = {
     {maracasSeconds, renderMaracas, 0x0808'0010u},
 };
 
-bool valid(const SnareSoundParams* params, double rate) {
-  return params != nullptr && params->sound >= 0 && params->sound < SNARE_SOUNDS &&
-         rate >= kMinRate && rate <= kMaxRate;
-}
-
-Knobs knobsOf(const SnareSoundParams& params) {
-  return {clamp01(params.tune), clamp01(params.tone), clamp01(params.decay), clamp01(params.snappy)};
-}
-
-int framesOf(const SnareSoundParams& params, double rate) {
-  const double seconds = std::min(kMaxSeconds, kSounds[params.sound].seconds(knobsOf(params)));
-  return static_cast<int>(seconds * rate);
-}
-
 }  // namespace
 
-extern "C" {
-
-int32_t snare_synth_frames(const SnareSoundParams* params, double sample_rate) {
-  if (!valid(params, sample_rate)) return SNARE_ERR_BAD_ARGUMENT;
-  return framesOf(*params, sample_rate);
+const boombapbot::VoiceTable& boombapbot::machineVoices() {
+  static constexpr VoiceTable table{kVoices, SNARE_SOUNDS};
+  return table;
 }
-
-int32_t snare_synth_render(const SnareSoundParams* params, double sample_rate, float* out,
-                           int32_t capacity) {
-  if (!valid(params, sample_rate) || out == nullptr) return SNARE_ERR_BAD_ARGUMENT;
-  const int frames = framesOf(*params, sample_rate);
-  if (capacity < frames) return SNARE_ERR_TOO_LARGE;
-  const Sound& sound = kSounds[params->sound];
-  sound.render(knobsOf(*params), sample_rate, params->seed == 0 ? sound.seed : params->seed, out, frames);
-  // Every sound ends at exactly zero, whatever its envelope was doing.
-  const int fade = std::min(frames, static_cast<int>(kFadeSeconds * sample_rate));
-  for (int i = 0; i < fade; ++i) {
-    out[frames - 1 - i] = static_cast<float>(static_cast<double>(out[frames - 1 - i]) * i / fade);
-  }
-  return frames;
-}
-
-}  // extern "C"

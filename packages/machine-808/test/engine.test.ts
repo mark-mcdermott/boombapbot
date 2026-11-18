@@ -31,7 +31,7 @@ import {
   synthSound,
   trackNotes,
 } from '../src/engine';
-import { contractsPath, fixturePath, loadFixture, loadWasm, nativeRenderPath, parseMidi, rms } from './helpers';
+import { fixturePath, loadFixture, loadWasm, machinePath, nativeRenderPath, parseMidi, rms } from './helpers';
 
 const wasm = loadWasm();
 const fixture = loadFixture();
@@ -346,7 +346,7 @@ describe('WebAssembly engine', () => {
       const midiPath = join(dir, `${name}.mid`);
       execFileSync(nativeRenderPath, [
         '--project', fixturePath,
-        '--contracts', contractsPath,
+        '--machine', machinePath,
         '--rhythm', String(rhythm),
         '--version', variation,
         '--out', wavPath,

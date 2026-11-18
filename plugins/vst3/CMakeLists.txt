@@ -31,7 +31,8 @@ FetchContent_MakeAvailable(JUCE)
 # The same static library the native tools and tests use. Its tests and the
 # render CLI are not part of the plugin build.
 set(SNARE_BUILD_TESTS OFF CACHE BOOL "Build the CTest suites" FORCE)
-set(SNARE_BUILD_TOOLS OFF CACHE BOOL "Build the boombapbot-render command line tool" FORCE)
+set(SNARE_BUILD_TOOLS OFF CACHE BOOL "Build the render command line tools" FORCE)
+set(BOOMBAPBOT_MACHINE_DIRS "${SNARE_REPO_ROOT}/packages/machine-808" CACHE STRING "Machine packages to build the engine for" FORCE)
 add_subdirectory("${SNARE_REPO_ROOT}/engine" "${CMAKE_CURRENT_BINARY_DIR}/engine")
 
 # ---- Plugin -----------------------------------------------------------------
@@ -65,7 +66,7 @@ target_compile_definitions(boombapbot_plugin PUBLIC
 
 target_link_libraries(boombapbot_plugin
   PRIVATE
-    boombapbot_engine
+    boombapbot_engine_808
     juce::juce_audio_processors
   PUBLIC
     juce::juce_recommended_config_flags
@@ -101,10 +102,10 @@ if(SNARE_VST3_BUILD_SELFTEST)
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JucePlugin_Name="boombapbot"
-    SNARE_CONTRACTS_DIR="${SNARE_REPO_ROOT}/packages/contracts")
+    SNARE_MACHINE_DIR="${SNARE_REPO_ROOT}/packages/machine-808")
 
   target_link_libraries(boombapbot_plugin_selftest PRIVATE
-    boombapbot_engine
+    boombapbot_engine_808
     juce::juce_audio_processors
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)
