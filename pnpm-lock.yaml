@@ -162,7 +162,30 @@ importers:
         specifier: 19.3.1
         version: 19.3.1(react@19.3.1)
 
-  packages/machine-ritm12: {}
+  packages/machine-ritm12:
+    dependencies:
+      '@boombapbot/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@boombapbot/editor':
+        specifier: workspace:*
+        version: link:../editor
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: 19.3.1
+        version: 19.3.1(react@19.3.1)
 
 packages:
 

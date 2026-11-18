@@ -6,6 +6,9 @@
     ]
   },
   "include": [
-    "test"
+    "src",
+    "test",
+    "data",
+    "../editor/src/assets.d.ts"
   ]
 }
