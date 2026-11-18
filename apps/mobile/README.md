@@ -65,9 +65,11 @@ taking the sound, the app coming back from the background, long playing.
 
 ## What is not right yet
 
-- **Export does nothing.** The settings sheet's Export makes a download,
-  which a web view inside an app ignores. It needs the file handed to the
-  phone's share sheet. Import has not been tried.
+- **Export saves nothing.** The settings sheet's Export makes a download,
+  which a web view inside an app ignores, so no file reaches the phone. A
+  WAV export is rendered all the same, in its worker, and the sheet then
+  says "WAV exported", which is not true there. It needs the file handed to
+  the phone's share sheet. Import has not been tried.
 - **Words written for the site.** The settings sheet says the draft is
   saved "in this browser" and lists keyboard keys.
 - **Sideways on a phone** the brand takes about a third of the screen and
