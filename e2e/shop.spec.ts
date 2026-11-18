@@ -1,14 +1,9 @@
-import { createHmac } from 'node:crypto';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import {
-  ACCOUNTS_URL,
-  FAKE_SERVICES_URL,
-  PRINTFUL_WEBHOOK_SECRET,
-  STRIPE_WEBHOOK_SECRET,
-} from './accounts-server';
+import { ACCOUNTS_URL, FAKE_SERVICES_URL, PRINTFUL_WEBHOOK_SECRET } from './accounts-server';
 import { openEditor } from './helpers';
 import { linkIn, newAddress } from './mail';
+import { checkoutEvent } from './stripe';
 
 // These run against the built server with the catalog in e2e/fixtures/shop.json
 // (a hoodie, M at 40.00 and XL at 42.00, sent to Canada, Germany or the United
@@ -62,28 +57,19 @@ async function checkout(request: APIRequestContext, items: unknown): Promise<str
   return order!;
 }
 
-/** What Stripe sends when a checkout is paid, signed the way Stripe signs it. */
-function paidEvent(order: string, secret = STRIPE_WEBHOOK_SECRET) {
-  const payload = JSON.stringify({
-    id: `evt_${order}`,
-    object: 'event',
-    type: 'checkout.session.completed',
-    data: {
-      object: {
-        id: `cs_${order}`,
-        object: 'checkout.session',
-        payment_status: 'paid',
-        payment_intent: `pi_${order}`,
-        amount_total: 12700,
-        customer_details: { email: 'buyer@example.com' },
-        metadata: { order },
-      },
+/** What Stripe sends when an order's checkout is paid. */
+const paidEvent = (order: string, secret?: string) =>
+  checkoutEvent(
+    {
+      id: `cs_${order}`,
+      payment_status: 'paid',
+      payment_intent: `pi_${order}`,
+      amount_total: 12700,
+      customer_details: { email: 'buyer@example.com' },
+      metadata: { order },
     },
-  });
-  const time = Math.floor(Date.now() / 1000);
-  const signature = createHmac('sha256', secret).update(`${time}.${payload}`).digest('hex');
-  return { data: payload, headers: { 'content-type': 'application/json', 'stripe-signature': `t=${time},v1=${signature}` } };
-}
+    secret,
+  );
 
 const forOrder = (all: FakeCall[], order: string) => {
   const external = order.replaceAll('-', '');
