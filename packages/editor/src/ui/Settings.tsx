@@ -140,7 +140,7 @@ export function Settings({ container }: SettingsProps) {
         <Group label="Beat name" labelFor={NAME_FIELD_ID}>
           <NameField />
         </Group>
-        <Group label="Rhythm">
+        <Group label="Patterns">
           <PatternActions />
         </Group>
         <Group label="File">
@@ -166,9 +166,9 @@ export function Settings({ container }: SettingsProps) {
         <Group>
           <p className="sb-footnote">{runtime.machine.keysHelp}</p>
           <p className="sb-hint">
-            v0.1 preview. The drum sounds are synthesised from the knobs and tuned by ear; they are not
-            recordings of any hardware. Your beat is saved only in this browser; export the project file to keep
-            a copy.
+            v0.1 preview. The drum sounds are made from the knobs; none of them is a recording. Your beat is
+            saved in this browser as you go. To keep a copy or move to another device, export the project file
+            here, or save the beat to a free account from the account button in the footer.
           </p>
         </Group>
       </Modal>
