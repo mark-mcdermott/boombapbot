@@ -1,10 +1,12 @@
 # boombapbot
 
 A drums-only beat maker. This repo holds v0.1: a web editor that is one drum
-machine, the 808, running entirely locally, plus a VST3 compile spike. It is
-being brought up to the whole machine from its operation manual; `README.md`
-says what is modelled so far and how it was verified, and
-`docs/follow-ups.md` has what is left and in what order. Accounts exist and
+machine, РИТМ-12, running entirely locally, plus a VST3 compile spike.
+РИТМ-12 is invented for boombapbot and is the machine the site ships. The
+808, the machine the site had first, is still here as a second machine
+package and is not shipped; it is on its way out of this repository, so do
+not build anything new on it. `README.md` says what is built and how it was
+verified, and `docs/follow-ups.md` has what is left and in what order. Accounts exist and
 are optional: sign-up, log-in and password reset, and a free account can
 hold up to 20 saved beats. The rest of the build spec's wider scope
 (background sync, native shells, billing) is not started.
@@ -34,13 +36,16 @@ pnpm build                 # production build, then scripts/check-build.mjs
 pnpm test:e2e              # Playwright, against apps/site/dist
 ```
 
+CI then builds the 808 and runs its panel's tests, with
+`BOOMBAPBOT_MACHINE=808` in front of `pnpm build` and `pnpm test:e2e`.
+
 - `pnpm test:e2e` tests the production build, so run `pnpm build` first.
   It needs `pnpm exec playwright install chromium` once on a new machine.
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
   `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
   `realtime`, `synth`, `swing`, `fx`, and `test_ritm12_voices`).
 - One Vitest file: `pnpm exec vitest run packages/machine-808/test/engine.test.ts`.
-- One Playwright file: `pnpm exec playwright test e2e/hardware.spec.ts`.
+- One Playwright file: `pnpm exec playwright test e2e/ritm12/panel.spec.ts`.
 - VST3 spike: `cmake -S plugins/vst3 -B build/vst3 -G Ninja`, then
   `cmake --build build/vst3`, then `ctest --test-dir build/vst3`.
 
@@ -117,10 +122,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   image in its `art/` folder, served under `machines/<id>/` and named by
   `art` in the asset manifest; `check-build` fails a build whose art is not
   byte for byte what is committed, or that carries another machine's.
-- To run РИТМ-12: `BOOMBAPBOT_MACHINE=ritm12 pnpm dev`, or the same
-  variable in front of `pnpm build` and `pnpm test:e2e`. Its browser tests
-  are `e2e/ritm12/`; the ones in `e2e/` itself are the 808's and the site's.
-  CI builds and tests both.
+- РИТМ-12 is what `pnpm dev`, `pnpm build` and `pnpm test:e2e` are when
+  `BOOMBAPBOT_MACHINE` is unset. To run the 808: `BOOMBAPBOT_MACHINE=808
+  pnpm dev`, or the same variable in front of `pnpm build` and
+  `pnpm test:e2e`. A machine's browser tests of its own panel are in its
+  folder, `e2e/ritm12/` and `e2e/808/`, each with its `helpers.ts`. The
+  tests in `e2e/` itself are the site's: the page, settings, accounts, saved
+  beats and the shop. They drive РИТМ-12 and run only on its build.
 - Shared between panels, in the editor: `useKnob` (a slider to a screen
   reader, dragged up and down, turned with the keys) and `useAssetManifest`.
 - A setup follows either what a panel's switches ask for (`follow.panel`,
@@ -142,7 +150,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `snare_engine_output_level` is the root mean square of the output over
   about a third of a second, after the volume: what a meter shows.
 - `scripts/prepare-assets.mjs` and `scripts/check-build.mjs` work for one
-  machine, named by `BOOMBAPBOT_MACHINE` like the site's alias (the 808 when
+  machine, named by `BOOMBAPBOT_MACHINE` like the site's alias (РИТМ-12 when
   unset). The asset manifest says which machine the build is.
 - `packages/editor/` is the React editor core. `EditorStore` holds the
   project and undo; `EditorRuntime` connects it to audio, local storage and
@@ -153,9 +161,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   sends on, for live playback and offline rendering alike.
 - The site mounts the editor through `apps/site/src/components/Machine.tsx`,
   which imports `#machine`: an alias in `astro.config.mjs` set by
-  `BOOMBAPBOT_MACHINE` (the 808 when unset), with the matching `paths` in
-  `apps/site/tsconfig.json`. The server reads projects with a codec made
-  from `#machine/document`. Only the chosen machine is ever imported.
+  `BOOMBAPBOT_MACHINE` (РИТМ-12 when unset), with the matching `paths` in
+  `apps/site/tsconfig.json`: change both together. The server reads projects
+  with a codec made from `#machine/document`. Only the chosen machine is
+  ever imported.
 - `apps/site/` is an Astro site that mounts the editor as a client-only
   island. Its pages are prerendered. The one thing that runs on a server is
   `src/pages/api/`, backed by `src/server/`: accounts (`api/auth`, Better
@@ -311,13 +320,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument and mode strips and the docked start button.
-- The power switch makes everything else on the panel `inert` through the
-  `sb-panel-controls` wrapper. A new panel control goes inside that wrapper.
-- A dial with fixed positions gets a `DialHandle` so it can be turned by
-  hand; its labels and the keyboard are the accessible way to the same choice.
-- Browser tests reach buried controls through `openSettings`, and the
-  machine through `selectTrack` and `stepButton` (`e2e/helpers.ts`). The
-  ones that need an account share `e2e/account.ts`.
+- A panel's power switch makes everything else on it `inert`. On the 808
+  that is the `sb-panel-controls` wrapper, and a dial with fixed positions
+  there gets a `DialHandle` so it can be turned by hand.
+- Browser tests reach buried controls through `openSettings`
+  (`e2e/helpers.ts`), and РИТМ-12 through `beat`, `step` and its test ids
+  (`e2e/ritm12/helpers.ts`). The ones that need an account share
+  `e2e/account.ts`.
 
 **Accounts**
 
@@ -362,7 +371,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   and the caller's id together (`ownedBeat`). Somebody else's beat is
   answered exactly as one that does not exist.
 - What is stored is what the build's project codec returns, never the body
-  as it came.
+  as it came, and only a beat the build's machine owns (`parseOwned`). A
+  beat of the machine before it is never converted on the server. Only a
+  page left open since the machine changed still sends one, and that page
+  shows the message of a refusal it knows, so the answer is `invalid` with
+  words telling the person to reload.
   The body is weighed first. One that is too large is still read to its end
   before the answer goes out, because answering early resets the connection.
 - The conflict rule is `cloudCopyIsNewer`. A replace carries `lastSeen`, the
@@ -376,6 +389,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - Loading goes through `EditorRuntime.loadSavedBeat`, which shares
   `adopt` with a file import: checked first, never replacing the draft with
   something invalid, and one undo step.
+- A beat taken over from the earlier machine is a new beat. The codec marks
+  it `adopted`, the runtime gives it a new id (a draft, a file and a saved
+  beat alike), and `SavedBeats` does not link it to the beat it was loaded
+  from. So saving it adds a beat, and the one stored before the machine
+  changed is never written over. Stored beats are not migrated.
 - On a page of words there is no machine, so the modal points back to it.
   `SavedBeats` reads the runtime from context for that reason; do not make
   it require one.
@@ -455,9 +473,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 ## Not verified yet
 
-The owner has listened to an earlier build; the sounds are a model made by
-ear and have not been compared with a real machine. Untested: Firefox,
-Safari on a Mac, Windows builds, and the VST3 in any host. The site is
+The owner has listened to РИТМ-12 once, on a local build, and said it
+sounds good; nobody has gone through it voice by voice or effect by effect.
+Its panel has only been run in Chromium: no real phone, Safari or Firefox
+has shown it. What follows about the live site was done while the site was
+the 808, so the accounts, saved beats and shop behind it are proven there
+and РИТМ-12 on the live site is not, until someone tries it. Untested:
+Firefox, Safari on a Mac, Windows builds, and the VST3 in any host. The site is
 deployed at `boombapbot.com`, and the owner has done these on it: signed up
 and reset a password (the emails arrived and their links worked), bought a
 sticker (paid at Stripe, accepted from Stripe's webhook, placed with
