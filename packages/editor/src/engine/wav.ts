@@ -102,7 +102,7 @@ export function encodeWav(
   right: Float32Array,
   sampleRate: number,
   bitDepth: WavBitDepth = 24,
-): Uint8Array {
+): Uint8Array<ArrayBuffer> {
   const frames = left.length;
   const bytesPerSample = bitDepth / 8;
   const dataSize = frames * 2 * bytesPerSample;

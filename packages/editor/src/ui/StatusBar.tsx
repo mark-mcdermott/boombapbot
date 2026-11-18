@@ -49,10 +49,10 @@ export function NoticeBanner() {
 }
 
 const AUDIO_TEXT: Record<string, string> = {
-  idle: 'Audio is off. Press start to turn it on.',
+  idle: 'Audio is off. Press play to turn it on.',
   starting: 'Starting audio…',
   running: 'Audio is running',
-  suspended: 'Audio is paused by the browser. Press start to resume.',
+  suspended: 'The browser paused the audio. Press play to bring it back.',
   error: 'Audio could not start',
 };
 
