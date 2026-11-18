@@ -31,8 +31,9 @@ in this file has been built unless it says so.
      code, for a small screen that asks for the picture. They can go if
      nobody wants the picture there.
    - The phone app. `apps/mobile` is as narrow as a phone, so it gets this
-     panel, and nobody has run it that way. It does not load the
-     lettering's typeface, so the lettering falls back to another face.
+     panel, and carries the lettering's typeface. It has run that way in
+     an iPhone simulator and an Android emulator, never on a phone, and
+     export and import were not run again on Android.
    - Decisions it made that are the owner's: step numbers on the keys,
      МУТ on its key, one level knob for the selected voice where the picture
      has eight, no level meter, and controls dimmed while the power is off.

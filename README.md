@@ -380,10 +380,14 @@ Two cross-checks worth knowing about:
   beside them, which no real phone has shown. Nobody has played it for
   long, tried it in Safari or Firefox on a phone, or held a tablet. The
   tests run it in headless browsers (Chromium, and once in Playwright's
-  WebKit and Firefox), in a 390 by 844 touch screen. The phone app in `apps/mobile` now gets it,
-  being as narrow as a phone. With it the app has run once, in an iPhone
-  simulator on 2026-11-18 (shown, a beat playing), and not on Android; the
-  app does not load the lettering's typeface.
+  WebKit and Firefox), in a 390 by 844 touch screen.
+  The phone app in `apps/mobile` now gets it,
+  being as narrow as a phone, and carries the lettering's typeface in its
+  bundle. With it the app ran on 2026-11-18 in an iPhone simulator (shown,
+  lettered as on the site, a beat playing, a WAV and a project file
+  exported, a project file imported) and in an Android emulator (shown,
+  lettered in the same face, a beat playing; export and import not run
+  again there).
 - **The pages of words.** Their layout was looked at in Chromium only, at
   375px, 768px and 1280px wide, in screenshots of the production build. No
   real phone, Safari or Firefox has shown them, and nobody has read them
