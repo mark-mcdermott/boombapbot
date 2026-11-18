@@ -393,6 +393,9 @@
 }
 
 .rt-ph-let {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--rt-cream);
   font-family: var(--font-plate);
   font-size: 12px;
@@ -403,9 +406,18 @@
   white-space: nowrap;
 }
 
-/* The lettering is drawn here, as paint is, and is not text of the page. */
-.rt-ph-let::before {
+/* The lettering is drawn here, as paint is, and is not text of the page. It
+   comes after the label's drawing, if it has one. */
+.rt-ph-let::after,
+.rt-ph-ends i::after {
   content: attr(data-let);
+}
+
+/* The picture's own drawing for a label, cut from it in the lettering's cream. */
+.rt-ph .rt-ph-icon {
+  width: auto;
+  height: 13px;
+  flex: none;
 }
 
 .rt-ph-let[data-dim] {
@@ -750,7 +762,7 @@
 }
 
 .rt-ph .rt-ph-mute {
-  width: 58px;
+  width: 78px;
   height: 44px;
 }
 
@@ -759,6 +771,13 @@
   font-size: 15px;
   font-weight: 800;
   text-shadow: none;
+}
+
+/* On a cream key the drawing is printed dark, like the key's lettering. */
+.rt-ph .rt-ph-mute .rt-ph-icon {
+  height: 15px;
+  filter: brightness(0);
+  opacity: 0.8;
 }
 
 /* ---- Three tabs hold the knobs ---- */
@@ -786,9 +805,19 @@
 }
 
 .rt-ph-tab .rt-ph-let {
+  gap: 6px;
   opacity: 0.62;
   font-size: 14px;
   letter-spacing: 0.12em;
+}
+
+.rt-ph .rt-ph-tab .rt-ph-icon {
+  height: 15px;
+}
+
+/* The drawing of the open tab is lit with its lettering. */
+.rt-ph-tab[aria-selected='true'] .rt-ph-icon {
+  filter: sepia(1) saturate(3.2) hue-rotate(-12deg) brightness(1.08) drop-shadow(0 0 4px rgb(255 170 46 / 0.6));
 }
 
 /* A tab has a lamp, lit for the one that is open. */
@@ -868,6 +897,27 @@
   opacity: 0.85;
 }
 
+/* What the picture letters at the two ends of a knob's travel. */
+.rt-ph-ends {
+  position: absolute;
+  right: -2px;
+  bottom: -3px;
+  left: -2px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--rt-cream);
+  font-family: var(--font-plate);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.rt-ph-ends i {
+  font-style: normal;
+}
+
 /* A piece of the picture, in the picture's own pixels, shrunk about the knob's centre. */
 .rt-ph-knob-art {
   position: absolute;
@@ -891,12 +941,12 @@
   padding: 0 6px;
 }
 
-.rt-ph-pick img {
+.rt-ph-pick > img {
   width: 30px;
   height: 30px;
 }
 
-.rt-ph-ctl-wide .rt-ph-pick img {
+.rt-ph-ctl-wide .rt-ph-pick > img {
   width: 50px;
   height: 50px;
 }

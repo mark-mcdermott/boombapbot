@@ -140,7 +140,12 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   rust are drawn in CSS until the owner paints a blank plate. The lettering
   is drawn by the stylesheet (`Lettered`), as paint is, so it is not text of
   the page; names stay English, with the lettering after a tab's name as it
-  is after a key's. The screen is the same drawing in a second shape
+  is after a key's. The lettering is there to look at. What tells someone
+  who cannot read it what a control is for is the drawing the picture has
+  beside that label, cut from the picture (`art/phone/icon-*.png`) and
+  shown in front of the lettering (`icon` on `Lettered`). Give every new
+  lettered control one; the mix has none on the picture and carries the
+  picture's 0 and 100% at the ends of its travel instead. The screen is the same drawing in a second shape
   (`PHONE_SCREEN` in `ui/Screen.tsx`); keep `PICTURE_SCREEN` as it is
   painted. It sets `data-own-transport`, which tells the editor to leave the
   docked start button out. It is laid out for a screen up to 430px wide and

@@ -14,9 +14,13 @@ in this file has been built unless it says so.
    A phone, and a tablet held upright, get a panel of their own since
    2026-11-18 (`?panel=picture` brings the picture back). What it still
    needs:
-   - The owner on a real phone: whether a thumb finds the keys (the step
-     keys are about 39px on a 390px screen), whether the knobs drag well,
-     and how much of it shows above the fold with the browser's bars.
+   - The owner has used it on an iPhone and an Android phone, in Chrome on
+     both, and likes how it looks and sounds (2026-11-18). They could not
+     tell what the Russian meant, so every label now has the picture's own
+     drawing beside it; that has not been on a real phone yet. Still to
+     find out there: whether the step keys (about 39px on a 390px screen)
+     are large enough over a long session, and how much of the panel shows
+     above the fold with the browser's bars.
    - Its paint. The olive and the rust are drawn in CSS and are flatter than
      the picture. One painted plate with no controls on it would replace
      them.

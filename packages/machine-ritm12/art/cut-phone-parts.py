@@ -91,6 +91,19 @@ def light_ink(name, box):
     Image.fromarray(cut, 'RGBA').save(out / f'{name}.png', optimize=True)
 
 
+def icon(name, box):
+    """A small drawing in cream on the paint, without the paint. The paint is read from the edge of the box, which is all paint."""
+    pixels, light = luminance(box)
+    edge = np.concatenate([light[:2].ravel(), light[-2:].ravel(), light[:, :2].ravel(), light[:, -2:].ravel()])
+    paint = np.percentile(edge, 75) * 1.3
+    ink = np.percentile(light, 99)
+    alpha = np.clip((light - paint) / (ink - paint), 0, 1) ** 0.8
+    cut = np.zeros(pixels.shape[:2] + (4,), 'uint8')
+    cut[..., :3] = (220, 202, 164)
+    cut[..., 3] = (alpha * 255).astype('uint8')
+    Image.fromarray(cut, 'RGBA').save(out / f'{name}.png', optimize=True)
+
+
 # The frame of the screen, with the dark tube inside it. The page stretches
 # it as a frame and draws the screen in the middle.
 rect('bezel', (870, 215, 1455, 605))
@@ -116,6 +129,33 @@ for voice, top, bottom in VOICES:
 
 light_ink('nameplate', (205, 165, 705, 268))
 light_ink('badge', (1490, 165, 1835, 250))
+
+# The small drawing the picture has beside a label, so that the phone's
+# panel can show what a control is for to someone who does not read its
+# lettering. Each box is that drawing alone, with a little paint round it.
+ICONS = {
+    'sequencer': (530, 885, 584, 925),
+    'hits': (692, 652, 726, 681),
+    'accents': (692, 711, 726, 736),
+    'mute': (883, 1104, 931, 1141),
+    'voice': (904, 622, 962, 650),
+    'pitch': (950, 690, 984, 726),
+    'decay': (1115, 692, 1163, 726),
+    'tone': (1261, 693, 1329, 723),
+    'level': (544, 296, 596, 336),
+    'tempo': (1519, 296, 1561, 344),
+    'swing': (1651, 297, 1699, 342),
+    'accent': (1796, 297, 1839, 343),
+    'size': (530, 780, 566, 816),
+    'effect': (1414, 623, 1458, 666),
+    'delay': (1561, 667, 1603, 695),
+    'reverb': (1561, 706, 1604, 743),
+    'flanger': (1561, 751, 1606, 781),
+    'chorus': (1561, 795, 1609, 825),
+    'volume': (1022, 1076, 1069, 1121),
+}
+for name, box in ICONS.items():
+    icon(f'icon-{name}', box)
 
 disc('lamp', 340, 400, 15)
 
