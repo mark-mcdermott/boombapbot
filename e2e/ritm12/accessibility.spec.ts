@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { openSettings } from '../helpers';
 import { openMachine } from './helpers';
 
@@ -12,6 +12,16 @@ function summarize(violations: Awaited<ReturnType<AxeBuilder['analyze']>>['viola
   }));
 }
 
+/**
+ * Waits until the settings sheet has finished fading in. Scanned while it is
+ * still half faded, its text reads as lower in contrast than it is.
+ */
+async function settingsSettled(page: Page): Promise<void> {
+  await page.getByTestId('settings-modal').evaluate(async (sheet) => {
+    await Promise.all(sheet.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
+}
+
 test('the machine has no detectable accessibility violations, stopped, playing or in settings', async ({ page }) => {
   await openMachine(page);
   expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
@@ -20,6 +30,7 @@ test('the machine has no detectable accessibility violations, stopped, playing o
   expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
   await page.getByTestId('stop').click();
   await openSettings(page);
+  await settingsSettled(page);
   expect(summarize((await new AxeBuilder({ page }).analyze()).violations)).toEqual([]);
 });
 
