@@ -22,7 +22,7 @@ the manual, not from a machine, and [The machine](#the-machine) says where
 it guesses.
 
 The 808 panel above is original artwork, drawn in code by
-[`scripts/draw-faceplates.mjs`](scripts/draw-faceplates.mjs).
+[`packages/machine-808/art/draw-faceplate.mjs`](packages/machine-808/art/draw-faceplate.mjs).
 
 ## Run it
 
@@ -377,7 +377,7 @@ of 64 is never full in normal use. This is a desktop number.
 ## Sounds: provenance
 
 The 808's sounds are synthesised by the engine itself, in
-[`engine/src/synth808.cpp`](engine/src/synth808.cpp): decaying tuned
+[`packages/machine-808/engine/voices.cpp`](packages/machine-808/engine/voices.cpp): decaying tuned
 oscillators, filtered noise and six square waves for the metallic voices,
 each built from its knob settings. It is a model made by ear. It has not been
 compared with a real machine, and nothing in it is sampled. The browser
@@ -394,19 +394,19 @@ they are kept, with their check, for when those machines come back. Details:
 
 The panel puts step buttons, lamps, the instrument selector, start/stop, the
 knobs and the voice switches where they are on the machine. The layout comes from the manifest
-in `packages/contracts/data/panels/808.panel.json`. State, keyboard and
+in `packages/machine-808/data/808.panel.json`. State, keyboard and
 accessibility do not depend on the picture: if the image fails to load, the
 panel is drawn from the same layout.
 
 A faceplate image ships only once it is cleared. There are two places an
 image can live:
 
-- **`assets/faceplates/`** holds cleared images. They are committed, and each
-  has a provenance entry in
-  [`assets/faceplates/README.md`](assets/faceplates/README.md). The 808 is
-  original artwork drawn by `scripts/draw-faceplates.mjs` from the panel's
-  own layout, so it needs no credit. The folder also keeps the owner's edits
-  of Creative Commons photographs of the 606, 707 and 909, with the brand
+- **A machine's `art/` folder** holds its cleared panel image. It is
+  committed, with a provenance entry in the folder's `README.md`
+  ([the 808's](packages/machine-808/art/README.md)). The 808 is original
+  artwork drawn by `art/draw-faceplate.mjs` from the panel's own layout, so
+  it needs no credit. `assets/faceplates/` keeps the owner's edits of
+  Creative Commons photographs of the 606, 707, 808 and 909, with the brand
   names removed, for when those machines come back. No build ships them.
 - **`misc/assets/`** holds the owner's unedited originals. It is ignored by
   git. `pnpm dev` uses what it finds there; `pnpm build` never does.
@@ -424,13 +424,13 @@ and the tempo are docked at the bottom of the screen.
 
 | Path | Contents |
 | --- | --- |
-| `engine/` | C++20 core, C ABI, WASM target, CTest suites, `boombapbot-render` tool |
-| `packages/contracts/` | What every project document carries, saved-beat and shop schemas, and for now the 808's data files and fixtures |
+| `engine/` | C++20 core with no voices of its own, C ABI, the CMake function that builds it for a machine, CTest suites, render tool |
+| `packages/contracts/` | What every project document carries, and the saved-beat and shop schemas |
 | `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
-| `packages/machine-808/` | The 808 as a machine: its project schema, tracks and sounds, panel, and what its controls do |
+| `packages/machine-808/` | The 808 as a machine: its project schema, data files and fixtures, voices, panel art and styles, and what its controls do |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
 | `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
-| `assets/faceplates/` | Cleared faceplate images, drawn or photographed, and their provenance |
+| `assets/faceplates/` | Cleared photographs of the classic machines and their provenance, not shipped |
 | `plugins/vst3/` | JUCE VST3 compile spike, outside the web build |
 | `e2e/` | Playwright tests |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |

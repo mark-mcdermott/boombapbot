@@ -17,7 +17,7 @@ First-time setup, in this order. Later steps use what earlier ones build.
 ./scripts/setup-emsdk.sh   # once: Emscripten 6.0.13 into .tools/emsdk
 pnpm install
 pnpm build:engine          # native engine + CTest, into build/native
-pnpm build:wasm            # same sources to build/wasm/boombapbot-engine.wasm
+pnpm build:wasm            # same sources to build/wasm/boombapbot-engine-<machine>.wasm
 pnpm dev                   # http://localhost:4321
 ```
 
@@ -62,10 +62,27 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   those together as a `Machine`. Core must never import a machine package.
 - `packages/contracts/` holds what every machine shares: what any project
   document carries and the codec a build makes from its machines
-  (`document.ts`), saved beats and the shop. For now it also holds the
-  808's JSON data files and fixtures (`data/`, `fixtures/`), because the C++
-  tests read the same files by path, so a change there is checked on both
-  sides.
+  (`document.ts`), saved beats and the shop.
+- A machine package also holds its data and what the engine needs from it:
+  for the 808, its JSON data files (`data/`) and fixtures (`fixtures/`),
+  which the C++ tests read by path, so a change there is checked on both
+  sides; its voices (`engine/voices.cpp`); its panel art and the script that
+  draws it (`art/`); and its panel's styles (`src/styles.css`, imported by
+  its `index.tsx`). The editor's own `styles.css` has no machine in it.
+- The engine is only ever built for a machine. The core
+  (`engine/src/engine.cpp`, `midi.cpp`, `synth.cpp`) has no voices; a
+  machine's sources define `boombapbot::machineVoices()`
+  (`engine/include/boombapbot/voices.h`) and its `engine/CMakeLists.txt`
+  calls `boombapbot_add_machine` (`engine/cmake/BoombapbotMachine.cmake`).
+  That gives `boombapbot-engine-<id>.wasm` and, natively,
+  `boombapbot_engine_<id>`. A plain `cmake -S engine` builds every machine
+  package in the repository; `BOOMBAPBOT_MACHINE_DIRS` names them otherwise.
+  The engine's test suites and render tool are still written against the
+  808's project and track table, so the 808's `engine/CMakeLists.txt` builds
+  them (`boombapbot-render-808 --project FILE --machine packages/machine-808`).
+- `scripts/prepare-assets.mjs` and `scripts/check-build.mjs` work for one
+  machine, named by `BOOMBAPBOT_MACHINE` like the site's alias (the 808 when
+  unset). The asset manifest says which machine the build is.
 - `packages/editor/` is the React editor core. `EditorStore` holds the
   project and undo; `EditorRuntime` connects it to audio, local storage and
   the exporters and hosts the machine; `AudioController` is the only thing
@@ -101,13 +118,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   when that measure begins; step edits apply at the next buffer.
 - Output must not depend on buffer size. `test_scheduler` checks that renders
   at different block sizes are bit-identical.
-- The functions the WASM build exports are listed in `engine/CMakeLists.txt`
-  (`SNARE_WASM_EXPORTS`). Add new C ABI functions there, and to
+- The functions the WASM build exports are listed in
+  `engine/cmake/BoombapbotMachine.cmake` (`SNARE_WASM_EXPORTS`). Add new C ABI functions there, and to
   `packages/editor/src/engine/wasm-engine.ts`.
 - `test_realtime` counts heap calls inside `snare_engine_render` and
   `test_abi.c` pins struct layouts; a unit test compares the header, the
   export list and the TypeScript bridge. Keep all three passing.
-- `engine/src/synth808.cpp` builds the 808's sounds from knob settings. Do
+- `packages/machine-808/engine/voices.cpp` builds the 808's sounds from knob settings. Do
   its arithmetic in double, use the C library's maths for coefficients only,
   and keep its own noise generator: that is what holds native and WASM to
   one 24-bit step per sound. Never synthesise on the audio thread; render
@@ -142,7 +159,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 **The project and the machine**
 
 - A track's position in `TRACK_IDS` is its engine track (the accent is 0), and
-  a role's `index` in `packages/contracts/data/roles.json` is its sound slot
+  a role's `index` in `packages/machine-808/data/roles.json` is its sound slot
   and the synthesiser's sound number. Never reorder or reuse either.
 - A step is on or off. Loudness comes from the accent track and the level
   knobs. There is no per-step velocity and no swing; do not bring them back
@@ -178,21 +195,21 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - The owner does not want manufacturer or product brand names in the app or
   its images. The machine is the "808". The one exception would be a photo
   credit line, which has to name the original work.
-- The faceplate is a drawing made by `scripts/draw-faceplates.mjs`. Its
+- The faceplate is a drawing made by `packages/machine-808/art/draw-faceplate.mjs`. Its
   manifest sets `faceplate.original` and has no credit. Change the script and
   run `pnpm faceplates:draw`; do not hand-edit the SVG. The script places live
   controls from the panel manifest, so keep reading positions from there.
   `check-build` fails a build whose faceplate is not the committed one, or has
-  no entry in `assets/faceplates/README.md`, or is a photograph without a
+  no entry in the machine's `art/README.md`, or is a photograph without a
   `faceplate.credit`.
-- The 606, 707 and 909 photographs in `assets/faceplates/` are the owner's
+- The 606, 707, 808 and 909 photographs in `assets/faceplates/` are the owner's
   debranded edits of Creative Commons works, kept for later. If one ships
   again it needs its credit shown under the panel; that is a licence
   requirement.
 - `misc/assets/` is git-ignored and is for the owner's unedited originals.
   Nothing from it may reach a production build or a commit.
 - Panel coordinates are in the image's own pixel space (`faceplate.width`
-  and `height`). `assets/faceplates/README.md` records how it was fitted.
+  and `height`). `packages/machine-808/art/README.md` records how it was fitted.
 - The header mascot (`packages/editor/src/assets/mascot.svg`) is the owner's
   artwork and is used unaltered. Its cream outline on the dark background is
   CSS, in `.sb-mascot`.
