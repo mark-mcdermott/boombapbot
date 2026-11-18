@@ -81,7 +81,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   The engine's test suites and render tool are still written against the
   808's project and track table, so the 808's `engine/CMakeLists.txt` builds
   them (`boombapbot-render-808 --project FILE --machine packages/machine-808`).
-- `packages/machine-ritm12/` is РИТМ-12, everything but its panel so far.
+- `packages/machine-ritm12/` is РИТМ-12.
   Its eight voices are `engine/voices.cpp` (pitch, tone and decay; their
   place in the table is their sound number, never reorder); what voices are
   built from is shared in `engine/include/boombapbot/dsp.h`. Its project
@@ -97,6 +97,32 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   formats. It must stay self-contained: it may not import the 808's package.
   A machine's draft has its own storage key, and a draft found under an
   earlier key is read and left exactly where it was.
+- РИТМ-12's panel (`src/ui/`) is one picture with every control live on top
+  of it. The stage is exactly as large as the picture, 2000 by 1333, and is
+  shrunk as a whole to fit its frame, so every position in `ui/layout.ts`
+  and every length in `src/styles.css` is in the picture's own pixels. A
+  stepped control (power, write, size, effect) shows another picture of
+  itself for each position (`Patch`); a knob's painted body stays still and
+  only its pointer line, a picture of its own, turns (`PointerKnob`,
+  `handTransform`); a lit key or lamp is light laid over the paint with a
+  blend mode. The screen and the meter are drawn a frame at a time outside
+  React (`ui/Screen.tsx`). What is lettered on the picture is Russian; every
+  control's accessible name is English, and a control that moves says what
+  it did in an `aria-live` line as well as on the machine's screen. The
+  mouse wheel must not turn a knob: it would hijack scrolling the page.
+- Its art is `art/` in its package: `plate.webp`, `patch/` and `pointer/`,
+  with where it comes from in `art/README.md`. `art/cut-art.py` cuts it
+  from the owner's pictures in the git-ignored `misc/assets/ritm12/`; do not
+  edit the cut files by hand. A machine with no panel manifest ships every
+  image in its `art/` folder, served under `machines/<id>/` and named by
+  `art` in the asset manifest; `check-build` fails a build whose art is not
+  byte for byte what is committed, or that carries another machine's.
+- To run РИТМ-12: `BOOMBAPBOT_MACHINE=ritm12 pnpm dev`, or the same
+  variable in front of `pnpm build` and `pnpm test:e2e`. Its browser tests
+  are `e2e/ritm12/`; the ones in `e2e/` itself are the 808's and the site's.
+  CI builds and tests both.
+- Shared between panels, in the editor: `useKnob` (a slider to a screen
+  reader, dragged up and down, turned with the keys) and `useAssetManifest`.
 - A setup follows either what a panel's switches ask for (`follow.panel`,
   the 808) or one pattern round and round (`follow.cue`). A render plan is a
   song of rhythms (`SongPlan`) or one cued pattern (`PatternPlan`). The

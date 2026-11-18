@@ -23,6 +23,18 @@ const dist = candidates.find((dir) => existsSync(join(dir, 'index.html')));
 const problems = [];
 const notes = [];
 
+/** Every image under a folder, as paths relative to it. */
+function imagesIn(dir, prefix = '') {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? imagesIn(join(dir, entry.name), `${prefix}${entry.name}/`)
+      : /\.(webp|png|svg|jpe?g)$/.test(entry.name)
+        ? [`${prefix}${entry.name}`]
+        : [],
+  );
+}
+
 function check(condition, message) {
   if (!condition) problems.push(message);
   return Boolean(condition);
@@ -77,6 +89,31 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
   // Sounds are synthesised by the engine, so no sample files may ship.
   check(!existsSync(join(dist, 'kits')), 'the build has a kits folder; sounds are synthesised, not shipped');
 
+  // Panel art in the build must be, byte for byte, what is committed in the
+  // machine's art folder, and nothing else may sit beside it.
+  const artDir = join(machineDir, 'art');
+  if (manifest.art) {
+    check(manifest.art === `machines/${machine}/`, `the art is served from ${manifest.art}, not from this machine's folder`);
+    check(existsSync(join(artDir, 'README.md')), "the machine's art folder has no README.md saying where its art comes from");
+    const built = imagesIn(join(dist, 'machines', machine));
+    const committed = imagesIn(artDir);
+    check(built.length > 0, 'the build lists panel art but ships none');
+    for (const file of built) {
+      const source = join(artDir, file);
+      check(
+        existsSync(source) && readFileSync(source).equals(readFileSync(join(dist, 'machines', machine, file))),
+        `machines/${machine}/${file} in the build is not the committed art/${file}`,
+      );
+    }
+    for (const file of committed) check(built.includes(file), `the committed art/${file} is missing from the build`);
+    notes.push(`art ${manifest.art}: ${built.length} file(s)`);
+  }
+  if (existsSync(join(dist, 'machines'))) {
+    for (const name of readdirSync(join(dist, 'machines'))) {
+      check(manifest.art === `machines/${name}/`, `the build has art for the ${name}, which is not the machine it is`);
+    }
+  }
+
   // A faceplate in the build must be the one committed in the machine's art folder.
   // The owner's local originals in misc/assets must never ship.
   const path = manifest.faceplate;
@@ -113,7 +150,7 @@ if (check(existsSync(manifestPath), 'boombapbot-assets.json is missing from the 
       check(path === `faceplates/${name}`, `faceplates/${name} is in the build but not in the asset manifest`);
     }
   }
-  notes.push(path ? `faceplate ${path}` : 'no faceplate');
+  if (!manifest.art) notes.push(path ? `faceplate ${path}` : 'no faceplate');
 }
 
 if (problems.length > 0) {

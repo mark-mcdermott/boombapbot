@@ -1,0 +1,151 @@
+import { expect, test } from '@playwright/test';
+import { beat, emptyPattern, openMachine, step, stepsOn } from './helpers';
+
+test.beforeEach(async ({ page }) => {
+  await openMachine(page);
+});
+
+test('the machine is its picture, with every control inside it', async ({ page }) => {
+  const frame = (await page.getByTestId('panel').boundingBox())!;
+  expect(frame.width / frame.height).toBeCloseTo(2000 / 1333, 2);
+  const controls = page.locator('.rt-key, .rt-knob');
+  expect(await controls.count()).toBe(38 + 16);
+  for (const box of await controls.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON() as DOMRect))) {
+    expect(box.left).toBeGreaterThanOrEqual(frame.x - 1);
+    expect(box.top).toBeGreaterThanOrEqual(frame.y - 1);
+    expect(box.right).toBeLessThanOrEqual(frame.x + frame.width + 1);
+    expect(box.bottom).toBeLessThanOrEqual(frame.y + frame.height + 1);
+  }
+  // The picture and every piece laid over it came from this build.
+  const images = await page.locator('.rt-plate, .rt-patch').evaluateAll((nodes) =>
+    nodes.map((node) => ({ src: (node as HTMLImageElement).src, loaded: (node as HTMLImageElement).naturalWidth > 0 })),
+  );
+  expect(images.length).toBe(7);
+  expect(images.every((image) => image.loaded && image.src.includes('/machines/ritm12/'))).toBe(true);
+});
+
+test('step keys put hits of the selected instrument on and take them off', async ({ page }) => {
+  await emptyPattern(page);
+  await page.getByTestId('voice-tom').click();
+  await step(page, 1).click();
+  await step(page, 7).click();
+  await expect(step(page, 7)).toHaveAttribute('aria-pressed', 'true');
+  await expect(step(page, 7)).toHaveAccessibleName('Tom, step 7, on');
+  expect(stepsOn((await beat(page)).patterns[2]!.steps.tom)).toEqual([1, 7]);
+  await step(page, 1).click();
+  expect(stepsOn((await beat(page)).patterns[2]!.steps.tom)).toEqual([7]);
+  // The keys show the instrument that is selected.
+  await page.getByTestId('voice-rim').click();
+  await expect(step(page, 7)).toHaveAttribute('aria-pressed', 'false');
+  // Undo takes back one key at a time.
+  await page.keyboard.press('ControlOrMeta+z');
+  expect(stepsOn((await beat(page)).patterns[2]!.steps.tom)).toEqual([1, 7]);
+});
+
+test('the write switch turns the step keys to accents, and shows its other picture', async ({ page }) => {
+  await emptyPattern(page);
+  const patch = page.locator('.rt-patch[src*="write-accents"]');
+  await expect(patch).toBeHidden();
+  await page.getByTestId('write').click();
+  await expect(patch).toBeVisible();
+  await step(page, 5).click();
+  const now = await beat(page);
+  expect(now.panel.write).toBe('accents');
+  expect(stepsOn(now.patterns[2]!.accents)).toEqual([5]);
+  await expect(step(page, 5)).toHaveAccessibleName('Accent, step 5, on');
+  await expect(step(page, 5)).toHaveAttribute('data-red', 'true');
+});
+
+test('the size switch leaves the last four steps out of a twelve-step measure', async ({ page }) => {
+  await emptyPattern(page);
+  await page.getByTestId('size').click();
+  expect((await beat(page)).size).toBe(12);
+  await expect(step(page, 13)).toHaveAttribute('aria-disabled', 'true');
+  await expect(step(page, 13)).toHaveAttribute('data-unused', 'true');
+  await step(page, 13).click({ force: true });
+  await step(page, 12).click();
+  expect(stepsOn((await beat(page)).patterns[2]!.steps.kick)).toEqual([12]);
+});
+
+test('the effect selector steps through its four positions and the mix knob adds it', async ({ page }) => {
+  const seen: string[] = [];
+  for (let press = 0; press < 4; press += 1) {
+    await page.getByTestId('effect').click();
+    seen.push((await beat(page)).effect.kind);
+  }
+  expect(seen).toEqual(['reverb', 'flanger', 'chorus', 'delay']);
+  await expect(page.locator('.rt-patch[src*="effect-delay"]')).toBeVisible();
+  const mix = page.getByTestId('mix');
+  await mix.focus();
+  await page.keyboard.press('PageUp');
+  await expect(mix).toHaveAttribute('aria-valuetext', '20%');
+  expect((await beat(page)).effect.mix).toBeCloseTo(0.2, 5);
+});
+
+test('knobs turn by keyboard and by dragging, and say where they stand', async ({ page }) => {
+  const tempo = page.getByTestId('tempo');
+  await tempo.focus();
+  await page.keyboard.press('End');
+  await expect(tempo).toHaveAttribute('aria-valuetext', '300 beats a minute');
+  await page.keyboard.press('Home');
+  expect((await beat(page)).tempo).toBe(40);
+  await expect(page.getByTestId('spoken')).toHaveText('Tempo: 40 beats a minute');
+
+  const volume = page.getByTestId('volume');
+  await volume.scrollIntoViewIfNeeded();
+  const box = (await volume.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 300, { steps: 6 });
+  await page.mouse.up();
+  expect((await beat(page)).mix.volume).toBe(1);
+  await volume.dblclick();
+  expect((await beat(page)).mix.volume).toBe(0.8);
+
+  // The voice knobs belong to the instrument that is selected.
+  await page.getByTestId('voice-perc').click();
+  await page.getByTestId('pitch').focus();
+  await page.keyboard.press('ArrowUp');
+  const now = await beat(page);
+  expect(now.voices.perc.pitch).toBeCloseTo(0.52, 5);
+  expect(now.voices.kick.pitch).toBe(0.5);
+  await expect(page.getByTestId('pitch')).toHaveAccessibleName('Perc pitch');
+});
+
+test('scrolling the page over the machine does not turn a knob', async ({ page }) => {
+  const before = await beat(page);
+  const box = (await page.getByTestId('tempo').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 240);
+  expect((await beat(page)).tempo).toBe(before.tempo);
+});
+
+test('mute, dice and clear work on what is selected', async ({ page }) => {
+  await emptyPattern(page);
+  await page.getByTestId('voice-snare').click();
+  await page.getByTestId('mute').click();
+  await expect(page.getByTestId('mute')).toHaveAttribute('aria-pressed', 'true');
+  expect((await beat(page)).mix.mutes).toMatchObject({ snare: true, kick: false });
+  await page.getByTestId('mute').click();
+
+  await page.getByTestId('dice').click();
+  await page.getByTestId('dice').click();
+  const rolled = (await beat(page)).patterns[2]!;
+  expect(stepsOn(rolled.steps.kick)).toEqual([]);
+  await page.getByTestId('clear-pattern').click();
+  expect(stepsOn((await beat(page)).patterns[2]!.steps.snare)).toEqual([]);
+  // The first pattern was never touched.
+  expect(stepsOn((await beat(page)).patterns[0]!.steps.kick).length).toBeGreaterThan(0);
+});
+
+test('switched off, the machine is dark and its controls are out of reach', async ({ page }) => {
+  await page.getByTestId('power').click();
+  await expect(page.getByTestId('panel')).toHaveAttribute('data-power', 'off');
+  await expect(page.locator('.rt-patch[src*="power-on"]')).toBeHidden();
+  await expect(page.locator('.rt-controls')).toHaveAttribute('inert', '');
+  const before = await beat(page);
+  await step(page, 2).click({ force: true });
+  expect(await beat(page)).toEqual(before);
+  await page.getByTestId('power').click();
+  await expect(page.locator('.rt-patch[src*="power-on"]')).toBeVisible();
+});

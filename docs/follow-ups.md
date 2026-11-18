@@ -19,6 +19,15 @@ outputs, separate instrument outputs, pedal jacks and memory protection.
 
 Not settled by any of that:
 
+- **РИТМ-12 is built but not live.** The site is still the 808. Before it
+  takes over: nobody has listened to its eight voices or its four effects,
+  whose levels and ranges were set by measurement and not by ear; its art is
+  2000 pixels wide and should be cut again from the owner's 3072-wide
+  pictures; its pointer lines were lifted from an earlier picture and the
+  owner may paint their own; it has been run in Chromium only, with no real
+  phone, Safari or Firefox; the pages of words (About, Docs, the policies)
+  still describe the 808; and the tests of the site, accounts, saved beats
+  and shop still run against the 808's build only.
 - **How it sounds.** `packages/machine-808/engine/voices.cpp` is a model made by ear. It
   needs a listen beside a real machine, voice by voice and knob by knob.
 - **Composing over a written track.** The manual says a track can be edited

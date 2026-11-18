@@ -1,6 +1,8 @@
 export { BoombapbotEditor, type BoombapbotEditorProps } from './ui/Editor';
 export { SitePage, type SitePageProps } from './ui/SitePage';
-export { RuntimeContext, useEditorState, useRuntime } from './ui/context';
+export { RuntimeContext, useAssetManifest, useEditorState, useRuntime } from './ui/context';
+export { useKnob, type KnobOptions } from './ui/knob';
+export { PlayButton } from './ui/PlayButton';
 export { Segmented } from './ui/Segmented';
 export { EditorRuntime, type AssetManifest } from './runtime';
 export { EditorStore, newProjectId, type EditorState } from './state/store';

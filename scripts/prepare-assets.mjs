@@ -10,7 +10,7 @@
 // --dev only and never reach a production build.
 
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -85,16 +85,55 @@ const faceplateDir = join(publicDir, 'faceplates');
 // Always start clean so an image copied by an earlier dev run cannot leak
 // into a production build.
 rmSync(faceplateDir, { recursive: true, force: true });
-const panel = readJson(join(machineDir, 'data', `${machine}.panel.json`));
-const cleared = join(machineDir, 'art', panel.faceplate.file);
-const local = join(root, 'misc/assets', panel.faceplate.file);
-const localOnly = !existsSync(cleared) && includeLocalFaceplates && existsSync(local);
-const source = existsSync(cleared) ? cleared : localOnly ? local : null;
+// A machine with a panel manifest names one faceplate image in it.
+const panelPath = join(machineDir, 'data', `${machine}.panel.json`);
+const panel = existsSync(panelPath) ? readJson(panelPath) : null;
 let faceplate = null;
-if (source) {
-  mkdirSync(faceplateDir, { recursive: true });
-  cpSync(source, join(faceplateDir, panel.faceplate.file));
-  faceplate = `faceplates/${panel.faceplate.file}`;
+let localOnly = false;
+if (panel) {
+  const cleared = join(machineDir, 'art', panel.faceplate.file);
+  const local = join(root, 'misc/assets', panel.faceplate.file);
+  localOnly = !existsSync(cleared) && includeLocalFaceplates && existsSync(local);
+  const source = existsSync(cleared) ? cleared : localOnly ? local : null;
+  if (source) {
+    mkdirSync(faceplateDir, { recursive: true });
+    cpSync(source, join(faceplateDir, panel.faceplate.file));
+    faceplate = `faceplates/${panel.faceplate.file}`;
+  }
+}
+
+// ---- Panel art ---------------------------------------------------------------
+//
+// A machine without one ships every image committed in its art folder, at
+// the same paths under machines/<id>/. Only that folder is read: nothing
+// from misc/assets can get in this way.
+
+const IMAGE = /\.(webp|png|svg|jpe?g)$/;
+
+/** Every image under a folder, as paths relative to it. */
+function imagesIn(dir, prefix = '') {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? imagesIn(join(dir, entry.name), `${prefix}${entry.name}/`)
+      : IMAGE.test(entry.name)
+        ? [`${prefix}${entry.name}`]
+        : [],
+  );
+}
+
+const machinesDir = join(publicDir, 'machines');
+rmSync(machinesDir, { recursive: true, force: true });
+const artDir = join(machineDir, 'art');
+let art;
+let artCount = 0;
+if (!panel && existsSync(artDir)) {
+  for (const file of imagesIn(artDir)) {
+    const target = join(machinesDir, machine, file);
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(join(artDir, file), target);
+    artCount += 1;
+  }
+  art = `machines/${machine}/`;
 }
 
 // ---- Manifest --------------------------------------------------------------
@@ -103,12 +142,13 @@ const manifest = {
   machine,
   engine: { worklet: `engine/${workletName}`, wasm: `engine/${wasmName}` },
   faceplate,
+  art,
 };
 writeFileSync(join(publicDir, 'boombapbot-assets.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(
   `prepare-assets: machine ${machine}, engine ${wasmName} (${wasmBytes.length} bytes), worklet ${workletName} ` +
     `(${workletBytes.length} bytes), ` +
-    (faceplate ? `faceplate ${panel.faceplate.file}` : 'no faceplate') +
+    (art ? `${artCount} art file(s)` : faceplate ? `faceplate ${panel.faceplate.file}` : 'no faceplate') +
     (localOnly ? ' (a local original, dev only)' : ''),
 );

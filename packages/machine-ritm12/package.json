@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "РИТМ-12: its project document, its eight voices, what its controls do and what it asks of the engine. Its panel comes next.",
+  "description": "РИТМ-12: its project document, its eight voices, what its controls do, what it asks of the engine, and its panel.",
   "exports": {
+    ".": "./src/index.tsx",
     "./document": "./src/document/index.ts"
   },
   "dependencies": {

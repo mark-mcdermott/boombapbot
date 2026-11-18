@@ -47,6 +47,9 @@ importers:
       '@boombapbot/machine-808':
         specifier: workspace:*
         version: link:../../packages/machine-808
+      '@boombapbot/machine-ritm12':
+        specifier: workspace:*
+        version: link:../../packages/machine-ritm12
       '@neondatabase/serverless':
         specifier: 1.2.0
         version: 1.2.0
