@@ -66,25 +66,44 @@ Export, on the same simulator: WAV loop opens the share sheet with the
 file, and "Save to Files" leaves a 24-bit stereo WAV of one measure in the
 Files app; the MIDI file and the project file open the sheet with theirs;
 closing the sheet without choosing leaves no "WAV exported" line and no
-error.
+error. While the sheet is open the settings sheet says "Saving the WAV…".
 
-`./gradlew assembleDebug` builds the Android app. It has not been run on
-an emulator or a phone.
+Import, on the same simulator: a project file saved to Files from the
+share sheet, then every pattern cleared, then Import: the phone's file
+chooser shows the file, and choosing it brings the beat back with the
+"Imported" notice.
+
+On an Android emulator (API 36.1, a 1080 by 2400 phone, Chrome 153's web
+view), on 2026-11-17: the app launches and shows the machine; Play starts
+the engine (audio running at 48 kHz, the step moving, output peaking at
+0.66); a step added to the pattern is still there after the app is stopped
+and opened again, and the draft is in the app's SharedPreferences. WAV
+loop, the MIDI file and the project file each open Android's share sheet
+with the file named, and the WAV written for it is the same 24-bit stereo
+file as on the iPhone; Back on the sheet leaves no "WAV exported" line and
+no error. Import opens Android's file chooser, and a project file chosen
+from Downloads is loaded with the "Imported" notice. The page's safe-area
+insets arrive there (51 CSS pixels at the top, 24 at the bottom).
 
 Nobody has listened to it or held it. Not checked: a real iPhone, a real
 Android phone, an iPad, the ringer switch, a phone call or another app
 taking the sound, the app coming back from the background, long playing.
+On the emulator no other app took a shared file: it has no account for
+Drive or Gmail.
 
 ## What is not right yet
 
-- **Export on Android is untried.** It is built on the same two plug-ins
-  and compiles, but no Android share sheet has shown a file from it.
+- **Android's share sheet has no "save to this phone".** It offers other
+  apps (Drive, Gmail, Messages, Bluetooth, Quick Share), not the phone's
+  own Downloads. Someone who wants the WAV on the phone has to go through
+  one of those. A "Save to Downloads" beside the share would need the
+  phone's document saver, which neither plug-in gives.
+- **A cold start on the Android emulator** shows the dark background for
+  about ten seconds before the machine appears. A real phone will be
+  quicker; how much is not known.
 - **Exports pile up in the cache.** Each one is written to the app's cache
   folder under its beat's name and left there. The system may clear that
   folder, and a second export of the same beat writes over the first.
-- **While the share sheet is open** the settings sheet behind it still says
-  "Rendering the WAV… 100%".
-- **Import has not been tried.**
 - **Words written for the site.** The settings sheet says the draft is
   saved "in this browser" and lists keyboard keys.
 - **Sideways on a phone** the brand takes about a third of the screen and
@@ -101,8 +120,8 @@ taking the sound, the app coming back from the background, long playing.
 
 ### Android
 
-- Run it: an emulator (none is set up on this Mac) and a real phone. The
-  Galaxy S9 that played the site is the one to try first, for stutter.
+- Run it on a real phone. The Galaxy S9 that played the site is the one to
+  try first, for stutter. It has run on an emulator only.
 - A release build needs an upload key and Play App Signing. The key is
   yours to make and keep; it must never be committed.
 - `versionCode` and `versionName` in `android/app/build.gradle` are still 1
