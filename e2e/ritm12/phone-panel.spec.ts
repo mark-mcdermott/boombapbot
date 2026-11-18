@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { scanner } from '../helpers';
 import { beat, step, stepsOn } from './helpers';
 
-// The phone's panel is a preview behind a link, so these open that link on a phone-sized touch screen.
+// A screen as narrow as a phone's gets the phone's panel. These run on a phone-sized touch screen.
 test.use({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -11,12 +11,12 @@ test.use({
 });
 
 async function openPhonePanel(page: Page): Promise<void> {
-  await page.goto('/?panel=phone');
+  await page.goto('/');
   await expect(page.getByTestId('editor')).toBeVisible();
   await expect(page.getByTestId('panel')).toHaveAttribute('data-view', 'phone');
 }
 
-test('the link shows the phone’s panel in place of the picture, and the page without it is as it was', async ({ page }) => {
+test('a phone gets the phone’s panel in place of the picture, with every part of it', async ({ page }) => {
   await openPhonePanel(page);
   await expect(page.getByTestId('plate')).toHaveCount(0);
   // It has its own keys for what the strip, the fit button and the dock stood in for.
@@ -34,11 +34,35 @@ test('the link shows the phone’s panel in place of the picture, and the page w
   await expect.poll(async () => (await parts()).filter((part) => !part.loaded).length).toBe(0);
   expect((await parts()).length).toBeGreaterThan(20);
   expect((await parts()).every((part) => part.src.includes('/machines/ritm12/phone/'))).toBe(true);
+});
 
-  await page.goto('/');
+test('the panel follows the screen’s width and keeps the beat, and the address can ask for either one', async ({ page }) => {
+  await openPhonePanel(page);
+  await page.getByTestId('pattern-3').click();
+  await page.getByTestId('voice-tom').click();
+  await step(page, 6).click();
+
+  // Wider than a tablet held upright: the picture, with the same beat on it.
+  await page.setViewportSize({ width: 1180, height: 820 });
   await expect(page.getByTestId('plate')).toBeVisible();
   await expect(page.getByTestId('panel')).not.toHaveAttribute('data-view', 'phone');
-  await expect(page.getByTestId('dock-play')).toBeVisible();
+  await expect(step(page, 6)).toHaveAttribute('aria-pressed', 'true');
+  expect(stepsOn((await beat(page)).patterns[2]!.steps.tom)).toEqual([6]);
+
+  // A tablet held upright gets the phone's panel, grown to use the room.
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await expect(page.getByTestId('panel')).toHaveAttribute('data-view', 'phone');
+  await expect(step(page, 6)).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await page.getByTestId('panel').boundingBox())!.width).toBeGreaterThan(540);
+  expect((await step(page, 6).boundingBox())!.width).toBeGreaterThanOrEqual(48);
+
+  // Asked for by name, either view shows at any width.
+  await page.goto('/?panel=picture');
+  await expect(page.getByTestId('plate')).toBeVisible();
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto('/?panel=phone');
+  await expect(page.getByTestId('panel')).toHaveAttribute('data-view', 'phone');
+  await expect(page.getByTestId('plate')).toHaveCount(0);
 });
 
 test('every key of the phone’s panel is large enough for a thumb', async ({ page }) => {

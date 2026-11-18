@@ -11,20 +11,24 @@ in this file has been built unless it says so.
    in desktop Chrome and on an iPhone in Safari and Firefox. Firefox and
    Safari on a Mac and an Android phone have not shown it, and nobody has
    played it for long on a phone.
-   A panel for a phone is being tried at `?panel=phone` (2026-11-18). What
-   it still needs before it is what a phone gets:
+   A phone, and a tablet held upright, get a panel of their own since
+   2026-11-18 (`?panel=picture` brings the picture back). What it still
+   needs:
    - The owner on a real phone: whether a thumb finds the keys (the step
      keys are about 39px on a 390px screen), whether the knobs drag well,
      and how much of it shows above the fold with the browser's bars.
    - Its paint. The olive and the rust are drawn in CSS and are flatter than
      the picture. One painted plate with no controls on it would replace
      them.
-   - Choosing it by the screen's width, not by a link, and taking the
-     instrument strip, the fit button and the dock away with it. A phone on
-     its side and a tablet are not thought through: the picture's step keys
-     are about 26px on a 768px tablet.
-   - The phone app. `apps/mobile` does not load the lettering's typeface and
-     has no address to ask for this panel with.
+   - A phone on its side. It is wider than 900px on the largest phones and
+     narrower on the rest, so some get the picture and some get a column
+     taller than the screen. Neither was designed for it.
+   - The instrument strip, the fit button and the dock are still in the
+     code, for a small screen that asks for the picture. They can go if
+     nobody wants the picture there.
+   - The phone app. `apps/mobile` is as narrow as a phone, so it gets this
+     panel, and nobody has run it that way. It does not load the
+     lettering's typeface, so the lettering falls back to another face.
    - Decisions it made that are the owner's: step numbers on the keys,
      МУТ on its key, one level knob for the selected voice where the picture
      has eight, no level meter, and controls dimmed while the power is off.

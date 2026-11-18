@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
 import { Segmented } from '@boombapbot/editor';
 import { EFFECT_KINDS, getVoice } from '../document';
 import { Key, Lamp, Patch, PointerKnob } from './Controls';
@@ -38,18 +38,37 @@ function useStageScale(frame: RefObject<HTMLDivElement | null>): number {
   return scale;
 }
 
-/**
- * The phone's panel is a preview for now: a page opened with `?panel=phone`
- * in its address shows it, at any width. Every other page shows the picture.
- */
-function asksForPhonePanel(): boolean {
-  return new URLSearchParams(window.location.search).get('panel') === 'phone';
+type View = 'phone' | 'picture';
+
+/** A screen no wider than this gets the phone's panel: a phone, or a tablet held upright. On it the picture's keys are too small for a finger. */
+const NARROW = '(max-width: 900px)';
+
+/** A page can ask for one view in its address, `?panel=phone` or `?panel=picture`, whatever its screen. */
+function askedFor(): View | null {
+  const asked = new URLSearchParams(window.location.search).get('panel');
+  return asked === 'phone' || asked === 'picture' ? asked : null;
 }
 
-/** РИТМ-12's panel, in the view this page is to show. */
+/** The view this page is to show: the one its address asks for, or else the one that suits its width. It follows the width as that changes. */
+function usePanelView(): View {
+  const [asked] = useState(askedFor);
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches);
+  useEffect(() => {
+    const query = window.matchMedia(NARROW);
+    const follow = () => setNarrow(query.matches);
+    query.addEventListener('change', follow);
+    return () => query.removeEventListener('change', follow);
+  }, []);
+  return asked ?? (narrow ? 'phone' : 'picture');
+}
+
+/**
+ * РИТМ-12's panel, in the view that suits the screen. Both views draw the
+ * same machine from the store, so changing from one to the other, as when a
+ * tablet is turned, loses nothing but which tab of knobs was open.
+ */
 export function Panel() {
-  const [phone] = useState(asksForPhonePanel);
-  return phone ? <PhonePanel /> : <PicturePanel />;
+  return usePanelView() === 'phone' ? <PhonePanel /> : <PicturePanel />;
 }
 
 /** The picture of the machine, with every control on it live. */

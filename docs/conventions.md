@@ -124,8 +124,12 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   draw it, through the same `Key`, `Lamp` and knob code in `ui/Controls.tsx`.
   A control is added or changed in the wiring, never in one view alone, and
   a control keeps one test id in both.
-- The phone's panel is a preview: a page opened with `?panel=phone` shows it,
-  at any width, and every other page shows the picture. It is not the
+- Which view shows is decided in `ui/Panel.tsx` (`usePanelView`): the phone's
+  panel on a screen up to 900px wide, which is a phone or a tablet held
+  upright, and the picture on anything wider. It follows the width as it
+  changes, and nothing is lost in between, because the beat is in the store.
+  A page's address can ask for either by name, `?panel=phone` or
+  `?panel=picture`, at any width. The phone's panel is not the
   picture shrunk. The page lays out parts cut from the picture
   (`art/phone/`) in a column: nameplate, screen, the eight voices, the step
   keys with the write switch, patterns with dice and clear, the transport
@@ -139,7 +143,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   is after a key's. The screen is the same drawing in a second shape
   (`PHONE_SCREEN` in `ui/Screen.tsx`); keep `PICTURE_SCREEN` as it is
   painted. It sets `data-own-transport`, which tells the editor to leave the
-  docked start button out.
+  docked start button out. It is laid out for a screen up to 430px wide and
+  grows as a whole, by up to 1.3 times, where there is more room
+  (`useGrowth`).
 - Its art is `art/` in its package: `plate.webp`, `patch/` and `pointer/`,
   with where it comes from in `art/README.md`. `art/cut-art.py` cuts it
   from the owner's pictures in the git-ignored `misc/assets/ritm12/`, and
@@ -378,7 +384,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument strip, the fit button and the docked start button.
-  The phone's panel has keys of its own for all three and shows none of them.
+  Those three are now only for a small screen whose address asks for the
+  picture: the phone's panel has keys of its own for all three and shows
+  none of them.
 - A panel's power switch makes everything else on it `inert`.
 - Browser tests reach buried controls through `openSettings`
   (`e2e/helpers.ts`), and РИТМ-12 through `beat`, `step` and its test ids

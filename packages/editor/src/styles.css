@@ -1586,6 +1586,18 @@ select.sb-input {
   font-size: 1em;
 }
 
+/* Something to type, such as part of an address. */
+.sb-prose code {
+  padding: 1px 5px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  white-space: nowrap;
+}
+
 /* A key of the keyboard, drawn as one of the machine's cream keys. */
 .sb-prose kbd {
   display: inline-block;
