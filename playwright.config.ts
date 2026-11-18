@@ -13,6 +13,25 @@ import {
 
 const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
 const withServer = /(accounts|beats|shop)\.spec\.ts/;
+// The build under test is one machine: the one BOOMBAPBOT_MACHINE named when
+// it was built. Each machine has its own tests of its panel; the ones in the
+// e2e folder itself are the 808's, and the site's.
+const machine = process.env.BOOMBAPBOT_MACHINE ?? '808';
+const ritm12 = /ritm12\/.*\.spec\.ts/;
+const ritm12Phone = /ritm12\/phone\.spec\.ts/;
+const desktop = { ...devices['Desktop Chrome'] };
+const phone = { ...devices['Pixel 7'] };
+const projects =
+  machine === 'ritm12'
+    ? [
+        { name: 'ritm12', use: desktop, testMatch: ritm12, testIgnore: ritm12Phone },
+        { name: 'ritm12-phone', use: phone, testMatch: ritm12Phone },
+      ]
+    : [
+        { name: 'desktop', use: desktop, testIgnore: [/phone\.spec\.ts/, withServer, ritm12] },
+        { name: 'phone', use: phone, testMatch: /phone\.spec\.ts/, testIgnore: ritm12 },
+        { name: 'server', use: { ...desktop, baseURL: ACCOUNTS_URL }, testMatch: withServer },
+      ];
 
 // The tests run against the production build. Run `pnpm build` first.
 //
@@ -34,11 +53,7 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'off',
   },
-  projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: [/phone\.spec\.ts/, withServer] },
-    { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /phone\.spec\.ts/ },
-    { name: 'server', use: { ...devices['Desktop Chrome'], baseURL: ACCOUNTS_URL }, testMatch: withServer },
-  ],
+  projects,
   webServer: [
     {
       command: `node scripts/serve-dist.mjs --port ${port}`,

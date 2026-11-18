@@ -85,6 +85,18 @@ jobs:
       - name: Browser tests (Playwright, against the production build)
         run: pnpm test:e2e
 
+      # The site is one machine a build. Everything above built and tested the
+      # one that is live; this builds and tests the other.
+      - name: Production build and build check, as the РИТМ-12
+        run: pnpm build
+        env:
+          BOOMBAPBOT_MACHINE: ritm12
+
+      - name: Browser tests of the РИТМ-12
+        run: pnpm test:e2e
+        env:
+          BOOMBAPBOT_MACHINE: ritm12
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
