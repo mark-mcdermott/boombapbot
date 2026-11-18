@@ -27,39 +27,47 @@ interface FooterProps {
 /**
  * The row under every page: who made it, then the pages (about, docs,
  * manifesto, policies) and the buttons (upgrade, cart, settings,
- * account).
+ * account). Each is an icon with its name in a tip. On a phone, where
+ * there is no pointing at an icon to learn its name, each is its name in
+ * words, in a row of their own above the credit.
  */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {
   const [accountOpen, setAccountOpen] = useState(false);
   return (
     <footer className="sb-footer">
       <p className="sb-made" data-testid="made-by">
-        built with <Heart className="sb-heart" role="img" aria-label="love" /> by{' '}
+        <span className="sb-made-with">
+          built with <Heart className="sb-heart" role="img" aria-label="love" />{' '}
+        </span>
+        by{' '}
         <a href="https://mm.coffee" target="_blank" rel="noreferrer noopener">
           mm.coffee
         </a>
       </p>
       <TipGroup>
-        <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
-          {SITE_PAGES.map(({ id, label }) => (
-            <Tip key={id} label={label} container={container}>
-              <a
-                className={`sb-footer-icon sb-ico-${id}`}
-                href={`${baseUrl}${id}`}
-                data-testid={`nav-${id}`}
-                aria-label={label}
-                aria-current={current === id ? 'page' : undefined}
-              >
-                {PAGE_ICONS[id]}
-              </a>
-            </Tip>
-          ))}
-        </nav>
-        <div className="sb-footer-icons sb-footer-tools">
-          <Upgrade baseUrl={baseUrl} container={container} logIn={() => setAccountOpen(true)} />
-          <Shop baseUrl={baseUrl} container={container} />
-          {settings}
-          <Account baseUrl={baseUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />
+        <div className="sb-footer-links">
+          <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
+            {SITE_PAGES.map(({ id, label }) => (
+              <Tip key={id} label={label} container={container}>
+                <a
+                  className={`sb-footer-icon sb-ico-${id}`}
+                  href={`${baseUrl}${id}`}
+                  data-testid={`nav-${id}`}
+                  aria-label={label}
+                  aria-current={current === id ? 'page' : undefined}
+                >
+                  {PAGE_ICONS[id]}
+                  <span className="sb-footer-word">{label}</span>
+                </a>
+              </Tip>
+            ))}
+          </nav>
+          <div className="sb-footer-icons sb-footer-tools">
+            <Upgrade baseUrl={baseUrl} container={container} logIn={() => setAccountOpen(true)} />
+            <Shop baseUrl={baseUrl} container={container} />
+            {settings}
+            <Account baseUrl={baseUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />
+          </div>
         </div>
       </TipGroup>
     </footer>

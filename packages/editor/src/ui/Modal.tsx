@@ -23,7 +23,7 @@ export interface ModalProps {
   children: ReactNode;
 }
 
-/** An icon button in the footer, and the modal it opens over the middle of the page. */
+/** A button in the footer, an icon or on a phone its name, and the modal it opens over the middle of the page. */
 export function Modal(props: ModalProps) {
   const { testId, title } = props;
   return (
@@ -35,6 +35,7 @@ export function Modal(props: ModalProps) {
           aria-label={props.label}
         >
           {props.icon}
+          <span className="sb-footer-word">{props.tip ?? props.label}</span>
           {props.badge && (
             <span className="sb-footer-badge" aria-hidden="true">
               {props.badge}
