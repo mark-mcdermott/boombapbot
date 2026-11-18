@@ -159,6 +159,15 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   fills in. A machine's `setup` turns a project into an `EngineSetup`
   (`engine/setup.ts`), which the runtime compares with the last one and
   sends on, for live playback and offline rendering alike.
+- A WAV export renders in a Worker, so a long one cannot hold the page
+  still. `engine/wav-job.ts` is the job and what runs it, with no DOM in it
+  and tested in Node; `wav-worker.ts` is the Worker and `wav-render.ts`
+  starts one for each export. The file must stay byte for byte what
+  `renderSong` and `encodeWav` give on the main thread; a unit test holds
+  that. The store's `wavExport` says where a render stands, and the
+  settings sheet shows it and says it to a screen reader. A MIDI file and
+  the sound of a knob are made on the main thread. Vite bundles the Worker
+  from `new URL('./wav-worker.ts', import.meta.url)`; keep that spelling.
 - The site mounts the editor through `apps/site/src/components/Machine.tsx`,
   which imports `#machine`: an alias in `astro.config.mjs` set by
   `BOOMBAPBOT_MACHINE` (РИТМ-12 when unset), with the matching `paths` in
@@ -349,6 +358,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   sessions, the credential and saved beats cascade, and orders keep their
   rows with the user unset. A new table that hangs off a user has to choose
   one of those two on purpose. Both app stores require this button.
+- Who is logged in is read by `signedInAccount` (`account/session.ts`),
+  never straight from the session answer. A host with no account server can
+  answer 200 at that address with its own page; whatever names no user is
+  nobody logged in.
 
 **Saved beats**
 
@@ -457,6 +470,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   creates the `AudioContext` synchronously inside the click for that reason.
 - `window.__boombapbot` exposes `debug()` and `renderLoop()` for tests. The
   browser tests use it to check that the worklet really rendered sound.
+  `renderLoop()` renders on the page what a WAV export renders in its Worker.
 - `pnpm dev` serves the Astro dev server; the browser tests and `pnpm serve`
   use the production build, so run `pnpm build` before either.
 
