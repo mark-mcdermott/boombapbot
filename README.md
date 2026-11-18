@@ -364,8 +364,9 @@ Two cross-checks worth knowing about:
   screen and in screenshots at 360 and 430 wide. No real
   phone has shown it, nobody has dragged its knobs with a thumb, and nobody
   has listened through it. The phone app in `apps/mobile` now gets it,
-  being as narrow as a phone, and nobody has run the app with it; the app
-  does not load the lettering's typeface.
+  being as narrow as a phone. With it the app has run once, in an iPhone
+  simulator on 2026-11-18 (shown, a beat playing), and not on Android; the
+  app does not load the lettering's typeface.
 - **The pages of words.** Their layout was looked at in Chromium only, at
   375px, 768px and 1280px wide, in screenshots of the production build. No
   real phone, Safari or Firefox has shown them, and nobody has read them

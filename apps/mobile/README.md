@@ -85,6 +85,13 @@ no error. Import opens Android's file chooser, and a project file chosen
 from Downloads is loaded with the "Imported" notice. The page's safe-area
 insets arrive there (51 CSS pixels at the top, 24 at the bottom).
 
+Everything above was seen with the picture of the machine. Since
+2026-11-18 a screen as narrow as a phone gets the phone's panel, and the
+app with it. With that panel, on the iPhone simulator on 2026-11-18: the
+app launches and shows it, Play starts the beat and the step moves, and
+the settings button is under it. Export, Import and the Android emulator
+have not been run again with it.
+
 Nobody has listened to it or held it. Not checked: a real iPhone, a real
 Android phone, an iPad, the ringer switch, a phone call or another app
 taking the sound, the app coming back from the background, long playing.
@@ -107,7 +114,8 @@ Drive or Gmail.
 - **Words written for the site.** The settings sheet says the draft is
   saved "in this browser" and lists keyboard keys.
 - **Sideways on a phone** the brand takes about a third of the screen and
-  the machine is taller than what is left, so it scrolls.
+  the machine is taller than what is left, so it scrolls. That was the
+  picture; the phone's panel has not been looked at sideways.
 - **The brand** is the site's header with its link switched off.
 - **The icon and the launch screen** are stand-ins: the three bars of the
   site's favicon on the page's dark background. Yours replace the images in
