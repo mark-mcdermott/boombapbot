@@ -73,6 +73,8 @@ pnpm serve
   machine, and a footer 50px under it. The footer's icons lead to the About,
   Docs, manifesto and Policies pages and open modals for upgrades,
   the cart, settings and your account; each shows its name when pointed at.
+  On a phone, where nothing can be pointed at, they are their names in
+  words, in one row, with "by mm.coffee" under it.
   Settings holds the beat name, undo and redo, a reset to the starter
   patterns, a clear for one pattern and one for everything, import and
   export, and the save and audio status. The upgrade is not for sale: its

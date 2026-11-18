@@ -336,6 +336,15 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `Footer` (About, Docs, manifesto, policies, upgrade, cart,
   settings, account) are shared. On the machine's page the header is the
   brand alone.
+- On a phone (680px and under) both are arranged differently, in CSS alone.
+  The machine's header is the mascot, a quarter larger, on the left and the
+  wordmark, a tenth smaller, against the right edge, with no tagline. The
+  footer is two rows: its eight names in words where a wider screen has
+  icons (`.sb-footer-word`, in every footer link and in `ui/Modal.tsx`'s
+  button), the pages and then the buttons, across the whole width; and
+  under them "by mm.coffee" on the right, without "built with" and its
+  heart. A count or a signed-in dot that rides an icon's corner follows
+  the word instead.
 - `SitePage` wraps a page of words; About, Docs, the manifesto, Credits and
   Policies are Astro pages in `apps/site/src/pages` that use it. There the
   header is a compact masthead (`.sb-masthead`: the mascot beside a small
