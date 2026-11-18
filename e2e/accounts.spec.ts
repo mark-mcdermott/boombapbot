@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext } from '@playwright/test';
+import { scanner } from './helpers';
 import { PASSWORD, ROW_ID, UUID, confirm, fill, logOut, openAccount, signUp, signedUp } from './account';
 import { ACCOUNTS_URL } from './accounts-server';
 import { linkIn, mailTo, newAddress } from './mail';
@@ -108,7 +108,7 @@ test('the account forms have no detectable accessibility violations', async ({ p
   const modal = page.getByTestId('account-modal');
   const scan = async () => {
     await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
-    return (await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id);
+    return (await scanner(page).analyze()).violations.map((violation) => violation.id);
   };
   expect(await scan()).toEqual([]);
   await fill(page, 'account-log-in', { email: newAddress(), password: 'nobody has this' });
@@ -129,7 +129,7 @@ test('an account is deleted with its password, and its saved beats go with it', 
   // Asking is not doing: the step can be left, and the account is as it was.
   await page.getByTestId('account-to-delete').click();
   await expect(page.getByTestId('account-delete')).toContainText('for good');
-  expect((await new AxeBuilder({ page }).include('[data-testid="account-modal"]').analyze()).violations).toEqual([]);
+  expect((await scanner(page).include('[data-testid="account-modal"]').analyze()).violations).toEqual([]);
   await page.getByTestId('account-delete-cancel').click();
   await expect(page.getByTestId('account-address')).toHaveText(address);
   await expect(page.getByTestId('beat')).toHaveCount(1);

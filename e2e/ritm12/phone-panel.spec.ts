@@ -1,9 +1,14 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { scanner } from '../helpers';
 import { beat, step, stepsOn } from './helpers';
 
 // The phone's panel is a preview behind a link, so these open that link on a phone-sized touch screen.
-test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+test.use({
+  viewport: { width: 390, height: 844 },
+  hasTouch: true,
+  // Firefox cannot pretend to be a phone; there this is a touch screen of a phone's size.
+  isMobile: async ({ browserName }, use) => use(browserName !== 'firefox'),
+});
 
 async function openPhonePanel(page: Page): Promise<void> {
   await page.goto('/?panel=phone');
@@ -132,7 +137,7 @@ test('the phone’s panel has no detectable accessibility violations, on any tab
   await openPhonePanel(page);
   for (const tab of ['voice', 'tempo', 'effect']) {
     await page.getByTestId(`tab-${tab}`).click();
-    const results = await new AxeBuilder({ page }).analyze();
+    const results = await scanner(page).analyze();
     expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([]);
   }
 });

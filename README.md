@@ -312,7 +312,10 @@ Run in this order; later steps use what earlier ones build.
 ### Results
 
 Run on macOS 26.6 on Apple silicon with Apple clang 21, Node 22.23.4,
-Emscripten 6.0.13 and headless Chromium via Playwright 1.63.
+Emscripten 6.0.13 and headless Chromium via Playwright 1.63. On 2026-11-18
+the browser tests also passed in that Playwright's builds of WebKit and
+Firefox (`BOOMBAPBOT_E2E_BROWSER=webkit pnpm test:e2e`); CI does not run
+them.
 
 | Step | Result |
 | --- | --- |
@@ -352,9 +355,12 @@ Two cross-checks worth knowing about:
 - **Browsers.** On 2026-11-18 the owner used РИТМ-12 on the live site on an
   iPhone in Safari and in Firefox, and in desktop Chrome. Firefox and Safari
   on a Mac and an Android phone have not shown it. Everything automated runs
-  in headless Chromium, the phone layout in its device emulation.
-- **The phone's panel.** It has run only in headless Chromium, in a
-  390 by 844 touch screen and in screenshots at 360 and 430 wide. No real
+  in headless Chromium, the phone layout in its device emulation. The same
+  tests passed once, on 2026-11-18, in Playwright's builds of WebKit and
+  Firefox on a Mac, which are not Safari or Firefox on a phone.
+- **The phone's panel.** It has run only in headless browsers (Chromium,
+  and once in Playwright's WebKit and Firefox), in a 390 by 844 touch
+  screen and in screenshots at 360 and 430 wide. No real
   phone has shown it, nobody has dragged its knobs with a thumb, and nobody
   has listened through it. The phone app in `apps/mobile` cannot reach it:
   it is chosen by the page's address, and the app has none to add to.

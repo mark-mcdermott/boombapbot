@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import { scanner } from './helpers';
 import { ROW_ID, UUID, signedUp, signedUpRequest } from './account';
 import { ACCOUNTS_URL } from './accounts-server';
 import { EARLIER_BEAT, beat as project, step, stepsOn, type Beat } from './ritm12/helpers';
@@ -382,7 +382,7 @@ test('the saved beats have no detectable accessibility violations', async ({ pag
   const modal = page.getByTestId('account-modal');
   const scan = async () => {
     await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
-    return (await new AxeBuilder({ page }).analyze()).violations.map((violation) => violation.id);
+    return (await scanner(page).analyze()).violations.map((violation) => violation.id);
   };
   // Empty.
   await expect(page.getByTestId('beats-empty')).toBeVisible();

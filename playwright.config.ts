@@ -7,10 +7,22 @@ const withServer = /(accounts|beats|shop|upgrade)\.spec\.ts/;
 // folder itself are the site's, and drive the same machine.
 const panel = /\/ritm12\/.*\.spec\.ts/;
 const panelPhone = /\/ritm12\/phone\.spec\.ts/;
-const desktop = { ...devices['Desktop Chrome'] };
+// The tests run in Chromium, which is what CI has. To try another engine,
+// install it once (`pnpm exec playwright install webkit firefox`) and name it:
+// `BOOMBAPBOT_E2E_BROWSER=webkit pnpm test:e2e`. Firefox cannot pretend to
+// be a phone, so its phone is a desktop browser in a phone's window.
+const BROWSERS = {
+  chromium: { desktop: devices['Desktop Chrome'], phone: devices['Pixel 7'] },
+  webkit: { desktop: devices['Desktop Safari'], phone: devices['iPhone 15'] },
+  firefox: { desktop: devices['Desktop Firefox'], phone: { ...devices['Desktop Firefox'], viewport: { width: 412, height: 839 } } },
+} as const;
+const browserName = (process.env.BOOMBAPBOT_E2E_BROWSER ?? 'chromium') as keyof typeof BROWSERS;
+const browser = BROWSERS[browserName];
+if (!browser) throw new Error(`BOOMBAPBOT_E2E_BROWSER must be one of ${Object.keys(BROWSERS).join(', ')}`);
+const desktop = { ...browser.desktop };
 const projects = [
   { name: 'ritm12', use: desktop, testMatch: panel, testIgnore: panelPhone },
-  { name: 'ritm12-phone', use: { ...devices['Pixel 7'] }, testMatch: panelPhone },
+  { name: 'ritm12-phone', use: { ...browser.phone }, testMatch: panelPhone },
   { name: 'site', use: desktop, testIgnore: [withServer, panel] },
   { name: 'server', use: { ...desktop, baseURL: ACCOUNTS_URL }, testMatch: withServer },
 ];
@@ -25,7 +37,8 @@ const projects = [
 export default defineConfig({
   testDir: 'e2e',
   globalSetup: './e2e/global-setup.ts',
-  timeout: 30_000,
+  // Firefox takes several times as long over an accessibility scan as the other two.
+  timeout: browserName === 'firefox' ? 60_000 : 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

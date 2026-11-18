@@ -38,12 +38,17 @@ interface BeatRowProps {
 function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
   const [confirming, setConfirming] = useState(false);
   const deleteButton = useRef<HTMLButtonElement>(null);
+  const keepButton = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
   const mine = busy && 'beat' in busy && busy.beat === beat.id ? busy.doing : null;
 
-  // Turning the question down puts focus back where it came from.
+  // Asking puts focus on the answer that loses nothing, and turning the
+  // question down puts it back where it came from. Both are done by hand: a
+  // browser that does not focus a button when it is clicked, as Safari does
+  // not, would otherwise leave focus behind on the modal.
   useEffect(() => {
-    if (wasConfirming.current && !confirming) deleteButton.current?.focus();
+    if (confirming) keepButton.current?.focus();
+    else if (wasConfirming.current) deleteButton.current?.focus();
     wasConfirming.current = confirming;
   }, [confirming]);
 
@@ -58,13 +63,13 @@ function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
         </span>
       </div>
       {confirming ? (
-        <div className="sb-beat-actions" role="group" aria-label={`Delete ${beat.name}?`}>
+        <div key="question" className="sb-beat-actions" role="group" aria-label={`Delete ${beat.name}?`}>
           <span className="sb-beat-ask">Delete it for good?</span>
           <button
+            ref={keepButton}
             className="sb-button"
             type="button"
             data-testid="beat-delete-cancel"
-            autoFocus
             onClick={() => setConfirming(false)}
           >
             Keep it
@@ -82,7 +87,7 @@ function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
           </button>
         </div>
       ) : (
-        <div className="sb-beat-actions">
+        <div key="actions" className="sb-beat-actions">
           <button
             className="sb-button"
             type="button"

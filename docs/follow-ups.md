@@ -45,8 +45,8 @@ in this file has been built unless it says so.
    closing note were rewritten for РИТМ-12 and for accounts, and the owner
    has read them. One line there still predates accounts: "This browser is
    not saving drafts. Export the project to keep it."
-6. **The pages of words.** The owner wants a design pass on About, Docs, the
-   manifesto, Credits and Policies.
+6. **The pages of words.** Their design pass was done on 2026-11-17. What it
+   left for the owner to decide is under "Accounts, upgrades and the shop".
 7. **Names left in the engine's header.** `engine.h` still names sixteen
    sound slots after the earlier machine's sounds (`SNARE_SOUND_KICK` and
    the rest). Nothing here needs more than their numbers; they can go once
@@ -297,7 +297,24 @@ Unverified: everything. No Tauri project exists yet.
   - The site's own values, set in Vercel for Production (see
     `apps/site/.env.example`). A changed value needs a new deployment: run
     the workflow by hand. All of them are set there as of 2026-11-16.
-- **Browsers.** The tests run in headless Chromium. On 2026-11-18 the owner
+- **Browsers.** The tests run in headless Chromium. On 2026-11-18 the whole
+  browser suite also passed in Playwright's builds of WebKit and Firefox on a
+  Mac (`BOOMBAPBOT_E2E_BROWSER`), the pages of words and the phone's panel
+  with it. That is not Safari or Firefox on a phone, and nobody listened: it
+  says the pages lay out and the controls answer. Two things it turned up:
+  - In Safari the delete question on a saved beat never took focus. Safari
+    does not focus a button when it is clicked, and the question had only
+    looked right in Chromium because the clicked button was reused for it.
+    Fixed; it now takes focus by hand.
+  - In Safari the library the modals are made with (`@base-ui/react`) gives
+    the focus guard at each end of an open modal the role of a button and
+    no name, so VoiceOver can land on an unnamed button there. It is the
+    library's own doing for Safari. The scans leave the guards out
+    (`scanner` in `e2e/helpers.ts`); nobody has listened to a modal with
+    VoiceOver.
+  Safari also keeps Tab for form controls and reaches a link with Option
+  and Tab unless its own setting says otherwise, so the footer's links are
+  not on the plain Tab key there. That is Safari, not the site. On 2026-11-18 the owner
   used РИТМ-12 on the live site on an iPhone in Safari and in Firefox, and
   loaded there a beat saved from desktop Chrome. Firefox and Safari on a Mac
   and an Android phone have not been tried on it.
