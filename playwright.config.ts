@@ -13,28 +13,17 @@ import {
 
 const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
 const withServer = /(accounts|beats|shop)\.spec\.ts/;
-// The build under test is one machine: the one BOOMBAPBOT_MACHINE named when
-// it was built, РИТМ-12 when it named none. The tests in the e2e folder
-// itself are the site's and run on the machine that is live; each machine's
-// tests of its own panel are in its folder.
-const machine = process.env.BOOMBAPBOT_MACHINE ?? 'ritm12';
-const own = new RegExp(`/${machine}/.*\\.spec\\.ts`);
-const ownPhone = new RegExp(`/${machine}/phone\\.spec\\.ts`);
-const anyMachine = /e2e\/[^/]+\/.*\.spec\.ts/;
+// РИТМ-12's tests of its own panel are in e2e/ritm12. The tests in the e2e
+// folder itself are the site's, and drive the same machine.
+const panel = /\/ritm12\/.*\.spec\.ts/;
+const panelPhone = /\/ritm12\/phone\.spec\.ts/;
 const desktop = { ...devices['Desktop Chrome'] };
-const phone = { ...devices['Pixel 7'] };
-const panel = [
-  { name: machine, use: desktop, testMatch: own, testIgnore: ownPhone },
-  { name: `${machine}-phone`, use: phone, testMatch: ownPhone },
+const projects = [
+  { name: 'ritm12', use: desktop, testMatch: panel, testIgnore: panelPhone },
+  { name: 'ritm12-phone', use: { ...devices['Pixel 7'] }, testMatch: panelPhone },
+  { name: 'site', use: desktop, testIgnore: [withServer, panel] },
+  { name: 'server', use: { ...desktop, baseURL: ACCOUNTS_URL }, testMatch: withServer },
 ];
-const projects =
-  machine === 'ritm12'
-    ? [
-        ...panel,
-        { name: 'site', use: desktop, testIgnore: [withServer, anyMachine] },
-        { name: 'server', use: { ...desktop, baseURL: ACCOUNTS_URL }, testMatch: withServer },
-      ]
-    : panel;
 
 // The tests run against the production build. Run `pnpm build` first.
 //

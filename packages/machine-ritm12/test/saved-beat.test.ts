@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditorRuntime, type KeyValueStorage } from '@boombapbot/editor';
 import { machineRitm12 } from '../src';
-import { earlier, newProject } from './helpers';
+import { MemoryStorage, earlier, newProject } from './helpers';
 
 /** The earlier machine's beat, as far as these tests look into it. */
 const earlierBeat = () => earlier(2) as { id: string; name: string };
@@ -37,12 +37,8 @@ describe('loading a saved beat onto the machine', () => {
 
   it('gives a draft left by the earlier machine a new id too', () => {
     const left = earlierBeat();
-    const items = new Map([['boombapbot.draft.v2', JSON.stringify(left)]]);
-    const storage: KeyValueStorage = {
-      getItem: (key) => items.get(key) ?? null,
-      setItem: (key, value) => void items.set(key, value),
-      removeItem: (key) => void items.delete(key),
-    };
+    const storage = new MemoryStorage();
+    storage.setItem('boombapbot.draft.v2', JSON.stringify(left));
     const { project } = runtime(storage).store.getState();
     expect(project.name).toBe(left.name);
     expect(project.id).not.toBe(left.id);

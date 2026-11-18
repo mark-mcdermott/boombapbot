@@ -132,7 +132,9 @@ double snare_tick_frame(double ticks, double bpm, double sample_rate);
 
 /* ---- Sound synthesis (any non-realtime thread) --------------------------- */
 
-/* The sounds of the 808 panel. A sound's number is also its slot. */
+/* Names for the sound slots, from the first machine the engine was built
+ * for. A sound's number is also its slot. A machine numbers its own voices
+ * from 0 and need not use these names. */
 enum {
   SNARE_SOUND_KICK = 0,
   SNARE_SOUND_SNARE = 1,

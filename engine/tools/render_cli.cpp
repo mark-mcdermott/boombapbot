@@ -1,15 +1,18 @@
-// boombapbot-render: renders a project through the native engine. It gives the
-// reference output that the WebAssembly build is compared against.
+// boombapbot-render: renders through the native engine. It gives the
+// reference output that the WebAssembly build is compared against, and it
+// knows no machine: it is built once for each, with that machine's voices.
 //
-//   boombapbot-render --project beat.json --machine packages/machine-808
-//       [--rhythm 0] [--version a|b] [--rate 44100] [--bits 24]
-//       [--out loop.wav] [--midi beat.mid] [--events events.json]
-//       [--swing 0..128] [--effect delay|reverb|flanger|chorus] [--wet 0..1]
+// From an engine setup: the file names a sample rate, a setup as the editor
+// writes one, the pattern to play and for how many measures, and optionally
+// the notes and velocities of a MIDI file. What is written is those
+// measures, from silence.
 //
-// It renders one measure of one rhythm as a seamless loop. It also writes one
-// synthesised sound as raw little-endian float samples:
+//   boombapbot-render --setup run.json [--bits 16|24]
+//       [--out measures.wav] [--midi beat.mid] [--events events.json]
 //
-//   boombapbot-render --synth 7 --raw cymbal.f32 [--rate 48000]
+// One synthesised sound, as raw little-endian float samples:
+//
+//   boombapbot-render --synth 7 --raw sound.f32 [--rate 48000]
 //       [--tune 0.5] [--tone 0.5] [--decay 0.5] [--snappy 0.5]
 
 #include <cstdio>
@@ -19,7 +22,9 @@
 #include <string>
 #include <vector>
 
-#include "project_io.h"
+#include "render.h"
+#include "setup_io.h"
+#include "wav_io.h"
 
 namespace {
 
@@ -43,12 +48,70 @@ int writeSound(std::map<std::string, std::string>& options) {
   return out ? 0 : 1;
 }
 
-int effectNamed(const std::string& name) {
-  if (name == "delay") return SNARE_EFFECT_DELAY;
-  if (name == "reverb") return SNARE_EFFECT_REVERB;
-  if (name == "flanger") return SNARE_EFFECT_FLANGER;
-  if (name == "chorus") return SNARE_EFFECT_CHORUS;
-  throw std::runtime_error("no such effect: " + name);
+void writeEvents(const SnareEngine* engine, const std::string& path) {
+  std::vector<SnareEvent> events(static_cast<std::size_t>(snare_engine_event_count(engine)));
+  if (!events.empty()) snare_engine_read_events(engine, events.data(), static_cast<int>(events.size()));
+  std::ofstream out(path);
+  out << "[";
+  for (std::size_t i = 0; i < events.size(); ++i) {
+    out << (i ? "," : "") << "\n  {\"frame\": " << static_cast<long long>(events[i].frame)
+        << ", \"step\": " << events[i].step << ", \"track\": " << events[i].track
+        << ", \"accent\": " << events[i].accent << ", \"pattern\": " << events[i].pattern << "}";
+  }
+  out << "\n]\n";
+}
+
+void writeMidi(const std::string& path, const SnarePattern* patterns, int count,
+               const std::vector<std::uint8_t>& sequence, const std::uint8_t* notes, int plain, int accented,
+               double bpm) {
+  const int measures = static_cast<int>(sequence.size());
+  const int size =
+      snare_midi_export(patterns, count, sequence.data(), measures, notes, plain, accented, bpm, nullptr, 0);
+  if (size < 0) throw std::runtime_error("the engine refused the MIDI export");
+  std::vector<std::uint8_t> midi(static_cast<std::size_t>(size));
+  snare_midi_export(patterns, count, sequence.data(), measures, notes, plain, accented, bpm, midi.data(), size);
+  snare::wav::writeFile(path, midi);
+}
+
+int renderSetup(std::map<std::string, std::string>& options) {
+  const snare::json::Value run = snare::json::parseFile(options["--setup"]);
+  const double rate = run.at("rate").number;
+  const int bits = options.count("--bits") ? std::atoi(options["--bits"].c_str()) : 24;
+  const snare::io::Setup setup = snare::io::readSetup(run.at("setup"));
+  const int index = run.at("pattern").asInt();
+  const int measures = run.at("measures").asInt();
+  if (index < 0 || index >= static_cast<int>(setup.patterns.size())) throw std::runtime_error("no such pattern");
+  if (measures < 1) throw std::runtime_error("nothing to play");
+
+  SnareEngine* engine = snare_engine_create(rate);
+  if (!engine) throw std::runtime_error("unsupported sample rate");
+  snare_engine_enable_event_log(engine, 8192);
+  snare::io::applySetup(engine, setup);
+  const SnarePattern& pattern = setup.patterns[static_cast<std::size_t>(index)];
+  const int frames =
+      static_cast<int>(snare_tick_frame(static_cast<double>(measures) * snare_pattern_ticks(&pattern), setup.tempo, rate));
+  snare::io::must(snare_engine_cue_pattern(engine, index), "the pattern");
+  snare::io::must(snare_engine_play_measures(engine, measures), "to play");
+  const snare::io::Rendered audio = snare::io::render(engine, frames);
+
+  if (options.count("--out")) {
+    snare::wav::writeFile(options["--out"], snare::wav::encodeStereo(audio.left, audio.right, rate, bits));
+  }
+  if (options.count("--events")) writeEvents(engine, options["--events"]);
+  if (options.count("--midi")) {
+    const snare::json::Value& midi = run.at("midi");
+    std::uint8_t notes[SNARE_TRACKS]{};
+    for (std::size_t track = 0; track < SNARE_TRACKS && track < midi.at("notes").array.size(); ++track) {
+      notes[track] = static_cast<std::uint8_t>(midi.at("notes").array[track].asInt());
+    }
+    const std::vector<std::uint8_t> sequence(static_cast<std::size_t>(measures), static_cast<std::uint8_t>(index));
+    writeMidi(options["--midi"], setup.patterns.data(), static_cast<int>(setup.patterns.size()), sequence, notes,
+              midi.at("plain").asInt(), midi.at("accented").asInt(), setup.tempo);
+  }
+  std::printf("pattern %d, %d measure(s), %.2f bpm, %d frames at %.0f Hz\n", index, measures, setup.tempo, frames,
+              rate);
+  snare_engine_destroy(engine);
+  return 0;
 }
 
 }  // namespace
@@ -57,90 +120,18 @@ int main(int argc, char** argv) {
   std::map<std::string, std::string> options;
   for (int i = 1; i + 1 < argc; i += 2) options[argv[i]] = argv[i + 1];
   if (options.count("--synth") && options.count("--raw")) return writeSound(options);
-  if (!options.count("--project") || !options.count("--machine")) {
+  if (!options.count("--setup")) {
     std::fprintf(stderr,
-                 "usage: boombapbot-render --project FILE --machine DIR [--rhythm N] [--version a|b]\n"
-                 "         [--rate HZ] [--bits 16|24] [--out FILE.wav] [--midi FILE.mid]\n"
-                 "         [--events FILE.json] [--swing 0..128]\n"
-                 "         [--effect delay|reverb|flanger|chorus] [--wet 0..1]\n");
+                 "usage: boombapbot-render --setup FILE [--bits 16|24] [--out FILE.wav] [--midi FILE.mid]\n"
+                 "         [--events FILE.json]\n"
+                 "       boombapbot-render --synth N --raw FILE.f32 [--rate HZ] [--tune 0..1] [--tone 0..1]\n"
+                 "         [--decay 0..1] [--snappy 0..1]\n");
     return 2;
   }
-
   try {
-    const std::string machineDir = options["--machine"];
-    const double rate = options.count("--rate") ? std::atof(options["--rate"].c_str()) : 44100.0;
-    const int bits = options.count("--bits") ? std::atoi(options["--bits"].c_str()) : 24;
-    const int rhythm = options.count("--rhythm") ? std::atoi(options["--rhythm"].c_str()) : 0;
-    const int version = options.count("--version") && options["--version"] == "b" ? 1 : 0;
-    if (rhythm < 0 || rhythm * 2 >= SNARE_PATTERNS) throw std::runtime_error("no such rhythm");
-    const int index = rhythm * 2 + version;
-
-    const snare::io::Roles roles = snare::io::loadRoles(machineDir);
-    const snare::io::Machine machine = snare::io::loadMachine(machineDir, roles);
-    const snare::io::Project project = snare::io::loadProject(options["--project"], machine);
-
-    SnareEngine* engine = snare_engine_create(rate);
-    if (!engine) throw std::runtime_error("unsupported sample rate");
-    snare_engine_enable_event_log(engine, 8192);
-    snare::io::applyProject(engine, machine, project);
-    // Swing and an effect are not the 808's; they are here so the engine's
-    // own features can be rendered and compared from the command line.
-    SnarePattern pattern = project.patterns[index];
-    if (options.count("--swing")) {
-      pattern.swing = static_cast<std::uint8_t>(std::atoi(options["--swing"].c_str()));
-      if (snare_engine_set_pattern(engine, index, &pattern) != SNARE_OK) throw std::runtime_error("no such swing");
-    }
-    if (options.count("--effect")) {
-      const double wet = options.count("--wet") ? std::atof(options["--wet"].c_str()) : 1.0;
-      if (snare_engine_set_effect(engine, effectNamed(options["--effect"]), wet) != SNARE_OK) {
-        throw std::runtime_error("no such effect setting");
-      }
-    }
-    const snare::io::Rendered loop = snare::io::renderLoop(engine, pattern, index, project.bpm, rate);
-
-    if (options.count("--out")) {
-      snare::wav::writeFile(options["--out"],
-                            snare::wav::encodeStereo(loop.left, loop.right, rate, bits));
-    }
-
-    if (options.count("--events")) {
-      std::vector<SnareEvent> events(static_cast<std::size_t>(snare_engine_event_count(engine)));
-      if (!events.empty()) {
-        snare_engine_read_events(engine, events.data(), static_cast<int>(events.size()));
-      }
-      std::ofstream out(options["--events"]);
-      out << "[";
-      for (std::size_t i = 0; i < events.size(); ++i) {
-        out << (i ? "," : "") << "\n  {\"frame\": " << static_cast<long long>(events[i].frame)
-            << ", \"step\": " << events[i].step << ", \"track\": " << events[i].track
-            << ", \"accent\": " << events[i].accent << ", \"pattern\": " << events[i].pattern << "}";
-      }
-      out << "\n]\n";
-    }
-
-    if (options.count("--midi")) {
-      // The note of the sound each track is switched to.
-      std::uint8_t notes[SNARE_TRACKS]{};
-      for (int track = 1; track < SNARE_TRACKS; ++track) {
-        notes[track] = roles.gmNotes[static_cast<std::size_t>(snare::io::trackSlot(machine, project, track))];
-      }
-      const std::uint8_t sequence[1] = {static_cast<std::uint8_t>(index)};
-      const int plain = snare::io::midiVelocity(snare::io::kPlainHit);
-      const int accented = snare::io::midiVelocity(snare::io::accentedHit(project.accent));
-      const int size = snare_midi_export(project.patterns, SNARE_PATTERNS, sequence, 1, notes, plain, accented,
-                                         project.bpm, nullptr, 0);
-      std::vector<std::uint8_t> midi(static_cast<std::size_t>(size));
-      snare_midi_export(project.patterns, SNARE_PATTERNS, sequence, 1, notes, plain, accented, project.bpm,
-                        midi.data(), size);
-      snare::wav::writeFile(options["--midi"], midi);
-    }
-
-    std::printf("%s: rhythm %d%s, %.2f bpm, %zu frames at %.0f Hz\n", project.name.c_str(), rhythm + 1,
-                version ? "B" : "A", project.bpm, loop.left.size(), rate);
-    snare_engine_destroy(engine);
+    return renderSetup(options);
   } catch (const std::exception& error) {
     std::fprintf(stderr, "boombapbot-render: %s\n", error.what());
     return 1;
   }
-  return 0;
 }

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, type Download, type Page } from '@playwright/test';
 
 // What every browser test shares, whichever machine the build is. A machine's
-// own helpers are beside its tests: ritm12/helpers.ts and 808/helpers.ts.
+// own helpers are beside its tests, as in ritm12/helpers.ts.
 
 export interface DebugSnapshot<Project = unknown> {
   audioStatus: string;

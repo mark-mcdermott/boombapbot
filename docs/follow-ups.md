@@ -7,65 +7,32 @@ in this file has been built unless it says so.
 
 РИТМ-12 is the machine the site is. What is left of it:
 
-1. **Try it where it has not been.** On the live site, on a real phone, in
-   Safari and in Firefox. It has only run in Chromium, and the phone layout
-   only in Chromium's device emulation.
-2. **A closer listen.** The owner has heard it once. Its eight voices, how
-   far each knob reaches and its four effects were set by measurement more
-   than by ear, and nobody has gone through them one by one.
+1. **Try it where it has not been.** The owner has used it on the live site
+   in desktop Chrome and on an iPhone in Safari and Firefox. Firefox and
+   Safari on a Mac and an Android phone have not shown it, and nobody has
+   played it for long on a phone.
+2. **A closer listen.** The owner has heard it and likes it. Its eight
+   voices, how far each knob reaches and its four effects were set by
+   measurement more than by ear, and nobody has gone through them one by
+   one.
 3. **Full-size art.** The picture is 2000 pixels wide. The owner's originals
    are 3072 wide; put one picture for each state in `misc/assets/ritm12/`,
    run `packages/machine-ritm12/art/cut-art.py` and update `ui/layout.ts`.
    The pointer lines were lifted from an earlier picture, and the owner may
    paint their own.
-4. **Real 808 beats.** A draft, a file and a stored beat from the 808 open
-   converted in the tests, from fixtures. Nobody has opened a real one. The
-   beats stored while the site was the 808 stay in the database as they
-   were; whether to convert or clear them later is the owner's call.
+4. **Beats of the earlier machine.** A draft, a file and a stored beat from
+   the machine the site had first open converted in the tests, from
+   fixtures. Nobody has opened a real one, and the owner had saved none.
+   Any stored by someone else stay in the database as they were.
 5. **The settings sheet's wording.** Its "Rhythm" heading, "Press start" and
-   its closing note were written for the 808 and for a time before accounts.
-
-## Moving the 808 out
-
-The 808 is not shipped and is to leave this repository. Before
-`packages/machine-808/` is deleted, what belongs to it has to go with it:
-its browser tests (`e2e/808/`), the VST3 spike (`plugins/vst3/`), the
-generated 606, 707 and 909 kits and their generator (`assets/kits/`,
-`scripts/gen_demo_kits.py`), the photographs in `assets/faceplates/`, the
-faceplate script and its check, and `scripts/bench-engine.mjs`, which still
-measures the 808's engine. The engine's test suites and render tool are
-written against the 808's project and track table
-(`engine/tools/project_io.h`), so they need a home too, or a machine of
-their own to test with, before the 808's package can go.
-
-What was never settled about the 808, for whoever carries it on:
-
-- **How it sounds.** `packages/machine-808/engine/voices.cpp` is a model made by ear. It
-  needs a listen beside a real machine, voice by voice and knob by knob.
-- **Composing over a written track.** The manual says a track can be edited
-  "from a certain point onward" without changing its length, and little
-  more. Here a rhythm chosen on the way replaces every measure from there to
-  the end of the track, a tapped fill-in replaces one measure, and the
-  machine stops at the end. A real machine may differ.
-- **Tracks running on.** A composition goes on into the next track when the
-  one before it holds all 64 measures. Whether the hardware decides it that
-  way is an inference from the manual.
-- **What the manual leaves out about fill-ins.** Here a tapped fill-in counts
-  as one of the measures the automatic fill-in counts and an intro does not;
-  AB keeps its turn across a fill-in; and the first-beat rule applies in the
-  play modes only, never cutting into an intro or fill-in.
-- **CLEAR as a latch.** On the machine CLEAR is held while a step button is
-  pressed. A mouse has one pointer, so here CLEAR stays down until a step is
-  pressed, or until it or Escape is pressed. Whether CLEAR also resets a
-  rhythm's stored pre-scale is not in the manual; here it does not.
-- **TAP timing.** A tap lands on the step the page last heard about, or the
-  next once that step is half over. The page learns of steps a little after
-  the engine plays them and before they are heard, so a tap can land a step
-  out at fast tempos. Placing it in the engine would be exact.
-- **Lamp behaviour.** The manual describes the lamps in each mode in words.
-  What they do on the hardware in the corner cases is unverified.
-- **The level model.** How far the level and accent knobs reach, and the taper
-  of each, are guesses (`packages/machine-808/src/document/machine.ts`).
+   its closing note were written for the earlier machine and for a time
+   before accounts.
+6. **The pages of words.** The owner wants a design pass on About, Docs, the
+   manifesto, Credits and Policies.
+7. **Names left in the engine's header.** `engine.h` still names sixteen
+   sound slots after the earlier machine's sounds (`SNARE_SOUND_KICK` and
+   the rest). Nothing here needs more than their numbers; they can go once
+   whatever is built on this core elsewhere has names of its own.
 
 ## Accounts, upgrades and the shop
 
@@ -182,11 +149,10 @@ upgrade still opens a modal that says it is not open.
   - The manifesto speaks of a small paid tier while About says upgrades are
     not here yet. Neither was changed.
   - Credits is still blank.
-- **The other machines** in the header are drawn but not built.
 
 ## Native shells
 
-All three shells reuse two things that exist today: the engine's C ABI
+Both shells reuse two things that exist today: the engine's C ABI
 (`engine/include/boombapbot/engine.h`) and the shared editor
 (`packages/editor`). The editor reaches audio only through
 `AudioController` (`packages/editor/src/engine/audio-controller.ts`), whose
@@ -235,20 +201,6 @@ Prerequisites:
 
 Unverified: everything. No Tauri project exists yet.
 
-### VST3
-
-See [`plugins/vst3/README.md`](../plugins/vst3/README.md) for the state of
-the compile spike. Beyond it:
-
-- Choose a JUCE licence path before distributing anything (JUCE 8 is AGPLv3 or
-  commercial). A public repository does not choose it.
-- Windows and macOS builds, host scanning, the Steinberg validator, state
-  recall in a host, transport sync (Host Sync mode) and offline bounce.
-- Freeze plugin and parameter IDs before a public beta.
-- The voice switches, knobs and pattern memory as plugin parameters and state.
-- A native JUCE editor sharing the panel manifest in
-  `packages/machine-808/data`.
-
 ## Web
 
 - **The rename.** The app was renamed on 2026-11-16 and the site moved to
@@ -273,16 +225,15 @@ the compile spike. Beyond it:
   - The site's own values, set in Vercel for Production (see
     `apps/site/.env.example`). A changed value needs a new deployment: run
     the workflow by hand. All of them are set there as of 2026-11-16.
-- **Browsers.** The tests run in headless Chromium. On 2026-11-17 the owner
-  logged in, loaded a beat and played it on an iPhone in Safari and in
-  Chrome and on a Samsung Galaxy S9 in Chrome, so audio starts on both
-  phone engines. Firefox and Safari on a Mac have not been tried, and
-  nobody has gone over the phone layout or long playing on a real phone.
+- **Browsers.** The tests run in headless Chromium. On 2026-11-18 the owner
+  used РИТМ-12 on the live site on an iPhone in Safari and in Firefox, and
+  loaded there a beat saved from desktop Chrome. Firefox and Safari on a Mac
+  and an Android phone have not been tried on it.
 - **Work on the main thread.** A one-measure render and the synthesis of a
   sound each take a few milliseconds, so both happen on the main thread. The
-  worst sound measured, a cymbal at its longest, took about 7 ms. A whole
-  rhythm track is longer and should render in a Worker; `renderLoop` has no
-  DOM dependencies.
+  longest sound of a machine can take several. An export longer than a
+  measure or two should render in a Worker; `renderSong` has no DOM
+  dependencies.
 - **Draft storage.** One draft in `localStorage`, written whole on every
   change, knob moves included. Multiple projects want IndexedDB. Two tabs
   editing at once overwrite each other. An account now holds several beats,
@@ -290,16 +241,11 @@ the compile spike. Beyond it:
 - **Stack items not used yet.** The build spec lists TanStack Query and
   Vercel Blob. Neither is installed: the account and shop modals fetch by
   hand, and a saved beat is a row in Postgres, not a file.
-- **The other three machines.** The 606, 707 and 909 are out of the editor.
-  Their generated sample kits and faceplate photographs are still in
-  `assets/`, with provenance. Each needs what the 808 now has: a track table,
-  a sound source, a panel manifest and its manual worked through.
 - **A grid view.** The earlier build had a second editor showing every track
   at once. It was removed so that the panel is the whole machine; one may
   come back as a view of the same project.
-- **Faceplates.** The 808 is a drawing made by `packages/machine-808/art/draw-faceplate.mjs`.
-  Its own licence is not chosen, and the manufacturer's rights in the look of
-  the machine need advice before a public release.
+- **The art's licence.** РИТМ-12's picture is the owner's own artwork and no
+  licence has been chosen for it.
 
 ## Product
 

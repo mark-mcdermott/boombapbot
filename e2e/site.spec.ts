@@ -225,6 +225,8 @@ test.describe('the page around the machine', () => {
       await page.keyboard.press('Escape');
       const results = await new AxeBuilder({ page }).analyze();
       expect(results.violations.map((violation) => violation.id)).toEqual([]);
+      // A line break in the page's source must not swallow the space before a link or a bold word.
+      expect(await page.locator('main').innerText()).not.toMatch(/[a-z,.:;](mm\.coffee|[А-ЯЁ]{3,})/);
       // The page does not scroll sideways, and the brand leads back to the machine.
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);

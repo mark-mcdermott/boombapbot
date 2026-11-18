@@ -19,6 +19,7 @@ include(cmake/BoombapbotMachine.cmake)
 
 if(SNARE_BUILD_TESTS AND NOT EMSCRIPTEN)
   enable_testing()
+  add_subdirectory(tests)
 endif()
 
 set(machine_dirs ${BOOMBAPBOT_MACHINE_DIRS})
