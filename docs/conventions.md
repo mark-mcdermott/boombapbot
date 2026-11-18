@@ -145,7 +145,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   beside that label, cut from the picture (`art/phone/icon-*.png`) and
   shown in front of the lettering (`icon` on `Lettered`). Give every new
   lettered control one; the mix has none on the picture and carries the
-  picture's 0 and 100% at the ends of its travel instead. The screen is the same drawing in a second shape
+  picture's 0 and 100% at the ends of its travel instead. And whatever a
+  control says when it is touched shows in English for a moment on the
+  screen's lower frame (`Caption`), the same words the `aria-live` line has:
+  a key says what it did, a knob says where it stands as soon as it is
+  pressed (`useTurning`), a tab says what is behind it, and the power switch
+  says on or off. A new control that does something must say it
+  (`readout.say`), in both tongues. The screen is the same drawing in a second shape
   (`PHONE_SCREEN` in `ui/Screen.tsx`); keep `PICTURE_SCREEN` as it is
   painted. It sets `data-own-transport`, which tells the editor to leave the
   docked start button out. It is laid out for a screen up to 430px wide and
