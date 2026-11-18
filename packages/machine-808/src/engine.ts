@@ -34,6 +34,7 @@ import {
   type EngineTrack,
   type ExportPlan,
   type LoopRender,
+  type SongPlan,
   type SnareWasm,
   type SynthSound,
 } from '@boombapbot/editor/engine';
@@ -147,7 +148,7 @@ export function enginePanel(project: Project): EnginePanel {
  * selector is on, played once through. Otherwise it is the rhythm the panel
  * is on as a loop: one measure, or A then B with its lever on AB.
  */
-export function exportPlan(project: Project): ExportPlan {
+export function exportPlan(project: Project): ExportPlan<SongPlan> {
   const { panel } = project;
   const switches = { ...enginePanel(project), autoFill: 0, firstBeatRule: false };
   const midi = { notes: trackNotes(project.sound), velocities: midiVelocities(project.sound) };
@@ -186,7 +187,7 @@ export function engineSetup(project: Project): EngineSetup {
     accent: { plain: mix.plain, accented: mix.accented },
     master: mix.master,
     patterns: enginePatterns(project.rhythms),
-    panel: enginePanel(project),
+    follow: { panel: enginePanel(project) },
   };
 }
 

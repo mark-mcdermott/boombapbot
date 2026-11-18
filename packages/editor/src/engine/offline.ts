@@ -18,7 +18,7 @@ const TIMING_RATE = 48_000;
 
 /** The patterns a plan plays, in order. */
 export function planPatterns(wasm: SnareWasm, plan: RenderPlan): number[] {
-  return wasm.songPatterns(plan.panel, plan.rhythms);
+  return 'pattern' in plan ? [plan.pattern] : wasm.songPatterns(plan.panel, plan.rhythms);
 }
 
 /** How long each measure of a plan lasts, in seconds. */
@@ -57,12 +57,17 @@ export function renderSong(wasm: SnareWasm, setup: EngineSetup, plan: RenderPlan
     const tail = setup.effect ? wasm.effectTailSeconds(setup.effect.kind, setup.tempo) : 0;
     const loopSeconds = wasm.tickFrame(ticks, setup.tempo, TIMING_RATE) / TIMING_RATE;
     const passes = plan.loop ? loopPasses(tail, loopSeconds) : 1;
-    const song = Array.from({ length: passes }, () => plan.rhythms).flat();
-    engine.enableEventLog(song.length * setup.tracks.length * STEPS_PER_MEASURE);
+    const measures = planPatterns(wasm, plan).length * passes;
+    engine.enableEventLog(measures * setup.tracks.length * STEPS_PER_MEASURE);
     applySetup(engine, setup);
-    engine.setPanel(plan.panel);
-    engine.setSong(song, false);
-    engine.play();
+    if ('pattern' in plan) {
+      engine.cuePattern(plan.pattern);
+      engine.playMeasures(measures);
+    } else {
+      engine.setPanel(plan.panel);
+      engine.setSong(Array.from({ length: passes }, () => plan.rhythms).flat(), false);
+      engine.play();
+    }
 
     // A loop is as long whichever pass of it is kept, so an effect cannot change its length.
     const loopFrames = wasm.tickFrame(ticks * 2, setup.tempo, sampleRate) - wasm.tickFrame(ticks, setup.tempo, sampleRate);

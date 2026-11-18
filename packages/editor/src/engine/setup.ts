@@ -17,24 +17,36 @@ export interface EngineSetup {
   patterns: EnginePattern[];
   /** The effect on the mix, for a machine that has one. */
   effect?: EngineEffect;
-  /** What the engine plays, measure by measure. */
-  panel: EnginePanel;
+  /** What the engine plays: what a panel's switches ask for, or one pattern round and round. */
+  follow: { panel: EnginePanel } | { cue: number };
 }
 
-/** Measures to render or export: their rhythms, the switches that choose their versions, and whether they loop. */
-export interface RenderPlan {
+/** Measures chosen as a panel would: their rhythms, the switches that choose their versions, and whether they loop. */
+export interface SongPlan {
   panel: EnginePanel;
   rhythms: number[];
   loop: boolean;
 }
 
+/** One pattern of the bank: round and round, or once through. */
+export interface PatternPlan {
+  pattern: number;
+  loop: boolean;
+}
+
+/** What to render or export. */
+export type RenderPlan = SongPlan | PatternPlan;
+
 /** A render plan with what a MIDI file needs besides. */
-export interface ExportPlan extends RenderPlan {
+export type ExportPlan<Plan extends RenderPlan = RenderPlan> = Plan & {
   /** MIDI note of each engine track. A track with no sound of its own has 0. */
   notes: number[];
   /** MIDI velocities of a plain and an accented hit. */
   velocities: { plain: number; accented: number };
-}
+};
+
+/** The mix with nothing added to it. */
+export const NO_EFFECT: EngineEffect = { kind: 'none', wet: 0 };
 
 /** Whether two flat records hold the same values. */
 export function sameValues<Value extends object>(a: Value, b: Value): boolean {

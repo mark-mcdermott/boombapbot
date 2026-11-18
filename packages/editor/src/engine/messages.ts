@@ -1,4 +1,4 @@
-import type { EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
+import type { EngineEffect, EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
 
 /** Main thread to worklet. */
 export type EngineCommand =
@@ -9,6 +9,9 @@ export type EngineCommand =
   | { type: 'patterns'; patterns: Array<{ index: number; pattern: EnginePattern }> }
   | { type: 'tempo'; bpm: number }
   | { type: 'panel'; panel: EnginePanel }
+  /** One pattern of the bank, round and round, from the next bar line. */
+  | { type: 'cue'; pattern: number }
+  | { type: 'effect'; effect: EngineEffect }
   | { type: 'fill'; armed: boolean }
   /** The rhythm of each measure of a song. Empty removes it. */
   | { type: 'song'; rhythms: number[]; loop: boolean }
@@ -26,6 +29,8 @@ export type EngineReport =
   | { type: 'measures'; measures: EngineMeasure[] }
   /** Play ended by itself: a song that does not repeat reached its end. */
   | { type: 'ended' }
+  /** How loud the output is now, for a meter. Sent only while it changes. */
+  | { type: 'level'; level: number }
   | {
       type: 'stats';
       /** Frames rendered since the processor started. */

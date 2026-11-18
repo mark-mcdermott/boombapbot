@@ -1,7 +1,7 @@
 import { createProjectCodec, type ParseResult, type ProjectBase, type ProjectCodec } from '@boombapbot/contracts';
 import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
 import { exportSongMidi, measureSeconds, renderSong, type LoopRender } from './engine/offline';
-import { samePattern, sameValues, type EngineSetup, type ExportPlan } from './engine/setup';
+import { NO_EFFECT, samePattern, sameValues, type EngineSetup, type ExportPlan } from './engine/setup';
 import { SnareWasm } from './engine/wasm-engine';
 import { encodeWav, type WavBitDepth } from './engine/wav';
 import type { Machine, MachineHost, MachineSession } from './machine';
@@ -66,6 +66,7 @@ export class EditorRuntime<
   private offlineWasm: Promise<SnareWasm> | null = null;
   private synced: EngineSetup | null = null;
   private stats: AudioStats | null = null;
+  private level = 0;
   // One sound per slot may be on its way to the audio thread. A knob that
   // moves again meanwhile marks the slot, and the newest setting follows.
   private readonly soundsInFlight = new Map<number, { stale: boolean }>();
@@ -121,6 +122,9 @@ export class EditorRuntime<
         if (!this.store.getState().playing) return;
         this.store.setPlaying(false);
         this.session.stopped();
+      },
+      onLevel: (level) => {
+        this.level = level;
       },
       onSound: (slot) => {
         this.soundsTaken += 1;
@@ -267,7 +271,15 @@ export class EditorRuntime<
         return old && samePattern(old, pattern) ? [] : [{ index, pattern }];
       }),
     );
-    if (!previous || !sameValues(previous.panel, setup.panel)) this.audio.setPanel(setup.panel);
+    if ('cue' in setup.follow) {
+      if (!previous || !('cue' in previous.follow) || previous.follow.cue !== setup.follow.cue) {
+        this.audio.cue(setup.follow.cue);
+      }
+    } else if (!previous || !('panel' in previous.follow) || !sameValues(previous.follow.panel, setup.follow.panel)) {
+      this.audio.setPanel(setup.follow.panel);
+    }
+    const effect = setup.effect ?? NO_EFFECT;
+    if (!sameValues(previous?.effect ?? NO_EFFECT, effect)) this.audio.setEffect(effect);
     for (const sound of setup.sounds) {
       const old = previous?.sounds.find((candidate) => candidate.sound === sound.sound);
       if (!old || !sameValues(old, sound)) void this.sendSound(sound.sound);
@@ -346,6 +358,7 @@ export class EditorRuntime<
     if ('error' in plan) throw new Error(plan.error);
     if (!audio) return plan;
     // Audio is rendered in memory, so a long track is cut at a whole measure.
+    if (!('rhythms' in plan)) return plan;
     const limit = wholeMeasuresWithin(measureSeconds(wasm, this.setup(), plan), MAX_WAV_SECONDS);
     if (limit < plan.rhythms.length) {
       this.store.notify(
@@ -415,6 +428,11 @@ export class EditorRuntime<
       result.changes,
     );
     return result.project;
+  }
+
+  /** How loud the output is now, from 0, for a meter. A plain reading: a panel asks as it draws. */
+  outputLevel(): number {
+    return this.level;
   }
 
   // ---- Diagnostics ---------------------------------------------------------
