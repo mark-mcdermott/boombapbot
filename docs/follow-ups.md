@@ -108,11 +108,12 @@ modal that says it is not open.
   checkout, one license and one emailed key for one payment, a route to
   enter a key in an account, routes to get it back, and `isUpgraded`
   beside the session. It has only run in the tests. What is left, in order:
-  - **Run the migration.** `apps/site/drizzle/0003_licenses.sql` adds the
-    `licenses` table and has not been run on Neon. Nothing that is live
-    reads that table, so the code can be deployed first; the routes under
-    `api/upgrade` fail until it is run, and it has to be before
-    `UPGRADE_OPEN` is set.
+  - **The migration is run.** `apps/site/drizzle/0003_licenses.sql` adds the
+    `licenses` table, and it was run on Neon on 2026-11-17, after the code was
+    merged. The table was checked afterwards: its columns, the four unique
+    columns, the owner that is unset when an account is deleted and the
+    email index are as the migration has them, it is empty, and the six
+    tables that were there hold the rows they held before.
   - **Decide which features are paid,** then gate them. Nothing reads
     `isUpgraded` yet. To settle with it: whether a key alone unlocks a device
     with nobody logged in, and how a paid feature behaves with no server,
