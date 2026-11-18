@@ -1,5 +1,9 @@
 ---
 import { SitePage } from '@boombapbot/editor';
+import screen from '../assets/ritm12/screen.webp';
+import topHalf from '../assets/ritm12/top-998.webp';
+import top from '../assets/ritm12/top.webp';
+import Section from '../components/Section.astro';
 import Base from '../layouts/Base.astro';
 
 const base = import.meta.env.BASE_URL;
@@ -10,72 +14,104 @@ const base = import.meta.env.BASE_URL;
   description="boombapbot is a drum machine that runs in your browser: what it is, how it is made, and what it keeps."
 >
   <SitePage client:load baseUrl={base} current="about">
-    <h1>About boombapbot</h1>
+    <h1><span lang="ru">РИТМ-12</span> is a rhythm computer from a factory that never existed.</h1>
     <p class="sb-lede">
-      boombapbot is a drum machine that runs in your browser. There is nothing to install, you don't need an
-      account, and what you play stays on your computer.
+      I made it up, lettering and all. boombapbot is that machine in your browser: there is nothing to install,
+      you don't need an account, and what you play stays on your computer.
     </p>
+    <p class="sb-hero-actions">
+      <a class="sb-key" href={base} data-testid="open-machine">Open the machine</a>
+      <a href={`${base}docs`}>Read the docs</a>
+    </p>
+    <figure class="sb-hero-art">
+      <picture>
+        <source media="(max-width: 640px)" srcset={screen.src} width={screen.width} height={screen.height} />
+        <img
+          src={top.src}
+          srcset={`${topHalf.src} ${topHalf.width}w, ${top.src} ${top.width}w`}
+          sizes="(max-width: 1220px) calc(100vw - 40px), 1140px"
+          width={top.width}
+          height={top.height}
+          alt="The top of РИТМ-12's panel, in worn olive paint with cream lettering: its nameplate, a level meter, a green screen with a few lines of Russian on it, and three knobs."
+          data-testid="hero-art"
+        />
+      </picture>
+      <figcaption>
+        The machine as it starts up. Its screen reads: memory check OK, eight voices, four patterns, ready.
+      </figcaption>
+    </figure>
 
-    <h2>What it is</h2>
-    <p>
-      The page is one machine, РИТМ-12. I made it up: a rhythm computer from a factory that never existed,
-      lettered in Russian. It has eight instruments, sixteen step keys, four patterns and one effect. You pick
-      an instrument, press the steps it should play, and press play.
-    </p>
-    <p>
-      The <a href={`${base}docs`}>docs</a> go through every control and say what the lettering means. Or just
-      open <a href={base}>the machine</a> and press play.
-    </p>
+    <Section title="What it is">
+      <p>
+        The page is one machine, lettered in Russian. It has eight instruments, sixteen step keys, four patterns
+        and one effect. You pick an instrument, press the steps it should play, and press play.
+      </p>
+      <p>
+        The <a href={`${base}docs`}>docs</a> go through every control and say what the lettering means. Or just
+        open <a href={base}>the machine</a> and press play.
+      </p>
+    </Section>
 
-    <h2>How it is made</h2>
-    <ul>
-      <li>
-        <strong>The sounds are synthesised.</strong> Each one is built from its knob settings as you turn them.
-        Nothing is a recording, and none of them copies a real machine. I made them by ear.
-      </li>
-      <li>
-        <strong>One engine keeps the time.</strong> The sequencer and the sounds are a single program that runs
-        on the browser's audio thread. Every step is placed on the audio clock, so the beat holds steady whatever
-        else the page is doing.
-      </li>
-      <li>
-        <strong>The panel is a picture.</strong> It is my own artwork, and every key, knob and switch in it is
-        live. The screen and the meter are drawn by the page while it plays.
-      </li>
-    </ul>
+    <Section title="How it is made" stacked>
+      <ul class="sb-plate sb-plate-three" role="list">
+        <li>
+          <strong>The sounds are synthesised.</strong> Each one is built from its knob settings as you turn them.
+          Nothing is a recording, and none of them copies a real machine. I made them by ear.
+        </li>
+        <li>
+          <strong>One engine keeps the time.</strong> The sequencer and the sounds are a single program that runs
+          on the browser's audio thread. Every step is placed on the audio clock, so the beat holds steady whatever
+          else the page is doing.
+        </li>
+        <li>
+          <strong>The panel is a picture.</strong> It is my own artwork, and every key, knob and switch in it is
+          live. The screen and the meter are drawn by the page while it plays.
+        </li>
+      </ul>
+    </Section>
 
-    <h2>What it keeps, and where</h2>
-    <p>
-      Your patterns and knob positions are saved in this browser every time you change something, and they are
-      there when you come back. They are not sent anywhere unless you save a beat to an account. To keep a copy
-      or move to another device, export the project file from settings, or save the beat to a free account and
-      load it there; you can also export audio and MIDI.
-    </p>
-    <p>
-      The site loads its own files and nothing else. There are no analytics and no ads. Making an account is
-      optional, and logging in sets the site's one cookie.
-    </p>
+    <Section title="Who made it">
+      <p>
+        One person. I have a master's in software engineering, I work in QA, I'm autistic, and I love writing code
+        about as much as I love electronic music. boombapbot is what happens when those overlap for long enough. I
+        build it in my spare time, on a little too much coffee and a little too much stress.
+      </p>
+      <p>
+        It's an independent project. РИТМ-12 and the maker's name on its panel are invented, and it copies no
+        real machine. The <a href={`${base}policies`}>policies</a> page has the rest.
+      </p>
+      <p class="sb-lede">
+        If something's broken, or you just want to say hi, I'm at <a
+          href="https://mm.coffee"
+          target="_blank"
+          rel="noreferrer noopener">mm.coffee</a
+        >.
+      </p>
+    </Section>
 
-    <h2>What came before</h2>
-    <p>
-      boombapbot started out as a different machine. If you made a beat on it, it opens here as a РИТМ-12 beat,
-      and the page lists what did not come across: that machine had more instruments and more rhythms than this
-      one has room for. A beat you saved to an account back then is still there as it was.
-    </p>
+    <Section title="What it keeps, and where">
+      <p>
+        Your patterns and knob positions are saved in this browser every time you change something, and they are
+        there when you come back. They are not sent anywhere unless you save a beat to an account. To keep a copy
+        or move to another device, export the project file from settings, or save the beat to a free account and
+        load it there; you can also export audio and MIDI.
+      </p>
+      <p>
+        The site loads its own files and nothing else. There are no analytics and no ads. Making an account is
+        optional, and logging in sets the site's one cookie.
+      </p>
+    </Section>
 
-    <h2>What is not here yet</h2>
-    <p>Upgrades. That button in the footer only says so for now.</p>
+    <Section title="What came before">
+      <p>
+        boombapbot started out as a different machine. If you made a beat on it, it opens here as a РИТМ-12 beat,
+        and the page lists what did not come across: that machine had more instruments and more rhythms than this
+        one has room for. A beat you saved to an account back then is still there as it was.
+      </p>
+    </Section>
 
-    <h2>Who made it</h2>
-    <p>
-      One person. I have a master's in software engineering, I work in QA, I'm autistic, and I love writing code
-      about as much as I love electronic music. boombapbot is what happens when those overlap for long enough. I
-      build it in my spare time, on a little too much coffee and a little too much stress.
-    </p>
-    <p>
-      It's an independent project. РИТМ-12 and the maker's name on its panel are invented, and it copies no
-      real machine. The <a href={`${base}policies`}>policies</a> page has the rest. If something's broken, or you
-      just want to say hi, I'm at <a href="https://mm.coffee" target="_blank" rel="noreferrer noopener">mm.coffee</a>.
-    </p>
+    <Section title="What is not here yet">
+      <p>Upgrades. That button in the footer only says so for now.</p>
+    </Section>
   </SitePage>
 </Base>

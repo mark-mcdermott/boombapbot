@@ -1,0 +1,14 @@
+---
+interface Props {
+  title: string;
+  /** The heading goes above the body, which takes the whole width. */
+  stacked?: boolean;
+}
+
+const { title, stacked = false } = Astro.props;
+---
+
+<section class:list={['sb-section', { 'sb-section-stacked': stacked }]}>
+  <h2>{title}</h2>
+  <div class="sb-section-body"><slot /></div>
+</section>

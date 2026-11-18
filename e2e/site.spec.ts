@@ -3,9 +3,10 @@ import { expect, test } from '@playwright/test';
 import { openEditor } from './helpers';
 
 test.describe('the page around the machine', () => {
-  test('the header is the brand alone, with no machines to choose from for now', async ({ page }) => {
+  test('on the machine’s page the header is the brand alone, with no machines to choose from for now', async ({ page }) => {
     await openEditor(page);
     await expect(page.getByTestId('brand')).toBeVisible();
+    await expect(page.getByTestId('site-nav')).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Machines' })).toHaveCount(0);
     await expect(page.locator('[data-testid^="machine-"]')).toHaveCount(0);
   });
@@ -200,13 +201,15 @@ test.describe('the page around the machine', () => {
     await expect(notice).toHaveCount(0);
   });
 
-  for (const [id, heading] of [
-    ['about', 'About boombapbot'],
+  const wordPages = [
+    ['about', 'РИТМ-12 is a rhythm computer from a factory that never existed.'],
     ['docs', 'How to use РИТМ-12'],
     ['manifesto', 'Stay Stoked, Stay Woke'],
     ['credits', 'Credits'],
     ['policies', 'Policies'],
-  ] as const) {
+  ] as const;
+
+  for (const [id, heading] of wordPages) {
     test(`the ${id} page is a page of its own with the same header and footer`, async ({ page }) => {
       await openEditor(page);
       await page.getByTestId(`nav-${id}`).click();
@@ -230,11 +233,96 @@ test.describe('the page around the machine', () => {
       await page.getByRole('link', { name: 'boombapbot home, Let’s cook' }).click();
       await expect(page.getByTestId('editor')).toBeVisible();
     });
+
+    test(`the ${id} page names the pages beside a small brand, and its own heading is the largest thing on it`, async ({ page }) => {
+      await page.goto(`/${id}`);
+      const names = ['Machine', 'About', 'Docs', 'Manifesto', 'Credits', 'Policies'];
+      const links = page.getByRole('navigation', { name: 'Pages' }).getByRole('link');
+      await expect(links).toHaveText(names);
+      // Each is read without pointing at anything, and the one for this page is marked.
+      for (const link of await links.all()) await expect(link).toBeVisible();
+      await expect(page.getByTestId(`top-${id}`)).toHaveAttribute('aria-current', 'page');
+      await expect(page.locator('[data-testid^="top-"][aria-current]')).toHaveCount(1);
+
+      const mark = (await page.locator('.sb-wordmark').boundingBox())!;
+      const title = page.getByRole('heading', { level: 1 });
+      const letters = await title.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+      expect(mark.height).toBeLessThan(letters / 2);
+      expect(mark.y + mark.height).toBeLessThan((await title.boundingBox())!.y);
+      await expect(page.getByTestId('tagline')).toBeHidden();
+
+      await page.getByTestId('top-machine').click();
+      await expect(page.getByTestId('editor')).toBeVisible();
+    });
+
+    test(`the ${id} page fits a phone`, async ({ page }) => {
+      await page.setViewportSize({ width: 375, height: 812 });
+      await page.goto(`/${id}`);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+      await expect(page.locator('h1')).toHaveCount(1);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      // All six names are on the screen, each large enough for a thumb.
+      for (const link of await page.getByRole('navigation', { name: 'Pages' }).getByRole('link').all()) {
+        const box = (await link.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(375);
+        expect(box.height).toBeGreaterThanOrEqual(40);
+      }
+      const results = await new AxeBuilder({ page }).analyze();
+      expect(results.violations.map((violation) => violation.id)).toEqual([]);
+    });
   }
+
+  test('the about page opens on the machine: what it is, the way in and a look at it', async ({ page }) => {
+    await page.goto('/about');
+    const picture = page.getByTestId('hero-art');
+    await expect(picture).toBeVisible();
+    await expect.poll(() => picture.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBeGreaterThan(0);
+    const title = (await page.getByRole('heading', { level: 1 }).boundingBox())!;
+    const way = (await page.getByTestId('open-machine').boundingBox())!;
+    const look = (await picture.boundingBox())!;
+    expect(way.y).toBeGreaterThan(title.y + title.height);
+    expect(look.y).toBeGreaterThan(way.y + way.height);
+    await expect(page.getByRole('link', { name: 'Read the docs' })).toHaveAttribute('href', /\/docs$/);
+    // Who made it can be reached.
+    await expect(page.locator('section', { hasText: 'Who made it' }).getByRole('link', { name: 'mm.coffee' })).toBeVisible();
+    await page.getByTestId('open-machine').click();
+    await expect(page.getByTestId('editor')).toBeVisible();
+  });
+
+  test('a phone gets its own cut of the about page’s picture', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('/about');
+    const picture = page.getByTestId('hero-art');
+    await expect.poll(() => picture.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBeGreaterThan(0);
+    expect(await picture.evaluate((node: HTMLImageElement) => node.currentSrc)).toMatch(/screen\.[^/]+\.webp$/);
+  });
+
+  test('the manifesto is one narrow column, and the footer follows it', async ({ page }) => {
+    await page.goto('/manifesto');
+    const column = (await page.locator('main').boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(column.width).toBeLessThanOrEqual(680);
+    expect(Math.abs(column.x + column.width / 2 - view.width / 2)).toBeLessThanOrEqual(1);
+    await expect(page.locator('main img, main picture')).toHaveCount(0);
+    const body = page.locator('main p').first();
+    expect(await body.evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(20);
+    const footer = (await page.locator('.sb-footer').boundingBox())!;
+    expect(footer.y - (column.y + column.height)).toBeLessThanOrEqual(120);
+  });
+
+  test('the credits page is still blank, and ends where it does', async ({ page }) => {
+    await page.goto('/credits');
+    await expect(page.locator('main')).toHaveText('Credits');
+    const blank = (await page.getByTestId('credits-blank').boundingBox())!;
+    const footer = (await page.locator('.sb-footer').boundingBox())!;
+    expect(footer.y - (blank.y + blank.height)).toBeLessThanOrEqual(120);
+  });
 
   test('the policies page says how the shop works before anything can be bought', async ({ page }) => {
     await page.goto('/policies');
-    const shop = page.locator('h2', { hasText: 'The shop' }).locator('xpath=following-sibling::ul[1]');
+    const shop = page.locator('section', { has: page.getByRole('heading', { name: 'The shop' }) }).locator('ul');
     await expect(shop).toContainText('printed to order');
     await expect(shop).toContainText('tell me within 30 days');
     await expect(shop).toContainText('Stripe');
@@ -244,7 +332,7 @@ test.describe('the page around the machine', () => {
 
   test('the policies page says what stays in the browser and what a saved beat keeps', async ({ page }) => {
     await page.goto('/policies');
-    const privacy = page.locator('h2', { hasText: 'Privacy' }).locator('xpath=following-sibling::ul[1]');
+    const privacy = page.locator('section', { has: page.getByRole('heading', { name: 'Privacy' }) }).locator('ul');
     await expect(privacy).toContainText('Your work stays in your browser unless you save it to your account.');
     await expect(privacy).toContainText('With no account, or with one you never save a beat to, they are not sent anywhere.');
     await expect(privacy).toContainText('If you save a beat to your account, I keep that beat.');

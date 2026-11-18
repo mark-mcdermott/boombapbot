@@ -47,6 +47,12 @@ importers:
       '@boombapbot/machine-ritm12':
         specifier: workspace:*
         version: link:../../packages/machine-ritm12
+      '@fontsource-variable/sofia-sans-condensed':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/pt-serif':
+        specifier: 5.3.0
+        version: 5.3.0
       '@neondatabase/serverless':
         specifier: 1.2.0
         version: 1.2.0
@@ -1028,6 +1034,12 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@fontsource-variable/sofia-sans-condensed@5.3.0':
+    resolution: {integrity: sha512-pfyjEn5plOBRtnQqXMDVR49QSdP9hYzgUi7J0w1bW5UG01MqQO8WGT9xdbPSt0+eZ6zrmaNzmk8QKUSkVltGMg==}
+
+  '@fontsource/pt-serif@5.3.0':
+    resolution: {integrity: sha512-ST+j/byBGZw6H+TQMX78o6Qlngfj2Va/Q9fAJxq54Is1ZQk1/FhBIuqyJcLmnpi0trG8V/hWO9Bx6ZY09A0DBQ==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -3925,6 +3937,10 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@fontsource-variable/sofia-sans-condensed@5.3.0': {}
+
+  '@fontsource/pt-serif@5.3.0': {}
 
   '@img/colour@1.1.0':
     optional: true
