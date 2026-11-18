@@ -6,10 +6,10 @@
     "resolveJsonModule": true,
     "paths": {
       "#machine": [
-        "../../packages/machine-808/src/index.tsx"
+        "../../packages/machine-ritm12/src/index.tsx"
       ],
       "#machine/document": [
-        "../../packages/machine-808/src/document/index.ts"
+        "../../packages/machine-ritm12/src/document/index.ts"
       ]
     }
   },

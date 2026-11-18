@@ -6,7 +6,7 @@ import { defineConfig, envField } from 'astro/config';
 
 const onVercel = Boolean(process.env.VERCEL);
 // The drum machine this build is. Only its package is ever imported.
-const machine = `@boombapbot/machine-${process.env.BOOMBAPBOT_MACHINE ?? '808'}`;
+const machine = `@boombapbot/machine-${process.env.BOOMBAPBOT_MACHINE ?? 'ritm12'}`;
 
 // Read when a request needs it, never at build time, so a build succeeds
 // with none of them set and a missing one is named by whatever asks for it.

@@ -70,7 +70,7 @@ jobs:
       - name: Build the WebAssembly engine
         run: pnpm build:wasm
 
-      - name: Put the engine, worklet and faceplate where the site serves them
+      - name: Put the engine, worklet and panel art where the site serves them
         run: pnpm prepare:assets
 
       - name: Install the Vercel CLI

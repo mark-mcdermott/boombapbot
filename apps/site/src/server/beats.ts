@@ -34,9 +34,17 @@ const MESSAGES: Record<BeatRefusal, string> = {
 };
 
 /** The answer when a request is turned down: why, in a word and in a sentence. */
-export function refuse(code: BeatRefusal, extra?: { updatedAt: Date }): Response {
+export function refuse(code: BeatRefusal, extra?: { updatedAt?: Date; message?: string }): Response {
   return json({ code, message: MESSAGES[code], ...extra }, STATUS[code]);
 }
+
+/**
+ * For a beat of the machine this site had before. Only a page left open since
+ * then still sends one, and that page shows what it is told under the codes
+ * it already knows, so this goes out as `invalid` with words of its own.
+ */
+const FROM_AN_EARLIER_PAGE =
+  'I changed the machine after you opened this page, so I did not save this. Reload the page: your beat opens on the new machine, and you can save it from there.';
 
 /** A beat as it leaves the server: named by its uuid, without its project or its row id. */
 export const beatSummary = {
@@ -64,7 +72,7 @@ export function ownedBeat(user: SignedInUser, id: string | undefined) {
   return uuid.success ? and(eq(beat.uuid, uuid.data), eq(beat.userId, user.id)) : null;
 }
 
-/** Reads the projects of the machine this build is. */
+/** Reads the projects of the machine this build is, and can tell one the machine before it made. */
 const codec = createProjectCodec([documentKind]);
 
 /** Room for the few fields a request carries beside the project. */
@@ -112,7 +120,12 @@ export async function readBeatRequest<Body extends { project?: unknown }>(
   const body = schema.safeParse(parseJson(text));
   if (!body.success) return { refusal: refuse('invalid') };
   if (beatTooLarge(beatBytes(body.data.project))) return { refusal: refuse('too_large') };
-  const parsed = codec.parse(body.data.project);
-  if (!parsed.ok) return { refusal: refuse('invalid') };
+  // Only this machine's own beats are stored. One it could take over is not
+  // converted here: the page does that, where the person sees what changed.
+  const parsed = codec.parseOwned(body.data.project);
+  if (!parsed.ok) {
+    const earlier = codec.parse(body.data.project).ok;
+    return { refusal: refuse('invalid', earlier ? { message: FROM_AN_EARLIER_PAGE } : undefined) };
+  }
   return { user: asked.user, data: body.data, project: parsed.project, bytes: beatBytes(parsed.project) };
 }
