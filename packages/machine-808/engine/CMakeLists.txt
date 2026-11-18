@@ -19,7 +19,7 @@ if(SNARE_BUILD_TOOLS)
 endif()
 
 if(SNARE_BUILD_TESTS)
-  foreach(suite timeline scheduler pattern_bank sequencer accent voices choke midi sound_map realtime synth)
+  foreach(suite timeline scheduler pattern_bank sequencer accent voices choke midi sound_map realtime synth swing fx)
     add_executable(test_${suite} "${BOOMBAPBOT_ENGINE_DIR}/tests/test_${suite}.cpp")
     target_link_libraries(test_${suite} PRIVATE boombapbot_engine_808)
     target_compile_options(test_${suite} PRIVATE ${SNARE_WARNINGS})

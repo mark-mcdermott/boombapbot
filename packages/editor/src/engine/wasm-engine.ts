@@ -6,7 +6,9 @@
  * and in Node for tests. Nothing here touches the DOM or the network.
  */
 
-export const SNARE_ABI_VERSION = 2;
+export const SNARE_ABI_VERSION = 3;
+/** The most a pattern can swing: its off-beat steps three quarters through their pair. */
+export const SNARE_SWING_MAX = 128;
 const SNARE_TRACKS = 12;
 const ERR_QUEUE_FULL = -1;
 const BYTES_PER_EVENT = 24;
@@ -45,6 +47,8 @@ interface EngineExports {
   snare_engine_set_track_level(engine: number, track: number, gain: number): number;
   snare_engine_set_accent(engine: number, plainGain: number, accentGain: number): number;
   snare_engine_set_master_volume(engine: number, volume: number): number;
+  snare_engine_set_effect(engine: number, effect: number, wet: number): number;
+  snare_effect_tail_seconds(effect: number, bpm: number): number;
   snare_engine_set_pattern(engine: number, index: number, pattern: number): number;
   snare_engine_set_step(engine: number, pattern: number, track: number, step: number, on: number): number;
   snare_engine_cue_pattern(engine: number, index: number): number;
@@ -65,6 +69,7 @@ interface EngineExports {
   snare_engine_stop_frame(engine: number): number;
   snare_engine_active_voices(engine: number): number;
   snare_engine_stolen_voices(engine: number): number;
+  snare_engine_output_level(engine: number): number;
   snare_engine_enable_event_log(engine: number, capacity: number): number;
   snare_engine_event_count(engine: number): number;
   snare_engine_read_events(engine: number, out: number, max: number): number;
@@ -100,6 +105,8 @@ export interface EnginePattern {
   firstLength: number;
   secondLength: number;
   stepsPerBeat: number;
+  /** How late every second step plays, from 0 to SNARE_SWING_MAX. Triplets do not swing. */
+  swing: number;
 }
 
 /** How one instrument track sounds: which slot it plays, and where. */
@@ -111,6 +118,16 @@ export interface EngineTrack {
   chokeGroup: number;
   /** Linear gain from the level knob. */
   gain: number;
+}
+
+/** The one effect on the mix, as the engine numbers them. */
+export const EFFECT = { none: 0, delay: 1, reverb: 2, flanger: 3, chorus: 4 } as const;
+export type EffectKind = keyof typeof EFFECT;
+
+/** The effect added to the mix, and how much of it, from 0 to 1. */
+export interface EngineEffect {
+  kind: EffectKind;
+  wet: number;
 }
 
 /** Where a variation switch stands, as the engine numbers the positions. */
@@ -236,7 +253,7 @@ export class SnareWasm {
     view.setUint8(pointer + PATTERN_LENGTHS_OFFSET, pattern.firstLength);
     view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 1, pattern.secondLength);
     view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 2, pattern.stepsPerBeat);
-    view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 3, 0);
+    view.setUint8(pointer + PATTERN_LENGTHS_OFFSET + 3, pattern.swing);
   }
 
   /**
@@ -305,6 +322,11 @@ export class SnareWasm {
     } finally {
       this.exports.free(pointer);
     }
+  }
+
+  /** How long an effect rings on after its last hit, in seconds. */
+  effectTailSeconds(kind: EffectKind, bpm: number): number {
+    return this.exports.snare_effect_tail_seconds(EFFECT[kind], bpm);
   }
 
   /** Output frame of a tick counted from where playback started. */
@@ -450,6 +472,10 @@ export class WasmEngine {
     this.send(() => this.x.snare_engine_set_master_volume(this.handle, volume));
   }
 
+  setEffect(effect: EngineEffect): void {
+    this.send(() => this.x.snare_engine_set_effect(this.handle, EFFECT[effect.kind], effect.wet));
+  }
+
   setPattern(index: number, pattern: EnginePattern): void {
     this.wasm.writePattern(this.scratch, pattern);
     this.send(() => this.x.snare_engine_set_pattern(this.handle, index, this.scratch));
@@ -565,6 +591,11 @@ export class WasmEngine {
 
   get stolenVoices(): number {
     return this.x.snare_engine_stolen_voices(this.handle);
+  }
+
+  /** How loud the output is now, for a meter: its root mean square, from 0. */
+  get outputLevel(): number {
+    return this.x.snare_engine_output_level(this.handle);
   }
 
   /** Records hits for tests and alignment checks. Call before rendering. */

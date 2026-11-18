@@ -98,6 +98,7 @@ export function enginePattern(rhythm: Rhythm, variation: Variation): EnginePatte
     firstLength: rhythm.firstLength,
     secondLength: rhythm.secondLength,
     stepsPerBeat: stepsPerBeat(rhythm.preScale),
+    swing: 0,
   };
 }
 
