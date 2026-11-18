@@ -397,6 +397,7 @@ it, and play and the tempo are docked at the bottom of the screen.
 | `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
 | `packages/machine-ritm12/` | РИТМ-12, the machine the site is: its project schema, voices, panel, art, and the reader that opens the earlier machine's beats |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
+| `apps/mobile/` | A first slice of the phone apps: the editor with РИТМ-12 in a Capacitor shell for iOS and Android. See its `README.md` |
 | `e2e/` | Playwright tests: the site's, and РИТМ-12's own in `e2e/ritm12/` |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |
 | `misc/assets/` | The owner's unedited pictures (ignored by git) |
@@ -430,8 +431,9 @@ stack" and most of "build one end-to-end beat". Next:
    Firefox, and listen to it voice by voice and effect by effect. What the
    build guesses at is listed in [`docs/follow-ups.md`](docs/follow-ups.md).
 2. Cut its art again from the owner's full-size pictures.
-3. Boot the same engine natively: Tauri with CPAL on desktop, Capacitor with
-   AVAudioEngine and Oboe on mobile.
+3. Boot the same engine natively: Tauri with CPAL on desktop, and on mobile
+   AVAudioEngine and Oboe behind the Capacitor shell in `apps/mobile`, which
+   plays through the web view for now.
 
 Saving beats to an account is built. Sync in the background, billing,
 signing and store submission come after that.
