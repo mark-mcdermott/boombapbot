@@ -1,5 +1,7 @@
 ---
 import { SitePage } from '@boombapbot/editor';
+import Lettering from '../components/Lettering.astro';
+import Section from '../components/Section.astro';
 import Base from '../layouts/Base.astro';
 
 const base = import.meta.env.BASE_URL;
@@ -16,161 +18,173 @@ const base = import.meta.env.BASE_URL;
       lettering is Russian, so this page gives each control as it is lettered and says what it is.
     </p>
 
-    <h2>The idea</h2>
-    <p>
-      The machine remembers four <strong>patterns</strong>: А, Б, В and Г. A pattern is one measure of sixteen
-      steps. It has a row for each of the eight instruments and one row of accents, and each step in a row is on
-      or off.
-    </p>
+    <Section title="The idea">
+      <p>
+        The machine remembers four <strong>patterns</strong>: А, Б, В and Г. A pattern is one measure of sixteen
+        steps. It has a row for each of the eight instruments and one row of accents, and each step in a row is on
+        or off.
+      </p>
+    </Section>
 
-    <h2>Writing a pattern</h2>
-    <ol>
-      <li>Press the play key, the first of the three under <strong>УПРАВЛЕНИЕ</strong>. The pattern goes round.</li>
-      <li>
-        Press an instrument key on the left, under <strong>ИНСТРУМЕНТЫ</strong>. It plays the sound and selects
-        it, and its lamp stays lit.
-      </li>
-      <li>
-        Press the step keys, the row of sixteen under <strong>СЕКВЕНСЕР</strong>, where it should play. A lit
-        key is a step that is on; press it again to turn it off.
-      </li>
-      <li>Choose another instrument and carry on. The step keys always show the instrument that is selected.</li>
-    </ol>
+    <Section title="Writing a pattern">
+      <ol>
+        <li>Press the play key, the first of the three under <Lettering>УПРАВЛЕНИЕ</Lettering>. The pattern goes round.</li>
+        <li>
+          Press an instrument key on the left, under <Lettering>ИНСТРУМЕНТЫ</Lettering>. It plays the sound and selects
+          it, and its lamp stays lit.
+        </li>
+        <li>
+          Press the step keys, the row of sixteen under <Lettering>СЕКВЕНСЕР</Lettering>, where it should play. A lit
+          key is a step that is on; press it again to turn it off.
+        </li>
+        <li>Choose another instrument and carry on. The step keys always show the instrument that is selected.</li>
+      </ol>
 
-    <h3>The instruments</h3>
-    <dl>
-      <dt>БАС</dt>
-      <dd>Kick.</dd>
-      <dt>МАЛЫЙ</dt>
-      <dd>Snare.</dd>
-      <dt>ХЛОП</dt>
-      <dd>Clap.</dd>
-      <dt>ХЭТ З and ХЭТ О</dt>
-      <dd>Closed hat and open hat. Each one cuts the other off.</dd>
-      <dt>ТОМ</dt>
-      <dd>Tom.</dd>
-      <dt>РИМ</dt>
-      <dd>Rim.</dd>
-      <dt>ПЕРК</dt>
-      <dd>Percussion.</dd>
-    </dl>
+      <h3>The instruments</h3>
+      <dl>
+        <dt><Lettering>БАС</Lettering></dt>
+        <dd>Kick.</dd>
+        <dt><Lettering>МАЛЫЙ</Lettering></dt>
+        <dd>Snare.</dd>
+        <dt><Lettering>ХЛОП</Lettering></dt>
+        <dd>Clap.</dd>
+        <dt><Lettering>ХЭТ З</Lettering> and <Lettering>ХЭТ О</Lettering></dt>
+        <dd>Closed hat and open hat. Each one cuts the other off.</dd>
+        <dt><Lettering>ТОМ</Lettering></dt>
+        <dd>Tom.</dd>
+        <dt><Lettering>РИМ</Lettering></dt>
+        <dd>Rim.</dd>
+        <dt><Lettering>ПЕРК</Lettering></dt>
+        <dd>Percussion.</dd>
+      </dl>
 
-    <h3>Accents</h3>
-    <p>
-      The <strong>РЕЖИМ ЗАПИСИ</strong> switch decides what the step keys write. On <strong>УДАРЫ</strong> they
-      write hits of the selected instrument. On <strong>АКЦЕНТЫ</strong> they write the pattern's accents. Every
-      instrument that plays on an accented step is louder, by as much as the <strong>АКЦЕНТ</strong> knob says.
-    </p>
+      <h3>Accents</h3>
+      <p>
+        The <Lettering>РЕЖИМ ЗАПИСИ</Lettering> switch decides what the step keys write. On <Lettering>УДАРЫ</Lettering> they
+        write hits of the selected instrument. On <Lettering>АКЦЕНТЫ</Lettering> they write the pattern's accents. Every
+        instrument that plays on an accented step is louder, by as much as the <Lettering>АКЦЕНТ</Lettering> knob says.
+      </p>
 
-    <h3>Recording by tapping</h3>
-    <p>
-      Press the record key, the one with the red dot, while the pattern plays. Now each instrument key you
-      press in time is written on the step it lands on. Press record again to stop. Everything tapped in one go
-      is one undo step.
-    </p>
+      <h3>Recording by tapping</h3>
+      <p>
+        Press the record key, the one with the red dot, while the pattern plays. Now each instrument key you
+        press in time is written on the step it lands on. Press record again to stop. Everything tapped in one go
+        is one undo step.
+      </p>
 
-    <h3>Mute, dice and clear</h3>
-    <ul>
-      <li><strong>МУТ</strong> silences the selected instrument and leaves its steps where they are.</li>
-      <li>The key with the die writes a new row for the selected instrument, by chance.</li>
-      <li><strong>СБРОС</strong> empties the pattern you are on. Undo brings it back.</li>
-    </ul>
+      <h3>Mute, dice and clear</h3>
+      <ul>
+        <li><Lettering>МУТ</Lettering> silences the selected instrument and leaves its steps where they are.</li>
+        <li>The key with the die writes a new row for the selected instrument, by chance.</li>
+        <li><Lettering>СБРОС</Lettering> empties the pattern you are on. Undo brings it back.</li>
+      </ul>
+    </Section>
 
-    <h2>Patterns, measure and tempo</h2>
-    <dl>
-      <dt>ПАТТЕРН</dt>
-      <dd>
-        The keys А, Б, В and Г choose the pattern you see and hear. Pressed while the machine plays, the new one
-        takes over at the end of the measure.
-      </dd>
-      <dt>РАЗМЕР</dt>
-      <dd>
-        The length of a measure, for all four patterns. <strong>16</strong> is sixteen steps, four to the beat.
-        <strong>12</strong> is twelve steps of triplets, three to the beat, and the last four step keys sit out.
-      </dd>
-      <dt>ТЕМП</dt>
-      <dd>From 40 to 300 beats a minute. The screen shows the number.</dd>
-      <dt>СВИНГ</dt>
-      <dd>Plays every second step late, from not at all up to a hard shuffle. Triplets do not swing.</dd>
-    </dl>
+    <Section title="Patterns, measure and tempo">
+      <dl>
+        <dt><Lettering>ПАТТЕРН</Lettering></dt>
+        <dd>
+          The keys А, Б, В and Г choose the pattern you see and hear. Pressed while the machine plays, the new one
+          takes over at the end of the measure.
+        </dd>
+        <dt><Lettering>РАЗМЕР</Lettering></dt>
+        <dd>
+          The length of a measure, for all four patterns. <strong>16</strong> is sixteen steps, four to the
+          beat. <strong>12</strong> is twelve steps of triplets, three to the beat, and the last four step keys sit
+          out.
+        </dd>
+        <dt><Lettering>ТЕМП</Lettering></dt>
+        <dd>From 40 to 300 beats a minute. The screen shows the number.</dd>
+        <dt><Lettering>СВИНГ</Lettering></dt>
+        <dd>Plays every second step late, from not at all up to a hard shuffle. Triplets do not swing.</dd>
+      </dl>
+    </Section>
 
-    <h2>The sounds</h2>
-    <ul>
-      <li>The knob beside each instrument key is that instrument's level.</li>
-      <li>
-        The three knobs under <strong>ОБРАБОТКА ГОЛОСА</strong> work on the selected instrument:
-        <strong>ПИТЧ</strong> is its pitch, <strong>ЗАТУХАНИЕ</strong> how long it rings, and
-        <strong>ТОН</strong> how bright it is. Each instrument keeps its own settings.
-      </li>
-      <li><strong>ГРОМКОСТЬ</strong> is the volume of the whole machine, and the <strong>УРОВЕНЬ</strong> meter shows how loud it is.</li>
-    </ul>
-    <p>
-      Drag a knob up or down to turn it, or focus it and use the arrow keys. The screen says what the control
-      you just touched did.
-    </p>
+    <Section title="The sounds">
+      <ul>
+        <li>The knob beside each instrument key is that instrument's level.</li>
+        <li>
+          The three knobs under <Lettering>ОБРАБОТКА ГОЛОСА</Lettering> work on the selected
+          instrument: <Lettering>ПИТЧ</Lettering> is its pitch, <Lettering>ЗАТУХАНИЕ</Lettering> how long it rings,
+          and <Lettering>ТОН</Lettering> how bright it is. Each instrument keeps its own settings.
+        </li>
+        <li><Lettering>ГРОМКОСТЬ</Lettering> is the volume of the whole machine, and the <Lettering>УРОВЕНЬ</Lettering> meter shows how loud it is.</li>
+      </ul>
+      <p>
+        Drag a knob up or down to turn it, or focus it and use the arrow keys. The screen says what the control
+        you just touched did.
+      </p>
+    </Section>
 
-    <h2>The effect</h2>
-    <p>
-      There is one effect on the whole machine. Press the <strong>ЭФФЕКТ</strong> selector to step to the next
-      of four: <strong>ДИЛЭЙ</strong> is an echo, <strong>РЕВЕРБ</strong> a reverb, <strong>ФЛЭНЖЕР</strong> a
-      flanger and <strong>ХОР</strong> a chorus. The <strong>СМЕСЬ</strong> knob sets how much of it you hear.
-      At 0 there is none.
-    </p>
+    <Section title="The effect">
+      <p>
+        There is one effect on the whole machine. Press the <Lettering>ЭФФЕКТ</Lettering> selector to step to the next
+        of four: <Lettering>ДИЛЭЙ</Lettering> is an echo, <Lettering>РЕВЕРБ</Lettering> a reverb, <Lettering>ФЛЭНЖЕР</Lettering> a
+        flanger and <Lettering>ХОР</Lettering> a chorus. The <Lettering>СМЕСЬ</Lettering> knob sets how much of it you hear.
+        At 0 there is none.
+      </p>
+    </Section>
 
-    <h2>Keeping what you make</h2>
-    <p>
-      Everything is saved in this browser as you go. The cog in the footer opens settings, where you can name
-      your beat, undo and redo, put the starter patterns back, clear one pattern or everything, and import or
-      export. With a free account you can also save up to 20 beats to it from the account button in the footer,
-      and load them on another device.
-    </p>
-    <ul>
-      <li><strong>Project file</strong> holds everything the machine remembers, and opens here again.</li>
-      <li>
-        <strong>WAV and MIDI</strong> hold the pattern you are on, as a loop of one measure. The WAV has the
-        effect in it.
-      </li>
-    </ul>
+    <Section title="Keeping what you make">
+      <p>
+        Everything is saved in this browser as you go. The cog in the footer opens settings, where you can name
+        your beat, undo and redo, put the starter patterns back, clear one pattern or everything, and import or
+        export. With a free account you can also save up to 20 beats to it from the account button in the footer,
+        and load them on another device.
+      </p>
+      <ul>
+        <li><strong>Project file</strong> holds everything the machine remembers, and opens here again.</li>
+        <li>
+          <strong>WAV and MIDI</strong> hold the pattern you are on, as a loop of one measure. The WAV has the
+          effect in it.
+        </li>
+      </ul>
+    </Section>
 
-    <h2>What comes with it</h2>
-    <p>A new machine has a beat on А and a busier turn of it on Б. В and Г are empty.</p>
+    <Section title="What comes with it">
+      <p>A new machine has a beat on А and a busier turn of it on Б. В and Г are empty.</p>
+    </Section>
 
-    <h2>Beats from the earlier machine</h2>
-    <p>
-      boombapbot used to be a different machine. A beat made on it opens here as a РИТМ-12 beat, whether it is
-      the draft in this browser, a project file or a beat saved to your account. The rhythm that machine was on
-      becomes pattern А, and a notice lists what did not fit.
-    </p>
-    <p>
-      Nothing old is written over. The earlier draft stays in this browser, and a beat in your account stays as
-      it was: saving the one that opened here adds a new beat beside it.
-    </p>
+    <Section title="Beats from the earlier machine">
+      <p>
+        boombapbot used to be a different machine. A beat made on it opens here as a РИТМ-12 beat, whether it is
+        the draft in this browser, a project file or a beat saved to your account. The rhythm that machine was on
+        becomes pattern А, and a notice lists what did not fit.
+      </p>
+      <p>
+        Nothing old is written over. The earlier draft stays in this browser, and a beat in your account stays as
+        it was: saving the one that opened here adds a new beat beside it.
+      </p>
+    </Section>
 
-    <h2>On a phone</h2>
-    <p>
-      The picture is wider than the screen, so scroll it sideways, or press <strong>Fit to screen</strong> under
-      it to see the whole machine at once. A strip under the picture chooses the instrument, and a play button
-      stays docked at the bottom.
-    </p>
+    <Section title="On a phone">
+      <p>
+        The picture is wider than the screen, so scroll it sideways, or press <strong>Fit to screen</strong> under
+        it to see the whole machine at once. A strip under the picture chooses the instrument, and a play button
+        stays docked at the bottom.
+      </p>
+    </Section>
 
-    <h2>Keyboard</h2>
-    <dl>
-      <dt><kbd>Space</kbd></dt>
-      <dd>Start or stop.</dd>
-      <dt>Arrow keys</dt>
-      <dd>Move between step keys, and turn the knob that has focus.</dd>
-      <dt><kbd>Enter</kbd></dt>
-      <dd>Press the key that has focus.</dd>
-      <dt><kbd>Esc</kbd></dt>
-      <dd>Close a window.</dd>
-      <dt><kbd>Ctrl</kbd> or <kbd>Cmd</kbd> + <kbd>Z</kbd></dt>
-      <dd>Undo. Add <kbd>Shift</kbd> to redo.</dd>
-    </dl>
+    <Section title="Keyboard">
+      <dl>
+        <dt><kbd>Space</kbd></dt>
+        <dd>Start or stop.</dd>
+        <dt>Arrow keys</dt>
+        <dd>Move between step keys, and turn the knob that has focus.</dd>
+        <dt><kbd>Enter</kbd></dt>
+        <dd>Press the key that has focus.</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>Close a window.</dd>
+        <dt><kbd>Ctrl</kbd> or <kbd>Cmd</kbd> + <kbd>Z</kbd></dt>
+        <dd>Undo. Add <kbd>Shift</kbd> to redo.</dd>
+      </dl>
+    </Section>
 
-    <h2>The power switch</h2>
-    <p>
-      <strong>СЕТЬ</strong> turns the machine off: it goes dark, it stops, and nothing else on it answers until
-      you switch it back on. Nothing it remembers is lost.
-    </p>
+    <Section title="The power switch">
+      <p>
+        <Lettering>СЕТЬ</Lettering> turns the machine off: it goes dark, it stops, and nothing else on it answers until
+        you switch it back on. Nothing it remembers is lost.
+      </p>
+    </Section>
   </SitePage>
 </Base>

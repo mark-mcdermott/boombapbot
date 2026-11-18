@@ -34,5 +34,14 @@ repository: they live in the git-ignored `misc/assets/ritm12/`.
   `python3 packages/machine-ritm12/art/cut-art.py`, and compare the boxes
   and pivots it prints with `src/ui/layout.ts`. Do not edit the cut files by
   hand.
+- **Stills on the About page:** `apps/site/src/assets/ritm12/` holds three
+  cuts of one still of this panel, taken from the built page as it starts
+  up, with the screen lit and showing its start-up lines: `top.webp` (the top
+  of the panel, 1996 pixels wide), `top-998.webp` (the same at half the
+  size) and `screen.webp` (the screen alone, for a phone). The still is the
+  whole panel photographed by a headless Chromium at twice the density with
+  the page 1040 pixels wide, so the art is drawn one to one, about two
+  seconds after the machine appears. They are this artwork and nothing
+  else; take them again if the art or the screen changes.
 - **Size:** the pictures here are 2000 pixels wide, as they came. The owner's
   originals are 3072 wide; the art should be cut again from those.

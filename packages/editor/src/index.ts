@@ -1,5 +1,5 @@
 export { BoombapbotEditor, type BoombapbotEditorProps } from './ui/Editor';
-export { SitePage, type SitePageProps } from './ui/SitePage';
+export { SitePage, type SitePageLayout, type SitePageProps } from './ui/SitePage';
 export { RuntimeContext, useAssetManifest, useEditorState, useRuntime } from './ui/context';
 export { useKnob, type KnobOptions } from './ui/knob';
 export { PlayButton } from './ui/PlayButton';
