@@ -43,8 +43,21 @@ export async function readProjectFile<Document extends ProjectBase>(
   return codec.parseText(text);
 }
 
-/** Saves bytes as a download. Browser only. */
-export function downloadBytes(name: string, data: Uint8Array | string, type: string): void {
+/** A file an export made, on its way to the person. */
+export interface ExportedFile {
+  name: string;
+  data: Uint8Array | string;
+  type: string;
+}
+
+/**
+ * Hands an exported file to the person. True once it is theirs to keep,
+ * false if they turned it down; a failure is thrown.
+ */
+export type SaveFile = (file: ExportedFile) => boolean | Promise<boolean>;
+
+/** Saves a file as a download. Browser only. */
+export function downloadFile({ name, data, type }: ExportedFile): boolean {
   const blob = new Blob([data as BlobPart], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -56,4 +69,5 @@ export function downloadBytes(name: string, data: Uint8Array | string, type: str
   link.remove();
   // Give the browser time to start the download before the URL goes away.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return true;
 }

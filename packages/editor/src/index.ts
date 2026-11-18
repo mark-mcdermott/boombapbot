@@ -15,4 +15,10 @@ export {
 } from './state/draft-storage';
 export type { Machine, MachineHost, MachineSession, StartPlan } from './machine';
 export type { EngineMeasure } from './engine/wasm-engine';
-export { exportBaseName, projectFileName, readProjectFile } from './state/project-io';
+export {
+  exportBaseName,
+  projectFileName,
+  readProjectFile,
+  type ExportedFile,
+  type SaveFile,
+} from './state/project-io';
