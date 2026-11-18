@@ -22,6 +22,10 @@ draft kept on the phone. It is not ready for either store.
   (`@capacitor/share`), from where it is saved to Files or sent to another
   app. Closing the sheet without choosing is not an error, and the settings
   sheet then does not say a WAV was exported.
+- `src/styles.css` loads Sofia Sans Condensed, the face the phone's panel
+  is lettered in, from the same pinned `@fontsource-variable` package as the
+  site. The app has no server to fetch it from, so the font files are in
+  its bundle.
 - `scripts/copy-assets.mjs` copies the engine, the worklet and the panel art
   from where `scripts/prepare-assets.mjs` put them for the site, so the app
   ships the files the site serves. `public/` is generated and ignored.
@@ -87,10 +91,28 @@ insets arrive there (51 CSS pixels at the top, 24 at the bottom).
 
 Everything above was seen with the picture of the machine. Since
 2026-11-18 a screen as narrow as a phone gets the phone's panel, and the
-app with it. With that panel, on the iPhone simulator on 2026-11-18: the
-app launches and shows it, Play starts the beat and the step moves, and
-the settings button is under it. Export, Import and the Android emulator
-have not been run again with it.
+app with it.
+
+With that panel, on the same iPhone simulator on 2026-11-18: the app
+launches and shows it, with the settings button under it. Its lettering
+(СЕКВЕНСЕР, ГОЛОС, ТЕМП, ЭФФЕКТ, ПИТЧ and the rest) is drawn in Sofia Sans
+Condensed: a screenshot of the app matches one of the site's phone panel
+in Safari on that simulator, and differs from a build of the app without
+the font, where the same words are in the system's wider face. Play starts
+the beat, the step moves and iOS shows its playing indicator. WAV loop
+opens the share sheet with the file, and the WAV written for it is 24-bit
+stereo; with the settings sheet scrolled to its end, "Saving the WAV…" is
+there above the share sheet; closing the sheet without choosing leaves no
+"WAV exported" line and no error. The project file opens the sheet and
+"Save to Files" keeps it; then every pattern cleared, then Import: the
+file chooser shows the file, and choosing it brings the beat back with
+the "Imported" notice. The MIDI file was not exported again.
+
+With that panel, on the same Android emulator on 2026-11-18: the app
+launches and shows it; the web view says the Cyrillic and Latin files of
+Sofia Sans Condensed are loaded and every label of the panel is set in
+it; Play starts the engine (audio running at 48 kHz, output peaking at
+0.66). Export and Import have not been run again there with it.
 
 Nobody has listened to it or held it. Not checked: a real iPhone, a real
 Android phone, an iPad, the ringer switch, a phone call or another app
@@ -111,6 +133,14 @@ Drive or Gmail.
 - **Exports pile up in the cache.** Each one is written to the app's cache
   folder under its beat's name and left there. The system may clear that
   folder, and a second export of the same beat writes over the first.
+- **The share sheet covers "Saving the WAV…"** on the iPhone unless the
+  settings sheet has been scrolled down first: the line sits under the
+  Export button, where the share sheet comes up.
+- **The "Imported" notice can be off the screen.** It is above the
+  machine, and the settings button is below it, so after an import from
+  the bottom of the page the notice is there only once you scroll up.
+- **The status bar on the Android emulator** had a dark clock and dark
+  icons on the page's dark background. I have not looked into why.
 - **Words written for the site.** The settings sheet says the draft is
   saved "in this browser" and lists keyboard keys.
 - **Sideways on a phone** the brand takes about a third of the screen and
