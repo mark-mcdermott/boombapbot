@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectBase } from '@boombapbot/contracts';
 import type { Machine, MachineSession } from '../machine';
 import { EditorRuntime } from '../runtime';
+import type { KeyValueStorage } from '../state/draft-storage';
 import { RuntimeContext, useEditorState, useRuntime } from './context';
 import { CookieNotice } from './CookieNotice';
 import { Footer } from './Footer';
@@ -19,6 +20,14 @@ export interface BoombapbotEditorProps<
   machine: Machine<Document, Transient, Session>;
   /** Base URL the site is served from. */
   baseUrl?: string;
+  /** Where the draft is kept. The browser's own storage when not given. */
+  storage?: KeyValueStorage | null;
+  /**
+   * What sits under the machine in place of the site's notice and footer,
+   * handed the settings button. For a shell with no site behind it, which
+   * has no pages, shop or account to offer.
+   */
+  below?: (settings: ReactNode) => ReactNode;
 }
 
 declare global {
@@ -68,7 +77,13 @@ function Dock() {
   );
 }
 
-function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: string }) {
+interface EditorBodyProps {
+  runtime: EditorRuntime;
+  baseUrl: string;
+  below?: (settings: ReactNode) => ReactNode;
+}
+
+function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
   const audioStatus = useEditorState((state) => state.audioStatus);
   const playing = useEditorState((state) => state.playing);
   const modals = useRef<HTMLDivElement>(null);
@@ -96,6 +111,7 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [runtime]);
 
+  const settings = <Settings container={modals} />;
   return (
     <div
       className="sb-app"
@@ -107,8 +123,14 @@ function EditorBody({ runtime, baseUrl }: { runtime: EditorRuntime; baseUrl: str
       <NoticeBanner />
       <runtime.machine.Panel />
       <div className="sb-below-machine">
-        <CookieNotice baseUrl={baseUrl} />
-        <Footer baseUrl={baseUrl} container={modals} settings={<Settings container={modals} />} />
+        {below ? (
+          below(settings)
+        ) : (
+          <>
+            <CookieNotice baseUrl={baseUrl} />
+            <Footer baseUrl={baseUrl} container={modals} settings={settings} />
+          </>
+        )}
       </div>
       <Dock />
       <div ref={modals} className="sb-modal-root" />
@@ -121,8 +143,8 @@ export function BoombapbotEditor<
   Document extends ProjectBase,
   Transient extends object,
   Session extends MachineSession<Document, Transient>,
->({ machine, baseUrl = '/' }: BoombapbotEditorProps<Document, Transient, Session>) {
-  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine }));
+>({ machine, baseUrl = '/', storage, below }: BoombapbotEditorProps<Document, Transient, Session>) {
+  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine, storage }));
 
   useEffect(() => {
     runtime.attach();
@@ -159,7 +181,7 @@ export function BoombapbotEditor<
   const shared = runtime as unknown as EditorRuntime;
   return (
     <RuntimeContext.Provider value={shared}>
-      <EditorBody runtime={shared} baseUrl={baseUrl} />
+      <EditorBody runtime={shared} baseUrl={baseUrl} below={below} />
     </RuntimeContext.Provider>
   );
 }
