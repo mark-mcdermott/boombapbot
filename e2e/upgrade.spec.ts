@@ -1,14 +1,15 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
-import { PASSWORD, ROW_ID, UUID, signedUpRequest } from './account';
+import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import { PASSWORD, ROW_ID, UUID, signedUp, signedUpRequest } from './account';
 import { ACCOUNTS_URL, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL, serverEnv } from './accounts-server';
+import { openEditor, scanner } from './helpers';
 import { mailTo, newAddress } from './mail';
 import { checkoutEvent } from './stripe';
 
 // The one-time upgrade and its license key. Like the shop's tests these run
 // against the built server with its database in memory, the outbox in place
-// of email and a fake in place of Stripe. Nothing here is a page: the
-// upgrade's modal is not built yet, so everything is asked of the server.
+// of email and a fake in place of Stripe. The first tests ask the server
+// alone; the ones after them go through the upgrade's modal.
 
 // One worker, in order: the fake remembers every checkout it was sent.
 test.describe.configure({ mode: 'serial' });
@@ -22,12 +23,15 @@ interface Checkout {
   form: Record<string, string>;
 }
 
+const checkouts = async (request: APIRequestContext) =>
+  (await (await request.get(`${FAKE_SERVICES_URL}/calls/upgrade`)).json()) as Checkout[];
+
 /** Starts a checkout for the upgrade and returns what Stripe was asked for. */
 async function checkout(request: APIRequestContext): Promise<Checkout> {
   const answer = await request.post('/api/upgrade/checkout', { headers: json });
   expect(answer.status(), await answer.text()).toBe(200);
   expect(await answer.json()).toEqual({ url: `${ACCOUNTS_URL}/?upgrade=paid` });
-  const asked = ((await (await request.get(`${FAKE_SERVICES_URL}/calls/upgrade`)).json()) as Checkout[]).at(-1);
+  const asked = (await checkouts(request)).at(-1);
   expect(asked).toBeTruthy();
   return asked!;
 }
@@ -289,6 +293,156 @@ test('an order from the shop is still an order, not a license', async ({ request
   expect(mailTo(address, /./)).toEqual([]);
 });
 
+async function openUpgrade(page: Page): Promise<void> {
+  await page.getByTestId('upgrade').click();
+  await expect(page.getByTestId('upgrade-modal')).toBeVisible();
+}
+
+/** Presses the button that pays, and returns what Stripe was asked for once the buyer is back. */
+async function buyInModal(page: Page, request: APIRequestContext): Promise<Checkout> {
+  const before = (await checkouts(request)).length;
+  await page.getByTestId('upgrade-buy').click();
+  // The fake "takes the money" at once and sends the buyer where Stripe would.
+  await expect(page.getByTestId('upgrade-thanks')).toContainText('Thank you');
+  expect(new URL(page.url()).search).toBe('');
+  const all = await checkouts(request);
+  expect(all).toHaveLength(before + 1);
+  return all.at(-1)!;
+}
+
+test('the modal sells it: the price, the way to Stripe and the way back', async ({ page, request }) => {
+  const asked: string[] = [];
+  page.on('request', (sent) => {
+    if (new URL(sent.url()).pathname.startsWith('/api/upgrade')) asked.push(sent.method());
+  });
+  await openEditor(page);
+  // Nothing about the upgrade is asked until somebody opens it.
+  await expect(page.getByTestId('account')).toHaveAccessibleName('Account');
+  expect(asked).toEqual([]);
+
+  await openUpgrade(page);
+  const modal = page.getByTestId('upgrade-modal');
+  await expect(page.getByTestId('upgrade-price')).toHaveText('$5.00');
+  await expect(page.getByTestId('upgrade-buy')).toHaveText('Pay $5.00 on Stripe');
+  await expect.poll(() => modal.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
+  expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+
+  // Nobody is logged in, so Stripe is told of no account and asks for the address itself.
+  const checkout = await buyInModal(page, request);
+  expect(checkout.form).toMatchObject({ 'metadata[purpose]': 'upgrade', success_url: `${ACCOUNTS_URL}/?upgrade=paid` });
+  expect(checkout.form).not.toHaveProperty('customer_email');
+  // Having just paid, nobody is offered it again, and the key's way onto an account is said.
+  await expect(page.getByTestId('upgrade-buy')).toHaveCount(0);
+  await expect(modal).toContainText('on its way');
+  await expect(page.getByTestId('upgrade-log-in')).toBeVisible();
+
+  // Closed and opened again, it is the offer as it was.
+  await page.getByTestId('upgrade-close').click();
+  await openUpgrade(page);
+  await expect(page.getByTestId('upgrade-thanks')).toHaveCount(0);
+  await expect(page.getByTestId('upgrade-buy')).toBeVisible();
+});
+
+test('coming back from Stripe without paying opens the offer again', async ({ page }) => {
+  await page.goto('/?upgrade=open');
+  await expect(page.getByTestId('upgrade-buy')).toBeVisible();
+  await expect(page.getByTestId('upgrade-thanks')).toHaveCount(0);
+  expect(new URL(page.url()).search).toBe('');
+});
+
+test('someone logged in buys it in the modal, and the key shows there once Stripe says so', async ({ page, request, context, browserName }) => {
+  // Only Chromium lets a test read the clipboard back.
+  const readsClipboard = browserName === 'chromium';
+  if (readsClipboard) await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const address = await signedUp(page);
+  await page.getByTestId('account-close').click();
+  await openUpgrade(page);
+  const checkout = await buyInModal(page, request);
+  expect(checkout.form.customer_email).toBe(address);
+
+  // Stripe has not said so yet: the modal waits, and does not sell it twice.
+  await expect(page.getByTestId('upgrade-waiting')).toBeVisible();
+  await expect(page.getByTestId('upgrade-buy')).toHaveCount(0);
+  await expect(page.getByTestId('upgrade-key')).toHaveCount(0);
+
+  // Then it does, and the key appears without anything being pressed.
+  expect((await paid(request, eventFor(checkout, address))).status()).toBe(200);
+  await expect(page.getByTestId('upgrade-key')).toHaveText(new RegExp(`^${KEY.source}$`));
+  const key = await page.getByTestId('upgrade-key').innerText();
+  expect(keysMailedTo(address)).toEqual([key]);
+  await expect(page.getByTestId('upgrade-waiting')).toHaveCount(0);
+
+  await page.getByTestId('upgrade-copy').click();
+  await expect(page.getByTestId('upgrade-copied')).toHaveText('Copied.');
+  if (readsClipboard) expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(key);
+  const modal = page.getByTestId('upgrade-modal');
+  expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+
+  // It is still there on another visit, with nothing to buy and nothing to thank.
+  await page.reload();
+  await expect(page.getByTestId('editor')).toBeVisible();
+  await openUpgrade(page);
+  await expect(page.getByTestId('upgrade-key')).toHaveText(key);
+  await expect(page.getByTestId('upgrade-thanks')).toHaveCount(0);
+  await expect(modal.locator('input')).toHaveCount(0);
+  await expect(page.getByTestId('upgrade-buy')).toHaveCount(0);
+});
+
+test('a key bought without an account is entered in the modal, once somebody is logged in', async ({ page, request }) => {
+  const key = await boughtWithoutAccount(request);
+
+  // With nobody logged in the modal says a key needs an account, and leads to one.
+  await openEditor(page);
+  await openUpgrade(page);
+  await page.getByTestId('upgrade-to-key').click();
+  await expect(page.getByTestId('upgrade-key-form')).toHaveCount(0);
+  await page.getByTestId('upgrade-log-in').click();
+  await expect(page.getByTestId('upgrade-modal')).toHaveCount(0);
+  await expect(page.getByTestId('account-log-in')).toBeVisible();
+
+  await signedUp(page);
+  await page.getByTestId('account-close').click();
+  await openUpgrade(page);
+  await page.getByTestId('upgrade-to-key').click();
+  const form = page.getByTestId('upgrade-key-form');
+
+  await form.getByTestId('upgrade-key-input').fill('BOOM-00000-00000-00000-00000');
+  await form.getByTestId('upgrade-submit').click();
+  await expect(page.getByTestId('upgrade-problem')).toHaveText('That is not a license key I know.');
+  await expect(form.getByTestId('upgrade-submit')).toBeEnabled();
+
+  // Typed carelessly, it is still the key.
+  await form.getByTestId('upgrade-key-input').fill(` ${key.toLowerCase().replaceAll('-', ' ')} `);
+  await form.getByTestId('upgrade-submit').click();
+  await expect(page.getByTestId('upgrade-key')).toHaveText(key);
+  await expect(page.getByTestId('upgrade-notice')).toHaveText('That key is on this account now.');
+  expect((await upgrade(page.request)).upgraded).toBe(true);
+
+  // Closed and opened again, the key is still there and the notice has gone.
+  await page.getByTestId('upgrade-close').click();
+  await openUpgrade(page);
+  await expect(page.getByTestId('upgrade-notice')).toHaveCount(0);
+  await expect(page.getByTestId('upgrade-key')).toHaveText(key);
+});
+
+test('a lost key is asked for in the modal and emailed to the address that bought it', async ({ page, request }) => {
+  const address = newAddress();
+  const key = await boughtWithoutAccount(request, address);
+
+  await openEditor(page);
+  await openUpgrade(page);
+  await page.getByTestId('upgrade-to-lost').click();
+  const form = page.getByTestId('upgrade-lost-form');
+  await form.getByTestId('upgrade-email').fill(address);
+  await form.getByTestId('upgrade-submit').click();
+  // The answer names the address and does not say whether it bought anything.
+  await expect(page.getByTestId('upgrade-key-sent')).toContainText(`If ${address} bought the upgrade`);
+  await expect.poll(() => keysMailedTo(address)).toEqual([key, key]);
+
+  await page.getByTestId('upgrade-back').click();
+  await expect(page.getByTestId('upgrade-buy')).toBeVisible();
+});
+
 test.describe('until the upgrade is switched on', () => {
   // The server as the live site runs until UPGRADE_OPEN is set, with its
   // limits on. It has a database of its own and shares the outbox.
@@ -314,13 +468,24 @@ test.describe('until the upgrade is switched on', () => {
 
   const closedJson = { origin: CLOSED_URL, 'content-type': 'application/json' };
 
-  const checkouts = async () => ((await (await closed.get(`${FAKE_SERVICES_URL}/calls/upgrade`)).json()) as Checkout[]).length;
-
   test('nothing is sold', async () => {
-    const before = await checkouts();
+    const before = (await checkouts(closed)).length;
     expect(await upgrade(closed)).toEqual({ open: false, priceCents: 500, currency: 'usd', upgraded: false });
     await refused(await closed.post('/api/upgrade/checkout', { headers: closedJson }), 503, 'closed');
-    expect(await checkouts()).toBe(before);
+    expect(await checkouts(closed)).toHaveLength(before);
+  });
+
+  test('the modal says it is not open and offers nothing to press, even to someone sent back from Stripe', async ({ browser }) => {
+    const page = await browser.newPage({ baseURL: CLOSED_URL });
+    for (const address of ['/', '/?upgrade=open']) {
+      await page.goto(address);
+      await expect(page.getByTestId('editor')).toBeVisible();
+      if (address === '/') await openUpgrade(page);
+      const modal = page.getByTestId('upgrade-modal');
+      await expect(page.getByTestId('upgrade-closed')).toContainText('not open yet');
+      await expect(modal.locator('input, button:not([data-testid="upgrade-close"])')).toHaveCount(0);
+    }
+    await page.close();
   });
 
   test('a payment already made is still honoured, and its key is not sent twice in ten minutes', async () => {

@@ -269,9 +269,9 @@ webhooks registered (Printful's by `pnpm shop:webhook --register`).
 
 ## Upgrade
 
-A one-time payment of 5 dollars that gives a license key. Only the server
-side exists, and it is switched off: nothing on the page offers it, nothing
-checks for it yet, and which features it will unlock is not decided.
+A one-time payment of 5 dollars that gives a license key. The server side
+and its modal exist, and it is switched off: nothing checks for it yet, and
+which features it will unlock is not decided.
 
 - It sells nothing until `UPGRADE_OPEN` is `on` and Stripe's key and webhook
   secret are set. Until then `/api/upgrade/checkout` refuses.
@@ -287,9 +287,24 @@ checks for it yet, and which features it will unlock is not decided.
   to that address again, each at most once in ten minutes.
 - Licenses live in a `licenses` table (`apps/site/drizzle/0003_licenses.sql`).
   A deleted account leaves its license behind with its key free to use again.
+- The upgrade icon's modal (`packages/editor/src/ui/Upgrade.tsx`) asks
+  `GET /api/upgrade` when it is opened, never before. Closed, it says what it
+  has always said and offers nothing to press. Open, it shows the price and a
+  button that goes to Stripe, a way to enter a key (which needs an account,
+  so it leads to the account modal first), and a way to have a lost key
+  emailed again. An upgraded account sees its key, with a button to copy it.
+- Stripe sends the buyer back to `/?upgrade=paid`, or to `/?upgrade=open` if
+  they changed their mind; the modal opens on either and takes the parameter
+  out of the address. Someone back before Stripe's webhook has arrived is
+  thanked and not offered it again, and a logged-in buyer is looked up every
+  two seconds, for half a minute, until the key is on the account.
+- The modal's words for the open upgrade are stand-ins, and none of them says
+  what the upgrade unlocks. They are the owner's to write before it is sold.
 
 What has been checked: all of the above against the built server with its
-database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`). What
+database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`), the
+modal included, and the modal by hand on that same server at a computer's
+width and a phone's. What
 has not: anything against real Stripe or a real email, and nothing has
 written to the live database, which has had the empty `licenses` table
 since 2026-11-17, when the migration was run there.
@@ -305,7 +320,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed, and its modal: buying with and without an account, the wait for Stripe, the key shown and copied, a key entered, a lost key asked for, and the closed modal), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -444,7 +459,7 @@ are docked at the bottom of the screen.
 | --- | --- |
 | `engine/` | C++20 core with no voices of its own, C ABI, the CMake function that builds it for a machine, CTest suites with their test machine, and a render tool that plays an engine setup |
 | `packages/contracts/` | What every project document carries, and the saved-beat, shop and upgrade schemas |
-| `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
+| `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account, shop and upgrade modals, and the contract a machine fills in |
 | `packages/machine-ritm12/` | РИТМ-12, the machine the site is: its project schema, voices, panel, art, and the reader that opens the earlier machine's beats |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats, the shop and the upgrade |
 | `apps/mobile/` | A first slice of the phone apps: the editor with РИТМ-12 in a Capacitor shell for iOS and Android. See its `README.md` |

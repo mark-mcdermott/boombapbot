@@ -216,7 +216,12 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   shop (`api/store`, `api/webhooks`, Stripe and Printful) and the upgrade
   (`api/upgrade`, the same Stripe webhook). The modals that
   talk to it are `packages/editor/src/ui/Account.tsx` (with
-  `SavedBeats.tsx`) and `Shop.tsx`.
+  `SavedBeats.tsx`), `Shop.tsx` and `Upgrade.tsx`. A call to the site's own
+  server goes through `ask` (`account/ask.ts`), which reads an answer and a
+  refusal with the contracts' schemas; `account/beats.ts` and
+  `upgrade/client.ts` are built on it. What a form shares (one call at a
+  time, the line that says what went wrong, a button that reads as a link)
+  is `ui/attempt.tsx`.
 - `apps/mobile/` is the same editor with РИТМ-12 in a Capacitor shell for
   iOS and Android, a Vite page with no server behind it. Its sound is the
   web view's own worklet and WASM engine. `BoombapbotEditor` takes three
@@ -375,11 +380,14 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   icon keeps its `aria-label`. The moves are CSS that picks shapes inside
   lucide's icons by their order, so look at all eight after changing an icon
   or upgrading `lucide-react`.
-- The upgrade has a server (see Upgrade below) and nothing on the page: its
-  modal says it is not open and offers no form. Which features are paid is
-  not decided, so do not add a feature list or a promise to it. The
-  cart is the shop (`ui/Shop.tsx`); it shows products only when the server
-  says the shop is open.
+- The upgrade's modal is `ui/Upgrade.tsx` (see Upgrade below). While the
+  server says it is closed, which the live site does, it says it is not open
+  and offers no form; a browser test holds that. Which features are paid is
+  not decided, so do not add a feature list or a promise to it, open or
+  closed. The cart is the shop (`ui/Shop.tsx`); it shows products only when
+  the server says the shop is open.
+- The footer keeps whether the account modal is open, so that the upgrade's
+  modal can close itself and send somebody there to log in.
 - The cookie notice (`ui/CookieNotice.tsx`) is on the machine's page only and
   sits between the machine and the footer. It is taller than the gap there,
   so the footer sits lower until it is closed. Do not make it an overlay: it
@@ -536,14 +544,25 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   account `resolveUser` gave it. It is a question of its own on purpose:
   `resolveUser` never reads `licenses`, so accounts, saved beats and the
   shop run the same whether or not that table exists yet. The page asks
-  `GET /api/upgrade`. Like everything else, the machine must not wait on
-  the answer.
+  `GET /api/upgrade`, and only once the upgrade's modal is open. Like
+  everything else, the machine must not wait on the answer.
+- The modal never sells to someone who has just paid. Stripe's way back
+  (`?upgrade=paid`) and its webhook arrive in either order, so until the
+  server says the account is upgraded the modal thanks the buyer, hides the
+  button and asks again every two seconds for half a minute. Opened from
+  its icon it starts over. Entering a key needs an account, as the server
+  does; whether a key alone should unlock a device is not decided.
+- The words the modal uses while the upgrade is open, and the refusals it
+  shows from `src/server/upgrade.ts`, are stand-ins for the owner to
+  rewrite. The closed modal's words are the owner's and were not changed.
 - Asking for a key by email (`remindKeys`) answers the same whether or not
   the address bought anything, and marks a key as sent before sending it,
   so each goes out once in ten minutes. `AUTH_RATE_LIMIT=off`, which only
   the browser tests set, takes that wait away too.
 - The tests keep the fake's upgrade checkouts in a log of their own
   (`/calls/upgrade`), so they and the shop's tests can run side by side.
+  The modal's tests are in `e2e/upgrade.spec.ts` with the server's, in one
+  worker, because they read the last checkout from that log.
   The closed switch is tested on a second server the spec starts itself.
 
 **Written copy**

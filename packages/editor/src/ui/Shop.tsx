@@ -18,6 +18,7 @@ import { Minus, Plus, ShoppingCart } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type RefObject } from 'react';
 import { cart, useCart } from '../shop/cart';
 import { takeParams } from './arrival';
+import { Problem as SharedProblem } from './attempt';
 import { SelectField, TextField } from './fields';
 import { Modal } from './Modal';
 import { Segmented } from './Segmented';
@@ -131,13 +132,7 @@ function Amount({ label, cents, testId }: { label: string; cents: number; testId
   );
 }
 
-function Problem({ text }: { text: string | null }) {
-  return (
-    <p className="sb-form-problem" role="alert" data-testid="cart-problem">
-      {text}
-    </p>
-  );
-}
+const Problem = ({ text }: { text: string | null }) => <SharedProblem text={text} testId="cart-problem" />;
 
 function CartLines({ lines, onCheckOut }: { lines: PricedLine[]; onCheckOut(): void }) {
   if (lines.length === 0) {

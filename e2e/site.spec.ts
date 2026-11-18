@@ -49,14 +49,14 @@ test.describe('the page around the machine', () => {
       await expect(modal).toHaveCount(0);
       await expect(page.getByTestId(id)).toBeFocused();
     }
-    // Upgrades and the shop are not switched on, and they say so without offering a form.
+    // These pages are served as plain files with no server behind them. The
+    // upgrade's modal says it cannot reach one, without offering a form.
     await page.getByTestId('upgrade').click();
-    await expect(page.getByTestId('upgrade-modal')).toContainText('not open yet');
+    await expect(page.getByTestId('upgrade-unreachable')).toContainText('The machine does not need it');
     await expect(page.getByTestId('upgrade-modal').locator('input, button:not([data-testid="upgrade-close"])')).toHaveCount(0);
     await page.getByTestId('upgrade-close').click();
     await page.getByTestId('account').click();
-    // These pages are served as plain files with no server behind them. The
-    // account modal says it cannot reach one, and the machine carries on.
+    // The account modal says the same, and the machine carries on.
     await expect(page.getByTestId('account-unreachable')).toContainText('The machine does not need it');
     await expect(page.getByTestId('account-modal').locator('input')).toHaveCount(0);
     await expect(page.getByTestId('account-retry')).toBeVisible();
