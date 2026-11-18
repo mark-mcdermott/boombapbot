@@ -39,7 +39,8 @@ in this file has been built unless it says so.
 
 Accounts are built: sign-up with a confirmed address, log-in, log-out and
 password reset, in the account modal, and saving beats to an account. The
-upgrade still opens a modal that says it is not open.
+upgrade's server side is built and switched off; its icon still opens a
+modal that says it is not open.
 
 - **Accounts are live.** The Neon database has its tables, and Vercel has
   the Resend key, the sending address and its own `BETTER_AUTH_SECRET`. On
@@ -97,9 +98,50 @@ upgrade still opens a modal that says it is not open.
   paid feature, with a license key the buyer is given and can retrieve later.
   Paid features are the stranger effects (delay, compression and the like),
   perhaps a place to show beats, and AI add-ons that are not defined yet;
-  ordinary effects (distortion, a flanger and the like) stay free. None of it
-  exists. The engine now has an echo, a reverb, a flanger and a chorus, made
-  for РИТМ-12 and tuned by ear by nobody yet; which are paid is still loose.
+  ordinary effects (distortion, a flanger and the like) stay free. The
+  engine now has an echo, a reverb, a flanger and a chorus, made for
+  РИТМ-12 and tuned by ear by nobody yet; which are paid is still loose.
+  Decided on 2026-11-17: a key is `BOOM` and four groups of five; it is
+  emailed and can be read from the account, or emailed again to the address
+  that paid; buying needs no account; a license outlives its account.
+  The server side is built to those decisions and switched off: a Stripe
+  checkout, one license and one emailed key for one payment, a route to
+  enter a key in an account, routes to get it back, and `isUpgraded`
+  beside the session. It has only run in the tests. What is left, in order:
+  - **Run the migration.** `apps/site/drizzle/0003_licenses.sql` adds the
+    `licenses` table and has not been run on Neon. Nothing that is live
+    reads that table, so the code can be deployed first; the routes under
+    `api/upgrade` fail until it is run, and it has to be before
+    `UPGRADE_OPEN` is set.
+  - **Decide which features are paid,** then gate them. Nothing reads
+    `isUpgraded` yet. To settle with it: whether a key alone unlocks a device
+    with nobody logged in, and how a paid feature behaves with no server,
+    since the machine has to work without one.
+  - **The modal.** The upgrade icon's modal needs its real contents: the
+    price from `GET /api/upgrade`, a button that posts to
+    `/api/upgrade/checkout` and follows the address it answers, the way
+    back from Stripe (`/?upgrade=paid` and `/?upgrade=open`, which nothing
+    reads yet), somewhere to enter a key, a way to ask for a lost one, and
+    the key shown to an upgraded account. All of its words are the owner's
+    to write, and so is the wording of the key's two emails
+    (`src/server/email.ts`), the name Stripe shows (`PRODUCT_NAME` in
+    `api/upgrade/checkout.ts`) and the refusals in `src/server/upgrade.ts`,
+    which are plain stand-ins.
+  - **Policies.** Before it is sold the page has to say what the upgrade
+    costs, how a refund for it works, and that a license keeps the buyer's
+    email and its Stripe payment's id, and stays after the account is
+    deleted.
+  - **Open it.** Set `UPGRADE_OPEN=on` in Vercel and deploy. The Stripe
+    webhook already registered for the shop is the one it uses; nothing
+    changes in the Stripe dashboard.
+  - **Refunds.** Refunding the payment in Stripe does not take the key
+    back. That needs a column to mark a license withdrawn and a case in
+    the webhook, once there is a refund policy.
+  - The key-by-email route has no limit of its own beyond one email per key
+    in ten minutes, and it answers sooner for an address that bought
+    nothing than for one that did, which a patient stranger could time.
+  - A paid upgrade that raises the beat limit would want the count and the
+    insert in `api/beats` in one statement first (see saved beats above).
 - **The shop** has been open on the live site since 2026-11-16. The catalog
   holds the two products in the Printful store, a hoodie and a sticker, and
   ships wherever Printful does, at Printful's live rate for the address.

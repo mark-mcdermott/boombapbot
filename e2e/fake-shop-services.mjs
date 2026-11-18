@@ -7,13 +7,17 @@
 //   POST /shipping/rates          Printful: what shipping costs to an address
 //   POST /orders                  Printful: a draft order
 //   POST /orders/:id/confirm      Printful: go ahead
-//   GET  /calls                   what has been asked so far
+//   GET  /calls                   what the shop has asked so far
+//   GET  /calls/upgrade           the checkouts for the upgrade, kept apart so
+//                                 the shop's tests and the upgrade's can run
+//                                 side by side and each count only its own
 //   POST /fail-next-confirm       the next confirm answers 500
 
 import { createServer } from 'node:http';
 
 const port = Number(process.argv[2] ?? 4175);
 const calls = [];
+const upgradeCalls = [];
 let nextId = 1000;
 let failNextConfirm = false;
 
@@ -36,6 +40,7 @@ createServer(async (request, response) => {
   const text = await read(request);
 
   if (request.method === 'GET' && pathname === '/calls') return answer(response, 200, calls);
+  if (request.method === 'GET' && pathname === '/calls/upgrade') return answer(response, 200, upgradeCalls);
   if (request.method === 'POST' && pathname === '/fail-next-confirm') {
     failNextConfirm = true;
     return answer(response, 200, { ok: true });
@@ -44,7 +49,8 @@ createServer(async (request, response) => {
   if (request.method === 'POST' && pathname === '/v1/checkout/sessions') {
     const form = Object.fromEntries(new URLSearchParams(text));
     const id = `cs_test_${nextId++}`;
-    calls.push({ service: 'stripe', call: 'checkout', id, form });
+    const log = form['metadata[purpose]'] === 'upgrade' ? upgradeCalls : calls;
+    log.push({ service: 'stripe', call: 'checkout', id, form });
     // The buyer "pays" straight away and is sent where a real checkout would send them.
     return answer(response, 200, { id, object: 'checkout.session', url: form.success_url });
   }

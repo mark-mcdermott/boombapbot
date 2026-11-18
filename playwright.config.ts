@@ -1,18 +1,8 @@
-import { randomBytes } from 'node:crypto';
 import { defineConfig, devices } from '@playwright/test';
-import {
-  ACCOUNTS_PORT,
-  ACCOUNTS_URL,
-  FAKE_SERVICES_PORT,
-  FAKE_SERVICES_URL,
-  OUTBOX,
-  PRINTFUL_WEBHOOK_SECRET,
-  SHOP_FIXTURE,
-  STRIPE_WEBHOOK_SECRET,
-} from './e2e/accounts-server';
+import { ACCOUNTS_PORT, ACCOUNTS_URL, FAKE_SERVICES_PORT, FAKE_SERVICES_URL, serverEnv } from './e2e/accounts-server';
 
 const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
-const withServer = /(accounts|beats|shop)\.spec\.ts/;
+const withServer = /(accounts|beats|shop|upgrade)\.spec\.ts/;
 // РИТМ-12's tests of its own panel are in e2e/ritm12. The tests in the e2e
 // folder itself are the site's, and drive the same machine.
 const panel = /\/ritm12\/.*\.spec\.ts/;
@@ -29,7 +19,7 @@ const projects = [
 //
 // Most of them use apps/site/dist/client served as plain static files, which
 // is how the machine has to work: with no server behind it at all. The
-// accounts and shop tests use the built server instead, with a database that
+// accounts, shop and upgrade tests use the built server instead, with a database that
 // lives in memory, an outbox folder in place of real email, and a fake that
 // answers for Stripe and Printful. So do the saved beats tests.
 export default defineConfig({
@@ -57,21 +47,10 @@ export default defineConfig({
       command: 'node apps/site/dist/server/entry.mjs',
       url: `${ACCOUNTS_URL}/api/auth/ok`,
       env: {
-        HOST: '127.0.0.1',
-        PORT: String(ACCOUNTS_PORT),
-        PUBLIC_SITE_URL: ACCOUNTS_URL,
-        DATABASE_URL: 'pglite:memory',
-        BETTER_AUTH_SECRET: randomBytes(32).toString('base64'),
-        EMAIL_OUTBOX: OUTBOX,
+        ...serverEnv(ACCOUNTS_PORT),
         // Every test signs up from one address, faster than the limiter allows.
         AUTH_RATE_LIMIT: 'off',
-        SHOP_CATALOG: SHOP_FIXTURE,
-        STRIPE_SECRET_KEY: randomBytes(16).toString('hex'),
-        STRIPE_WEBHOOK_SECRET,
-        STRIPE_API_URL: FAKE_SERVICES_URL,
-        PRINTFUL_API_KEY: randomBytes(16).toString('hex'),
-        PRINTFUL_WEBHOOK_SECRET,
-        PRINTFUL_API_URL: FAKE_SERVICES_URL,
+        UPGRADE_OPEN: 'on',
       },
       // Never reused: its database and its secret belong to one run.
       reuseExistingServer: false,

@@ -4,6 +4,7 @@ import { STRIPE_WEBHOOK_SECRET } from 'astro:env/server';
 import { fulfil } from '../../../server/shop/fulfil';
 import { getStripe } from '../../../server/shop/stripe';
 import { json } from '../../../server/site';
+import { isUpgrade, issueLicense } from '../../../server/upgrade';
 
 export const prerender = false;
 
@@ -22,7 +23,8 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
-    await fulfil(event.data.object);
+    const session = event.data.object;
+    await (isUpgrade(session) ? issueLicense(session) : fulfil(session));
   }
   return json({ received: true });
 };

@@ -22,6 +22,13 @@
       "when": 1794858166478,
       "tag": "0002_beats",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794974217891,
+      "tag": "0003_licenses",
+      "breakpoints": true
     }
   ]
 }
