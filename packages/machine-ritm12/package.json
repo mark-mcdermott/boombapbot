@@ -1,0 +1,7 @@
+{
+  "name": "@boombapbot/machine-ritm12",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "РИТМ-12: so far its eight voices for the engine. Its project document and panel come next."
+}

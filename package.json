@@ -21,7 +21,7 @@
     "dev": "node scripts/prepare-assets.mjs --dev && pnpm --filter @boombapbot/site dev",
     "build": "node scripts/prepare-assets.mjs && pnpm --filter @boombapbot/site build && node scripts/check-build.mjs",
     "preview": "pnpm --filter @boombapbot/site preview",
-    "typecheck": "tsc --noEmit -p packages/contracts && tsc --noEmit -p packages/editor && tsc --noEmit -p packages/machine-808 && tsc --noEmit -p e2e && pnpm --filter @boombapbot/site check",
+    "typecheck": "tsc --noEmit -p packages/contracts && tsc --noEmit -p packages/editor && tsc --noEmit -p packages/machine-808 && tsc --noEmit -p packages/machine-ritm12 && tsc --noEmit -p e2e && pnpm --filter @boombapbot/site check",
     "test": "pnpm test:engine && pnpm test:unit && pnpm test:e2e",
     "test:engine": "ctest --test-dir build/native --output-on-failure",
     "test:unit": "vitest run",
