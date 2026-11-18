@@ -191,9 +191,14 @@ modal that says it is not open.
   not legal advice; nobody qualified has read it. It says no sales tax or
   VAT is collected, which is true of the site and is not a view on what the
   owner owes. Update it again before the upgrade is sold.
-- **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own text, put
-  in word for word on 2026-11-15, "for now". It mentions a small paid tier,
-  which does not exist yet; the shop is the only thing with a price.
+- **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own position.
+  Their first text went in word for word on 2026-11-15. On 2026-11-18 they
+  asked for its wording to be gone over, and what is there now is that
+  rewrite: the same claims in the same order, in four short paragraphs. It
+  no longer speaks of a paid tier, which did not exist; it says the machine
+  has a shop, which it does. It ends on thinking about all this and names
+  nothing done about it; if there is something, that sentence is the
+  owner's to write.
 - **The pages of words** were laid out again on 2026-11-17: a compact
   masthead that names the pages, headings in a rail, About opening on a
   still of the machine, and the manifesto as one narrow column. Left for the
@@ -207,8 +212,6 @@ modal that says it is not open.
     and "Who made it" moved up to third. No claim was added.
   - Whether "Docs" should be called "Manual".
   - Whether the manifesto is signed. It is not.
-  - The manifesto speaks of a small paid tier while About says upgrades are
-    not here yet. Neither was changed.
   - Credits is still blank.
 
 ## Native shells
