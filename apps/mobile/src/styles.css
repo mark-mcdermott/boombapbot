@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+@import '@boombapbot/editor/styles.css';
+
+/* The editor's classes live in the workspace package. */
+@source '../../../packages/editor/src';
+
+html {
+  color-scheme: dark;
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  /* The page runs under the status bar and the rounded corners. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  background:
+    radial-gradient(1200px 500px at 50% -180px, rgb(255 255 255 / 0.05), transparent 70%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  /* An app does not bounce past its edges or pop up a menu on a long press. */
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
+}
+
+/* On the site the brand links home. Here it is home, and following it would start the machine again. */
+.sb-brand-link {
+  pointer-events: none;
+}
+
+/* What scrolls past the top must not show through the status bar. It sits over the page and under a modal's backdrop. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 42;
+  height: env(safe-area-inset-top);
+  background: var(--color-bg);
+}

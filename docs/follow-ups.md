@@ -205,11 +205,25 @@ native engine instance.
 
 ### Capacitor (iOS and Android)
 
-Prerequisites:
+A first slice is built in `apps/mobile`: the editor with РИТМ-12 in a
+Capacitor shell, playing through the web view's own worklet and WASM
+engine, with the draft kept in the device's own store and no accounts,
+saved beats or shop. On 2026-11-17 it ran in an iPhone simulator (the
+machine shown, a beat playing, the draft back after a relaunch) and its
+Android debug build succeeded without being run. Nobody has listened to it
+or held it on a phone. `apps/mobile/README.md` lists what is not right yet
+(export does nothing there, the words are the site's, the sideways layout,
+a stand-in icon) and what a store needs: signing, accounts in the app with
+the delete step both stores require, Apple's rule on selling the upgrade,
+and Google Play's closed test of 12 testers for 14 days.
+
+What a native audio bridge needs, in place of the web view's sound:
 
 - Xcode with an Apple developer team, and Android Studio with the NDK. Neither
   is available on Linux CI for iOS; iOS needs a macOS runner.
-- A Capacitor plugin (`apps/mobile`) exposing the `EngineCommand` messages.
+- A Capacitor plugin in `apps/mobile` exposing the `EngineCommand` messages.
+  `AudioController` is made inside `EditorRuntime`, which needs a way to be
+  handed another one.
   - iOS: `AVAudioEngine` with an `AVAudioSourceNode` whose render block calls
     `snare_engine_render`. Configure `AVAudioSession` for playback and handle
     interruptions and route changes by reopening at the new sample rate.
@@ -221,11 +235,8 @@ Prerequisites:
   device's sample rate instead of receiving PCM over the bridge.
 - Position and stats reports throttled across the bridge. The worklet already
   reports at most once per step and ten times a second for stats.
-- Decide draft storage: Web Storage inside the WebView is not durable enough
-  on iOS. `draft-storage.ts` takes a `KeyValueStorage`, so a native-backed
-  implementation can be dropped in.
 
-Unverified: everything. No Capacitor project exists yet.
+Unverified: the bridge is not started.
 
 ### Tauri (Windows and macOS)
 
