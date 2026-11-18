@@ -1,16 +1,15 @@
-import { BookOpen, HandFist, Heart, Info, Scale, ScrollText, Sparkles } from 'lucide-react';
+import { BookOpen, Heart, Info, Scale, ScrollText, Sparkles } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
 import { Account } from './Account';
 import { Modal } from './Modal';
-import { SITE_PAGES, type SitePageId } from './pages';
+import { SITE_PAGES, type ListedPageId, type SitePageId } from './pages';
 import { Shop } from './Shop';
 import { Tip, TipGroup } from './Tip';
 
-const PAGE_ICONS: Record<SitePageId, ReactNode> = {
+const PAGE_ICONS: Record<ListedPageId, ReactNode> = {
   about: <Info />,
   docs: <BookOpen />,
-  manifesto: <HandFist />,
-  credits: <ScrollText />,
+  manifesto: <ScrollText />,
   policies: <Scale />,
 };
 
@@ -27,7 +26,7 @@ interface FooterProps {
 
 /**
  * The row under every page: who made it, then the pages (about, docs,
- * manifesto, credits, policies) and the buttons (upgrade, cart, settings,
+ * manifesto, policies) and the buttons (upgrade, cart, settings,
  * account).
  */
 export function Footer({ baseUrl, container, current, settings }: FooterProps) {

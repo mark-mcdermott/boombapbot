@@ -320,7 +320,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   (`packages/editor/src/ui/Settings.tsx`).
 - `Header` (the brand: mascot over the tagline, together as tall as the
   wordmark beside them) and
-  `Footer` (About, Docs, manifesto, credits, policies, upgrade, cart,
+  `Footer` (About, Docs, manifesto, policies, upgrade, cart,
   settings, account) are shared. On the machine's page the header is the
   brand alone.
 - `SitePage` wraps a page of words; About, Docs, the manifesto, Credits and
@@ -351,7 +351,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   they were taken; take them again if the panel's art changes. The words on
   About are the owner's to edit.
 - Credits is blank until the owner writes it. The ruled outline on it
-  (`.sb-blank`) is drawn in CSS and holds no words.
+  (`.sb-blank`) is drawn in CSS and holds no words. Nothing leads to it
+  while it is blank: it is left out of `SITE_PAGES`, so neither the
+  masthead nor the footer names it, and its page stands at `/credits`. Put
+  it back in that list, with an icon in `Footer.tsx`, when it has words.
 - On the machine's page the footer sits 50px under the machine
   (`--footer-drop`, `.sb-below-machine`). On a page of words it follows the
   words, so a short page ends where its words do. Keep
@@ -362,7 +365,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
   and a move of its own when pointed at. The tip is for the eye only: the
   icon keeps its `aria-label`. The moves are CSS that picks shapes inside
-  lucide's icons by their order, so look at all nine after changing an icon
+  lucide's icons by their order, so look at all eight after changing an icon
   or upgrading `lucide-react`.
 - The upgrade has a server (see Upgrade below) and nothing on the page: its
   modal says it is not open and offers no form. Which features are paid is
