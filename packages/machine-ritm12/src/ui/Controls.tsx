@@ -157,7 +157,8 @@ export interface KnobWiring {
 /**
  * What turns a knob: dragged up and down, turned with the arrow keys, put
  * back with a double click. Each change goes to the machine and is said on
- * its screen. Spread `bind` on the knob's element.
+ * its screen. Pressed, a knob says where it stands, so a touch is enough to
+ * learn what it is. Spread `bind` on the knob's element.
  */
 export function useTurning(wiring: KnobWiring) {
   const { value } = wiring;
@@ -189,6 +190,7 @@ export function useTurning(wiring: KnobWiring) {
       onPointerDown(event: PointerEvent<HTMLElement>) {
         setDragging(true);
         knob.onPointerDown(event);
+        readout.say(wiring.shown(value), `${wiring.label}: ${wiring.spoken(value)}`);
       },
       onPointerUp() {
         setDragging(false);

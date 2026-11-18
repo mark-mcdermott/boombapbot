@@ -46,8 +46,10 @@ export interface Wiring {
   readout: Readout;
   /** The line a control last put on the screen. */
   line: { current: ScreenLine };
-  /** The same, in English, for a screen reader. */
+  /** The same, in English: for a screen reader, and for whoever can see the lettering but not read it. */
   spoken: string;
+  /** How many lines have been said. It moves on even when the same line is said again. */
+  said: number;
   power: boolean;
   powerLamp: LampWiring;
   /** Where each stepped control stands. */
@@ -79,7 +81,7 @@ export function useWiring(): Wiring {
   const step = useEditorState((state) => state.currentStep);
   const playingPattern = useEditorState((state) => state.currentPattern);
   const recording = useEditorState((state) => state.transient.recording);
-  const [spoken, setSpoken] = useState('');
+  const [said, setSaid] = useState({ text: '', count: 0 });
   const [taps, setTaps] = useState<Partial<Record<VoiceId, number>>>({});
   const line = useRef<ScreenLine>({ text: '', until: 0 });
   const frame = useRef<HTMLDivElement>(null);
@@ -89,7 +91,7 @@ export function useWiring(): Wiring {
     () => ({
       say(onScreen, english) {
         line.current = { text: onScreen, until: performance.now() + LINE_MS };
-        setSpoken(english);
+        setSaid((now) => ({ text: english, count: now.count + 1 }));
       },
       art: (file) => (artBase ? runtime.assetUrl(`${artBase}${file}`) : null),
     }),
@@ -191,7 +193,10 @@ export function useWiring(): Wiring {
       pressed: power,
       lit: power,
       data: { 'data-rocker': 'true' },
-      onPress: () => runtime.setPower(!power),
+      onPress: () => {
+        runtime.setPower(!power);
+        readout.say(power ? 'СЕТЬ ВЫКЛ' : 'СЕТЬ ВКЛ', power ? 'Power off' : 'Power on');
+      },
     },
     play: { label: 'Play', testId: 'play', lit: playing, pressed: playing, onPress: () => void runtime.play() },
     stop: { label: 'Stop', testId: 'stop', onPress: () => runtime.stop() },
@@ -278,7 +283,8 @@ export function useWiring(): Wiring {
     frame,
     readout,
     line,
-    spoken,
+    spoken: said.text,
+    said: said.count,
     power,
     powerLamp: { glow: power ? 0.9 : 0, testId: 'lamp-power' },
     write: panel.write,
