@@ -38,7 +38,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   It needs `pnpm exec playwright install chromium` once on a new machine.
 - One engine test binary: `./build/native/test_scheduler` (also `timeline`,
   `pattern_bank`, `sequencer`, `accent`, `voices`, `choke`, `midi`, `sound_map`,
-  `realtime`, `synth`).
+  `realtime`, `synth`, `swing`, `fx`, and `test_ritm12_voices`).
 - One Vitest file: `pnpm exec vitest run packages/machine-808/test/engine.test.ts`.
 - One Playwright file: `pnpm exec playwright test e2e/hardware.spec.ts`.
 - VST3 spike: `cmake -S plugins/vst3 -B build/vst3 -G Ninja`, then
@@ -48,9 +48,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 - `engine/` is the only audio engine: a C++20 drum machine core behind a C
   ABI (`engine/include/boombapbot/engine.h`). It holds a bank of 32 patterns,
-  twelve tracks (the accent and eleven instruments), sixteen sound slots, the
-  808's synthesiser and a mix bus. It builds natively and to WebAssembly from
-  the same sources. Do not add a second engine in JavaScript, even to work
+  twelve tracks (the accent and up to eleven instruments), sixteen sound
+  slots and a mix bus, with swing by pattern, one effect on the mix and an
+  output level for a meter. It builds natively and to WebAssembly from the
+  same sources. Do not add a second engine in JavaScript, even to work
   around a failing WASM build.
 - A machine is one package, and the rest is core that knows no machine.
   `packages/machine-808/` is the 808: its project document
@@ -80,6 +81,23 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   The engine's test suites and render tool are still written against the
   808's project and track table, so the 808's `engine/CMakeLists.txt` builds
   them (`boombapbot-render-808 --project FILE --machine packages/machine-808`).
+- `packages/machine-ritm12/` is РИТМ-12. So far it is its eight voices
+  (`engine/voices.cpp`: pitch, tone and decay; their place in the table is
+  their sound number, never reorder) and their tests. What voices are built
+  from is shared in `engine/include/boombapbot/dsp.h`.
+- Swing is a byte of the pattern (`SnarePattern.swing`, 0 to
+  `SNARE_SWING_MAX`): every second step of a measure of four or eight steps
+  to the beat plays late by `swing / 256` of a step, in the engine and in a
+  MIDI export alike. The bar line never swings, and triplets do not.
+- The effect on the mix (`engine/src/fx.h`, `snare_engine_set_effect`) is an
+  echo, a reverb, a flanger or a chorus, added ahead of the limiter. It keeps
+  the engine's promises: every buffer is allocated when the engine is made,
+  state moves a sample at a time, and nothing calls the C library's maths
+  per sample. With no effect set it does not touch the samples, which is what
+  keeps the 808's output as it was. An offline loop is played often enough
+  for the effect's tail to settle (`loopPasses`), without changing its length.
+- `snare_engine_output_level` is the root mean square of the output over
+  about a third of a second, after the volume: what a meter shows.
 - `scripts/prepare-assets.mjs` and `scripts/check-build.mjs` work for one
   machine, named by `BOOMBAPBOT_MACHINE` like the site's alias (the 808 when
   unset). The asset manifest says which machine the build is.
@@ -162,8 +180,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   a role's `index` in `packages/machine-808/data/roles.json` is its sound slot
   and the synthesiser's sound number. Never reorder or reuse either.
 - A step is on or off. Loudness comes from the accent track and the level
-  knobs. There is no per-step velocity and no swing; do not bring them back
-  as a convenience.
+  knobs. There is no per-step velocity; do not bring it back as a
+  convenience. The 808 has no swing either: its patterns leave the engine's
+  swing at 0.
 - The engine's pattern for a rhythm is `rhythm * 2`, plus one for its B
   version (`patternIndex`).
 - The instrument selector chooses a rhythm track in play and compose, and a
