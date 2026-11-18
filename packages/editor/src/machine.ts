@@ -60,6 +60,11 @@ export interface Machine<
   /** What an export holds, or why there is nothing to export. */
   exportPlan(project: Document): ExportPlan | { error: string };
   session(host: MachineHost<Document, Transient>): Session;
+  /**
+   * The machine itself. A panel that puts its own start button within a
+   * thumb's reach on a phone sets `data-own-transport` on its outermost
+   * element, and the editor then leaves its docked start button out.
+   */
   Panel: ComponentType;
   /** The machine's own buttons in settings, after undo and redo. */
   SettingsActions: ComponentType;

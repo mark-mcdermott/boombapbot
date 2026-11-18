@@ -304,7 +304,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the phone layout, the phone's panel behind its link (its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
@@ -353,6 +353,11 @@ Two cross-checks worth knowing about:
   iPhone in Safari and in Firefox, and in desktop Chrome. Firefox and Safari
   on a Mac and an Android phone have not shown it. Everything automated runs
   in headless Chromium, the phone layout in its device emulation.
+- **The phone's panel.** It has run only in headless Chromium, in a
+  390 by 844 touch screen and in screenshots at 360 and 430 wide. No real
+  phone has shown it, nobody has dragged its knobs with a thumb, and nobody
+  has listened through it. The phone app in `apps/mobile` cannot reach it:
+  it is chosen by the page's address, and the app has none to add to.
 - **The pages of words.** Their layout was looked at in Chromium only, at
   375px, 768px and 1280px wide, in screenshots of the production build. No
   real phone, Safari or Firefox has shown them, and nobody has read them
@@ -416,6 +421,11 @@ and nothing from it reaches a build.
 On a phone the picture keeps a size that can be worked and scrolls sideways,
 or fits the screen at the press of a button. An instrument strip sits under
 it, and play and the tempo are docked at the bottom of the screen.
+
+A panel made for a phone is being tried behind a link: add `?panel=phone` to
+the page's address. It is the same machine laid out as a column of
+thumb-sized keys, with the knobs behind three tabs, built from parts cut from
+the picture. It is a preview and replaces nothing yet.
 
 ## Layout
 

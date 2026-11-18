@@ -114,9 +114,32 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   control's accessible name is English, and a control that moves says what
   it did in an `aria-live` line as well as on the machine's screen. The
   mouse wheel must not turn a knob: it would hijack scrolling the page.
+- The panel has two views of one wiring. `ui/wiring.ts` (`useWiring`) reads
+  the machine's state once and makes every control's name, state and action
+  from it; `PicturePanel` (in `ui/Panel.tsx`) and `ui/PhonePanel.tsx` only
+  draw it, through the same `Key`, `Lamp` and knob code in `ui/Controls.tsx`.
+  A control is added or changed in the wiring, never in one view alone, and
+  a control keeps one test id in both.
+- The phone's panel is a preview: a page opened with `?panel=phone` shows it,
+  at any width, and every other page shows the picture. It is not the
+  picture shrunk. The page lays out parts cut from the picture
+  (`art/phone/`) in a column: nameplate, screen, the eight voices, the step
+  keys with the write switch, patterns with dice and clear, the transport
+  and mute, and three tabs (voice, tempo, effect) that hold the knobs. Its
+  styles are the `.rt-ph` part of `src/styles.css`, in the page's own
+  pixels; a knob's body and pointer line are a piece of the picture shrunk
+  about the knob's centre (`PHONE_KNOBS` in `ui/layout.ts`). Its paint and
+  rust are drawn in CSS until the owner paints a blank plate. The lettering
+  is drawn by the stylesheet (`Lettered`), as paint is, so it is not text of
+  the page; names stay English, with the lettering after a tab's name as it
+  is after a key's. The screen is the same drawing in a second shape
+  (`PHONE_SCREEN` in `ui/Screen.tsx`); keep `PICTURE_SCREEN` as it is
+  painted. It sets `data-own-transport`, which tells the editor to leave the
+  docked start button out.
 - Its art is `art/` in its package: `plate.webp`, `patch/` and `pointer/`,
   with where it comes from in `art/README.md`. `art/cut-art.py` cuts it
-  from the owner's pictures in the git-ignored `misc/assets/ritm12/`; do not
+  from the owner's pictures in the git-ignored `misc/assets/ritm12/`, and
+  `art/cut-phone-parts.py` cuts `phone/` from what that made; do not
   edit the cut files by hand. A build ships every image in the machine's
   `art/` folder, served under `machines/<id>/` and named by
   `art` in the asset manifest; `check-build` fails a build whose art is not
@@ -348,6 +371,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   must never cover a control.
 - What stays on the page with the machine: import and error notices, and on
   a phone the instrument strip, the fit button and the docked start button.
+  The phone's panel has keys of its own for all three and shows none of them.
 - A panel's power switch makes everything else on it `inert`.
 - Browser tests reach buried controls through `openSettings`
   (`e2e/helpers.ts`), and РИТМ-12 through `beat`, `step` and its test ids
