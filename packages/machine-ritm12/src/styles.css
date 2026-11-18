@@ -1,0 +1,328 @@
+/* РИТМ-12's panel. The editor's own stylesheet has everything around it.
+
+   The stage is exactly as large as the picture, 2000 by 1333, so every
+   length on it below is in the picture's own pixels. The stage as a whole is
+   shrunk to fit its frame. */
+
+.rt-machine {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rt-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-line-soft);
+  border-radius: var(--radius);
+  background: #0b0906;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rt-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2000 / 1333;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rt-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2000px;
+  height: 1333px;
+  transform-origin: 0 0;
+}
+
+.rt-plate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* The controls take no box of their own: their children sit on the stage. */
+.rt-controls,
+.rt-group {
+  display: contents;
+}
+
+/* ---- Keys ---------------------------------------------------------------- */
+
+.rt-key {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rt-key[data-round] {
+  border-radius: 50%;
+}
+
+.rt-key[aria-disabled='true'] {
+  cursor: default;
+}
+
+.rt-key:focus-visible,
+.rt-knob:focus-visible {
+  outline: 3px solid #ffd27a;
+  outline-offset: 4px;
+}
+
+.rt-key::before,
+.rt-key::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.rt-key::before {
+  inset: 0;
+  border-radius: inherit;
+}
+
+.rt-key::after {
+  inset: -30px;
+  border-radius: 40px;
+  mix-blend-mode: screen;
+}
+
+.rt-key:active::before {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.28);
+  mix-blend-mode: multiply;
+}
+
+/* A lit key: the picture's own key shows through an amber wash, with its glow
+   spilling on the panel around it. */
+.rt-key[data-lit]::before {
+  opacity: 1;
+  mix-blend-mode: overlay;
+  background: radial-gradient(ellipse at 50% 40%, #ffe9a8 0%, #ffb23f 30%, #ff8410 70%, #d96a05 100%);
+}
+
+.rt-key[data-lit]::after {
+  opacity: 1;
+  background: radial-gradient(closest-side, rgba(255, 150, 40, 0.5), rgba(255, 120, 20, 0.16) 62%, transparent);
+}
+
+.rt-key[data-red][data-lit]::before {
+  background: radial-gradient(ellipse at 50% 40%, #ffd9c8 0%, #ff6a4a 30%, #e3260e 70%, #a81200 100%);
+}
+
+.rt-key[data-red][data-lit]::after {
+  background: radial-gradient(closest-side, rgba(255, 70, 40, 0.5), rgba(255, 40, 20, 0.16) 62%, transparent);
+}
+
+/* The step sounding now. */
+.rt-key[data-now]:not([data-lit])::before {
+  opacity: 1;
+  mix-blend-mode: soft-light;
+  background: rgba(255, 244, 214, 0.95);
+}
+
+.rt-key[data-now][data-lit] {
+  filter: brightness(1.22);
+}
+
+/* A step the measure does not reach. */
+.rt-key[data-unused]::before {
+  opacity: 1;
+  mix-blend-mode: multiply;
+  background: rgba(20, 16, 8, 0.62);
+}
+
+.rt-key[data-blink][data-lit]::before,
+.rt-key[data-blink][data-lit]::after {
+  animation: rt-blink 0.5s steps(2, jump-none) infinite;
+}
+
+@keyframes rt-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* The power rocker glows through its paddle, not its bezel. */
+.rt-key[data-rocker]::before {
+  inset: 19px 21px 6px 21px;
+  border-radius: 5px;
+}
+
+.rt-key[data-rocker][data-lit]::before {
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse at 50% 46%, rgba(255, 150, 110, 0.85), rgba(255, 46, 14, 0.55) 62%, rgba(140, 0, 0, 0.2) 100%);
+}
+
+.rt-key[data-rocker][data-lit]::after {
+  background: radial-gradient(closest-side, rgba(255, 50, 20, 0.45), transparent);
+}
+
+/* ---- Lamps --------------------------------------------------------------- */
+
+.rt-lamp {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: var(--rt-glow, 0);
+  mix-blend-mode: screen;
+  background: radial-gradient(circle at 46% 42%, #ffe0cc 0%, #ff5a36 34%, #d21a00 68%, transparent 72%);
+}
+
+.rt-lamp::after {
+  content: '';
+  position: absolute;
+  inset: -160%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 70, 36, 0.55), rgba(255, 50, 20, 0.14) 55%, transparent);
+}
+
+/* ---- Stepped controls ---------------------------------------------------- */
+
+/* A stepped control shows another picture of itself for each position. */
+.rt-patch {
+  position: absolute;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.rt-patch[data-shown] {
+  visibility: visible;
+}
+
+/* ---- Knobs --------------------------------------------------------------- */
+
+.rt-knob {
+  position: absolute;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.rt-knob[data-dragging] {
+  cursor: grabbing;
+}
+
+/* The knob's body and the light on it stay as painted. Only this pointer
+   line, a picture of its own, turns. */
+.rt-hand {
+  position: absolute;
+  background: center / 100% 100% no-repeat;
+  transition: transform 0.16s ease-out;
+  pointer-events: none;
+}
+
+.rt-knob[data-dragging] .rt-hand {
+  transition: none;
+}
+
+/* ---- Screen -------------------------------------------------------------- */
+
+.rt-screen {
+  position: absolute;
+  border-radius: 48px / 44px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rt-screen canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  filter: blur(0.35px);
+}
+
+.rt-screen-lines {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.3) 2px 3px);
+}
+
+.rt-frame[data-power='on'] .rt-screen-lines {
+  opacity: 1;
+}
+
+.rt-screen-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(ellipse 62% 38% at 28% 10%, rgba(255, 255, 255, 0.075), transparent 70%);
+  box-shadow: inset 0 0 44px 16px rgba(0, 0, 0, 0.86);
+}
+
+/* ---- Meter --------------------------------------------------------------- */
+
+.rt-meter {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 46px 46px 6px 6px / 22px 22px 6px 6px;
+  pointer-events: none;
+}
+
+.rt-needle,
+.rt-needle-shadow {
+  position: absolute;
+  transform-origin: 50% 100%;
+  border-radius: 2px;
+}
+
+.rt-needle {
+  background: linear-gradient(to right, #0e0b08 0 62%, #5b5144 100%);
+}
+
+.rt-needle-shadow {
+  margin-bottom: -4px;
+  margin-left: 5px;
+  background: rgba(40, 26, 10, 0.35);
+  filter: blur(2.5px);
+}
+
+.rt-meter-glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s;
+  mix-blend-mode: soft-light;
+  background: radial-gradient(ellipse at 50% 110%, rgba(255, 214, 140, 0.9), transparent 75%);
+}
+
+.rt-frame[data-power='on'] .rt-meter-glow {
+  opacity: 1;
+}
+
+/* ---- Phones -------------------------------------------------------------- */
+
+/* Touch-sized stand-ins for the picture's small instrument buttons. */
+.rt-touch {
+  display: none;
+}
+
+.rt-strip .sb-segment {
+  min-height: 44px;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 680px) {
+  /* The picture keeps a usable size and scrolls sideways. */
+  .rt-scroll:not([data-fit='true']) .rt-frame {
+    width: 900px;
+  }
+
+  .rt-touch {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
