@@ -428,6 +428,7 @@ and the tempo are docked at the bottom of the screen.
 | `packages/contracts/` | What every project document carries, and the saved-beat and shop schemas |
 | `packages/editor/` | React editor core: store, runtime, AudioWorklet bridge, exporters, local draft, the account and shop modals, and the contract a machine fills in |
 | `packages/machine-808/` | The 808 as a machine: its project schema, data files and fixtures, voices, panel art and styles, and what its controls do |
+| `packages/machine-ritm12/` | РИТМ-12, the machine being built to replace it: its project schema, voices, panel, art, and the reader that opens the 808's beats. Run it with `BOOMBAPBOT_MACHINE=ritm12 pnpm dev` |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats and the shop |
 | `assets/kits/` | Generated sample kits for the 606, 707 and 909, not loaded at the moment |
 | `assets/faceplates/` | Cleared photographs of the classic machines and their provenance, not shipped |
