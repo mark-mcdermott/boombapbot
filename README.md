@@ -90,9 +90,14 @@ pnpm serve
   picture is Russian; every control's accessible name is English, and a
   control that moves says what it did on the machine's screen and to a
   screen reader.
-- **About and Docs** are pages of their own on the same Astro site, with the
-  same header and footer. Docs goes through every control and says what its
-  lettering means. Credits is a blank page for now.
+- **Pages of words.** About, Docs, the manifesto, Credits and Policies are
+  pages of their own on the same Astro site, with the same footer. Their
+  header is a compact masthead that names every page beside the brand, so
+  nothing has to be pointed at to find them. About opens on a still of the
+  machine with its screen lit and a key that opens it. Docs goes through
+  every control and says what its lettering means. The manifesto is one
+  narrow column. Credits is a blank page for now. They are set in two faces
+  the site serves itself, PT Serif and Sofia Sans Condensed.
 - **Eight sounds, synthesised.** Kick, snare, clap, closed and open hat, tom,
   rim and percussion. The engine builds each one from its pitch, decay and
   tone knobs, so turning one re-synthesises that sound. Nothing is a
@@ -288,7 +293,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: the project schema and the move from version 1, the project-to-engine mapping, native versus WASM output for six rhythms of the fixture and for each synthesised sound, byte-identical MIDI from both builds, the engine's export list against its header and the TypeScript bridge, WAV and MIDI contents, import, draft recovery, store, the limits and the conflict rule for saved beats, what a device remembers about them; and for РИТМ-12 its project schema, what its controls do, its engine setup, and its reader for 808 beats, which become new beats |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, exports, the draft, an 808 draft and an 808 file opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, the pages of words. Against the built server with its database in memory: accounts, the shop, and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, an 808 beat loading as a new beat, and an 808 beat refused on save) |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, exports, the draft, an 808 draft and an 808 file opening converted, the phone layout, and an accessibility scan. The site: the page layout and settings sheet, the header and footer, the modals, and the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan). Against the built server with its database in memory: accounts, the shop, and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, an 808 beat loading as a new beat, and an 808 beat refused on save) |
 | `BOOMBAPBOT_MACHINE=808 pnpm build`, then the same in front of `pnpm test:e2e` | The 808's build and its panel's browser tests: every selector position, knob and switch, the write modes, manual play, rhythm tracks, the power switch, dials, lamps, keyboard, touch layout, exports, its draft and an accessibility scan |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
@@ -345,6 +350,10 @@ Two cross-checks worth knowing about:
   layout was checked in Chromium's device emulation. On 2026-11-17, on the
   808, the owner logged in, loaded a beat and played it on an iPhone in
   Safari and in Chrome and on a Samsung Galaxy S9 in Chrome.
+- **The pages of words.** Their layout was looked at in Chromium only, at
+  375px, 768px and 1280px wide, in screenshots of the production build. No
+  real phone, Safari or Firefox has shown them, and nobody has read them
+  with a screen reader; the accessibility check is the automated scan.
 - **Deployment.** `.github/workflows/deploy.yml` builds the site and hands it
   to Vercel after CI passes on `main`. It ran for the first time on
   2026-11-16, and the live site was checked by hand afterwards: the machine

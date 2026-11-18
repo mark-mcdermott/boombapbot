@@ -166,6 +166,22 @@ upgrade still opens a modal that says it is not open.
 - **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own text, put
   in word for word on 2026-11-15, "for now". It mentions a small paid tier,
   which does not exist yet; the shop is the only thing with a price.
+- **The pages of words** were laid out again on 2026-11-17: a compact
+  masthead that names the pages, headings in a rail, About opening on a
+  still of the machine, and the manifesto as one narrow column. Left for the
+  owner to decide:
+  - The names in the masthead reverse an earlier decision, that the header
+    is the brand alone and the footer's icons are the navigation. They are
+    one component, `ui/SiteNav.tsx`, if they are to go.
+  - The masthead drops the tagline. It is still on the machine's page.
+  - The words on About were reordered and its first lines rewritten as a
+    draft: the heading, the paragraph under it, the caption of the picture,
+    and "Who made it" moved up to third. No claim was added.
+  - Whether "Docs" should be called "Manual".
+  - Whether the manifesto is signed. It is not.
+  - The manifesto speaks of a small paid tier while About says upgrades are
+    not here yet. Neither was changed.
+  - Credits is still blank.
 - **The other machines** in the header are drawn but not built.
 
 ## Native shells

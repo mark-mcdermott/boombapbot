@@ -294,13 +294,40 @@ CI then builds the 808 and runs its panel's tests, with
 - `Header` (the brand: mascot over the tagline, together as tall as the
   wordmark beside them) and
   `Footer` (About, Docs, manifesto, credits, policies, upgrade, cart,
-  settings, account) are shared. The header is the brand alone.
-  `SitePage` wraps a page of words in them; About, Docs, the manifesto,
-  Credits and Policies are Astro pages in `apps/site/src/pages` that use it.
-  Credits is blank until the owner writes it.
+  settings, account) are shared. On the machine's page the header is the
+  brand alone.
+- `SitePage` wraps a page of words; About, Docs, the manifesto, Credits and
+  Policies are Astro pages in `apps/site/src/pages` that use it. There the
+  header is a compact masthead (`.sb-masthead`: the mascot beside a small
+  wordmark, with no tagline) and names the pages beside the brand
+  (`ui/SiteNav.tsx`, with a lamp lit for the page that is open), so the
+  page's own `h1` is the largest thing on it. The pages are listed once, in
+  `ui/pages.ts`, for the masthead and the footer alike.
+- A page of words is a title (its one `h1`, and a `.sb-lede` if it has one)
+  and then `Section`s (`apps/site/src/components/Section.astro`). A section
+  sets its heading in a rail beside its body on a wide screen and above it
+  on a narrow one; `stacked` gives the body the whole width.
+  `layout="note"` on `SitePage` is one narrow column, set larger and with no
+  art: the manifesto. Words quoted from the machine's lettering go in
+  `Lettering.astro`, which marks them as Russian.
+- Their styles are the "Pages of words" part of the editor's `styles.css`.
+  The two faces, PT Serif to read and Sofia Sans Condensed for headings, are
+  pinned `@fontsource` packages loaded in `apps/site/src/styles/global.css`:
+  the site serves them itself and loads nothing from another host. The
+  colours taken from the machine's picture (`--ritm-*`) are for these pages
+  only. The cream key (`.sb-key`, and `kbd`), the lamp and the outline
+  (`.sb-plate`) are borrowed from the picture; do not add its art to the
+  manifesto.
+- About opens on the machine: what it is as the `h1`, the way in, and a
+  still of the top of the panel with its screen lit. The stills are in
+  `apps/site/src/assets/ritm12/` and the machine's `art/README.md` says how
+  they were taken; take them again if the panel's art changes. The words on
+  About are the owner's to edit.
+- Credits is blank until the owner writes it. The ruled outline on it
+  (`.sb-blank`) is drawn in CSS and holds no words.
 - On the machine's page the footer sits 50px under the machine
-  (`--footer-drop`, `.sb-below-machine`). On a page of words it stays at
-  the bottom. Keep
+  (`--footer-drop`, `.sb-below-machine`). On a page of words it follows the
+  words, so a short page ends where its words do. Keep
   Policies true to what the site does: it covers accounts, saved beats and
   the shop, with the returns policy in the owner's words. Update it before
   the upgrade is sold.
