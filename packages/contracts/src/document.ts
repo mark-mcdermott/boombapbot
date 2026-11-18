@@ -26,6 +26,11 @@ export type ParseResult<Document extends ProjectBase = ProjectBase> =
       project: Document;
       /** What a document from elsewhere lost on the way in. Empty for a current one. */
       changes: string[];
+      /**
+       * Set by the codec when no machine in the build owned the document and
+       * one took it over. What comes back is then a new beat, not the one read.
+       */
+      adopted?: true;
     }
   | { ok: false; errors: string[] };
 
@@ -87,7 +92,7 @@ export function createProjectCodec<Document extends ProjectBase>(
     if (adopting) {
       for (const kind of kinds) {
         const adopted = kind.adopt?.(input);
-        if (adopted) return adopted;
+        if (adopted) return adopted.ok ? { ...adopted, adopted: true } : adopted;
       }
     }
     return { ok: false, errors: [NO_SUCH_MACHINE] };

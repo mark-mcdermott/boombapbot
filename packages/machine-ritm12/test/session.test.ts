@@ -226,6 +226,7 @@ describe('the draft', () => {
     const loaded = loadDraft(storage, documentRitm12, codec);
     if (loaded.status !== 'restored') throw new Error(loaded.status);
     expect(loaded.project.machine).toBe('ritm12');
+    expect(loaded.adopted).toBe(true);
     expect(loaded.changes.length).toBeGreaterThan(1);
     expect(storage.getItem('boombapbot.draft.v2')).toBe(left);
     expect(storage.items.size).toBe(1);

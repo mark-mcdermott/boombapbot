@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PROJECT_FORMAT } from '@boombapbot/contracts';
 import {
@@ -68,6 +69,14 @@ describe('the РИТМ-12 project document', () => {
     expect(codec.parse({ ...project, format: 'something.else' }).ok).toBe(false);
   });
 
+  it('reads the committed fixture of a current beat and writes it back unchanged', () => {
+    const text = readFileSync(new URL('../fixtures/four-patterns.project.json', import.meta.url), 'utf8');
+    const read = codec.parseText(text);
+    if (!read.ok) throw new Error(read.errors.join('; '));
+    expect(read.changes).toEqual([]);
+    expect(codec.serialize(read.project)).toBe(text);
+  });
+
   it('owns only its own documents, and keeps its draft in a place of its own', () => {
     expect(documentRitm12.owns({ machine: 'ritm12', schemaVersion: 3 })).toBe(true);
     expect(documentRitm12.owns({ schemaVersion: 2 })).toBe(false);
@@ -76,6 +85,9 @@ describe('the РИТМ-12 project document', () => {
     // What the server asks: only this machine's own, never a beat taken over.
     expect(codec.parseOwned(earlier(2)).ok).toBe(false);
     expect(codec.parseOwned(newProject()).ok).toBe(true);
+    // The page takes one over, and is told that it did.
+    expect(codec.parse(earlier(2))).toMatchObject({ ok: true, adopted: true });
+    expect(codec.parse(newProject())).not.toHaveProperty('adopted');
   });
 });
 

@@ -88,7 +88,11 @@ export class EditorRuntime<
     const draft = this.storage ? loadDraft(this.storage, machine.document, this.codec) : { status: 'empty' as const };
     this.store = new EditorStore({
       project:
-        draft.status === 'restored' ? draft.project : machine.document.create({ id: newProjectId(), now: new Date() }),
+        draft.status !== 'restored'
+          ? machine.document.create({ id: newProjectId(), now: new Date() })
+          : draft.adopted
+            ? asNewBeat(draft.project)
+            : draft.project,
       memory: machine.memory,
       transient: machine.transient,
       draftOrigin: draft.status === 'restored' ? 'restored' : draft.status === 'unreadable' ? 'recovered' : 'new',
@@ -405,14 +409,18 @@ export class EditorRuntime<
   /**
    * Puts a beat saved to an account on the machine, by the same road as an
    * imported file: checked first, and one undo step. Returns the project it
-   * became, or null when it was not a project and nothing changed.
+   * became and whether it was taken over from another machine, or null when
+   * it was not a project and nothing changed.
    */
-  loadSavedBeat(saved: unknown): Document | null {
-    return this.adopt(
-      this.codec.parse(saved),
+  loadSavedBeat(saved: unknown): { project: Document; adopted: boolean } | null {
+    const result = this.codec.parse(saved);
+    const adopted = result.ok && result.adopted === true;
+    const project = this.adopt(
+      result,
       'That saved beat could not be read.',
-      (beat) => `Loaded “${beat}” from your account.`,
+      (beat) => `Loaded “${beat}” from your account.${adopted ? ' The one in your account is as it was.' : ''}`,
     );
+    return project && { project, adopted };
   }
 
   /** Replaces the project with one read from elsewhere, or says why not. */
@@ -421,15 +429,16 @@ export class EditorRuntime<
       this.store.notify('error', `${refused} Your current beat is unchanged.`, result.errors);
       return null;
     }
-    this.store.replaceProject(result.project);
+    const project = result.adopted ? asNewBeat(result.project) : result.project;
+    this.store.replaceProject(project);
     const earlier =
       result.changes.length > 0 ? ` It came from an earlier version. ${this.machine.messages.earlierVersion}` : '';
     this.store.notify(
       'info',
-      `${done(result.project.name)} Undo brings back the previous beat.${earlier}`,
+      `${done(project.name)} Undo brings back the previous beat.${earlier}`,
       result.changes,
     );
-    return result.project;
+    return project;
   }
 
   /** How loud the output is now, from 0, for a meter. A plain reading: a panel asks as it draws. */
@@ -450,6 +459,14 @@ export class EditorRuntime<
       project: state.project,
     };
   }
+}
+
+/**
+ * A beat taken over from another machine is a new beat. Under the id it came
+ * with, saving it to an account would replace the one it was read from.
+ */
+function asNewBeat<Document extends ProjectBase>(project: Document): Document {
+  return { ...project, id: newProjectId() };
 }
 
 /** The longest WAV an export renders. */
