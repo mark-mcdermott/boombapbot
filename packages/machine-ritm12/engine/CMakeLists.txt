@@ -6,8 +6,8 @@ if(EMSCRIPTEN)
 endif()
 
 if(SNARE_BUILD_TOOLS)
-  # The same tool as the 808's. Only its --synth mode, which renders one
-  # sound, means anything here until the tool reads this machine's projects.
+  # The core's render tool with this machine's voices in it: what the
+  # WebAssembly build of РИТМ-12 is compared with.
   add_executable(boombapbot-render-ritm12 "${BOOMBAPBOT_ENGINE_DIR}/tools/render_cli.cpp")
   target_link_libraries(boombapbot-render-ritm12 PRIVATE boombapbot_engine_ritm12)
   target_compile_options(boombapbot-render-ritm12 PRIVATE ${SNARE_WARNINGS})
