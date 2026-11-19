@@ -120,9 +120,23 @@ site its icon still opens a modal that says it is not open.
     and loaded it on an iPhone and an Android phone. Deleting a saved beat,
     the question about a newer cloud copy and the 20-beat limit have only
     run in the tests.
-  - The limit is counted and then the row is inserted, as two statements.
-    Two saves sent at the same instant could both get in at 19. Harmless at
-    this size; a paid tier with a hard quota would want it in one statement.
+  - **The count and the insert are one statement**, since 2026-11-18. A
+    `beat_counts` table holds how many beats each account has; a save
+    raises it only while it is under the limit and inserts the beat only if
+    it rose, and a delete lowers it in the statement that deletes the beat.
+    Two saves at once queue on the account's row, so they cannot both take
+    the last place. **Its migration has not been run.**
+    `apps/site/drizzle/0005_beat_counts.sql` adds the table and counts the
+    beats already saved; run it with `pnpm db:migrate` after the code is
+    merged and before it is deployed, because the new code fails to save or
+    delete without the table. A beat the old code saves between the
+    migration and the deploy is not counted, which would let that account
+    hold one more. Checked in the tests (thirty saves sent at once stop at
+    twenty, and a delete gives back one place) and against a real Postgres
+    17 with thirty sessions at once: the new statement stopped at twenty
+    and the count matched the rows, where the old count-then-insert let all
+    thirty in. The tests' in-process database runs one statement at a time,
+    so the race itself is shown only by that Postgres run.
   - A device remembers which saved beat its project goes with in its own
     browser storage. A project brought over as a file, not loaded from the
     account, is saved as a new beat there.
@@ -247,11 +261,21 @@ site its icon still opens a modal that says it is not open.
   - **Refunds.** Refunding the payment in Stripe does not take the key
     back. That needs a column to mark a license withdrawn and a case in
     the webhook, once there is a refund policy.
-  - The key-by-email route has no limit of its own beyond one email per key
-    in ten minutes, and it answers sooner for an address that bought
-    nothing than for one that did, which a patient stranger could time.
-  - A paid upgrade that raises the beat limit would want the count and the
-    insert in `api/beats` in one statement first (see saved beats above).
+  - **The key-by-email route is limited and answers alike**, since
+    2026-11-18. One address can be asked about three times an hour, and one
+    visitor's address can ask five times in ten minutes; past that the
+    answer is 429 `too_many`. Both are counted in the `rate_limits` table
+    the way Better Auth counts, with the visitor's address worked out as
+    Better Auth does, and the email address is counted by its hash. The
+    keys are looked up and sent after the answer has gone (`waitUntil` from
+    `@vercel/functions` keeps the function alive for it on Vercel), so the
+    answer is the same, and as quick, whether or not the address bought
+    anything; a failed send is logged. No migration. Checked in the tests,
+    including on a server whose email always fails, where a buyer and a
+    stranger get the same status, headers and body. Not yet tried on
+    Vercel itself.
+  - The beat limit is counted and raised in one statement now (see saved
+    beats above), so a paid upgrade can raise it.
 - **The shop** has been open on the live site since 2026-11-16. The catalog
   holds the two products in the Printful store, a hoodie and a sticker, and
   ships wherever Printful does, at Printful's live rate for the address.
