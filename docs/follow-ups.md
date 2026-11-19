@@ -59,14 +59,22 @@ in this file has been built unless it says so.
    has read them. The line it shows when a draft cannot be written named
    only the export; since 2026-11-18, on the site, it names an account too:
    "To keep this beat, export the project file or save it to an account."
-   The owner has not read that wording. The phone app has no accounts and
-   keeps the line as it was. Two things are left:
-   - A browser whose storage is missing from the start (a private window
-     that blocks it) is never told. The line appears only once a write
-     has failed, and with no storage nothing is written, so the sheet goes
-     on saying "Draft will be saved in this browser".
-   - The closing note points to "the account button in the footer" in the
-     phone app as well, which has neither.
+   The owner has not read that wording. Since 2026-11-18 as well:
+   - Storage that is missing from the start (a private window that blocks
+     it, or `localStorage` that throws) is reported as soon as the editor
+     opens, with the same line and state as a failed write. A shell that
+     hands in its own store is not affected.
+   - In the phone and desktop apps the draft lines say "on this device"
+     instead of "in this browser", the line for a failed write reads "This
+     device is not saving drafts. Export the project to keep it.", and the
+     closing note names only the export, with no account or footer.
+   - The closing note leaves out "Your beat is saved … as you go" while the
+     draft cannot be written.
+
+   Unit tests cover the wording in both kinds of page and the missing
+   storage, and a Playwright test on the site blocks `localStorage` before
+   the page loads and checks the sheet. Neither app was opened to look at
+   the sheet; the owner has not read the new wording for the apps.
 6. **The pages of words.** Their design pass was done on 2026-11-17. What it
    left for the owner to decide is under "Accounts, upgrades and the shop".
 7. **Names left in the engine's header.** `engine.h` still names sixteen

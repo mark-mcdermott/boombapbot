@@ -5,6 +5,7 @@ import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
 import type { WavBitDepth } from '../engine/wav';
 import type { WavExport } from '../state/store';
 import { useEditorState, useRuntime } from './context';
+import { closingNoteText } from './draft-words';
 import { ChevronIcon, DownloadIcon, UploadIcon } from './icons';
 import { Modal } from './Modal';
 import { PatternActions, StatusBar } from './StatusBar';
@@ -163,6 +164,7 @@ interface SettingsProps {
 /** The cog, and the modal behind it that holds everything but the machine. */
 export function Settings({ container, accounts }: SettingsProps) {
   const runtime = useRuntime();
+  const draftKept = useEditorState((state) => state.draftState === 'saved');
   const [open, setOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -225,11 +227,7 @@ export function Settings({ container, accounts }: SettingsProps) {
         </Group>
         <Group>
           <p className="sb-footnote">{runtime.machine.keysHelp}</p>
-          <p className="sb-hint">
-            v0.1 preview. The drum sounds are made from the knobs; none of them is a recording. Your beat is
-            saved in this browser as you go. To keep a copy or move to another device, export the project file
-            here, or save the beat to a free account from the account button in the footer.
-          </p>
+          <p className="sb-hint">{closingNoteText({ accounts, kept: draftKept })}</p>
         </Group>
       </Modal>
     </>

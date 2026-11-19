@@ -1,4 +1,5 @@
 import { useEditorState, useRuntime } from './context';
+import { draftStatusText } from './draft-words';
 import { CloseIcon, RedoIcon, UndoIcon } from './icons';
 
 export function PatternActions() {
@@ -69,14 +70,7 @@ export function StatusBar({ accounts }: StatusBarProps) {
   const draftOrigin = useEditorState((state) => state.draftOrigin);
   const { machine } = useRuntime();
 
-  const saved =
-    draftState === 'error'
-      ? accounts
-        ? 'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.'
-        : 'This browser is not saving drafts. Export the project to keep it.'
-      : draftSavedAt
-        ? `Draft saved in this browser at ${new Date(draftSavedAt).toLocaleTimeString()}`
-        : 'Draft will be saved in this browser';
+  const saved = draftStatusText({ state: draftState, savedAt: draftSavedAt, accounts });
 
   return (
     <div className="sb-status">

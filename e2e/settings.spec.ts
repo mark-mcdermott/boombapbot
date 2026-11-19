@@ -147,3 +147,25 @@ test('a browser that stops keeping the draft says so, and names both ways to kee
     'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.',
   );
 });
+
+test('a browser with no storage from the start says so before anything is written', async ({ page }) => {
+  // A private window that blocks storage throws as soon as the page reaches for it.
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      get() {
+        throw new DOMException('Access is denied for this document.', 'SecurityError');
+      },
+    });
+  });
+  await page.reload();
+  await expect(page.getByTestId('editor')).toBeVisible();
+  await openSettings(page);
+  const status = page.getByTestId('draft-status');
+  await expect(status).toHaveAttribute('data-state', 'error');
+  await expect(status).toContainText(
+    'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.',
+  );
+  const note = page.getByTestId('settings-modal').locator('.sb-hint');
+  await expect(note).not.toContainText('saved in this browser');
+  await expect(note).toContainText('save the beat to a free account from the account button in the footer');
+});
