@@ -25,8 +25,9 @@ in this file has been built unless it says so.
      are large enough over a long session, and how much of the panel shows
      above the fold with the browser's bars.
    - Its paint. The olive and the rust are drawn in CSS and are flatter than
-     the picture. One painted plate with no controls on it would replace
-     them.
+     the picture. The owner finds the panel nice as it is (2026-11-18), so
+     this is not asked for; one painted plate with no controls on it would
+     replace them if it ever is.
    - A phone on its side. It is wider than 900px on the largest phones and
      narrower on the rest, so some get the picture and some get a column
      taller than the screen. Neither was designed for it.
@@ -40,10 +41,10 @@ in this file has been built unless it says so.
    - Decisions it made that are the owner's: step numbers on the keys,
      МУТ on its key, one level knob for the selected voice where the picture
      has eight, no level meter, and controls dimmed while the power is off.
-2. **A closer listen.** The owner has heard it and likes it. Its eight
-   voices, how far each knob reaches and its four effects were set by
-   measurement more than by ear, and nobody has gone through them one by
-   one.
+2. **A closer listen.** The owner went through the eight instruments and
+   says they are all good (2026-11-18). They were set by measurement more
+   than by ear, and so were the four effects, which the owner has not said
+   they went through one by one.
 3. **Full-size art.** The picture is 2000 pixels wide. The owner's originals
    are 3072 wide; put one picture for each state in `misc/assets/ritm12/`,
    run `packages/machine-ritm12/art/cut-art.py` and update `ui/layout.ts`.
@@ -176,10 +177,26 @@ site its icon still opens a modal that says it is not open.
     columns, the owner that is unset when an account is deleted and the
     email index are as the migration has them, it is empty, and the six
     tables that were there hold the rows they held before.
-  - **Decide which features are paid,** then gate them. Nothing reads
-    `isUpgraded` yet. To settle with it: whether a key alone unlocks a device
-    with nobody logged in, and how a paid feature behaves with no server,
-    since the machine has to work without one.
+  - **What is paid is decided,** on 2026-11-18: extra effects, new ones
+    beside the four the machine has, which stay free. They are fully gated:
+    someone who has not upgraded cannot hear them. They are six, chosen by
+    the owner the same day: a crusher, tape, a pump, a filter, vinyl and a
+    phaser. Nothing reads `isUpgraded` yet. The six are built in the engine
+    (2026-11-18) and nowhere else: no control reaches them and РИТМ-12's
+    document cannot name them, so nothing a visitor has changes. They pass
+    the engine's tests, natively and in WebAssembly alike. How each sounds
+    was set by measurement and nobody has listened: the crusher's rate and
+    levels, tape's drive and wobble, how deep the pump ducks (it halves the
+    loudness of the test beat at full), the filter's range and ring,
+    vinyl's hiss and pops, the phaser's sweep. Still to do before they are
+    sold: the owner listens and they are tuned; РИТМ-12's document takes
+    them (a schema change, with its step and fixture); they are gated; and
+    they get a place on the machine. Still to settle:
+    where they sit on the machine, whose painted effect switch has four
+    positions (a unit of their own beside it, or the same switch stepping
+    on); whether a key alone unlocks a device with nobody logged in; and how
+    a paid effect behaves with no server, since the machine has to work
+    without one.
   - **The modal is built**, on 2026-11-18, and shows only while the server
     says the upgrade is open: the price from `GET /api/upgrade`, a button
     that goes to Stripe, the way back (`/?upgrade=paid` and

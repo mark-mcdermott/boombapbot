@@ -200,12 +200,28 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `SNARE_SWING_MAX`): every second step of a measure of four or eight steps
   to the beat plays late by `swing / 256` of a step, in the engine and in a
   MIDI export alike. The bar line never swings, and triplets do not.
-- The effect on the mix (`engine/src/fx.h`, `snare_engine_set_effect`) is an
-  echo, a reverb, a flanger or a chorus, added ahead of the limiter. It keeps
-  the engine's promises: every buffer is allocated when the engine is made,
-  state moves a sample at a time, and nothing calls the C library's maths
-  per sample. With no effect set it does not touch the samples. An offline loop is played often enough
-  for the effect's tail to settle (`loopPasses`), without changing its length.
+- The effect on the mix (`engine/src/fx.h`, `snare_engine_set_effect`) sits
+  ahead of the limiter. The engine has ten. An echo, a reverb, a flanger, a
+  chorus and vinyl noise are added to the mix. A crusher, tape, a pump, a
+  filter and a phaser work on the mix itself, and with their amount at 0
+  give back exactly what came in, which is what lets one effect fade out
+  before the next begins; for the filter the amount is how far it is shut.
+  РИТМ-12 has the first four. The other six are for the upgrade: they are
+  in the engine and in the bridge's `EFFECT`, and no machine's document can
+  name them yet. All of it keeps the engine's promises: every buffer is
+  allocated when the engine is made, state moves a sample at a time, and
+  nothing calls the C library's maths per sample (the filter's and the
+  phaser's tangent comes from the same polynomial as the sine). With no
+  effect set it does not touch the samples. Vinyl's noise starts from one
+  seed, so a render can be made twice, and it sounds only while there is
+  something to hear and for a moment after. The pump hears the low end of
+  the mix, not the kick's own track: the core knows no machine's tracks.
+  An offline loop is played often enough for the effect's tail to settle
+  (`loopPasses`), without changing its length. A new effect needs its
+  number in `engine.h`, its name in `engine/tools/setup_io.h` and in
+  `EFFECT` in `wasm-engine.ts`, a tail in `effectTailSeconds`, and a place
+  in the lists in `engine/tests/test_fx.cpp`, `test_realtime.cpp` and
+  `packages/machine-ritm12/test/native.test.ts`.
 - `snare_engine_output_level` is the root mean square of the output over
   about a third of a second, after the volume: what a meter shows.
 - `scripts/prepare-assets.mjs` and `scripts/check-build.mjs` work for one
@@ -681,9 +697,16 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   outlives its account. The price and the shape of a key are in
   `packages/contracts/src/upgrade.ts`; the server is `src/server/upgrade.ts`
   and the routes under `api/upgrade`.
-- This is the entitlement, not the gating. Nothing calls `isUpgraded` yet,
-  and which features are paid is not decided. Do not gate a feature, or
-  tell a visitor what the upgrade unlocks, until the owner says which.
+- This is the entitlement, not the gating. Nothing calls `isUpgraded` yet.
+  The owner decided on 2026-11-18 that the upgrade unlocks extra effects:
+  new ones, beside the four the machine has, which stay free as the modal
+  promises. They are fully gated: someone who has not upgraded cannot hear
+  them at all. They are six: a crusher (fewer bits and a lower sample
+  rate), tape (saturation, a slow wobble and a duller top), a pump (a
+  compressor that ducks everything under the kick), a filter (a resonant
+  low-pass swept by the mix knob), vinyl (crackle and hiss) and a phaser.
+  Where they sit on the machine is not decided, so do not tell a visitor
+  what the upgrade unlocks until they can be reached there.
 - It is closed until `UPGRADE_OPEN` is `on`, and without Stripe's key or the
   webhook's secret (`upgradeOpen`). Closed, checkout refuses. A payment
   already made is still honoured: the webhook does not ask whether it is
@@ -770,8 +793,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 ## Not verified yet
 
-The owner has listened to РИТМ-12 on a local build and said it sounds good;
-nobody has gone through it voice by voice or effect by effect. On the live
+The owner has listened to РИТМ-12 on a local build and said it sounds good,
+and has since gone through its eight instruments and says they are all good;
+nobody has said they went through its four effects one by one. On the live
 site, `boombapbot.com`, the owner has used РИТМ-12 on an iPhone in Safari
 and in Firefox, and saved a beat to an account from desktop Chrome and
 loaded it in Firefox on the iPhone. Before that, while the site was an
