@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type Route } from '@playwright/test';
+import { openSettings } from '../helpers';
 
 export const DRAFT_KEY = 'boombapbot.draft.v3.ritm12';
 export const EARLIER_DRAFT_KEY = 'boombapbot.draft.v2';
@@ -53,4 +54,27 @@ export async function emptyPattern(page: Page): Promise<void> {
 
 export function playing(page: Page): Promise<{ step: number; pattern: number }> {
   return page.evaluate(() => window.__boombapbot!.playing());
+}
+
+/**
+ * Takes hold of every script the page asks for from now on. By the time
+ * settings is open the page has all of its own, so the one script left to
+ * ask for is the Worker a WAV renders in.
+ */
+export async function holdScripts(page: Page, held: (route: Route) => Promise<void>): Promise<void> {
+  await openSettings(page);
+  await page.route('**/*.js', held);
+}
+
+/** Holds the Worker a WAV renders in until the returned function is called. */
+export async function holdTheRender(page: Page): Promise<() => void> {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await holdScripts(page, async (route) => {
+    await released;
+    await route.continue();
+  });
+  return release;
 }

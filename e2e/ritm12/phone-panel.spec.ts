@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openSettings, scanner } from '../helpers';
-import { beat, step, stepsOn } from './helpers';
+import { closeSettings, openSettings, scanner } from '../helpers';
+import { beat, holdTheRender, step, stepsOn } from './helpers';
 
 // A screen as narrow as a phone's gets the phone's panel. These run on a phone-sized touch screen.
 test.use({
@@ -225,4 +225,25 @@ test('the settings sheet on a touchscreen does not list keyboard keys', async ({
   await openPhonePanel(page);
   await openSettings(page);
   await expect(page.getByTestId('keys-help')).toBeHidden();
+});
+
+test('on a phone the WAV export chip sits centred at the foot of the screen, over nothing it hides for long', async ({ page }) => {
+  await openPhonePanel(page);
+  const release = await holdTheRender(page);
+  await page.getByTestId('export-menu').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-wav').click();
+  await closeSettings(page);
+
+  const chip = page.getByTestId('wav-export-chip');
+  await expect(chip).toHaveText('Rendering the WAV… 0%, open settings');
+  const box = (await chip.boundingBox())!;
+  expect(Math.abs(box.x + box.width / 2 - 390 / 2)).toBeLessThan(2);
+  expect(box.y + box.height).toBeLessThanOrEqual(844 - 12);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  release();
+  await download;
+  await expect(chip).toHaveText('WAV exported, open settings');
+  await expect(chip).toHaveCount(0, { timeout: 10_000 });
 });

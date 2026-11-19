@@ -499,9 +499,17 @@ What is left:
   and an Android phone have not been tried on it.
 - **Work on the main thread.** The synthesis of a sound takes a few
   milliseconds, the longest of a machine several, and happens on the main
-  thread. A WAV export renders in a Worker. One thing is left of that:
-  the settings sheet shows where a render stands, so nobody sees it once
-  the sheet is closed. A menu item that is switched off has had a look of
+  thread. A WAV export renders in a Worker. Since 2026-11-18 where a render
+  stands shows outside the settings sheet too: with the sheet closed, a chip
+  at the foot of the screen counts the render up, says when it is saving,
+  then says it is done or failed and goes, after five seconds or eight. It
+  is a button that opens the sheet, and a polite live region tells a screen
+  reader when a render starts and how it ends. It mounts with the modals,
+  not in the footer, so a shell's own `below` has it as well. A Playwright
+  test holds the Worker up, closes the sheet and follows the chip from
+  rendering to done and then gone, on a desktop and on a phone's width; the
+  accessibility scan passes with it showing. It has not been seen in the
+  phone or desktop app. A menu item that is switched off has had a look of
   its own since 2026-11-18: its name dimmed, no hand over it, and its note,
   which says why, as legible as before.
 - **Draft storage.** One draft in `localStorage`, written whole on every
