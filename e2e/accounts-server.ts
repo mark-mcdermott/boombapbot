@@ -50,3 +50,6 @@ export const CLOSED_URL = `http://127.0.0.1:${CLOSED_PORT}`;
 export const LIMITED_PORT = Number(process.env.BOOMBAPBOT_E2E_LIMITED_PORT ?? 4177);
 export const LIMITED_URL = `http://127.0.0.1:${LIMITED_PORT}`;
 export const LIMITED_DATABASE = resolve('build/e2e-limited-db');
+
+/** One the upgrade's tests start with an outbox that cannot be written, so every email it tries fails. */
+export const BROKEN_MAIL_PORT = Number(process.env.BOOMBAPBOT_E2E_BROKEN_MAIL_PORT ?? 4178);

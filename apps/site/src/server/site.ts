@@ -1,3 +1,4 @@
+import { waitUntil } from '@vercel/functions';
 import { PUBLIC_SITE_URL } from 'astro:env/server';
 
 /**
@@ -16,4 +17,13 @@ export function originFor(request: Request): string {
 
 export function json(body: unknown, status = 200): Response {
   return Response.json(body, { status });
+}
+
+/**
+ * Carries on with `work` after the answer has gone. On Vercel the function
+ * is kept alive until it settles; the Node server the tests run stays up
+ * anyway. Nobody is waiting to hear of a failure, so it is logged.
+ */
+export function afterResponse(work: Promise<unknown>, what: string): void {
+  waitUntil(work.catch((error: unknown) => console.error(`${what} failed after the answer was sent.`, error)));
 }

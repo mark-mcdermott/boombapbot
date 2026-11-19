@@ -90,7 +90,8 @@ export const KeyReminderRequestSchema = z.object({ email: z.email().max(320) });
  * sale. `signed_out`: nobody is logged in. `already_upgraded`: the account
  * has a license. `no_license`: it has none. `unknown_key`: no such key.
  * `key_taken`: the key is on another account. `invalid`: the request could
- * not be read. The message is for the person.
+ * not be read. `too_many`: the same thing was asked too often lately. The
+ * message is for the person.
  */
 export const UPGRADE_REFUSALS = [
   'closed',
@@ -100,6 +101,7 @@ export const UPGRADE_REFUSALS = [
   'unknown_key',
   'key_taken',
   'invalid',
+  'too_many',
 ] as const;
 export type UpgradeRefusal = (typeof UPGRADE_REFUSALS)[number];
 

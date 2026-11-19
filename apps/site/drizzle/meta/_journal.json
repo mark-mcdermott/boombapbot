@@ -36,6 +36,13 @@
       "when": 1795043494318,
       "tag": "0004_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795066133517,
+      "tag": "0005_beat_counts",
+      "breakpoints": true
     }
   ]
 }

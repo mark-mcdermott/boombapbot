@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { ReplaceBeatRequestSchema, cloudCopyIsNewer } from '@boombapbot/contracts';
 import { and, eq } from 'drizzle-orm';
-import { beatSummary, ownedBeat, readBeatRequest, refuse, signedIn } from '../../../server/beats';
+import { beatSummary, deleteBeat, ownedBeat, readBeatRequest, refuse, signedIn } from '../../../server/beats';
 import { getDb } from '../../../server/db';
 import { beat } from '../../../server/db/schema';
 import { json } from '../../../server/site';
@@ -65,7 +65,6 @@ export const DELETE: APIRoute = async ({ request, params }) => {
   if ('refusal' in asked) return asked.refusal;
   const owned = ownedBeat(asked.user, params.id);
   if (!owned) return refuse('not_found');
-  const db = await getDb();
-  const [removed] = await db.delete(beat).where(owned).returning({ id: beat.uuid });
+  const removed = await deleteBeat(owned);
   return removed ? json(removed) : refuse('not_found');
 };

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { FREE_BEAT_LIMIT, SaveBeatRequestSchema, beatLimitReached } from '@boombapbot/contracts';
+import { FREE_BEAT_LIMIT, SaveBeatRequestSchema } from '@boombapbot/contracts';
 import { desc, eq } from 'drizzle-orm';
-import { beatSummary, readBeatRequest, refuse, signedIn } from '../../../server/beats';
+import { beatSummary, readBeatRequest, refuse, saveNewBeat, signedIn } from '../../../server/beats';
 import { getDb } from '../../../server/db';
 import { beat } from '../../../server/db/schema';
 import { json } from '../../../server/site';
@@ -25,15 +25,6 @@ export const GET: APIRoute = async ({ request }) => {
 export const POST: APIRoute = async ({ request }) => {
   const asked = await readBeatRequest(request, SaveBeatRequestSchema);
   if ('refusal' in asked) return asked.refusal;
-  const { user, project, bytes } = asked;
-  const db = await getDb();
-  if (beatLimitReached(await db.$count(beat, eq(beat.userId, user.id)))) return refuse('limit');
-
-  const now = new Date();
-  const [saved] = await db
-    .insert(beat)
-    .values({ userId: user.id, name: project.name, project, bytes, createdAt: now, updatedAt: now })
-    .returning(beatSummary);
-  if (!saved) throw new Error('The beat could not be saved.');
-  return json({ beat: saved }, 201);
+  const saved = await saveNewBeat(asked.user, asked.project, asked.bytes);
+  return saved ? json({ beat: saved }, 201) : refuse('limit');
 };

@@ -745,9 +745,19 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   shows from `src/server/upgrade.ts`, are stand-ins for the owner to
   rewrite. The closed modal's words are the owner's and were not changed.
 - Asking for a key by email (`remindKeys`) answers the same whether or not
-  the address bought anything, and marks a key as sent before sending it,
-  so each goes out once in ten minutes. `AUTH_RATE_LIMIT=off`, which only
-  the browser tests set, takes that wait away too.
+  the address bought anything: the keys are looked up and sent after the
+  answer (`afterResponse` in `src/server/site.ts`), never before it. A key
+  is marked as sent before it goes, so each goes out once in ten minutes.
+  The route is counted per address and per visitor (`mayRemindKeys`) in
+  Better Auth's `rate_limits` table by `consumeRateLimit`
+  (`src/server/rate-limit.ts`); a new counted route gets its rule in
+  `SITE_RATE_RULES`, which Better Auth is given too so that it keeps the
+  rows long enough. `AUTH_RATE_LIMIT=off`, which only the browser tests
+  set, takes the limits and the ten-minute wait away.
+- A saved beat is inserted and deleted only through `saveNewBeat` and
+  `deleteBeat` (`src/server/beats.ts`), which keep `beat_counts` in step in
+  the same statement. Anything else that adds or removes beats has to do
+  the same, or the limit drifts.
 - The tests keep the fake's upgrade checkouts in a log of their own
   (`/calls/upgrade`), so they and the shop's tests can run side by side.
   The modal's tests are in `e2e/upgrade.spec.ts` with the server's, in one
