@@ -446,15 +446,19 @@ Two cross-checks worth knowing about:
   built on, and nowhere else. Nobody has listened to it: that its output is
   not silent is the engine's own account, read by the app and by the page.
   The sound device was never really changed under it, the dialog that asks
-  where to keep an export has never been on a screen, and it has not been
-  built for Windows. Its [`README.md`](apps/desktop/README.md) has the
+  where to keep an export has never been on a screen. On Windows it
+  compiles and its Rust tests pass in CI, and nobody has run it on a
+  Windows machine. Its [`README.md`](apps/desktop/README.md) has the
   whole list.
 - **The phone app's native engine.** The phone app now plays through the
   engine built natively: AVAudioEngine on iOS, Oboe on Android. It ran on
   2026-11-18 in an iPhone simulator and an Android emulator, through the
   Mac's speakers, and nowhere else. Nobody has listened to it. A call faked
   by the emulator stopped the beat as it should; no real call, ringer
-  switch, headphones or change of device has happened to it.
+  switch, headphones or change of device has happened to it. Playing out
+  of the front (Now Playing on iOS, a media notification on Android) ran
+  in the same simulator and emulator. The plug-in is built for 32-bit
+  Android as well, and nothing 32-bit has run.
 - **Device performance.** See the benchmark below; it says nothing about
   phones.
 
@@ -554,7 +558,10 @@ stack" and most of "build one end-to-end beat". Next:
    CPAL) and on both phones (AVAudioEngine and Oboe behind the Capacitor
    shell in `apps/mobile`) that is done as a first slice, in a simulator
    and an emulator for the phones, and nobody has listened to any of it.
-   Next are real phones and Windows.
+   The phones keep playing out of the front, 32-bit Android is built, and
+   Windows compiles and passes its Rust tests in CI. None of those has run
+   on the hardware it is for: next are real phones, a 32-bit Android phone
+   and a Windows machine.
 
 Saving beats to an account is built. Sync in the background, billing,
 signing and store submission come after that.

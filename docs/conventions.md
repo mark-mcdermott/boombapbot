@@ -12,8 +12,9 @@ apps: it runs in a simulator and an emulator and is not ready for a
 store. On both phones it plays through the engine built natively.
 `apps/desktop` is a first slice of the desktop app, for macOS: the engine
 built natively behind the same editor. It runs on the Mac it was built on
-and is not signed. The rest of the build spec's wider scope (background
-sync, Windows, billing) is not started.
+and is not signed. On Windows it compiles and its Rust tests pass in CI,
+and it has not run on a Windows machine. The rest of the build spec's wider
+scope (background sync, billing) is not started.
 
 ## Commands
 
