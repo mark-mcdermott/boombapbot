@@ -169,3 +169,9 @@ test('a browser with no storage from the start says so before anything is writte
   await expect(note).not.toContainText('saved in this browser');
   await expect(note).toContainText('save the beat to a free account from the account button in the footer');
 });
+
+test('the settings sheet lists the keyboard keys where there is a mouse or a trackpad', async ({ page }) => {
+  await openSettings(page);
+  await expect(page.getByTestId('keys-help')).toBeVisible();
+  await expect(page.getByTestId('keys-help')).toContainText('Space');
+});

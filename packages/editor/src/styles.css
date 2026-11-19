@@ -463,6 +463,13 @@
   line-height: 1.9;
 }
 
+/* The keys are no help where nothing but a touchscreen points. */
+@media not (any-pointer: fine) {
+  .sb-footnote {
+    display: none;
+  }
+}
+
 .sb-footnote kbd {
   padding: 1px 5px;
   border: 1px solid var(--color-line);
