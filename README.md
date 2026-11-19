@@ -563,5 +563,6 @@ stack" and most of "build one end-to-end beat". Next:
    on the hardware it is for: next are real phones, a 32-bit Android phone
    and a Windows machine.
 
-Saving beats to an account is built. Sync in the background, billing,
-signing and store submission come after that.
+Saving beats to an account is built, and so is a one-time paid upgrade,
+switched off until it is sold; its six effects are in the engine only. Sync
+in the background, signing and store submission come after that.
