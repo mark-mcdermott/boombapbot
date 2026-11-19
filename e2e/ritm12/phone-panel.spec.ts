@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { scanner } from '../helpers';
+import { openSettings, scanner } from '../helpers';
 import { beat, step, stepsOn } from './helpers';
 
 // A screen as narrow as a phone's gets the phone's panel. These run on a phone-sized touch screen.
@@ -219,4 +219,10 @@ test('the phone’s panel has no detectable accessibility violations, on any tab
     const results = await scanner(page).analyze();
     expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([]);
   }
+});
+
+test('the settings sheet on a touchscreen does not list keyboard keys', async ({ page }) => {
+  await openPhonePanel(page);
+  await openSettings(page);
+  await expect(page.getByTestId('keys-help')).toBeHidden();
 });

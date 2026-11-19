@@ -70,11 +70,18 @@ in this file has been built unless it says so.
      closing note names only the export, with no account or footer.
    - The closing note leaves out "Your beat is saved … as you go" while the
      draft cannot be written.
+   - The list of keyboard keys is hidden where nothing but a touchscreen
+     points (no mouse or trackpad), so a phone does not show it and an iPad
+     with a trackpad does.
+   - The notice for a draft that could not be read says the draft "was set
+     aside, not deleted" instead of "kept in this browser", in every shell.
 
    Unit tests cover the wording in both kinds of page and the missing
    storage, and a Playwright test on the site blocks `localStorage` before
-   the page loads and checks the sheet. Neither app was opened to look at
-   the sheet; the owner has not read the new wording for the apps.
+   the page loads and checks the sheet. Playwright checks the keys are
+   listed on a desktop browser and hidden on a phone-sized touch screen
+   (Chromium's Pixel 7). Neither app was opened to look at the sheet; the
+   owner has not read the new wording for the apps.
 6. **The pages of words.** Their design pass was done on 2026-11-17. What it
    left for the owner to decide is under "Accounts, upgrades and the shop".
 7. **Names left in the engine's header.** `engine.h` still names sixteen

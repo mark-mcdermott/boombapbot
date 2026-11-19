@@ -26,7 +26,7 @@ export const machineRitm12: Machine<Project, TransientRitm12, SessionRitm12> = {
   messages: {
     earlierVersion: 'What changed on the way is listed here.',
     unreadableDraft:
-      'Your saved draft could not be read, so a starter beat was loaded. The unreadable draft was kept in this browser.',
+      'Your saved draft could not be read, so a starter beat was loaded. The unreadable draft was set aside, not deleted.',
   },
 };
 

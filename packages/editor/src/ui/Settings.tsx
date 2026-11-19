@@ -226,7 +226,7 @@ export function Settings({ container, accounts }: SettingsProps) {
           <StatusBar accounts={accounts} />
         </Group>
         <Group>
-          <p className="sb-footnote">{runtime.machine.keysHelp}</p>
+          <p className="sb-footnote" data-testid="keys-help">{runtime.machine.keysHelp}</p>
           <p className="sb-hint">{closingNoteText({ accounts, kept: draftKept })}</p>
         </Group>
       </Modal>
