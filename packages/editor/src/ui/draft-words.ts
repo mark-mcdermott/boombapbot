@@ -1,3 +1,5 @@
+import type { DraftState } from '../state/store';
+
 /**
  * What the settings sheet says about the draft. The site keeps it in the
  * browser and has accounts; a shell keeps it on the device and has none.
@@ -8,7 +10,7 @@ export interface DraftWordsContext {
 }
 
 export interface DraftStatus extends DraftWordsContext {
-  state: 'saved' | 'error';
+  state: DraftState;
   savedAt: number | null;
 }
 
@@ -18,10 +20,16 @@ export function draftStatusText({ state, savedAt, accounts }: DraftStatus): stri
       ? 'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.'
       : 'This device is not saving drafts. Export the project to keep it.';
   }
+  if (state === 'elsewhere') return draftElsewhereText({ accounts });
   const place = accounts ? 'in this browser' : 'on this device';
   return savedAt
     ? `Draft saved ${place} at ${new Date(savedAt).toLocaleTimeString()}`
     : `Draft will be saved ${place}`;
+}
+
+/** Said while another tab, or on a device another window, owns the draft. */
+export function draftElsewhereText({ accounts }: DraftWordsContext): string {
+  return `This beat is open in another ${accounts ? 'tab' : 'window'}, which is saving it. Changes here are not saved.`;
 }
 
 export interface ClosingNote extends DraftWordsContext {

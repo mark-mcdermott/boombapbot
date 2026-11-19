@@ -2215,3 +2215,11 @@ select.sb-input {
     animation: none !important;
   }
 }
+
+/* Another tab keeps the draft: the notice, with the one way to bring it here. */
+.sb-draft-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

@@ -1,6 +1,11 @@
-import type { DocumentKind, ProjectBase, ProjectCodec } from '@boombapbot/contracts';
+import type { DocumentKind, ParseResult, ProjectBase, ProjectCodec } from '@boombapbot/contracts';
+import { describe } from '../engine/engine-audio';
 
-/** The part of Web Storage this module needs, so tests can supply a fake. */
+/**
+ * A synchronous key-value store a shell can hand in for the draft, such as
+ * the phone app's device store. Also the shape of Web Storage, which is where
+ * the web editor kept its draft before IndexedDB and still reads it from once.
+ */
 export interface KeyValueStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -46,9 +51,7 @@ export function loadDraft<Document extends ProjectBase>(
   if (text === null) return { status: 'empty' };
 
   const result = codec.parseText(text);
-  if (result.ok) {
-    return { status: 'restored', project: result.project, changes: result.changes, adopted: result.adopted === true };
-  }
+  if (result.ok) return draftLoadOf(result);
 
   // A draft kept where an earlier version left it is never moved or removed.
   if (key === kind.draftKey) {
@@ -60,6 +63,13 @@ export function loadDraft<Document extends ProjectBase>(
     }
   }
   return { status: 'unreadable', errors: result.errors };
+}
+
+/** A draft read from wherever it was kept, as the editor opens it. */
+export function draftLoadOf<Document extends ProjectBase>(result: ParseResult<Document>): DraftLoad<Document> {
+  return result.ok
+    ? { status: 'restored', project: result.project, changes: result.changes, adopted: result.adopted === true }
+    : { status: 'unreadable', errors: result.errors };
 }
 
 export type DraftSave = { ok: true } | { ok: false; error: string };
@@ -88,8 +98,4 @@ export function browserStorage(): KeyValueStorage | null {
   } catch {
     return null;
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

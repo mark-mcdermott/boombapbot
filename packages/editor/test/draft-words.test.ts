@@ -21,19 +21,20 @@ const runtimeWith = (storage?: KeyValueStorage | null) =>
   new EditorRuntime({ baseUrl: '/', machine: testMachine, storage });
 
 describe('storage that is missing from the start', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   it('is reported as soon as the editor opens, as a failed write is', () => {
     expect(runtimeWith(null).store.getState().draftState).toBe('error');
   });
 
-  it('is reported when the browser will not hand over its storage', () => {
-    vi.stubGlobal('localStorage', {
-      setItem: () => {
-        throw new DOMException('The operation is insecure.', 'SecurityError');
-      },
-    });
-    expect(runtimeWith().store.getState().draftState).toBe('error');
+  it('is reported when the browser has no IndexedDB to hand over', async () => {
+    vi.stubGlobal('indexedDB', undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const runtime = await EditorRuntime.open({ baseUrl: '/', machine: testMachine });
+    expect(runtime.store.getState().draftState).toBe('error');
   });
 
   it('is not reported when a shell hands in its own store', () => {
@@ -60,6 +61,15 @@ describe('the draft status line', () => {
     );
     expect(draftStatusText({ state: 'error', savedAt: null, accounts: false })).toBe(
       'This device is not saving drafts. Export the project to keep it.',
+    );
+  });
+
+  it('names the other tab, or window, that is saving the beat', () => {
+    expect(draftStatusText({ state: 'elsewhere', savedAt: Date.now(), accounts: true })).toBe(
+      'This beat is open in another tab, which is saving it. Changes here are not saved.',
+    );
+    expect(draftStatusText({ state: 'elsewhere', savedAt: null, accounts: false })).toBe(
+      'This beat is open in another window, which is saving it. Changes here are not saved.',
     );
   });
 });

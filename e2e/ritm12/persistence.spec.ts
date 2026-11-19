@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { exportVia, downloadBytes } from '../helpers';
+import { exportVia, downloadBytes, storedDraft } from '../helpers';
 import { DRAFT_KEY, EARLIER_BEAT, EARLIER_DRAFT_KEY, beat, openMachine, step, stepsOn } from './helpers';
 
 test('the beat is kept in this browser and comes back on the next visit', async ({ page }) => {
@@ -8,7 +8,7 @@ test('the beat is kept in this browser and comes back on the next visit', async 
   await page.getByTestId('voice-perc').click();
   await step(page, 6).click();
   await page.getByTestId('size').click();
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key) !== null, DRAFT_KEY)).toBe(true);
+  await expect.poll(async () => (await storedDraft<{ size: number }>(page, DRAFT_KEY))?.size).toBe(12);
   await page.reload();
   await expect(page.getByTestId('plate')).toBeVisible();
   const back = await beat(page);
@@ -36,9 +36,9 @@ test('a draft left by the earlier machine opens as a beat for this one, and is l
   expect(opened).toMatchObject({ machine: 'ritm12', name: 'Mixed rhythms fixture', tempo: 124 });
   expect(opened.patterns[0]!.steps.kick).toBe('x...x...x..xx...');
   expect(opened.patterns[0]!.accents).toBe('x.......x.......');
-  // The earlier draft is untouched, and this machine keeps its own beside it.
+  // The earlier draft is untouched, and this machine keeps its own in IndexedDB.
   expect(await page.evaluate((key) => localStorage.getItem(key), EARLIER_DRAFT_KEY)).toBe(EARLIER_BEAT);
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key) !== null, DRAFT_KEY)).toBe(true);
+  await expect.poll(async () => (await storedDraft<{ name: string }>(page, DRAFT_KEY))?.name).toBe('Mixed rhythms fixture');
   await page.reload();
   await expect(page.getByTestId('plate')).toBeVisible();
   await expect(page.getByTestId('notice')).toHaveCount(0);
