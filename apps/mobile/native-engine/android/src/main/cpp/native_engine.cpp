@@ -172,12 +172,18 @@ class Output final : public oboe::AudioStreamDataCallback, public oboe::AudioStr
   std::atomic<bool> lost_{false};
 };
 
-SnareEngine* engineOf(jlong handle) { return reinterpret_cast<SnareEngine*>(handle); }
-Renderer* rendererOf(jlong handle) { return reinterpret_cast<Renderer*>(handle); }
-Output* outputOf(jlong handle) { return reinterpret_cast<Output*>(handle); }
+// A handle is a pointer widened to Java's long through uintptr_t, so that on a
+// 32-bit phone it is zero-extended and comes back the same pointer.
+template <typename Pointer>
+Pointer* pointerOf(jlong handle) {
+  return reinterpret_cast<Pointer*>(static_cast<std::uintptr_t>(handle));
+}
+SnareEngine* engineOf(jlong handle) { return pointerOf<SnareEngine>(handle); }
+Renderer* rendererOf(jlong handle) { return pointerOf<Renderer>(handle); }
+Output* outputOf(jlong handle) { return pointerOf<Output>(handle); }
 template <typename Pointer>
 jlong handleOf(Pointer* pointer) {
-  return reinterpret_cast<jlong>(pointer);
+  return static_cast<jlong>(reinterpret_cast<std::uintptr_t>(pointer));
 }
 
 }  // namespace
