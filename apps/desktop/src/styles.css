@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+/* The face the panel is lettered in, carried in the app: it has no server to fetch it from. */
+@import '@fontsource-variable/sofia-sans-condensed/wght.css';
+@import '@boombapbot/editor/styles.css';
+
+/* The editor's classes live in the workspace package. */
+@source '../../../packages/editor/src';
+
+html {
+  color-scheme: dark;
+  background: var(--color-bg);
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  background:
+    radial-gradient(1200px 500px at 50% -180px, rgb(255 255 255 / 0.05), transparent 70%),
+    var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  /* A window does not bounce past its edges. */
+  overscroll-behavior: none;
+}
+
+/* On the site the brand links home. Here it is home, and following it would start the machine again. */
+.sb-brand-link {
+  pointer-events: none;
+}

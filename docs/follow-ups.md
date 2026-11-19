@@ -284,6 +284,19 @@ message set is `packages/editor/src/engine/messages.ts`. A native shell
 replaces that one class with a bridge that sends the same messages to a
 native engine instance.
 
+The way in for that bridge is built. `BoombapbotEditor` takes `audio`, and
+the runtime plays through whatever controller it makes. A shell hands in
+`NativeAudioController` (`packages/editor/src/engine/native-audio.ts`) and
+fills in four calls for it, `open`, `send`, `listen` and `close`
+(`NativeEngineBridge`). It is sent `NativeEngineCommand`: a sound as its
+knobs, for the engine to synthesise at its device's rate, and the effect by
+the engine's number. When the bridge makes its engine again by itself, it
+reports `ready` with the new rate and the runtime tells the new engine the
+beat again. Unit tests hold this with stand-in controllers and a fake
+bridge (`packages/editor/test/audio-seam.test.ts`). The web build goes on
+making its own `AudioController`, and every unit and browser test it had
+passes unchanged. The desktop app is the first real engine behind it.
+
 ### Capacitor (iOS and Android)
 
 A first slice is built in `apps/mobile`: the editor with РИТМ-12 in a
@@ -299,43 +312,80 @@ icon) and what a store needs: signing, accounts
 in the app with the delete step both stores require, Apple's rule on selling
 the upgrade, and Google Play's closed test of 12 testers for 14 days.
 
-What a native audio bridge needs, in place of the web view's sound:
+The native audio bridge is built for both phones: a Capacitor plug-in in
+`apps/mobile/native-engine` that fills in `NativeEngineBridge`. On iOS the
+engine is built by the repository's CMake as an XCFramework,
+`AVAudioSession` is set for playback, and an `AVAudioEngine` whose
+`AVAudioSourceNode` render block calls `snare_engine_render` plays it. On
+Android the same CMake builds it with the NDK (r27d, installed on
+2026-11-18), and an Oboe stream's data callback calls `snare_engine_render`,
+with audio focus and changes of device handled. Sounds are synthesised by
+the engine at the phone's rate. On 2026-11-18 it ran in an iPhone
+simulator and an Android emulator: the machine shown, a beat playing
+through it, the engine's own peak at 0.66, and the engine made again
+halfway with the beat playing on. On the emulator a faked phone call
+stopped the beat and play started it again. Nobody has listened to it, and
+it has not been on a phone. `apps/mobile/README.md` has what was checked
+and how.
 
-- Xcode with an Apple developer team, and Android Studio with the NDK. Neither
-  is available on Linux CI for iOS; iOS needs a macOS runner.
-- A Capacitor plugin in `apps/mobile` exposing the `EngineCommand` messages.
-  `AudioController` is made inside `EditorRuntime`, which needs a way to be
-  handed another one.
-  - iOS: `AVAudioEngine` with an `AVAudioSourceNode` whose render block calls
-    `snare_engine_render`. Configure `AVAudioSession` for playback and handle
-    interruptions and route changes by reopening at the new sample rate.
-  - Android: Oboe with a C++ callback calling `snare_engine_render`; build the
-    engine with the NDK from `engine/CMakeLists.txt`. Handle audio focus and
-    device changes.
-- Sounds need no files: the engine synthesises them
-  (`snare_engine_synth_sound`), so a native shell can call that at the
-  device's sample rate instead of receiving PCM over the bridge.
-- Position and stats reports throttled across the bridge. The worklet already
-  reports at most once per step and ten times a second for stats.
+What is left:
 
-Unverified: the bridge is not started.
+- **Real phones**, and listening to them. A simulator cannot ring, take a
+  call, have headphones pulled or a Bluetooth route chosen, and the
+  emulator only fakes a call, so most of what the plug-in does then is
+  built and has not run.
+- **32-bit Android phones** get no plug-in: the library is built for arm64
+  and x86_64 only.
+- **Background playing.** The app does not ask iOS to play when it is not
+  in front.
+- **CI.** Nothing builds the plug-in or runs its tests; that needs a macOS
+  runner for iOS, as the desktop app's checks do, and an emulator with the
+  NDK for Android.
 
 ### Tauri (Windows and macOS)
 
-Prerequisites:
+A first slice is built in `apps/desktop`, for macOS: the editor with
+РИТМ-12 in a Tauri window, playing through the engine built natively by the
+repository's CMake and a CPAL output stream. On 2026-11-18 it ran on the
+Mac it was built on, from the dev server, as a debug build and as the
+release `.app`: the window shows the machine, a beat plays, and the
+engine's own numbers say the output was not silent. Nobody has listened to
+it. `apps/desktop/README.md` has what was checked, how, and what was not.
 
-- Rust toolchain, the Tauri CLI, and platform build tools (MSVC on Windows,
-  Xcode command line tools on macOS).
-- A Rust audio bridge (`apps/desktop`) that opens a CPAL output stream and
-  calls the engine through the C ABI. Link `boombapbot_engine` as a static
-  library built by CMake (the `cmake` crate or a build script).
-- The engine's control functions are safe to call from one non-audio thread;
-  the CPAL callback must be the only caller of `snare_engine_render`.
-- Device change handling: recreate the engine at the new sample rate and load
-  the project into it again, which re-synthesises the sounds at that rate.
-- Tauri commands mirroring `EngineCommand`, and events for position and stats.
+What is left:
 
-Unverified: everything. No Tauri project exists yet.
+- **Listen to it.** Everything known about its sound is numbers.
+- **A real change of sound device.** Pull headphones out, plug a 44.1 kHz
+  interface in, change the rate in Audio MIDI Setup. The app is built to
+  make the engine again at the new rate and have the page tell it the beat
+  again, and that was run only by making the app behave as if the device
+  had said so. CPAL 0.18 follows the default device by itself and says
+  when it has; whether the beat carries on cleanly through that is untried.
+- **The dialog that asks where to keep an export.** It has never been on a
+  screen: the check writes exports to a folder of its own in place of
+  asking. Import, which opens the system's file chooser, is untried too.
+- **Windows.** Not built. It needs MSVC and WebView2. `build.rs` already
+  looks where a Visual Studio generator puts the library, and CPAL's WASAPI
+  host follows the default device as CoreAudio's does, but none of it has
+  been compiled there.
+- **CI.** Nothing builds the app or runs its Rust tests. It needs a macOS
+  runner (and a Windows one), with Rust and the CMake the engine already
+  needs. The page's TypeScript and its unit tests do run in CI.
+- **How long a tap takes to sound.** The stream asks for buffers of 256
+  frames and got them on the Mac's own speakers; a tap also crosses Tauri's
+  bridge and waits for the next buffer. Not measured, and not compared with
+  the web view.
+- **The draft is in the web view's storage,** under the app's identifier.
+  The phone app keeps its draft in the device's own store for a reason that
+  may apply here: find out whether macOS ever clears it.
+- **Signing and notarising**, for anyone else to open it without a warning:
+  an Apple developer team and a Developer ID certificate, which are the
+  owner's. The identifier `com.boombapbot.desktop` and the icon (the phone
+  app's stand-in) are stand-ins as well.
+- **Accounts, saved beats and the shop** are left out, as in the phone app,
+  and for the same reasons: they ask the page's own address for `/api/...`.
+- **Words written for the site.** The settings sheet says the draft is saved
+  "in this browser".
 
 ## Web
 
