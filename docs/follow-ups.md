@@ -351,8 +351,12 @@ What is left:
   call, have headphones pulled or a Bluetooth route chosen, and the
   emulator only fakes a call, so most of what the plug-in does then is
   built and has not run.
-- **32-bit Android phones** get no plug-in: the library is built for arm64
-  and x86_64 only.
+- **32-bit Android phones**: the library is built for `armeabi-v7a` and
+  `x86` as well as `arm64-v8a` and `x86_64`, with no warnings and no
+  locking atomics, but nothing 32-bit has run. The emulators on an Apple
+  silicon Mac are 64-bit only; the plug-in's 6 tests pass on the arm64 one.
+  A 32-bit ARM phone is the test. `apps/mobile/README.md` has the details
+  and the size change.
 - **Background playing.** The app does not ask iOS to play when it is not
   in front.
 - **CI.** Nothing builds the plug-in or runs its tests; that needs a macOS

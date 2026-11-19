@@ -41,7 +41,9 @@ own audio: AVAudioEngine on an iPhone, Oboe on Android.
     repository's own CMake (`add_subdirectory` of `engine/`), always
     optimised, with the NDK pinned in `build.gradle` (r27d,
     27.3.13750724, and CMake 3.31.6). Oboe 1.11.0 comes from Google's
-    Maven as a prefab package.
+    Maven as a prefab package. It is built for `arm64-v8a` and
+    `armeabi-v7a` (phones) and `x86_64` and `x86` (emulators on Intel
+    computers).
   - `native_engine.cpp` is the Oboe stream and the engine's C ABI over JNI.
     The stream's data callback is the only caller of `snare_engine_render`:
     it renders through scratch made with it into the buffer Oboe hands it,
@@ -356,9 +358,30 @@ emulator; see above. Left:
   phone to try Android on first.
 - **The delay between a tap and its sound**, which the web view made
   longest on Android, has not been measured on either.
-- **32-bit Android.** The library is built for arm64 and x86_64 only
-  (`abiFilters`). A phone that runs only 32-bit apps gets no plug-in, and
-  would fail to start the app's engine. Add `armeabi-v7a` if one matters.
+- **32-bit Android has been built, not run.** Since 2026-11-18 the
+  library is built for `armeabi-v7a` and `x86` as well as `arm64-v8a` and
+  `x86_64`. Both 32-bit builds compile with the engine's warnings and none
+  come up. The ARM one is ARMv7 Thumb-2 with VFPv3 and NEON, the NDK's
+  default. No build calls the C++ runtime's atomics, which would take a lock
+  on the audio thread: the engine's and the plug-in's 64-bit atomics are
+  instructions on both. On x86 the arithmetic is SSE, and x87 appears only
+  where the 32-bit calling convention returns a float. A handle crosses JNI
+  as a pointer widened through `uintptr_t`, so a 32-bit pointer comes back
+  the same. The engine's structs have the same offsets on every ABI: the
+  WebAssembly build, which `test_abi.c` holds to them, is 32-bit already.
+  No struct crosses JNI as bytes in any case. What ran: the plug-in's 6 tests, on the
+  arm64 emulator (Android 16), after the change. Nothing 32-bit has run.
+  The emulators on this Mac (Apple silicon) list only `arm64-v8a`, and
+  Apple's chips cannot run 32-bit ARM code. The x86 build could run on an
+  Intel computer or a Linux CI runner with an x86 image. A 32-bit ARM phone
+  is the test.
+- **The size of 32-bit.** Release builds, before and after: the universal
+  APK went from 17.0 MB to 27.9 MB, since the libraries are stored
+  uncompressed; the AAB from 7.9 MB to 11.3 MB; the plug-in's AAR from
+  1.2 MB to 2.3 MB. Play hands a phone only its own ABI's libraries, so an
+  arm64 phone downloads what it did before. A 32-bit ARM phone gets 5.3 MB
+  of libraries (the plug-in 0.7, the C++ runtime 1.3, Oboe 3.4), against
+  6.4 MB on arm64.
 - `native-engine/` keeps its own copies of the rules the desktop app keeps
   in Rust, one in Swift and one in Java: what the commands and reports are,
   and what the page is told and how often. A change to
