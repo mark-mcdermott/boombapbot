@@ -169,7 +169,10 @@ jobs:
 
       - name: Generate the Capacitor plug-in projects
         working-directory: apps/mobile
-        run: pnpm exec cap update android
+        # The app's web assets are not needed to build the plug-in, only the folder they go in.
+        run: |
+          mkdir -p android/app/src/main/assets
+          pnpm exec cap update android
 
       - name: Build the plug-in and its tests
         working-directory: apps/mobile/android
