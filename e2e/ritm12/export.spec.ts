@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { downloadBytes, exportVia, openSettings, parseMidi, parseWav } from '../helpers';
 import { beat, hitCount, openMachine } from './helpers';
 
@@ -8,6 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 const status = (page: Page) => page.getByTestId('wav-export-status');
 const said = (page: Page) => page.getByTestId('wav-export-said');
+const colorOf = (part: Locator) => part.evaluate((node) => getComputedStyle(node).color);
 
 /**
  * Takes hold of every script the page asks for from now on. By the time
@@ -74,8 +75,14 @@ test('a render under way says so, to the eye and to a screen reader, and a secon
   for (const item of ['export-wav', 'export-wav-16']) {
     await expect(page.getByTestId(item)).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByTestId(item)).toContainText('One is rendering now');
+    // It looks switched off as well: no hand over it, and its name dimmed beside the note that says why.
+    await expect(page.getByTestId(item)).toHaveCSS('cursor', 'default');
+    const name = await colorOf(page.getByTestId(item).locator('span').first());
+    expect(name).not.toBe(await colorOf(page.getByTestId('export-midi').locator('span').first()));
+    expect(name).not.toBe(await colorOf(page.getByTestId(item).locator('.sb-menu-note')));
   }
   await expect(page.getByTestId('export-midi')).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(page.getByTestId('export-midi')).toHaveCSS('cursor', 'pointer');
   await page.keyboard.press('Escape');
 
   release();

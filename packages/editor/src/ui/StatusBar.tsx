@@ -56,7 +56,12 @@ const AUDIO_TEXT: Record<string, string> = {
   error: 'Audio could not start',
 };
 
-export function StatusBar() {
+interface StatusBarProps {
+  /** Whether a beat can also be saved to an account here. A shell with no site behind it has none. */
+  accounts: boolean;
+}
+
+export function StatusBar({ accounts }: StatusBarProps) {
   const audioStatus = useEditorState((state) => state.audioStatus);
   const audioError = useEditorState((state) => state.audioError);
   const draftState = useEditorState((state) => state.draftState);
@@ -66,7 +71,9 @@ export function StatusBar() {
 
   const saved =
     draftState === 'error'
-      ? 'This browser is not saving drafts. Export the project to keep it.'
+      ? accounts
+        ? 'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.'
+        : 'This browser is not saving drafts. Export the project to keep it.'
       : draftSavedAt
         ? `Draft saved in this browser at ${new Date(draftSavedAt).toLocaleTimeString()}`
         : 'Draft will be saved in this browser';

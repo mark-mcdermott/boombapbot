@@ -114,7 +114,7 @@ function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [runtime]);
 
-  const settings = <Settings container={modals} />;
+  const settings = <Settings container={modals} accounts={!below} />;
   return (
     <div
       className="sb-app"

@@ -156,10 +156,12 @@ function Group({ label, labelFor, children }: { label?: string; labelFor?: strin
 interface SettingsProps {
   /** Where the modal mounts, so it inherits the editor's theme. */
   container: RefObject<HTMLElement | null>;
+  /** Whether the page has an account to save a beat to. */
+  accounts: boolean;
 }
 
 /** The cog, and the modal behind it that holds everything but the machine. */
-export function Settings({ container }: SettingsProps) {
+export function Settings({ container, accounts }: SettingsProps) {
   const runtime = useRuntime();
   const [open, setOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -219,7 +221,7 @@ export function Settings({ container }: SettingsProps) {
           <runtime.machine.Notes />
         </Group>
         <Group>
-          <StatusBar />
+          <StatusBar accounts={accounts} />
         </Group>
         <Group>
           <p className="sb-footnote">{runtime.machine.keysHelp}</p>
