@@ -505,8 +505,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   under them "by mm.coffee" on the right, without "built with" and its
   heart. A count or a signed-in dot that rides an icon's corner follows
   the word instead.
-- `SitePage` wraps a page of words; About, Docs, the manifesto, Credits and
-  Policies are Astro pages in `apps/site/src/pages` that use it. There the
+- `SitePage` wraps a page of words; About, Docs, the manifesto and Policies
+  are Astro pages in `apps/site/src/pages` that use it. There the
   header is a compact masthead (`.sb-masthead`: the mascot beside a small
   wordmark, with no tagline) and names the pages beside the brand
   (`ui/SiteNav.tsx`, with a lamp lit for the page that is open), so the
@@ -532,11 +532,6 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `apps/site/src/assets/ritm12/` and the machine's `art/README.md` says how
   they were taken; take them again if the panel's art changes. The words on
   About are the owner's to edit.
-- Credits is blank until the owner writes it. The ruled outline on it
-  (`.sb-blank`) is drawn in CSS and holds no words. Nothing leads to it
-  while it is blank: it is left out of `SITE_PAGES`, so neither the
-  masthead nor the footer names it, and its page stands at `/credits`. Put
-  it back in that list, with an icon in `Footer.tsx`, when it has words.
 - On the machine's page the footer sits 50px under the machine
   (`--footer-drop`, `.sb-below-machine`). On a page of words it follows the
   words, so a short page ends where its words do. Keep

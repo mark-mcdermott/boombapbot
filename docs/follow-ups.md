@@ -328,7 +328,6 @@ site its icon still opens a modal that says it is not open.
     and "Who made it" moved up to third. No claim was added.
   - Whether "Docs" should be called "Manual".
   - Whether the manifesto is signed. It is not.
-  - Credits is still blank.
 
 ## Native shells
 

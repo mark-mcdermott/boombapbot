@@ -93,15 +93,14 @@ pnpm serve
   picture is Russian; every control's accessible name is English, and a
   control that moves says what it did on the machine's screen and to a
   screen reader.
-- **Pages of words.** About, Docs, the manifesto, Credits and Policies are
-  pages of their own on the same Astro site, with the same footer. Their
+- **Pages of words.** About, Docs, the manifesto and Policies are pages
+  of their own on the same Astro site, with the same footer. Their
   header is a compact masthead that names every page beside the brand, so
   nothing has to be pointed at to find them. About opens on a still of the
   machine with its screen lit and a key that opens it. Docs goes through
   every control and says what its lettering means. The manifesto is one
-  narrow column. Credits is a blank page for now, at `/credits`, and nothing
-  leads to it until it has something on it. They are set in two faces
-  the site serves itself, PT Serif and Sofia Sans Condensed.
+  narrow column. They are set in two faces the site serves itself, PT Serif
+  and Sofia Sans Condensed.
 - **Eight sounds, synthesised.** Kick, snare, clap, closed and open hat, tom,
   rim and percussion. The engine builds each one from its pitch, decay and
   tone knobs, so turning one re-synthesises that sound. Nothing is a

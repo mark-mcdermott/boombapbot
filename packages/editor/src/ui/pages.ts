@@ -6,10 +6,4 @@ export const SITE_PAGES = [
   { id: 'policies', label: 'Policies' },
 ] as const;
 
-export type ListedPageId = (typeof SITE_PAGES)[number]['id'];
-
-/**
- * Every page of words. Credits has nothing written on it yet, so nothing
- * leads to it: it stands at its own address until there is something to read.
- */
-export type SitePageId = ListedPageId | 'credits';
+export type SitePageId = (typeof SITE_PAGES)[number]['id'];

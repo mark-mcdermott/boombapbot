@@ -1,12 +1,12 @@
 import { BookOpen, Heart, Info, Scale, ScrollText } from 'lucide-react';
 import { useState, type ReactNode, type RefObject } from 'react';
 import { Account } from './Account';
-import { SITE_PAGES, type ListedPageId, type SitePageId } from './pages';
+import { SITE_PAGES, type SitePageId } from './pages';
 import { Shop } from './Shop';
 import { Tip, TipGroup } from './Tip';
 import { Upgrade } from './Upgrade';
 
-const PAGE_ICONS: Record<ListedPageId, ReactNode> = {
+const PAGE_ICONS: Record<SitePageId, ReactNode> = {
   about: <Info />,
   docs: <BookOpen />,
   manifesto: <ScrollText />,
