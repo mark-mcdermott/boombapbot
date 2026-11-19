@@ -1,0 +1,206 @@
+name: Native apps
+
+# The desktop app and the phone engine plug-in. macOS minutes cost about ten
+# times Linux ones, so this runs only when something these builds use changes.
+on:
+  push:
+    branches: [main]
+    paths: &native-paths
+      - engine/**
+      - packages/machine-*/engine/**
+      - apps/desktop/**
+      - apps/mobile/native-engine/**
+      - scripts/build-engine-ios.sh
+      - scripts/build-wasm.sh
+      - scripts/setup-emsdk.sh
+      - .emscripten-version
+      - pnpm-lock.yaml
+      - .github/workflows/native.yml
+  pull_request:
+    paths: *native-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  wasm:
+    name: WebAssembly engine for the desktop page
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: lukka/get-cmake@v3.31.6
+        with:
+          cmakeVersion: 3.31.6
+
+      - name: Cache Emscripten
+        uses: actions/cache@v4
+        with:
+          path: .tools/emsdk
+          key: emsdk-${{ runner.os }}-${{ hashFiles('.emscripten-version') }}
+
+      - name: Install the pinned Emscripten
+        run: ./scripts/setup-emsdk.sh
+
+      - name: Build the WebAssembly engine
+        run: ./scripts/build-wasm.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-engine
+          path: build/wasm/boombapbot-engine-*.wasm
+          if-no-files-found: error
+          retention-days: 1
+
+  desktop:
+    name: Desktop app on ${{ matrix.name }}
+    needs: wasm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-26
+            build: pnpm --filter @boombapbot/desktop bundle
+          - name: Windows
+            os: windows-latest
+            build: pnpm --filter @boombapbot/desktop exec tauri build --no-bundle
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # The runner's own CMake: 3.31 does not know Windows' Visual Studio 2026 generator.
+      - name: CMake
+        run: cmake --version
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-engine
+          path: build/wasm
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare the engine and the panel art
+        run: pnpm prepare:assets
+
+      - name: Build the app
+        run: ${{ matrix.build }}
+
+      - name: Rust tests
+        run: pnpm --filter @boombapbot/desktop test:engine
+
+  ios:
+    name: Phone engine plug-in on iOS
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: lukka/get-cmake@v3.31.6
+        with:
+          cmakeVersion: 3.31.6
+
+      - name: Build the engine as an XCFramework
+        run: ./scripts/build-engine-ios.sh ritm12 apps/mobile/native-engine/ios/BoombapbotEngine.xcframework
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/spm
+          key: spm-${{ runner.os }}-${{ hashFiles('apps/mobile/native-engine/Package.swift') }}
+
+      - name: The plug-in's tests in a simulator
+        working-directory: apps/mobile/native-engine
+        run: |
+          simulator="$(xcrun simctl list devices available --json \
+            | jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))][0].udid')"
+          xcodebuild test \
+            -scheme BoombapbotNativeEngine \
+            -destination "id=$simulator" \
+            -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/build/spm"
+
+  android:
+    name: Phone engine plug-in on Android
+    needs: wasm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the NDK and CMake build.gradle pins
+        run: |
+          ndk="$(sed -nE 's/.*ndkVersion = "([^"]+)".*/\1/p' apps/mobile/native-engine/android/build.gradle)"
+          cmake="$(sed -nE 's/.*version "([0-9.]+)".*/\1/p' apps/mobile/native-engine/android/build.gradle)"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ndk" "cmake;$cmake"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-engine
+          path: build/wasm
+
+      # Capacitor writes the plug-in projects Gradle includes only beside a built page.
+      - name: Build the page and sync it into the Android project
+        run: |
+          pnpm prepare:assets
+          pnpm --filter @boombapbot/mobile build
+          pnpm --filter @boombapbot/mobile exec cap sync android
+
+      - name: Build the plug-in and its tests
+        working-directory: apps/mobile/android
+        run: ./gradlew :boombapbot-native-engine:assembleDebug :boombapbot-native-engine:assembleDebugAndroidTest
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: The plug-in's instrumented tests in an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          working-directory: apps/mobile/android
+          script: ./gradlew :boombapbot-native-engine:connectedDebugAndroidTest

@@ -11,10 +11,16 @@ set(BOOMBAPBOT_CORE_SOURCES
   "${BOOMBAPBOT_ENGINE_DIR}/src/engine.cpp"
   "${BOOMBAPBOT_ENGINE_DIR}/src/midi.cpp"
   "${BOOMBAPBOT_ENGINE_DIR}/src/synth.cpp")
-set(SNARE_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
 # No fused multiply-add, so native and WebAssembly builds do the same
-# arithmetic and render the same samples.
-set(SNARE_FLOAT_FLAGS -ffp-contract=off)
+# arithmetic and render the same samples. MSVC contracts only when asked
+# (/fp:contract), and reads sources as UTF-8 only when told.
+if(MSVC)
+  set(SNARE_WARNINGS /W4 /utf-8)
+  set(SNARE_FLOAT_FLAGS /fp:precise)
+else()
+  set(SNARE_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
+  set(SNARE_FLOAT_FLAGS -ffp-contract=off)
+endif()
 
 # Functions the WebAssembly build exports. Keep in step with engine.h.
 set(SNARE_WASM_EXPORTS

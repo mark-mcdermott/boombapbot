@@ -338,8 +338,10 @@ Run in this order; later steps use what earlier ones build.
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
 
-The desktop app has two checks of its own, which CI does not run. They need
-Rust, and `pnpm prepare:assets` first.
+The desktop app has two checks of its own. They need Rust, and
+`pnpm prepare:assets` first. `.github/workflows/native.yml` builds the app
+on macOS and Windows and runs `test:engine` on both. It does not run
+`check:run`, which makes sound.
 
 | Command | What it checks |
 | --- | --- |
@@ -351,7 +353,9 @@ need Xcode and the engine built for iOS (`pnpm --filter @boombapbot/mobile
 engine:ios`); on Android, the NDK and CMake its `build.gradle` names. Its
 tests run in a simulator or an emulator, and the app checks itself in one
 as the desktop app does, but for exports. `apps/mobile/README.md` has the
-commands.
+commands. `.github/workflows/native.yml` runs the plug-in's tests in an
+iPhone simulator on macOS and in an Android emulator on Linux. It does not
+build the app or run its check.
 
 ### Results
 

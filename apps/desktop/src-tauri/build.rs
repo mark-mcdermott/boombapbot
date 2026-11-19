@@ -7,10 +7,13 @@ const MACHINE: &str = "ritm12";
 /// Builds the engine with the repository's own CMake, as a static library
 /// with the machine's voices in it, and links it.
 fn main() {
-    let repository = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("cargo sets the manifest directory"))
-        .join("../../..")
-        .canonicalize()
-        .expect("the app sits two folders into the repository");
+    // Not canonicalised: on Windows that gives a \\?\ path, which MSBuild cannot open sources through.
+    let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("cargo sets the manifest directory"));
+    let repository = manifest
+        .ancestors()
+        .nth(3)
+        .expect("the app sits two folders into the repository")
+        .to_path_buf();
     let engine = repository.join("engine");
     let machine = repository.join(format!("packages/machine-{MACHINE}"));
     let library = format!("boombapbot_engine_{MACHINE}");
