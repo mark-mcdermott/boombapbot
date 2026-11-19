@@ -207,9 +207,9 @@ reads from the real Neon database once it is migrated. On the live site, on
 2026-11-16, the owner signed up and later reset a password: both emails
 arrived through Resend and their links worked.
 
-What has not: the rate limit counting in the database on the live site. Its
-table is added by `apps/site/drizzle/0004_rate_limits.sql`, which has not
-been run there, and has to be before this code is deployed.
+The rate limit's table (`apps/site/drizzle/0004_rate_limits.sql`) has been
+in the real database since 2026-11-18, when the migration was run there,
+before the code that uses it was deployed.
 
 ### Saved beats
 

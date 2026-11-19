@@ -135,20 +135,24 @@ site its icon still opens a modal that says it is not open.
   table, so every server counts together: three tries at logging in or
   signing up in ten seconds from one address, three requests for an email
   in a minute, a hundred of anything else in ten seconds.
-  - **The migration is written and not run.**
-    `apps/site/drizzle/0004_rate_limits.sql` adds the table. It has to be
-    run on Neon before this code is live: without the table every route
-    under `api/auth` answers with an error, log-in, sign-up and password
-    reset among them. Asking who is logged in is the one that would still
-    work.
+  - **The migration is run.** `apps/site/drizzle/0004_rate_limits.sql`
+    adds the table. It was run on Neon on 2026-11-18 (US Central), with
+    `pnpm db:migrate`, after the code was merged and before it was
+    deployed. Neon's record of migrations held the four before it, so only
+    this one was applied. The table was checked afterwards: its columns,
+    the identity `id`, the unique `uuid` and `key` are as the migration has
+    them, it was empty, and the seven tables that were there hold the rows
+    they held before.
   - Asking who is logged in is not counted. Every page asks it as it
     loads, and counting it would write to the database for each visitor.
-  - Not checked on Vercel: that a visitor's address reaches Better Auth.
-    It reads `x-forwarded-for` and trusts it only when it holds a single
-    address. Where it finds none, every visitor shares one count for each
-    route, and with the count in the database that is one count for the
-    whole site. A log-in's row has a column for the address it came from,
-    read the same way; nobody has looked at whether it is filled in.
+  - **A visitor's address reaches Better Auth on Vercel.** It reads
+    `x-forwarded-for` and trusts it only when it holds a single address;
+    where it finds none, every visitor would share one count for each
+    route, which with the count in the database is one count for the whole
+    site. Checked on the live site on 2026-11-18, after the deploy: one
+    log-in with a made-up account was answered "wrong password", and the
+    row it left in `rate_limits` was keyed by the caller's own IPv4
+    address. Asking who is logged in still answered and left no row.
   - Better Auth clears old rows away itself as new ones are counted.
   - The routes outside `api/auth` (saved beats, the shop, the upgrade) are
     not covered by it.
