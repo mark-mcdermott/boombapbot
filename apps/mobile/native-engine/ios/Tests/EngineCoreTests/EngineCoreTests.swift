@@ -90,6 +90,19 @@ final class CommandTests: XCTestCase {
         XCTAssertEqual(json(.stats(frames: 4800, peak: 0.5, peakEver: 0.75, voices: 2, stolen: 1)),
                        ["type": "stats", "frames": 4800.0, "peak": 0.5, "peakEver": 0.75, "voices": 2, "stolen": 1])
     }
+
+    func testAwayThePageIsToldWhatChangesTheMachineAndNotWhatShowsItAtWork() {
+        var away = Away(since: 10, frames: 4800)
+        let passing: [Report] = [.ready(sampleRate: 48000), .error("gone"), .sound(slot: 1), .ended,
+                                 .measures([Measure(frame: 96, ordinal: 1, pattern: 0, kind: .basic, position: -1)])]
+        for report in passing { XCTAssertTrue(away.passes(report), "\(report)") }
+        let held: [Report] = [.position(step: 3, pattern: 0, playing: true), .level(0.2),
+                              .stats(frames: 9600, peak: 0.66, peakEver: 0.66, voices: 2, stolen: 0),
+                              .stats(frames: 14400, peak: 0.4, peakEver: 0.66, voices: 2, stolen: 0)]
+        for report in held { XCTAssertFalse(away.passes(report), "\(report)") }
+        XCTAssertEqual(away.peak, 0.66)
+        XCTAssertEqual(away.framesBefore, 4800)
+    }
 }
 
 final class EngineTests: XCTestCase {

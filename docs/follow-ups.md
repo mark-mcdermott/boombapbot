@@ -365,8 +365,22 @@ What is left:
   silicon Mac are 64-bit only; the plug-in's 6 tests pass on the arm64 one.
   A 32-bit ARM phone is the test. `apps/mobile/README.md` has the details
   and the size change.
-- **Background playing.** The app does not ask iOS to play when it is not
-  in front.
+- **Background playing.** Built on 2026-11-18, as decided: a beat that
+  plays keeps playing when the app leaves the front or the screen locks.
+  On iOS the app has the `audio` background mode, shows the beat in Now
+  Playing and takes a pause from there; on Android a foreground service of
+  the media playback type keeps the app alive while the beat plays, with a
+  media notification whose pause stops it. Either way the pause stops the
+  beat in the plug-in and tells the page, and the page is told the step
+  again when the app comes back. Once stopped there is nothing to press
+  play on: playing again is done in the app. It ran in the iPhone
+  simulator and the Android emulator: the engine rendered in real time out
+  of the front and behind the lock screen, the pause stopped it, and the
+  page matched on return, playing or stopped. Not tried: real phones, a
+  real call out of the front, headphones or Bluetooth out of the front, how
+  long a phone lets it play, and what it costs in battery. In the
+  simulator iOS did not suspend the app after the beat stopped out of the
+  front, though the plug-in lets go of the sound then; a phone may differ.
 - **CI.** Nothing builds the plug-in or runs its tests; that needs a macOS
   runner for iOS, as the desktop app's checks do, and an emulator with the
   NDK for Android.

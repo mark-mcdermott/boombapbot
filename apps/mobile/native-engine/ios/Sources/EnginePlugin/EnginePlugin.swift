@@ -1,6 +1,8 @@
 import AVFoundation
 import Capacitor
 import EngineCore
+import os
+import UIKit
 
 /// The engine built natively, for the page: the calls of `NativeEngineBridge`
 /// (packages/editor/src/engine/native-audio.ts) and its reports, on "report".
@@ -36,6 +38,12 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
     private var configurationObserver: NSObjectProtocol?
     /// Times the engine was made again because the phone changed its sound.
     private var reopened = 0
+    /// Set while the app is not in front.
+    private var away: Away?
+    private var nowPlaying: NowPlaying?
+    /// Whether the lock screen shows the beat playing.
+    private var showsPlaying = false
+    private let log = Logger(subsystem: "com.boombapbot.engine", category: "engine")
 
     override public func load() {
         let center = NotificationCenter.default
@@ -44,6 +52,11 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
         center.addObserver(self, selector: #selector(routeChanged(_:)), name: AVAudioSession.routeChangeNotification, object: session)
         center.addObserver(self, selector: #selector(servicesReset(_:)), name: AVAudioSession.mediaServicesWereResetNotification,
                            object: session)
+        center.addObserver(self, selector: #selector(wentAway(_:)), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        center.addObserver(self, selector: #selector(cameBack(_:)), name: UIApplication.willEnterForegroundNotification, object: nil)
+        nowPlaying = NowPlaying { [weak self] in
+            self?.control.async { self?.stopBeat() }
+        }
     }
 
     deinit {
@@ -51,6 +64,7 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func report(_ report: Report) {
+        if away?.passes(report) == false { return }
         notifyListeners(Self.reportEvent, data: report.json)
     }
 
@@ -103,7 +117,7 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
             forName: .AVAudioEngineConfigurationChange, object: output.audioEngine, queue: nil
         ) { [weak self] _ in
             // The engine stopped itself: the phone's output is not what it was.
-            self?.control.async { self?.reopen() }
+            self?.control.async { self?.recover() }
         }
         schedule()
         return output.engine.sampleRate
@@ -117,6 +131,7 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
         configurationObserver = nil
         output?.stop()
         output = nil
+        showPlaying(false)
     }
 
     /// Makes the engine again at the rate the phone runs at now. The page then
@@ -145,10 +160,90 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
     private func look() {
         guard let output else { return }
         watch.look(output.engine, output.renderer, now: ProcessInfo.processInfo.systemUptime) { report($0) }
+        showPlaying(output.isRunning && output.engine.isPlaying)
+        if away != nil, output.isRunning, !output.engine.isPlaying { sleep(output) }
         let wanted = output.engine.isPlaying ? Self.playingPause : Self.restingPause
         if wanted != pause {
             pause = wanted
             timer?.schedule(deadline: .now() + pause, repeating: pause, leeway: .milliseconds(1))
+        }
+    }
+
+    /// Stops the beat without the page, which may be asleep, and tells it the beat ended.
+    private func stopBeat() {
+        guard let output, output.engine.isPlaying else { return }
+        do {
+            _ = try output.engine.apply(.stop)
+        } catch {
+            log.error("The beat could not be stopped: \(error.localizedDescription, privacy: .public)")
+        }
+        report(.ended)
+    }
+
+    private func showPlaying(_ playing: Bool) {
+        guard playing != showsPlaying else { return }
+        showsPlaying = playing
+        nowPlaying?.show(playing: playing)
+    }
+
+    /// Nothing plays while the app is away: the phone's sound is let go, so
+    /// that the phone may suspend the app. The engine stays for its return.
+    private func sleep(_ output: AudioOutput) {
+        do {
+            try output.pause()
+        } catch {
+            log.error("The phone's sound could not be let go: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// After the phone changed its sound under the engine. In front, the engine
+    /// is made again if the sound stopped or its rate changed, and the page
+    /// tells it the beat again. Away, the page may be asleep and could not, so
+    /// a beat that plays goes on with this engine, at its own rate, which
+    /// AVAudioEngine's mixer converts; it is made again on the app's return.
+    private func recover() {
+        guard let output else { return }
+        if output.isRunning && output.currentRate == output.engine.sampleRate { return }
+        guard away != nil else { return reopen() }
+        guard !output.isRunning, !output.isPaused, output.engine.isPlaying else { return }
+        do {
+            try output.resume()
+        } catch {
+            log.error("The beat could not go on: \(error.localizedDescription, privacy: .public)")
+            report(.ended)
+        }
+    }
+
+    // MARK: The app in and out of the front
+
+    @objc private func wentAway(_ notice: Notification) {
+        control.async {
+            guard let output = self.output else { return }
+            self.away = Away(since: ProcessInfo.processInfo.systemUptime, frames: output.engine.framesRendered)
+            if !output.engine.isPlaying { self.sleep(output) }
+        }
+    }
+
+    /// The page is told where the engine is, and a sound let go is taken again.
+    @objc private func cameBack(_ notice: Notification) {
+        control.async {
+            guard let away = self.away else { return }
+            self.away = nil
+            guard let output = self.output else { return }
+            let engine = output.engine
+            let seconds = ProcessInfo.processInfo.systemUptime - away.since
+            let frames = Int(engine.framesRendered - away.framesBefore)
+            self.log.info("Back in front after \(seconds, format: .fixed(precision: 1), privacy: .public) s: \(frames, privacy: .public) frames rendered meanwhile, peak \(away.peak, format: .fixed(precision: 2), privacy: .public), \(engine.isPlaying ? "playing" : "stopped", privacy: .public)")
+            self.report(.position(step: engine.currentStep, pattern: engine.currentPattern, playing: engine.isPlaying))
+            if output.isPaused {
+                do {
+                    try output.resume()
+                } catch {
+                    self.log.error("The phone's sound could not be taken again: \(error.localizedDescription, privacy: .public)")
+                    return self.reopen()
+                }
+            }
+            self.recover()
         }
     }
 
@@ -169,23 +264,23 @@ public class BoombapbotEnginePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.output?.stop()
                 self.report(.ended)
             case .ended:
-                self.reopen()
+                // Away, the engine is made again on the app's return.
+                if self.away == nil { self.reopen() }
             @unknown default:
                 break
             }
         }
     }
 
-    /// Headphones pulled out stop the beat, as the phone's own players do.
-    /// Any other change of route makes the engine again only if the rate
-    /// changed or the sound stopped with it.
+    /// Headphones pulled out stop the beat, as the phone's own players do,
+    /// here rather than by the page, which may be asleep. Any other change of
+    /// route is recovered from.
     @objc private func routeChanged(_ notice: Notification) {
         let raw = notice.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
         let reason = raw.flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
         control.async {
-            guard let output = self.output else { return }
-            if reason == .oldDeviceUnavailable { self.report(.ended) }
-            if !output.isRunning || output.currentRate != output.engine.sampleRate { self.reopen() }
+            if reason == .oldDeviceUnavailable { self.stopBeat() }
+            self.recover()
         }
     }
 
