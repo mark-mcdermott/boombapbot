@@ -1,4 +1,5 @@
 export { BoombapbotEditor, type BoombapbotEditorProps } from './ui/Editor';
+export { shellFooter } from './ui/ShellFooter';
 export { SitePage, type SitePageLayout, type SitePageProps } from './ui/SitePage';
 export { RuntimeContext, useAssetManifest, useEditorState, useRuntime } from './ui/context';
 export { useKnob, type KnobOptions } from './ui/knob';
@@ -15,6 +16,17 @@ export {
 } from './state/draft-storage';
 export type { Machine, MachineHost, MachineSession, StartPlan } from './machine';
 export type { EngineMeasure } from './engine/wasm-engine';
+export type {
+  AudioControllerEvents,
+  AudioFactory,
+  AudioState,
+  AudioStats,
+  EngineAudio,
+  SampledEngineAudio,
+  SynthEngineAudio,
+} from './engine/engine-audio';
+export type { EngineCommand, EngineReport, NativeEngineCommand } from './engine/messages';
+export { NativeAudioController, type NativeEngineBridge } from './engine/native-audio';
 export {
   exportBaseName,
   projectFileName,

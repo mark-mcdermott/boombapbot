@@ -3,14 +3,60 @@
 The shared editor with РИТМ-12 inside a Capacitor shell, for iOS and
 Android. Bundle id `com.boombapbot.app`, shown under its icon as
 "boombapbot". This is the first slice: the machine, its settings and a
-draft kept on the phone. It is not ready for either store.
+draft kept on the phone. It is not ready for either store. On both
+phones the beat plays through the engine built natively and the phone's
+own audio: AVAudioEngine on an iPhone, Oboe on Android.
 
 ## What is here
 
 - `src/main.tsx` mounts `BoombapbotEditor` with РИТМ-12, the same way
-  `apps/site/src/components/Machine.tsx` does, with three differences: the
+  `apps/site/src/components/Machine.tsx` does, with four differences: the
   draft goes to the device's own store, an export goes to the phone's share
-  sheet, and under the machine there is only the settings button.
+  sheet, under the machine there is only the settings button, and where the
+  phone has the engine plug-in the sound is the plug-in's.
+- `native-engine/` is that plug-in, a package of its own that Capacitor
+  finds through the app's dependencies (`link:./native-engine`). On iOS it
+  is a Swift package, `Package.swift`, with four parts:
+  - `BoombapbotEngine.xcframework`, the engine built for РИТМ-12 by the
+    repository's CMake, for a phone and for the simulator
+    (`scripts/build-engine-ios.sh`, run by `pnpm engine:ios`). It is built,
+    not committed.
+  - `EngineRender`, in C: what the audio thread calls. It renders straight
+    into the buffers AVAudioEngine hands it, calls nothing but
+    `snare_engine_render`, takes no lock and allocates nothing, and leaves
+    a peak in an atomic for the control thread.
+  - `EngineCore`, in Swift with no Capacitor in it: the commands and reports
+    in the editor's spelling, the engine for its control thread, and what
+    the page is told and how often, as the worklet tells it. Its tests are
+    `ios/Tests/`.
+  - `EnginePlugin`: the Capacitor plug-in, `BoombapbotEngine` to the page.
+    `AudioOutput.swift` sets `AVAudioSession` for playback and runs an
+    `AVAudioEngine` whose `AVAudioSourceNode` render block calls
+    `EngineRender`; `EnginePlugin.swift` makes every other call to the
+    engine on one queue of its own and answers the phone's notices.
+
+  On Android it is a Gradle library module, `native-engine/android`, that
+  `cap sync` adds to the app:
+  - `src/main/cpp/CMakeLists.txt` builds the engine for РИТМ-12 with the
+    repository's own CMake (`add_subdirectory` of `engine/`), always
+    optimised, with the NDK pinned in `build.gradle` (r27d,
+    27.3.13750724, and CMake 3.31.6). Oboe 1.11.0 comes from Google's
+    Maven as a prefab package.
+  - `native_engine.cpp` is the Oboe stream and the engine's C ABI over JNI.
+    The stream's data callback is the only caller of `snare_engine_render`:
+    it renders through scratch made with it into the buffer Oboe hands it,
+    takes no lock and allocates nothing. A device that leaves or changes
+    makes Oboe close the stream, and the callback for that only sets a flag.
+  - The Java (`com.boombapbot.engine`) is the rest, as on iOS: `Command` and
+    `Report` in the editor's spelling, `Engine` for the control thread,
+    `Watch` for what the page is told and how often, `AudioOutput` for the
+    stream, and `BoombapbotEnginePlugin`, which makes every other call to
+    the engine on one thread of its own and answers audio focus and the
+    phone's "becoming noisy". Its tests are `src/androidTest`, on a phone
+    or an emulator.
+- `src/native-engine.ts` is the bridge the editor asks for
+  (`NativeEngineBridge`) over that plug-in, and starts the run that checks
+  itself when one is asked for.
 - `src/device-storage.ts` puts the device's store (UserDefaults on iOS,
   SharedPreferences on Android, through `@capacitor/preferences`) behind the
   `KeyValueStorage` the editor asks for. A web view's own storage can be
@@ -26,15 +72,40 @@ draft kept on the phone. It is not ready for either store.
   is lettered in, from the same pinned `@fontsource-variable` package as the
   site. The app has no server to fetch it from, so the font files are in
   its bundle.
-- `scripts/copy-assets.mjs` copies the engine, the worklet and the panel art
-  from where `scripts/prepare-assets.mjs` put them for the site, so the app
-  ships the files the site serves. `public/` is generated and ignored.
+- `scripts/copy-app-assets.mjs`, at the repository root, copies the engine,
+  the worklet and the panel art from where `scripts/prepare-assets.mjs` put
+  them for the site, so the app ships the files the site serves. The
+  desktop app uses it too. `public/` is generated and ignored.
 - `ios/` and `android/` are the native projects Capacitor made. They are
   committed. `cap sync` rewrites `ios/App/CapApp-SPM/Package.swift` and the
   copies of the web build inside them.
 
-Sound is the web view's own: the same AudioWorklet and WebAssembly engine
-as the site. There is no native audio code.
+On a phone the page sends the engine's messages to the plug-in, and a
+sound goes as its knobs: the engine synthesises it at the rate the phone's
+output runs at. In a browser (`pnpm dev`), which has no plug-in, the sound
+is the web view's own: the same AudioWorklet and WebAssembly engine as the
+site. Exports render on the page with the WebAssembly engine everywhere.
+
+What the plug-in does when the phone changes its sound:
+
+- **A call, an alarm or another app takes the sound.** The beat stops, and
+  the page is told it ended, so it shows the machine stopped; it waits for
+  a press of play. On an iPhone the phone stops the sound itself, and when
+  it gives it back the engine is made again at the rate the phone runs at
+  then. On Android the plug-in asks for audio focus when play is pressed,
+  stops the beat when it loses focus, and gives focus back when the beat
+  stops. A sound that only asks for quiet for a moment (a "duck") is left
+  to Android, which lowers the beat.
+- **Headphones pulled out** stop the beat, as the phone's own players do
+  (`oldDeviceUnavailable` on iOS, "becoming noisy" on Android).
+- **Any other change of device.** On iOS, a change of route, or
+  AVAudioEngine saying its configuration changed, makes the engine again
+  at the new rate when the rate changed or the sound stopped. On Android
+  the stream is closed by Oboe when its device leaves or changes, and the
+  engine is made again at the new device's rate. Either way the page tells
+  the new engine the beat again and it plays on.
+- **The phone's audio starting over** (media services reset) makes
+  everything again.
 
 Accounts, saved beats, the shop and the upgrade are left out on purpose, and
 so are the footer's pages. Nothing in the app talks to a server.
@@ -45,9 +116,10 @@ At the repository root, once the engine is built (`pnpm build:wasm`):
 
 ```bash
 pnpm prepare:assets
-pnpm --filter @boombapbot/mobile sync      # web build, then copy into ios/ and android/
-pnpm --filter @boombapbot/mobile ios       # needs Xcode; asks which simulator
-pnpm --filter @boombapbot/mobile android   # needs Android Studio's SDK and an emulator or a phone
+pnpm --filter @boombapbot/mobile engine:ios  # the engine for iOS, once and after it changes; needs Xcode
+pnpm --filter @boombapbot/mobile sync        # web build, then copy into ios/ and android/
+pnpm --filter @boombapbot/mobile ios         # builds the engine for iOS again, syncs, asks which simulator
+pnpm --filter @boombapbot/mobile android     # needs Android Studio's SDK and an emulator or a phone
 ```
 
 `pnpm --filter @boombapbot/mobile dev` serves the page alone on port 4331;
@@ -56,6 +128,48 @@ in a browser the draft falls back to that browser's storage.
 Checks: `pnpm typecheck` and `pnpm test:unit` at the root cover this
 folder with the rest, and so does CI. CI does not build the native
 projects: iOS needs a macOS runner.
+
+The plug-in's own tests run in a simulator, from `native-engine/`, once the
+engine for iOS is built:
+
+```bash
+xcodebuild test -scheme BoombapbotNativeEngine -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+On Android they run on a phone or a booted emulator, from `android/`, once
+the app is synced. They need the NDK and CMake versions `build.gradle`
+names, from Android Studio's SDK Manager:
+
+```bash
+./gradlew :boombapbot-native-engine:connectedDebugAndroidTest
+```
+
+The app checks itself when launched with `BOOMBAPBOT_CHECK` set, as the
+desktop app does: the page presses play, listens for three seconds, asks the
+engine for its own account, stops, and the plug-in prints one line that
+starts `BOOMBAPBOT_CHECK` with the report as JSON, then closes the app, with
+0 only if neither side's peak was silent. `reopen` also makes the engine
+again halfway. Exports go to the share sheet, which waits for a person, so
+the check leaves them out. With the app installed in a booted simulator:
+
+```bash
+SIMCTL_CHILD_BOOMBAPBOT_CHECK=reopen xcrun simctl launch --console-pty --terminate-running-process booted com.boombapbot.app
+```
+
+On Android the mode goes as an extra of the intent that starts the app,
+the plug-in writes the report to the app's own files and says in the log
+(tag `BoombapbotEngine`) whether it passed, and the app closes its screen.
+With a debug build installed:
+
+```bash
+adb shell am start -n com.boombapbot.app/.MainActivity --es boombapbotCheck reopen
+```
+
+```bash
+adb shell run-as com.boombapbot.app cat files/check-report.json
+```
+
+Both make sound, through the Mac.
 
 ## What has been checked
 
@@ -114,11 +228,65 @@ Sofia Sans Condensed are loaded and every label of the panel is set in
 it; Play starts the engine (audio running at 48 kHz, output peaking at
 0.66). Export and Import have not been run again there with it.
 
-Nobody has listened to it or held it. Not checked: a real iPhone, a real
-Android phone, an iPad, the ringer switch, a phone call or another app
-taking the sound, the app coming back from the background, long playing.
-On the emulator no other app took a shared file: it has no account for
-Drive or Gmail.
+With the native engine, on the same iPhone simulator on 2026-11-18:
+
+- The plug-in's tests: 6 pass. Every command and report reads and writes
+  in the editor's spelling, a buffer holds the beat in stereo and in mono
+  (longer than the scratch a mono buffer goes through), the page is told
+  what the worklet would tell it, as often, and a command the engine cannot
+  take is refused in words.
+- The app launches and shows the phone's panel. Play by hand starts the
+  beat: the step moves and the voices' lamps light.
+- The check run (`reopen`): the plug-in opened AVAudioEngine on the route
+  named "Speaker" at 48 kHz. The phone was asked for buffers of 256 frames
+  and says it gives them; the render block was called 286 times for
+  146,432 frames in about three seconds, so about 512 frames a call. All
+  eight sounds were made by the engine and acknowledged, and the page was
+  shown every step from 1 to 16. The engine's own peak was 0.66, read by
+  the plug-in from the render block and by the page from the stats sent
+  to it, the same as the desktop app and the web engine on this beat.
+  Made again halfway, the page told the new engine the beat again (sixteen
+  sounds sent and acknowledged in all) and it played on from its first
+  step with the same peak. Stop stopped it, and the engine says so.
+
+With the native engine, on the same Android emulator (Android 16) on
+2026-11-18, with NDK r27d and Oboe 1.11.0:
+
+- The plug-in's tests: 6 pass on the emulator, the same as iOS's.
+- The check run (`reopen`): Oboe opened an AAudio stream, shared rather
+  than exclusive, at 48 kHz in stereo float, in bursts of 960 frames with
+  a buffer of 4,360 (an emulator's numbers; a phone's will be smaller).
+  All eight sounds were made by the engine and acknowledged, and the page
+  was shown every step from 1 to 16. The engine's own peak was 0.66, read
+  by the plug-in and by the page, as on iOS and the desktop. Made again
+  halfway, the page told the new engine the beat again and it played on.
+  When the app closed its screen, AAudio's log shows the stream stopped and
+  closed before the engine went.
+- Play by hand, after a check run had closed the screen and left the
+  process alive: the beat plays, the play key and the voices' lamps lit.
+  The first time this was tried the app crashed. The plug-in of the closed
+  screen still held audio focus, was told it had lost it, and handed that
+  to a thread it had already stopped. The plug-in now gives focus back
+  whenever the beat stops or the page closes the engine, and a notice that
+  arrives after it has gone is let go; the same steps then played.
+- A phone call, faked by the emulator (`adb emu gsm call`), while the beat
+  played: telephony took focus for the ringtone, the plug-in heard it lose
+  focus for a moment, stopped the beat and gave focus back, and the app
+  showed the machine stopped when the call was cancelled. Play then took
+  focus again and the beat played; stop gave it back.
+
+Nobody has listened to it or held it. The simulator and the emulator play
+through the Mac's speakers, and everything above about the native engine's
+sound is its numbers. Not checked: a real iPhone, a real Android phone, an iPad,
+the ringer switch, a phone call or another app taking the sound,
+headphones in or out, a Bluetooth route, the app coming back from the
+background, long playing; on Android, headphones, a Bluetooth device or
+another app taking the sound for good, and a phone older than Android 8,
+where focus is asked for the old way. A simulator cannot make most of those happen:
+what the plug-in does then is built and not run, except making the engine
+again, which `reopen` runs by asking for it rather than by a real change
+of route. On the emulator no other app took a shared file: it has no
+account for Drive or Gmail.
 
 ## What is not right yet
 
@@ -151,9 +319,19 @@ Drive or Gmail.
 - **The icon and the launch screen** are stand-ins: the three bars of the
   site's favicon on the page's dark background. Yours replace the images in
   `ios/App/App/Assets.xcassets` and `android/app/src/main/res`.
-- **The ringer switch.** The page asks iOS to treat its sound as playback
-  (`navigator.audioSession`), which should keep it sounding with the switch
-  on silent. A simulator has no switch, so this is untried.
+- **The ringer switch.** The plug-in sets `AVAudioSession` for playback,
+  which should keep it sounding with the switch on silent. A simulator has
+  no switch, so this is untried.
+- **Sound stops when the app leaves the front.** The app does not ask iOS
+  to play in the background (`UIBackgroundModes`). Whether a drum machine
+  should go on playing then is yours to decide.
+- **Knob turns while the phone has the sound.** During a call the engine
+  stays made and its sound is stopped, so what the page sends waits in its
+  queue. A long run of knob turns then could fill it, and the page would
+  show an audio error. Not tried.
+- **Two notices for one change.** A change of route and AVAudioEngine's
+  own notice can both arrive and make the engine again twice. The page is
+  then told the beat twice. Harmless as far as I can tell, and not tried.
 
 ## What is left before a store
 
@@ -170,16 +348,21 @@ Drive or Gmail.
 
 ### A native audio bridge
 
-The web view's audio is good enough to start with and has limits a
-plug-in would remove: the delay between a tap and its sound, which is
-longest on Android; sound stopping when the app is not in front; and no
-say in what happens on a call or when headphones are pulled.
-`docs/follow-ups.md`, "Native shells", has the design: a Capacitor plug-in
-that takes the `EngineCommand` messages of
-`packages/editor/src/engine/messages.ts` and drives the C++ engine with
-AVAudioEngine on iOS and Oboe on Android, in place of `AudioController`.
-`AudioController` is made inside `EditorRuntime` today, so the runtime needs
-a way to be handed another one.
+Both halves are built: iOS has run in a simulator and Android in an
+emulator; see above. Left:
+
+- **A real iPhone and a real Android phone**, and listening to them:
+  everything in "Not checked". The Galaxy S9 that played the site is the
+  phone to try Android on first.
+- **The delay between a tap and its sound**, which the web view made
+  longest on Android, has not been measured on either.
+- **32-bit Android.** The library is built for arm64 and x86_64 only
+  (`abiFilters`). A phone that runs only 32-bit apps gets no plug-in, and
+  would fail to start the app's engine. Add `armeabi-v7a` if one matters.
+- `native-engine/` keeps its own copies of the rules the desktop app keeps
+  in Rust, one in Swift and one in Java: what the commands and reports are,
+  and what the page is told and how often. A change to
+  `packages/editor/src/engine/messages.ts` changes all three.
 
 ### Accounts in the app
 

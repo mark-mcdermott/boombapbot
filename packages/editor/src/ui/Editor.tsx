@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ProjectBase } from '@boombapbot/contracts';
+import type { AudioFactory } from '../engine/engine-audio';
 import type { Machine, MachineSession } from '../machine';
 import { EditorRuntime } from '../runtime';
 import type { KeyValueStorage } from '../state/draft-storage';
@@ -25,6 +26,11 @@ export interface BoombapbotEditorProps<
   storage?: KeyValueStorage | null;
   /** Where an exported file goes. A download when not given. */
   save?: SaveFile;
+  /**
+   * What plays the engine. The page's own worklet when not given; a shell
+   * that runs the engine natively hands in a controller for that one.
+   */
+  audio?: AudioFactory;
   /**
    * What sits under the machine in place of the site's notice and footer,
    * handed the settings button. For a shell with no site behind it, which
@@ -146,8 +152,8 @@ export function BoombapbotEditor<
   Document extends ProjectBase,
   Transient extends object,
   Session extends MachineSession<Document, Transient>,
->({ machine, baseUrl = '/', storage, save, below }: BoombapbotEditorProps<Document, Transient, Session>) {
-  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine, storage, save }));
+>({ machine, baseUrl = '/', storage, save, audio, below }: BoombapbotEditorProps<Document, Transient, Session>) {
+  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine, storage, save, audio }));
 
   useEffect(() => {
     runtime.attach();

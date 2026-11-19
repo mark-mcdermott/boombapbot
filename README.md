@@ -330,12 +330,27 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm build:engine` | Builds the native engine and runs CTest, the engine's own suites with a test machine of two plain voices: the tick timeline, scheduler timing across buffer sizes and pre-scales, ten minutes without drift, the pattern bank and its 1st and 2nd parts, the sequencer (A, AB and B, intro, tapped and automatic fill-ins, the first-beat rule, songs and the measure log), accent and level smoothing, voices and stealing, hat chokes, MIDI, the synthesis calls, swing, each effect, no allocation inside the render call, and the header compiling as C; then РИТМ-12's eight voices across their knobs |
 | `pnpm build:wasm` | Builds the engine to WebAssembly |
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
-| `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
+| `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; the editor playing through a controller a shell hands it, with stand-ins for one that takes samples and one that makes its own sounds, and the controller of a native engine against a fake bridge (the order of commands, an engine made again being told the beat again); the desktop app's page asking only for commands the app has, and the phone app's only for what its engine plug-in has; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
 | `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, a draft that cannot be written, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts (and, on a second server with the limits on and its database in a folder, an address turned away after three tries, the check of who is logged in left uncounted, and the count still there after the server is started again), the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed, and its modal: buying with and without an account, the wait for Stripe, the key shown and copied, a key entered, a lost key asked for, and the closed modal), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
+
+The desktop app has two checks of its own, which CI does not run. They need
+Rust, and `pnpm prepare:assets` first.
+
+| Command | What it checks |
+| --- | --- |
+| `pnpm --filter @boombapbot/desktop test:engine` | `cargo test`: the app's bindings against the engine linked into it (the ABI version and the size of each struct), every command and report in the editor's spelling, and the audio thread's half with no sound device: no heap call while buffers are filled, a beat in the buffer for a device of one, two or six channels, and the page told what the worklet would tell it, as often |
+| `pnpm --filter @boombapbot/desktop check:run` | Builds the app and runs it with `BOOMBAPBOT_DESKTOP_CHECK` set: the page plays the starter beat for three seconds through the default sound device, then exports a WAV, a MIDI file and a project file to a folder of its own, and the app prints what the page saw and what the engine did and exits with 0 only if neither side's peak was silent. `BOOMBAPBOT_DESKTOP_CHECK=reopen` also makes the engine again halfway, as a change of device does. It makes sound |
+
+The phone app's engine plug-in has checks of its own as well. On iOS they
+need Xcode and the engine built for iOS (`pnpm --filter @boombapbot/mobile
+engine:ios`); on Android, the NDK and CMake its `build.gradle` names. Its
+tests run in a simulator or an emulator, and the app checks itself in one
+as the desktop app does, but for exports. `apps/mobile/README.md` has the
+commands.
 
 ### Results
 
@@ -422,6 +437,19 @@ Two cross-checks worth knowing about:
 - **Deleting an account.** Built and tested against the in-process
   database. Nobody has deleted an account through the page on the live
   site.
+- **The desktop app.** `apps/desktop` ran on 2026-11-18 on the Mac it was
+  built on, and nowhere else. Nobody has listened to it: that its output is
+  not silent is the engine's own account, read by the app and by the page.
+  The sound device was never really changed under it, the dialog that asks
+  where to keep an export has never been on a screen, and it has not been
+  built for Windows. Its [`README.md`](apps/desktop/README.md) has the
+  whole list.
+- **The phone app's native engine.** The phone app now plays through the
+  engine built natively: AVAudioEngine on iOS, Oboe on Android. It ran on
+  2026-11-18 in an iPhone simulator and an Android emulator, through the
+  Mac's speakers, and nowhere else. Nobody has listened to it. A call faked
+  by the emulator stopped the beat as it should; no real call, ringer
+  switch, headphones or change of device has happened to it.
 - **Device performance.** See the benchmark below; it says nothing about
   phones.
 
@@ -482,6 +510,7 @@ are docked at the bottom of the screen.
 | `packages/machine-ritm12/` | РИТМ-12, the machine the site is: its project schema, voices, panel, art, and the reader that opens the earlier machine's beats |
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats, the shop and the upgrade |
 | `apps/mobile/` | A first slice of the phone apps: the editor with РИТМ-12 in a Capacitor shell for iOS and Android. See its `README.md` |
+| `apps/desktop/` | A first slice of the desktop app, for macOS: the editor with РИТМ-12 in a Tauri window, playing through the engine built natively and CPAL. See its `README.md` |
 | `e2e/` | Playwright tests: the site's, and РИТМ-12's own in `e2e/ritm12/` |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |
 | `misc/assets/` | The owner's unedited pictures (ignored by git) |
@@ -515,9 +544,11 @@ stack" and most of "build one end-to-end beat". Next:
    Firefox, and listen to it voice by voice and effect by effect. What the
    build guesses at is listed in [`docs/follow-ups.md`](docs/follow-ups.md).
 2. Cut its art again from the owner's full-size pictures.
-3. Boot the same engine natively: Tauri with CPAL on desktop, and on mobile
-   AVAudioEngine and Oboe behind the Capacitor shell in `apps/mobile`, which
-   plays through the web view for now.
+3. Boot the same engine natively. On a Mac (`apps/desktop`, Tauri with
+   CPAL) and on both phones (AVAudioEngine and Oboe behind the Capacitor
+   shell in `apps/mobile`) that is done as a first slice, in a simulator
+   and an emulator for the phones, and nobody has listened to any of it.
+   Next are real phones and Windows.
 
 Saving beats to an account is built. Sync in the background, billing,
 signing and store submission come after that.

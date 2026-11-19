@@ -1,0 +1,14 @@
+{
+  "name": "@boombapbot/native-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The phone app's Capacitor plug-in: the engine built natively, played through the phone's own audio.",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  }
+}

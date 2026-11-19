@@ -8,9 +8,12 @@ built elsewhere on the same core. `README.md` says what is built and how it
 was verified, and `docs/follow-ups.md` has what is left and in what order. Accounts exist and
 are optional: sign-up, log-in and password reset, and a free account can
 hold up to 20 saved beats. `apps/mobile` is a first slice of the phone
-apps: it runs in a simulator and is not ready for a store. The rest of the
-build spec's wider scope (background sync, native audio, a desktop shell,
-billing) is not started.
+apps: it runs in a simulator and an emulator and is not ready for a
+store. On both phones it plays through the engine built natively.
+`apps/desktop` is a first slice of the desktop app, for macOS: the engine
+built natively behind the same editor. It runs on the Mac it was built on
+and is not signed. The rest of the build spec's wider scope (background
+sync, Windows, billing) is not started.
 
 ## Commands
 
@@ -47,6 +50,18 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - One Vitest file: `pnpm exec vitest run packages/machine-ritm12/test/native.test.ts`.
 - One Playwright file: `pnpm exec playwright test e2e/ritm12/panel.spec.ts`.
 - `pnpm bench` measures the WebAssembly engine at its worst case.
+- The desktop app, which CI does not build. It needs Rust and
+  `pnpm prepare:assets` first: `pnpm --filter @boombapbot/desktop app` runs
+  it from a dev server, `bundle` builds the `.app`, `test:engine` is
+  `cargo test` for its Rust, and `check:run` builds it and has it play a
+  beat and report on itself. `check:run` makes sound.
+- The phone app's engine for iOS: `pnpm --filter @boombapbot/mobile
+  engine:ios` builds it, and its plug-in's tests run in a simulator with
+  `xcodebuild test -scheme BoombapbotNativeEngine` in
+  `apps/mobile/native-engine`. On Android its tests run on an emulator with
+  `./gradlew :boombapbot-native-engine:connectedDebugAndroidTest` in
+  `apps/mobile/android`, with the NDK and CMake its `build.gradle` pins.
+  `apps/mobile/README.md` has the check runs.
 
 ## How it fits together
 
@@ -205,6 +220,30 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   fills in. A machine's `setup` turns a project into an `EngineSetup`
   (`engine/setup.ts`), which the runtime compares with the last one and
   sends on, for live playback and offline rendering alike.
+- The runtime plays through an `EngineAudio` (`engine/engine-audio.ts`) and
+  knows no more of it than that. It makes an `AudioController` unless it is
+  handed something else: `audio` on `BoombapbotEditor` is a function from
+  where reports go (`AudioControllerEvents`) to a controller. What is
+  handed in for an engine a shell runs natively is `NativeAudioController`
+  (`engine/native-audio.ts`), which a shell gives a `NativeEngineBridge`:
+  four calls, `open`, `send`, `listen` and `close`. The messages are in
+  `engine/messages.ts`. A native engine is sent `NativeEngineCommand`, the
+  worklet's commands but for two: a sound goes as its knobs (`synth`), for
+  the engine to make at its own rate, and the effect goes by the engine's
+  number, so a bridge keeps no list of effects. What comes back is
+  `EngineReport` either way. The commands both take the same way are sent
+  by one class, `EngineCommands`, which both controllers extend; add a
+  command there, or to both if they must differ.
+- A native controller sends one batch to its bridge at a time, and what is
+  asked meanwhile goes together in the next, so the engine hears commands
+  in the order given whatever the bridge does with two calls at once. Keep
+  that if the sending changes.
+- A native engine that was made again, as one is when the sound device
+  changes, reports `ready` with its new rate. The controller then calls
+  `onReset`, and the runtime tells the new engine the whole setup again
+  (`retell`), which makes its sounds at the new rate, and to play on if it
+  was playing. `ready` is not sent when an engine is first opened: `open`
+  answers with the rate.
 - A WAV export renders in a Worker, so a long one cannot hold the page
   still. `engine/wav-job.ts` is the job and what runs it, with no DOM in it
   and tested in Node; `wav-worker.ts` is the Worker and `wav-render.ts`
@@ -234,9 +273,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   time, the line that says what went wrong, a button that reads as a link)
   is `ui/attempt.tsx`.
 - `apps/mobile/` is the same editor with РИТМ-12 in a Capacitor shell for
-  iOS and Android, a Vite page with no server behind it. Its sound is the
-  web view's own worklet and WASM engine. `BoombapbotEditor` takes three
-  things for a shell like it: `storage`, where the draft is kept (the app
+  iOS and Android, a Vite page with no server behind it. `BoombapbotEditor`
+  takes four things for a shell: `audio`, above, which this app hands in
+  where the phone has its engine plug-in (both phones; in a browser the
+  sound is the web view's own worklet and WASM engine);
+  `storage`, where the draft is kept (the app
   hands in the device's own store, `src/device-storage.ts`); `save`, where
   an exported file goes (a download when not given; the app hands it to the
   phone's share sheet, `src/share-file.ts`, because a web view inside an app
@@ -248,13 +289,57 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   The settings sheet is told whether the page has accounts (`accounts`,
   false when `below` is given), and names an account as a way to keep a
   beat only where there is one.
-  The app leaves accounts, saved beats and the shop out. Its engine, worklet
-  and art are the site's, copied by `scripts/copy-assets.mjs` from what
+  The app leaves accounts, saved beats and the shop out, and what it puts
+  under the machine is `shellFooter`, the editor's. Its engine, worklet
+  and art are the site's, copied by `scripts/copy-app-assets.mjs` from what
   `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native
   projects and are committed; `cap sync` rewrites parts of them. Its
   `README.md` says how to run it, what was checked and what is left.
+- The phone's engine plug-in is `apps/mobile/native-engine`, a package the
+  app depends on (`link:`) so that Capacitor finds it: Capacitor calls it
+  `BoombapbotNativeEngine` and asks its `Package.swift` for a product of
+  that name. Its iOS half is a Swift package. The engine is a binary target,
+  `BoombapbotEngine.xcframework`, built for a machine by
+  `scripts/build-engine-ios.sh` with the repository's CMake and not
+  committed. `EngineRender` is the C the audio thread runs; `EngineCore` is
+  the Swift that touches the engine, with no Capacitor, so its tests run on
+  their own; `EnginePlugin` is the Capacitor plug-in and the phone's audio.
+  Capacitor finds the plug-in's class by the first `@objc(...)` in a Swift
+  file under `ios/`, so only `EnginePlugin.swift` may have one. Its Android
+  half is the Gradle module `android/`: `src/main/cpp` builds the engine
+  with the repository's CMake (`add_subdirectory` of `engine/`, found from
+  the folder's real path, since Gradle may reach it through
+  `node_modules`) and plays it with Oboe; the Java is the rest. The NDK
+  and CMake versions are pinned in its `build.gradle`; change them there.
+- A shell that runs the engine natively checks itself with
+  `runShellCheck` (`packages/editor/src/shell-check.ts`, imported from
+  `@boombapbot/editor/shell-check`, only in a check run): the page plays
+  the beat, and reports what it saw and what the engine says of itself
+  through a `ShellCheckHost` the shell fills in. A shell's page asks its
+  native side whether this is a check run, and loads the check only then.
+- `apps/desktop/` is the same editor with РИТМ-12 in a Tauri window, for
+  macOS first, and the one shell whose sound is not the web view's. Its page
+  (`src/main.tsx`) hands the editor a `NativeAudioController` over
+  `src/tauri-engine.ts`, and `save` as `src/save-export.ts`: the app asks
+  where to keep a file and writes it, and the page never names a place on
+  the disk. Served to a browser by `pnpm dev`, the same page is the editor
+  as the site has it. The Rust is `src-tauri/`. `build.rs` builds the
+  engine with the repository's CMake as `boombapbot_engine_ritm12` and
+  links it; `ffi.rs` is the C ABI as far as the app calls it;
+  `messages.rs` is `NativeEngineCommand` and `EngineReport` in serde, with
+  tests that hold both to the editor's spelling; `engine.rs` splits the
+  engine as its threading contract does, an `Engine` for control calls and
+  a `Renderer` for the audio thread; `output.rs` is the CPAL stream;
+  `bridge.rs` is the control thread; `watch.rs` decides what the page is
+  told and how often, as the worklet does; `save.rs` is exports; and
+  `check.rs`, with the page's `src/check.ts`, is the run that checks
+  itself. Its page still
+  loads the WASM engine, for exports. It leaves out what `apps/mobile`
+  leaves out. Its `README.md` says how to run it, what was checked and what
+  is left.
 - Nothing the editor imports may need the page's address to be http or
-  https when the file is read: an app's page is `capacitor://localhost`.
+  https when the file is read: an app's page is `capacitor://localhost`,
+  or `tauri://localhost`.
   The account client is made on first use for that reason (`authClient()`
   in `account/client.ts`).
 
@@ -289,7 +374,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   render. When a sound knob moves, `EditorRuntime.sendSound` re-synthesises
   that one sound on the main thread and posts it; one sound per slot is in
   flight at a time and the newest setting follows when the worklet
-  acknowledges.
+  acknowledges. A native engine is sent the knobs instead and synthesises on
+  its control thread (`snare_engine_synth_sound`); it acknowledges the same
+  way, and the same one-in-flight rule holds.
 - A track has one voice: its new hit fades the old one. The engine takes
   linear gains; a machine's knob tapers live in its `src/document/machine.ts`
   and nowhere else. Track level and master volume are smoothed per sample,
@@ -303,6 +390,47 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - The page learns what played from the measure log, which the worklet drains
   after every render and never skips. A measure whose rhythm changed on its
   second beat is reported twice under one ordinal.
+- In the desktop app the sound device's callback (`Renderer::fill`) is the
+  only caller of `snare_engine_render`, and it allocates nothing, takes no
+  lock and calls nothing else: its buffers are made before the stream
+  starts, and what it leaves for others to read (`Meter`) is atomics.
+  `tests/audio_thread.rs` counts heap calls around it; keep that passing.
+  CPAL may call the stream's error callback on the audio thread too, so
+  that sets a bit (`StreamNews`) and no more.
+- Every other call to the engine there is made on one thread, `bridge.rs`'s.
+  Tauri runs each command on a thread of its own, so a command hands its
+  request to that thread and waits. Do not call the engine from a command.
+- The stream is dropped before the engine it plays (`Output` holds them in
+  that order). A device that changes its rate, or one that leaves, gets a
+  new engine at the new rate and a `ready` report; the app keeps no copy of
+  the beat, and the page tells the new engine again.
+- A C ABI function the desktop app calls is declared in its `ffi.rs` as
+  well. A command or a report that changes in `messages.ts` changes in
+  `messages.rs` and its tests, and in the phone plug-in's
+  `EngineCore/Messages.swift` and its tests.
+- On iOS the render block of the plug-in's `AVAudioSourceNode` is the only
+  caller of `snare_engine_render`. It captures a pointer and nothing Swift
+  counts, and calls `bb_render_fill` in `EngineRender`, C that renders into
+  the buffers it is handed, calls nothing else, takes no lock and allocates
+  nothing (a mono buffer goes through scratch made with it). Keep the block
+  that small. Every other call to the engine is made on the plug-in's
+  `control` queue: Capacitor's calls, the phone's notices and the watch's
+  timer all hop onto it.
+- On iOS too the sound stops before the engine goes (`AudioOutput.stop`,
+  then the renderer, then the engine), and a change of rate gets a new
+  engine and a `ready` report. A call or another app taking the sound is
+  reported as `ended`, so the page shows the machine stopped, and the new
+  engine waits for play. Headphones pulled out stop the beat the same way.
+- On Android the Oboe stream's data callback is the only caller of
+  `snare_engine_render`, in `native_engine.cpp`, under the same rules: no
+  lock, no allocation, scratch made with it, and only a flag set when Oboe
+  closes the stream because its device left. Every other call is made on
+  the plug-in's `control` thread. The plug-in asks for audio focus when
+  play is pressed and gives it back when the beat stops or the page closes
+  the engine, never when the engine is only made again. A notice from the
+  phone (focus, becoming noisy) goes through `onControl`, which lets it go
+  if the plug-in has already been destroyed: a closed screen's plug-in can
+  still be told things while the process lives.
 - The tools and tests must compile with Clang as well as GCC. CI builds both.
 - `-ffp-contract=off` is deliberate: it keeps native and WASM renders within
   two 24-bit steps of each other, which a unit test asserts.
@@ -617,7 +745,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 
 - These are generated and git-ignored; never commit them:
   `apps/site/public/engine/`, `public/machines/`,
-  `public/boombapbot-assets.json`, `build/`, `.tools/`.
+  `public/boombapbot-assets.json`, `build/`, `.tools/`, an app's `public/`,
+  and `apps/desktop/src-tauri/target/` and `gen/`. `Cargo.lock` there is
+  committed.
 - The worklet is bundled separately by `scripts/prepare-assets.mjs`. After
   changing `engine/worklet/processor.ts` or `wasm-engine.ts`, restart
   `pnpm dev` or run `pnpm prepare:assets`.
@@ -654,13 +784,23 @@ account or a saved beat, the newer-copy question, the beat limit, a beat
 from the earlier machine opening converted, a refund, and a purchase without
 an account.
 Nobody has tried long playing on a phone.
+The desktop app has run on one Mac, and what is known of its sound is the
+engine's own numbers: nobody has listened to it. Its `README.md` lists the
+rest: a real change of sound device, the dialog that asks where to keep an
+export, and Windows. The phone app's native engine has run in an iPhone
+simulator and an Android emulator only, and the same holds: no one has
+listened, and no real call, headphones or change of device has happened
+to it. The emulator's faked call is the one interruption that has.
 Say so rather than assuming these work.
 
 ## Working in this repo
 
 - Work goes on a feature branch and lands through a pull request. CI
   (`.github/workflows/ci.yml`) runs every check above, with the engine also
-  built by Clang and under the sanitizers.
+  built by Clang and under the sanitizers. It typechecks the desktop app's
+  page and runs its unit tests with the rest. It does not build the app or
+  run its Rust tests: run `test:engine` and `check:run` by hand after
+  changing `apps/desktop/src-tauri` or the engine's C ABI.
 - Production is deployed by `.github/workflows/deploy.yml` once CI passes on
   `main`: it builds the engine and the site and hands Vercel the finished
   output, because Vercel cannot build the engine. `apps/site/vercel.json`

@@ -1,0 +1,5 @@
+# Copied from the site's prepared assets by scripts/copy-app-assets.mjs.
+public/
+# What cargo builds, and the schemas Tauri writes beside the capabilities.
+src-tauri/target/
+src-tauri/gen/

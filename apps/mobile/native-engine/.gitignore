@@ -1,0 +1,10 @@
+# Built by scripts/build-engine-ios.sh (`pnpm --filter @boombapbot/mobile engine:ios`).
+ios/BoombapbotEngine.xcframework/
+# What Swift Package Manager and Xcode keep beside a package. The app's own
+# Package.resolved, under ios/App, is the one that is committed.
+.build/
+.swiftpm/
+Package.resolved
+# What Gradle and the NDK build beside the Android half.
+android/build/
+android/.cxx/

@@ -1,0 +1,22 @@
+[package]
+name = "boombapbot-desktop"
+version = "0.1.0"
+description = "boombapbot on a desktop: the shared editor with РИТМ-12, playing through the native engine."
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[lib]
+name = "boombapbot_desktop"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+cmake = "=0.1.58"
+tauri-build = { version = "=2.7.6", features = [] }
+
+[dependencies]
+cpal = "=0.18.2"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+tauri = { version = "=2.12.7", features = [] }
+tauri-plugin-dialog = "=2.8.4"
