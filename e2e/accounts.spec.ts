@@ -1,8 +1,10 @@
+import { rmSync } from 'node:fs';
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { scanner } from './helpers';
 import { PASSWORD, ROW_ID, UUID, confirm, fill, logOut, openAccount, signUp, signedUp } from './account';
-import { ACCOUNTS_URL } from './accounts-server';
+import { ACCOUNTS_URL, LIMITED_DATABASE, LIMITED_PORT, LIMITED_URL } from './accounts-server';
 import { linkIn, mailTo, newAddress } from './mail';
+import { startServer, type SecondServer } from './second-server';
 
 // These run against the built server (see playwright.config.ts): a database
 // in memory, and an outbox folder where it files the email it would send.
@@ -195,5 +197,74 @@ test.describe('what the server answers', () => {
     expect(user.email).toBe(address);
     expect(session.id).toMatch(UUID);
     expect(session).not.toHaveProperty('userId');
+  });
+});
+
+test.describe('with its limits on, as the live site has them', () => {
+  // One worker, in order: each test adds to what the server has counted.
+  test.describe.configure({ mode: 'serial' });
+
+  // A server of its own, since the shared one runs with its limits off. Its
+  // database is kept in a folder, so that it is still there after a restart.
+  const database = { DATABASE_URL: `pglite:${LIMITED_DATABASE}` };
+  let server: SecondServer;
+
+  test.beforeAll(async ({ playwright }) => {
+    rmSync(LIMITED_DATABASE, { recursive: true, force: true });
+    server = await startServer(playwright, LIMITED_PORT, database);
+  });
+
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  /** The headers of a request that reached the site from that address. Each test has addresses of its own. */
+  const from = (address: string) => ({
+    origin: LIMITED_URL,
+    'content-type': 'application/json',
+    'x-forwarded-for': address,
+  });
+  const logIn = (address: string) =>
+    server.request.post('/api/auth/sign-in/email', {
+      data: { email: newAddress(), password: 'not the password' },
+      headers: from(address),
+    });
+  const askForReset = (address: string) =>
+    server.request.post('/api/auth/request-password-reset', {
+      data: { email: newAddress(), redirectTo: `${LIMITED_URL}/?account=reset` },
+      headers: from(address),
+    });
+
+  test('an address that keeps trying to log in is turned away for a while, and another is not', async () => {
+    // Three tries in ten seconds, then none.
+    const tries: number[] = [];
+    for (let count = 0; count < 4; count += 1) tries.push((await logIn('203.0.113.10')).status());
+    expect(tries).toEqual([401, 401, 401, 429]);
+    const refused = await logIn('203.0.113.10');
+    expect(refused.status()).toBe(429);
+    expect(Number(refused.headers()['x-retry-after'])).toBeGreaterThan(0);
+
+    expect((await logIn('203.0.113.11')).status()).toBe(401);
+  });
+
+  test('asking who is logged in is not counted, however often a page asks', async () => {
+    // Anything else on these routes is refused after a hundred in ten seconds.
+    const asked = await Promise.all(
+      Array.from({ length: 120 }, () => server.request.get('/api/auth/get-session', { headers: from('203.0.113.20') })),
+    );
+    expect(asked.map((answer) => answer.status()).filter((status) => status !== 200)).toEqual([]);
+  });
+
+  test('the count is in the database: a server started again still turns the address away', async ({ playwright }) => {
+    // Three requests for a reset in a minute, then none.
+    const tries: number[] = [];
+    for (let count = 0; count < 4; count += 1) tries.push((await askForReset('203.0.113.30')).status());
+    expect(tries).toEqual([200, 200, 200, 429]);
+
+    // A count kept in memory would be gone with the server that kept it.
+    await server.stop();
+    server = await startServer(playwright, LIMITED_PORT, database);
+    expect((await askForReset('203.0.113.30')).status()).toBe(429);
+    expect((await askForReset('203.0.113.31')).status()).toBe(200);
   });
 });

@@ -1,9 +1,9 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
 import { PASSWORD, ROW_ID, UUID, signedUp, signedUpRequest } from './account';
-import { ACCOUNTS_URL, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL, serverEnv } from './accounts-server';
+import { ACCOUNTS_URL, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL } from './accounts-server';
 import { openEditor, scanner } from './helpers';
 import { mailTo, newAddress } from './mail';
+import { startServer, type SecondServer } from './second-server';
 import { checkoutEvent } from './stripe';
 
 // The one-time upgrade and its license key. Like the shop's tests these run
@@ -446,24 +446,16 @@ test('a lost key is asked for in the modal and emailed to the address that bough
 test.describe('until the upgrade is switched on', () => {
   // The server as the live site runs until UPGRADE_OPEN is set, with its
   // limits on. It has a database of its own and shares the outbox.
-  let server: ChildProcess;
+  let server: SecondServer;
   let closed: APIRequestContext;
 
   test.beforeAll(async ({ playwright }) => {
-    // Started with those settings and nothing else, so no switch set in a shell reaches it.
-    server = spawn(process.execPath, ['apps/site/dist/server/entry.mjs'], {
-      env: serverEnv(CLOSED_PORT),
-      stdio: 'ignore',
-    });
-    closed = await playwright.request.newContext({ baseURL: CLOSED_URL });
-    await expect
-      .poll(async () => (await closed.get('/api/upgrade').catch(() => null))?.status() ?? 0, { timeout: 20_000 })
-      .toBe(200);
+    server = await startServer(playwright, CLOSED_PORT);
+    closed = server.request;
   });
 
   test.afterAll(async () => {
-    await closed?.dispose();
-    server?.kill();
+    await server?.stop();
   });
 
   const closedJson = { origin: CLOSED_URL, 'content-type': 'application/json' };

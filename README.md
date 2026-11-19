@@ -190,6 +190,12 @@ pnpm db:migrate
   server in `apps/site/dist/server`. `pnpm serve` serves the pages alone;
   `node apps/site/dist/server/entry.mjs` serves them with the API. On Vercel
   the build uses Vercel's adapter instead.
+- `DATABASE_URL=pglite:./.data/dev` keeps that database in a folder, and
+  the folder can be opened again.
+- Logging in, signing up and asking for an email are rate limited by Better
+  Auth, by the address a request came from. The counts are rows in the
+  `rate_limits` table, so every server on Vercel counts together. Asking who
+  is logged in, which every page does, is not counted.
 - Every table has an integer `id` and a `uuid`. Only the uuid ever leaves
   the server.
 - After changing `apps/site/src/server/db/schema.ts`, run `pnpm db:generate`
@@ -200,6 +206,10 @@ with the in-process database and the outbox, and that the built server
 reads from the real Neon database once it is migrated. On the live site, on
 2026-11-16, the owner signed up and later reset a password: both emails
 arrived through Resend and their links worked.
+
+What has not: the rate limit counting in the database on the live site. Its
+table is added by `apps/site/drizzle/0004_rate_limits.sql`, which has not
+been run there, and has to be before this code is deployed.
 
 ### Saved beats
 
@@ -322,7 +332,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts, import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, a draft that cannot be written, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts, the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed, and its modal: buying with and without an account, the wait for Stripe, the key shown and copied, a key entered, a lost key asked for, and the closed modal), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, a draft that cannot be written, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts (and, on a second server with the limits on and its database in a folder, an address turned away after three tries, the check of who is logged in left uncounted, and the count still there after the server is started again), the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed, and its modal: buying with and without an account, the wait for Stripe, the key shown and copied, a key entered, a lost key asked for, and the closed modal), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.
