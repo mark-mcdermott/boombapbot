@@ -129,9 +129,29 @@ site its icon still opens a modal that says it is not open.
   saved beats with it and unties its orders, which are kept. It has only run
   in the tests. A pending verification row for the address is left to
   expire.
-- **Rate limiting.** Better Auth's limiter is on in production and counts in
-  memory, which on Vercel means per instance. Move it to the database before
-  relying on it.
+- **Rate limiting.** Better Auth's limiter is on in production. It counted
+  in memory, which on Vercel means each server kept a count of its own.
+  Since 2026-11-18 the code counts in the database, in a `rate_limits`
+  table, so every server counts together: three tries at logging in or
+  signing up in ten seconds from one address, three requests for an email
+  in a minute, a hundred of anything else in ten seconds.
+  - **The migration is written and not run.**
+    `apps/site/drizzle/0004_rate_limits.sql` adds the table. It has to be
+    run on Neon before this code is live: without the table every route
+    under `api/auth` answers with an error, log-in, sign-up and password
+    reset among them. Asking who is logged in is the one that would still
+    work.
+  - Asking who is logged in is not counted. Every page asks it as it
+    loads, and counting it would write to the database for each visitor.
+  - Not checked on Vercel: that a visitor's address reaches Better Auth.
+    It reads `x-forwarded-for` and trusts it only when it holds a single
+    address. Where it finds none, every visitor shares one count for each
+    route, and with the count in the database that is one count for the
+    whole site. A log-in's row has a column for the address it came from,
+    read the same way; nobody has looked at whether it is filled in.
+  - Better Auth clears old rows away itself as new ones are counted.
+  - The routes outside `api/auth` (saved beats, the shop, the upgrade) are
+    not covered by it.
 - **Upgrade.** Decided by the owner: a flat one-time 5 dollars unlocks every
   paid feature, with a license key the buyer is given and can retrieve later.
   Paid features are the stranger effects (delay, compression and the like),

@@ -80,8 +80,15 @@ async function build() {
 
     // On in production, as Better Auth has it. The browser tests run the
     // production build and sign up many times from one address, so they alone
-    // switch it off.
-    rateLimit: { enabled: import.meta.env.PROD && AUTH_RATE_LIMIT !== 'off' },
+    // switch it off. It counts in the database: counted in memory, each
+    // server on Vercel would keep a count of its own. Asking who is logged in
+    // is not counted. Every page asks that as it loads, and counting it would
+    // write to the database for each visitor, logged in or not.
+    rateLimit: {
+      enabled: import.meta.env.PROD && AUTH_RATE_LIMIT !== 'off',
+      storage: 'database',
+      customRules: { '/get-session': false },
+    },
 
     advanced: { database: { generateId: 'serial' } },
     hooks: { after: hideRowIds },

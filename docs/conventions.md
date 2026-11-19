@@ -443,8 +443,21 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   database: ask first.
 - `DATABASE_URL=pglite:memory` opens a Postgres inside the process, built
   from the committed migrations, and `EMAIL_OUTBOX` files mail in a folder
-  in place of sending it. The accounts tests use both. A Vercel build
-  leaves the in-process database out (`__LOCAL_DATABASE__`).
+  in place of sending it. The accounts tests use both. `pglite:` and a
+  folder keeps the database there; it notes in a `local_migrations` table
+  which migrations it has had, so the folder can be opened again and gets
+  only the new ones. A Vercel build leaves the in-process database out
+  (`__LOCAL_DATABASE__`).
+- Better Auth's rate limit counts in the database (`rateLimit` in the
+  schema, the `rate_limits` table), never in memory: on Vercel each server
+  would keep a count of its own. Asking who is logged in (`/get-session`)
+  is left out of it on purpose, because every page asks that as it loads
+  and a count would be a write to the database for each visitor. Only the
+  browser tests switch the limit off (`AUTH_RATE_LIMIT=off`). Its own
+  tests are in `e2e/accounts.spec.ts`, on a second server with the limits
+  on and its database in a folder, so that one of them can stop the server
+  and find the count still there. A request there says where it came from
+  in `x-forwarded-for`, with addresses no other test uses.
 - Sign-up always needs a confirmed address. Better Auth sends that email in
   the background, so a failed send does not fail the sign-up; the modal
   always offers to send it again. Keep that.
@@ -586,7 +599,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   (`/calls/upgrade`), so they and the shop's tests can run side by side.
   The modal's tests are in `e2e/upgrade.spec.ts` with the server's, in one
   worker, because they read the last checkout from that log.
-  The closed switch is tested on a second server the spec starts itself.
+  The closed switch is tested on a second server the spec starts itself
+  (`startServer` in `e2e/second-server.ts`, which the accounts tests use too).
 
 **Written copy**
 

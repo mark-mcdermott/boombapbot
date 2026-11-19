@@ -1,5 +1,5 @@
 import type { Address, ProjectBase } from '@boombapbot/contracts';
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Every table has two keys. `id` is a plain integer for joins and never
 // leaves the server. `uuid` is the only name a row has outside it: in a URL,
@@ -8,7 +8,7 @@ const rowId = () => integer('id').primaryKey().generatedByDefaultAsIdentity();
 const publicId = () => uuid('uuid').notNull().unique().defaultRandom();
 const moment = (name: string) => timestamp(name, { withTimezone: true });
 
-// The four tables Better Auth reads and writes. The columns are its contract:
+// The five tables Better Auth reads and writes. The columns are its contract:
 // one missing here fails at sign-in, not at compile time.
 
 export const user = pgTable('users', {
@@ -79,6 +79,20 @@ export const verification = pgTable(
   },
   (table) => [index('verifications_identifier_idx').on(table.identifier)],
 );
+
+/**
+ * How often one address has lately asked for one of Better Auth's routes:
+ * `key` is the address and the route, `lastRequest` a time in milliseconds.
+ * It is counted here so that every server counts together. Better Auth
+ * writes the rows and clears the old ones away; nothing joins to one.
+ */
+export const rateLimit = pgTable('rate_limits', {
+  id: rowId(),
+  uuid: publicId(),
+  key: text('key').notNull().unique(),
+  count: integer('count').notNull(),
+  lastRequest: bigint('last_request', { mode: 'number' }).notNull(),
+});
 
 /** What was bought, as it was priced when the order was made. */
 export interface OrderItem {

@@ -45,3 +45,8 @@ export function serverEnv(port: number): Record<string, string> {
 /** A second server the upgrade's tests start for themselves, as the live site is until the upgrade opens. */
 export const CLOSED_PORT = Number(process.env.BOOMBAPBOT_E2E_CLOSED_PORT ?? 4176);
 export const CLOSED_URL = `http://127.0.0.1:${CLOSED_PORT}`;
+
+/** Another the accounts tests start, with its limits on and its database kept in a folder. */
+export const LIMITED_PORT = Number(process.env.BOOMBAPBOT_E2E_LIMITED_PORT ?? 4177);
+export const LIMITED_URL = `http://127.0.0.1:${LIMITED_PORT}`;
+export const LIMITED_DATABASE = resolve('build/e2e-limited-db');
