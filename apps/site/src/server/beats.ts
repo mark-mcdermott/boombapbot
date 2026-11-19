@@ -9,9 +9,10 @@ import {
   type ProjectBase,
 } from '@boombapbot/contracts';
 import { documentKind } from '#machine/document';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, getTableName, lt, sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
-import { beat } from './db/schema';
+import { getDb } from './db';
+import { beat, beatCount } from './db/schema';
 import { resolveUser, type SignedInUser } from './session';
 import { json } from './site';
 
@@ -128,4 +129,63 @@ export async function readBeatRequest<Body extends { project?: unknown }>(
     return { refusal: refuse('invalid', earlier ? { message: FROM_AN_EARLIER_PAGE } : undefined) };
   }
   return { user: asked.user, data: body.data, project: parsed.project, bytes: beatBytes(parsed.project) };
+}
+
+/**
+ * Saves a project as a new beat if the account has room for it, and answers
+ * with the beat, or null when it is full. Taking the room and inserting the
+ * beat are one statement: the account's count goes up only while it is under
+ * the limit, and the beat is inserted only if it went up. Two saves at once
+ * queue on the count, so they cannot both take the last place.
+ */
+export async function saveNewBeat(user: SignedInUser, project: ProjectBase, bytes: number, limit = FREE_BEAT_LIMIT) {
+  const db = await getDb();
+  const room = db.$with('room').as(
+    db
+      .insert(beatCount)
+      .values({ userId: user.id, count: 1 })
+      .onConflictDoUpdate({
+        target: beatCount.userId,
+        set: { count: sql`${beatCount.count} + 1` },
+        setWhere: lt(beatCount.count, limit),
+      })
+      .returning({ userId: beatCount.userId }),
+  );
+  // An insert from a select names every column, in the table's order, so
+  // the ones the table fills itself are filled here the way it would.
+  const [saved] = await db
+    .with(room)
+    .insert(beat)
+    .select(
+      db
+        .select({
+          id: sql<number>`nextval(pg_get_serial_sequence(${getTableName(beat)}, ${beat.id.name}))`.as('id'),
+          uuid: sql<string>`gen_random_uuid()`.as('uuid'),
+          userId: room.userId,
+          name: sql<string>`${project.name}::text`.as('name'),
+          project: sql<ProjectBase>`${JSON.stringify(project)}::jsonb`.as('project'),
+          bytes: sql<number>`${bytes}::integer`.as('bytes'),
+          createdAt: sql<Date>`now()`.as('created_at'),
+          updatedAt: sql<Date>`now()`.as('updated_at'),
+        })
+        .from(room),
+    )
+    .returning(beatSummary);
+  return saved ?? null;
+}
+
+/** Deletes one beat and gives its room back, in one statement. Answers with its uuid, or null when there was none. */
+export async function deleteBeat(owned: SQL) {
+  const db = await getDb();
+  const gone = db.$with('gone').as(db.delete(beat).where(owned).returning({ id: beat.uuid, userId: beat.userId }));
+  const freed = db.$with('freed').as(
+    db
+      .update(beatCount)
+      .set({ count: sql`greatest(${beatCount.count} - 1, 0)` })
+      .from(gone)
+      .where(eq(beatCount.userId, gone.userId))
+      .returning({ userId: beatCount.userId }),
+  );
+  const [removed] = await db.with(gone, freed).select({ id: gone.id }).from(gone);
+  return removed ?? null;
 }

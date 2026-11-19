@@ -514,6 +514,25 @@ test.describe('what the server answers about beats', () => {
     expect((await put({ project: fixture(), lastSeen: 'a while ago' })).status()).toBe(400);
   });
 
+  test('saves sent all at once still stop at the limit, and a delete gives the room back', async ({ request }) => {
+    await signedUpRequest(request);
+    const answers = await Promise.all(
+      Array.from({ length: LIMIT + 5 }, (_, number) => post(request, { project: fixture(`Beat ${number + 1}`) })),
+    );
+    const statuses = answers.map((answer) => answer.status());
+    expect(statuses.filter((status) => status === 201)).toHaveLength(LIMIT);
+    expect(statuses.filter((status) => status === 403)).toHaveLength(5);
+    const beats = await listed(request);
+    expect(beats).toHaveLength(LIMIT);
+
+    // Deleting gives back exactly one place, however many saves try for it.
+    expect((await request.delete(`/api/beats/${beats[0]!.id}`)).status()).toBe(200);
+    expect((await request.delete(`/api/beats/${beats[0]!.id}`)).status()).toBe(404);
+    const refill = await Promise.all(Array.from({ length: 3 }, () => post(request, { project: fixture() })));
+    expect(refill.map((answer) => answer.status()).sort()).toEqual([201, 403, 403]);
+    expect(await listed(request)).toHaveLength(LIMIT);
+  });
+
   test('row ids never leave it: a beat is known outside by its uuid', async ({ request }) => {
     await signedUpRequest(request);
     const created = await post(request, { project: fixture() });

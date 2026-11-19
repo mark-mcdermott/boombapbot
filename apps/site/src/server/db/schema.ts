@@ -1,5 +1,6 @@
 import type { Address, ProjectBase } from '@boombapbot/contracts';
-import { bigint, boolean, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { bigint, boolean, check, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Every table has two keys. `id` is a plain integer for joins and never
 // leaves the server. `uuid` is the only name a row has outside it: in a URL,
@@ -155,6 +156,24 @@ export const beat = pgTable(
     updatedAt: moment('updated_at').notNull().defaultNow(),
   },
   (table) => [index('beats_user_id_idx').on(table.userId)],
+);
+
+/**
+ * How many beats an account holds, kept beside `beats` so that saving one
+ * can check the limit and take the room in a single statement: two saves at
+ * once queue on this row, and the second sees the first one's count. The
+ * beats routes keep it in step, in the same statements that insert and
+ * delete a beat. An account with no row has never saved one.
+ */
+export const beatCount = pgTable(
+  'beat_counts',
+  {
+    id: rowId(),
+    uuid: publicId(),
+    userId: owner().unique(),
+    count: integer('count').notNull(),
+  },
+  (table) => [check('beat_counts_count_not_negative', sql`${table.count} >= 0`)],
 );
 
 /**
