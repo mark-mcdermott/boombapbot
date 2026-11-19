@@ -127,3 +127,23 @@ test('everything can be cleared at once, stays cleared after a reload, and comes
   await expect(page.getByTestId('editor')).toBeVisible();
   expect(blank(await beat(page))).toBe(true);
 });
+
+test('a browser that stops keeping the draft says so, and names both ways to keep the beat', async ({ page }) => {
+  // Storage that was there when the page loaded and then takes nothing more, as a full one does.
+  await page.addInitScript(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key !== 'boombapbot.probe') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+      write.call(this, key, value);
+    };
+  });
+  await page.reload();
+  await expect(page.getByTestId('editor')).toBeVisible();
+  await step(page, 2).click();
+  await openSettings(page);
+  const status = page.getByTestId('draft-status');
+  await expect(status).toHaveAttribute('data-state', 'error');
+  await expect(status).toContainText(
+    'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.',
+  );
+});

@@ -245,6 +245,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   turned the file down, and an export then claims nothing. It can take as
   long as the person does, so a WAV export has a `saving` state between
   `rendering` and `done`, and another WAV cannot be asked for in either.
+  The settings sheet is told whether the page has accounts (`accounts`,
+  false when `below` is given), and names an account as a way to keep a
+  beat only where there is one.
   The app leaves accounts, saved beats and the shop out. Its engine, worklet
   and art are the site's, copied by `scripts/copy-assets.mjs` from what
   `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native

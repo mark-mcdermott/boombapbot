@@ -335,6 +335,12 @@
   background: var(--color-raised-2);
 }
 
+/* One that is switched off keeps its note, which says why, and dims its name. */
+.sb-menu-item[data-disabled] {
+  color: var(--color-faint);
+  cursor: default;
+}
+
 .sb-menu-note {
   color: var(--color-dim);
   font-size: 12px;

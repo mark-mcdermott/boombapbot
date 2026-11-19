@@ -53,10 +53,19 @@ in this file has been built unless it says so.
    the machine the site had first open converted in the tests, from
    fixtures. Nobody has opened a real one, and the owner had saved none.
    Any stored by someone else stay in the database as they were.
-5. **One line in the settings sheet.** Its heading, its audio lines and its
+5. **The settings sheet's words.** Its heading, its audio lines and its
    closing note were rewritten for РИТМ-12 and for accounts, and the owner
-   has read them. One line there still predates accounts: "This browser is
-   not saving drafts. Export the project to keep it."
+   has read them. The line it shows when a draft cannot be written named
+   only the export; since 2026-11-18, on the site, it names an account too:
+   "To keep this beat, export the project file or save it to an account."
+   The owner has not read that wording. The phone app has no accounts and
+   keeps the line as it was. Two things are left:
+   - A browser whose storage is missing from the start (a private window
+     that blocks it) is never told. The line appears only once a write
+     has failed, and with no storage nothing is written, so the sheet goes
+     on saying "Draft will be saved in this browser".
+   - The closing note points to "the account button in the footer" in the
+     phone app as well, which has neither.
 6. **The pages of words.** Their design pass was done on 2026-11-17. What it
    left for the owner to decide is under "Accounts, upgrades and the shop".
 7. **Names left in the engine's header.** `engine.h` still names sixteen
@@ -351,12 +360,11 @@ Unverified: everything. No Tauri project exists yet.
   and an Android phone have not been tried on it.
 - **Work on the main thread.** The synthesis of a sound takes a few
   milliseconds, the longest of a machine several, and happens on the main
-  thread. A WAV export renders in a Worker. Two things are left of that:
+  thread. A WAV export renders in a Worker. One thing is left of that:
   the settings sheet shows where a render stands, so nobody sees it once
-  the sheet is closed; and a menu item that is switched off has no look of
-  its own, because the editor's `styles.css` has no rule for
-  `.sb-menu-item[data-disabled]` (dimmed, no pointer). Until it has one, the
-  WAV items say "One is rendering now" and look as they always do.
+  the sheet is closed. A menu item that is switched off has had a look of
+  its own since 2026-11-18: its name dimmed, no hand over it, and its note,
+  which says why, as legible as before.
 - **Draft storage.** One draft in `localStorage`, written whole on every
   change, knob moves included. Multiple projects want IndexedDB. Two tabs
   editing at once overwrite each other. An account now holds several beats,
