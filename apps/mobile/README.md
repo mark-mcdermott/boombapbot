@@ -311,9 +311,9 @@ account for Drive or Gmail.
   the bottom of the page the notice is there only once you scroll up.
 - **The status bar on the Android emulator** had a dark clock and dark
   icons on the page's dark background. I have not looked into why.
-- **Words written for the site.** The settings sheet says the draft is
-  saved "in this browser", lists keyboard keys, and ends by pointing to an
-  account button in a footer the app does not have.
+- **Keyboard keys in the settings sheet.** It lists the machine's keyboard
+  keys, which a phone has no use for. Its draft lines and closing note were
+  fitted to the apps on 2026-11-18.
 - **Sideways on a phone** the brand takes about a third of the screen and
   the machine is taller than what is left, so it scrolls. That was the
   picture; the phone's panel has not been looked at sideways.

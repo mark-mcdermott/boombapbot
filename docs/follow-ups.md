@@ -413,8 +413,6 @@ What is left:
   app's stand-in) are stand-ins as well.
 - **Accounts, saved beats and the shop** are left out, as in the phone app,
   and for the same reasons: they ask the page's own address for `/api/...`.
-- **Words written for the site.** The settings sheet says the draft is saved
-  "in this browser".
 
 ## Web
 
