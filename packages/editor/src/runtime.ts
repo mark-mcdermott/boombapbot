@@ -1,11 +1,12 @@
 import { createProjectCodec, type ParseResult, type ProjectBase, type ProjectCodec } from '@boombapbot/contracts';
-import { AudioController, type AudioStats, type EngineAssets } from './engine/audio-controller';
+import { AudioController } from './engine/audio-controller';
+import { describe, type AudioFactory, type AudioStats, type EngineAssets, type EngineAudio } from './engine/engine-audio';
 import { exportSongMidi, measureSeconds, renderSong, type LoopRender } from './engine/offline';
 import { renderWav } from './engine/wav-render';
 import { NO_EFFECT, samePattern, sameValues, type EngineSetup, type ExportPlan } from './engine/setup';
-import { SnareWasm } from './engine/wasm-engine';
+import { SnareWasm, type SynthSound } from './engine/wasm-engine';
 import type { WavBitDepth } from './engine/wav';
-import type { Machine, MachineHost, MachineSession } from './machine';
+import type { Machine, MachineHost, MachineSession, StartPlan } from './machine';
 import {
   browserStorage,
   loadDraft,
@@ -37,6 +38,8 @@ export interface RuntimeOptions<
   storage?: KeyValueStorage | null;
   /** Where an exported file goes. A download when not given. */
   save?: SaveFile;
+  /** What plays the engine. The page's own worklet when not given. */
+  audio?: AudioFactory;
 }
 
 export interface DebugSnapshot<Document extends ProjectBase = ProjectBase> {
@@ -66,7 +69,7 @@ export class EditorRuntime<
   private readonly baseUrl: string;
   private readonly storage: KeyValueStorage | null;
   private readonly save: SaveFile;
-  private readonly audio: AudioController;
+  private readonly audio: EngineAudio;
   private manifest: Promise<AssetManifest> | null = null;
   private wasmBytes: Promise<ArrayBuffer> | null = null;
   private offlineWasm: Promise<SnareWasm> | null = null;
@@ -80,6 +83,8 @@ export class EditorRuntime<
   private stepStartedAt = 0;
   private soundsSent = 0;
   private soundsTaken = 0;
+  /** What play asked of the engine besides the setup, while it plays. */
+  private playingPlan: StartPlan | null = null;
   private unsubscribe: (() => void) | null = null;
 
   constructor(options: RuntimeOptions<Document, Transient, Session>) {
@@ -113,7 +118,8 @@ export class EditorRuntime<
       this.store.notify('error', machine.messages.unreadableDraft, draft.errors);
     }
 
-    this.audio = new AudioController({
+    const makeAudio: AudioFactory = options.audio ?? ((events) => new AudioController(events));
+    this.audio = makeAudio({
       onState: (state, error) => this.store.setAudioStatus(state, error),
       onPosition: (step, pattern, playing) => {
         // Ignore a late "stopped" report that crosses a fresh Play.
@@ -132,6 +138,7 @@ export class EditorRuntime<
       onEnded: () => {
         if (!this.store.getState().playing) return;
         this.store.setPlaying(false);
+        this.playingPlan = null;
         this.session.stopped();
       },
       onLevel: (level) => {
@@ -143,6 +150,7 @@ export class EditorRuntime<
         this.soundsInFlight.delete(slot);
         if (flight?.stale) void this.sendSound(slot);
       },
+      onReset: () => this.retell(),
     });
 
     const host: MachineHost<Document, Transient> = {
@@ -298,10 +306,23 @@ export class EditorRuntime<
   }
 
   /**
-   * Synthesises the sound of one slot from the machine's settings and sends
-   * it to the audio thread. The work happens here, on the main thread, never
-   * in the worklet. One sound per slot is on its way at a time; a knob that
-   * moves again meanwhile is followed once the worklet has taken the last one.
+   * Tells an engine that was made again everything the last one knew, and
+   * to carry on playing if it was. Sounds on their way to the last one will
+   * not be acknowledged, so none is waited for.
+   */
+  private retell(): void {
+    this.soundsInFlight.clear();
+    this.synced = null;
+    this.syncAudio();
+    if (!this.playingPlan) return;
+    this.audio.setSong(this.playingPlan.song, this.playingPlan.loop);
+    this.audio.play();
+  }
+
+  /**
+   * Sends the sound of one slot, made from the machine's settings, to the
+   * engine. One sound per slot is on its way at a time; a knob that moves
+   * again meanwhile is followed once the engine has taken the last one.
    */
   private async sendSound(slot: number): Promise<void> {
     const sampleRate = this.audio.sampleRate;
@@ -313,15 +334,32 @@ export class EditorRuntime<
     }
     this.soundsInFlight.set(slot, { stale: false });
     try {
-      const wasm = await this.loadOfflineWasm();
-      const sound = this.setup().sounds.find((candidate) => candidate.sound === slot);
-      if (!sound) throw new Error(`the machine has no sound in slot ${slot}`);
-      this.audio.setSound(slot, wasm.synthesise(sound, sampleRate), 1, sampleRate);
+      await this.deliverSound(slot, sampleRate);
       this.soundsSent += 1;
     } catch (error) {
       this.soundsInFlight.delete(slot);
       this.store.notify('error', describe(error));
     }
+  }
+
+  /**
+   * A native engine makes the sound itself from its knobs. For the worklet
+   * it is synthesised here, on the main thread, never on the audio thread,
+   * and handed over as samples.
+   */
+  private async deliverSound(slot: number, sampleRate: number): Promise<void> {
+    if (this.audio.synthSound) {
+      this.audio.synthSound(this.soundIn(slot));
+      return;
+    }
+    const wasm = await this.loadOfflineWasm();
+    this.audio.setSound(slot, wasm.synthesise(this.soundIn(slot), sampleRate), 1, sampleRate);
+  }
+
+  private soundIn(slot: number): SynthSound {
+    const sound = this.setup().sounds.find((candidate) => candidate.sound === slot);
+    if (!sound) throw new Error(`the machine has no sound in slot ${slot}`);
+    return sound;
   }
 
   async togglePlay(): Promise<void> {
@@ -344,6 +382,7 @@ export class EditorRuntime<
     const plan = this.session.start();
     if (!plan) return;
     this.audio.setSong(plan.song, plan.loop);
+    this.playingPlan = plan;
     this.store.setPlaying(true);
     this.session.started?.();
     this.audio.play();
@@ -351,6 +390,7 @@ export class EditorRuntime<
 
   stop(): void {
     this.store.setPlaying(false);
+    this.playingPlan = null;
     this.audio.stop();
     this.session.stopped();
   }
@@ -523,8 +563,4 @@ async function fetchBytes(url: string): Promise<ArrayBuffer> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   return response.arrayBuffer();
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

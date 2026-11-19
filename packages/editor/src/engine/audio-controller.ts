@@ -1,46 +1,26 @@
 import {
+  EngineCommands,
+  deliverReport,
+  describe,
+  type AudioControllerEvents,
+  type AudioState,
+  type EngineAssets,
+  type SampledEngineAudio,
+} from './engine-audio';
+import {
   PROCESSOR_NAME,
   type EngineCommand,
   type EngineReport,
   type ProcessorOptions,
 } from './messages';
-import type { EngineEffect, EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
-
-export type AudioState = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
-
-export interface AudioStats {
-  frames: number;
-  peak: number;
-  peakEver: number;
-  voices: number;
-  stolen: number;
-}
-
-export interface AudioControllerEvents {
-  onState(state: AudioState, error: string | null): void;
-  onPosition(step: number, pattern: number, playing: boolean): void;
-  onStats(stats: AudioStats): void;
-  /** Measures the engine began, in order and without gaps. */
-  onMeasures(measures: EngineMeasure[]): void;
-  /** Play ended by itself, at the end of a song that does not repeat. */
-  onEnded(): void;
-  /** The worklet has taken the sound last sent for this slot. */
-  onSound(slot: number): void;
-  /** How loud the output is now, from 0. */
-  onLevel(level: number): void;
-}
-
-export interface EngineAssets {
-  workletUrl: string;
-  wasmBytes: ArrayBuffer;
-}
+import type { EngineEffect } from './wasm-engine';
 
 /**
  * Owns the AudioContext and the engine worklet node. Everything that crosses
  * to the audio thread goes through `post`, so the UI never blocks on audio and
  * audio never waits on the UI or the network.
  */
-export class AudioController {
+export class AudioController extends EngineCommands implements SampledEngineAudio {
   private context: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
   private state: AudioState = 'idle';
@@ -48,6 +28,7 @@ export class AudioController {
   private readonly events: AudioControllerEvents;
 
   constructor(events: AudioControllerEvents) {
+    super();
     this.events = events;
   }
 
@@ -142,33 +123,17 @@ export class AudioController {
 
   private receive(report: EngineReport): void {
     switch (report.type) {
-      case 'position':
-        this.events.onPosition(report.step, report.pattern, report.playing);
-        break;
-      case 'stats':
-        this.events.onStats(report);
-        break;
-      case 'measures':
-        this.events.onMeasures(report.measures);
-        break;
-      case 'ended':
-        this.events.onEnded();
-        break;
-      case 'sound':
-        this.events.onSound(report.slot);
-        break;
-      case 'level':
-        this.events.onLevel(report.level);
-        break;
       case 'error':
         this.setState('error', report.message);
         break;
       case 'ready':
         break;
+      default:
+        deliverReport(report, this.events);
     }
   }
 
-  private post(command: EngineCommand, transfer: Transferable[] = []): void {
+  protected post(command: EngineCommand, transfer: Transferable[] = []): void {
     this.node?.port.postMessage(command, transfer);
   }
 
@@ -177,56 +142,8 @@ export class AudioController {
     this.post({ type: 'sound', slot, pcm, channels, sampleRate }, [pcm.buffer]);
   }
 
-  setTracks(tracks: EngineTrack[]): void {
-    this.post({ type: 'tracks', tracks });
-  }
-
-  setMix(plain: number, accented: number, master: number): void {
-    this.post({ type: 'mix', plain, accented, master });
-  }
-
-  setPatterns(patterns: Array<{ index: number; pattern: EnginePattern }>): void {
-    if (patterns.length > 0) this.post({ type: 'patterns', patterns });
-  }
-
-  setTempo(bpm: number): void {
-    this.post({ type: 'tempo', bpm });
-  }
-
-  /** What the panel asks the engine to play. A change is read at the next bar line. */
-  setPanel(panel: EnginePanel): void {
-    this.post({ type: 'panel', panel });
-  }
-
-  /** One pattern of the bank, round and round. A change is read at the next bar line. */
-  cue(pattern: number): void {
-    this.post({ type: 'cue', pattern });
-  }
-
   setEffect(effect: EngineEffect): void {
     this.post({ type: 'effect', effect });
-  }
-
-  /** The rhythm of each measure of a rhythm track. Empty goes back to what the panel asks for. */
-  setSong(rhythms: number[], loop: boolean): void {
-    this.post({ type: 'song', rhythms, loop });
-  }
-
-  /** TAP in manual play: the intro/fill-in plays once. */
-  armFill(armed: boolean): void {
-    this.post({ type: 'fill', armed });
-  }
-
-  play(): void {
-    this.post({ type: 'play' });
-  }
-
-  stop(): void {
-    this.post({ type: 'stop' });
-  }
-
-  trigger(track: number, accent: boolean): void {
-    this.post({ type: 'trigger', track, accent });
   }
 
   async dispose(): Promise<void> {
@@ -237,8 +154,4 @@ export class AudioController {
     this.setState('idle');
     if (context) await context.close().catch(() => undefined);
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

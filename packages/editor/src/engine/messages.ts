@@ -1,6 +1,6 @@
-import type { EngineEffect, EngineMeasure, EnginePanel, EnginePattern, EngineTrack } from './wasm-engine';
+import type { EngineEffect, EngineMeasure, EnginePanel, EnginePattern, EngineTrack, SynthSound } from './wasm-engine';
 
-/** Main thread to worklet. */
+/** The page to the worklet. */
 export type EngineCommand =
   /** One slot's samples, mono or interleaved stereo. Acknowledged by slot. */
   | { type: 'sound'; slot: number; pcm: Float32Array; channels: number; sampleRate: number }
@@ -19,7 +19,26 @@ export type EngineCommand =
   | { type: 'stop' }
   | { type: 'trigger'; track: number; accent: boolean };
 
-/** Worklet to main thread. */
+/** The commands every engine takes the same way, whatever carries them. */
+export type SharedEngineCommand = Exclude<EngineCommand, { type: 'sound' | 'effect' }>;
+
+/**
+ * The page to an engine a shell runs natively. Two commands differ from the
+ * worklet's. Such an engine makes its own sounds, at its device's rate, so it
+ * is sent a sound's knobs in place of samples and acknowledges by slot all
+ * the same. And it is sent the effect by the engine's own number, so a
+ * bridge needs no list of the effects there are.
+ */
+export type NativeEngineCommand =
+  | SharedEngineCommand
+  | { type: 'synth'; sound: SynthSound }
+  | { type: 'effect'; effect: number; wet: number };
+
+/**
+ * An engine to the page. From a native engine, `ready` is not sent when it
+ * is first opened: it says the bridge made the engine again by itself, at
+ * this rate, and that the new one has been told nothing.
+ */
 export type EngineReport =
   | { type: 'ready'; sampleRate: number }
   | { type: 'error'; message: string }
