@@ -380,6 +380,112 @@
   font-size: 13px;
 }
 
+/* ---- WAV export chip ---------------------------------------------------- */
+
+/* Where a WAV export stands once the settings sheet is closed. It floats at
+   the foot of the screen, against the left edge of the page's column, clear
+   of the footer's buttons on the right; on a phone it is centred over the
+   dock, or over the foot of the screen where a panel does without one. It
+   sits under the menus, tips and modals. */
+.sb-export-chip {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: max(var(--gutter), calc((100vw - 1180px) / 2 + var(--gutter)));
+  z-index: 42;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 2 * var(--gutter));
+  min-height: 40px;
+  padding: 8px 16px 8px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-panel) 94%, transparent);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--color-dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: sb-export-chip-in 180ms ease-out;
+  transition: border-color 120ms, color 120ms;
+}
+
+.sb-export-chip:hover {
+  border-color: var(--color-faint);
+  color: var(--color-text);
+}
+
+.sb-export-chip-meter {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-line);
+}
+
+.sb-export-chip-meter::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left;
+  transition: transform 120ms linear;
+}
+
+/* Handed over and waiting on the person: the bar is full and breathes. */
+.sb-export-chip[data-state='saving'] .sb-export-chip-meter::after {
+  animation: sb-export-chip-wait 1.4s ease-in-out infinite;
+}
+
+.sb-export-chip-mark {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.sb-export-chip[data-state='done'] .sb-export-chip-mark {
+  color: var(--color-ok);
+}
+
+.sb-export-chip[data-state='error'] {
+  border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-line));
+}
+
+.sb-export-chip[data-state='error'] .sb-export-chip-mark {
+  color: var(--color-danger);
+}
+
+@keyframes sb-export-chip-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes sb-export-chip-wait {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 680px) {
+  .sb-export-chip {
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .sb-app:has([data-own-transport]) .sb-export-chip {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+  }
+}
+
 /* ---- Play --------------------------------------------------------------- */
 
 .sb-play {

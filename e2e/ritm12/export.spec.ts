@@ -1,6 +1,6 @@
-import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
-import { downloadBytes, exportVia, openSettings, parseMidi, parseWav } from '../helpers';
-import { beat, hitCount, openMachine } from './helpers';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { closeSettings, downloadBytes, exportVia, parseMidi, parseWav, scanner } from '../helpers';
+import { beat, hitCount, holdScripts, holdTheRender, openMachine } from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await openMachine(page);
@@ -8,17 +8,9 @@ test.beforeEach(async ({ page }) => {
 
 const status = (page: Page) => page.getByTestId('wav-export-status');
 const said = (page: Page) => page.getByTestId('wav-export-said');
+const chip = (page: Page) => page.getByTestId('wav-export-chip');
+const chipSaid = (page: Page) => page.getByTestId('wav-export-chip-said');
 const colorOf = (part: Locator) => part.evaluate((node) => getComputedStyle(node).color);
-
-/**
- * Takes hold of every script the page asks for from now on. By the time
- * settings is open the page has all of its own, so the one script left to
- * ask for is the Worker a WAV renders in.
- */
-async function holdScripts(page: Page, held: (route: Route) => Promise<void>): Promise<void> {
-  await openSettings(page);
-  await page.route('**/*.js', held);
-}
 
 test('a WAV export is the pattern on the panel, rendered in a Worker', async ({ page }) => {
   let workers = 0;
@@ -54,19 +46,14 @@ test('the 16-bit WAV and the MIDI file hold the same measure', async ({ page }) 
 });
 
 test('a render under way says so, to the eye and to a screen reader, and a second one waits', async ({ page }) => {
-  let release = () => {};
-  const released = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await holdScripts(page, async (route) => {
-    await released;
-    await route.continue();
-  });
+  const release = await holdTheRender(page);
 
   await page.getByTestId('export-menu').click();
   const download = page.waitForEvent('download');
   await page.getByTestId('export-wav').click();
   await expect(status(page)).toHaveText('Rendering the WAV… 0%');
+  // The sheet says it itself, so the chip outside it stands aside.
+  await expect(chip(page)).toHaveCount(0);
   await expect(status(page)).toHaveAttribute('data-state', 'rendering');
   await expect(said(page)).toHaveText('Rendering the WAV…');
 
@@ -100,9 +87,50 @@ test('a render that cannot start says it failed, and the next one works', async 
   await expect(status(page)).toHaveAttribute('data-state', 'error');
   await expect(said(page)).toHaveText('The WAV export failed');
   await expect(page.getByTestId('notice')).toContainText('The WAV export failed');
+  await closeSettings(page);
+  await expect(chip(page)).toHaveText('The WAV export failed, open settings');
+  await expect(chip(page)).toHaveAttribute('data-state', 'error');
+  await expect(chipSaid(page)).toHaveText('The WAV export failed');
 
   await page.unroute('**/*.js');
   const wav = parseWav(await downloadBytes(await exportVia(page, 'export-wav')));
   expect(wav.frames).toBeGreaterThan(0);
   await expect(status(page)).toHaveText(/^WAV exported at /);
+});
+
+test('with the sheet closed, a chip counts the render up, says it is done, and goes', async ({ page }) => {
+  const release = await holdTheRender(page);
+  await page.getByTestId('export-menu').click();
+  const download = page.waitForEvent('download');
+  await page.getByTestId('export-wav').click();
+  await expect(status(page)).toHaveAttribute('data-state', 'rendering');
+  await closeSettings(page);
+
+  await expect(chip(page)).toBeVisible();
+  await expect(chip(page)).toHaveAttribute('data-state', 'rendering');
+  await expect(chip(page)).toHaveText('Rendering the WAV… 0%, open settings');
+  await expect(chipSaid(page)).toHaveRole('status');
+  await expect(chipSaid(page)).toHaveText('Rendering the WAV…');
+  // It is clear of the footer's buttons, which are on the right.
+  const box = (await chip(page).boundingBox())!;
+  const settings = (await page.getByTestId('settings').boundingBox())!;
+  expect(box.x + box.width).toBeLessThan(settings.x);
+  expect((await scanner(page).analyze()).violations.map((violation) => violation.id)).toEqual([]);
+
+  // A button: reached with the keyboard, it opens the sheet, which then says it all.
+  await chip(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('settings-modal')).toBeVisible();
+  await expect(chip(page)).toHaveCount(0);
+  await expect(chipSaid(page)).toHaveText('');
+  await closeSettings(page);
+  await expect(chip(page)).toBeVisible();
+
+  release();
+  expect(parseWav(await downloadBytes(await download)).frames).toBeGreaterThan(0);
+  await expect(chip(page)).toHaveText('WAV exported, open settings');
+  await expect(chip(page)).toHaveAttribute('data-state', 'done');
+  await expect(chipSaid(page)).toHaveText(/^WAV exported at /);
+  await expect(chip(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(chipSaid(page)).toHaveText('');
 });

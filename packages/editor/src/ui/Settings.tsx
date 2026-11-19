@@ -3,12 +3,13 @@ import { Settings as SettingsIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { PROJECT_FILE_EXTENSION } from '@boombapbot/contracts';
 import type { WavBitDepth } from '../engine/wav';
-import type { WavExport } from '../state/store';
 import { useEditorState, useRuntime } from './context';
 import { closingNoteText } from './draft-words';
 import { ChevronIcon, DownloadIcon, UploadIcon } from './icons';
 import { Modal } from './Modal';
 import { PatternActions, StatusBar } from './StatusBar';
+import { WavExportChip } from './WavExportChip';
+import { wavExportSaid, wavExportWait } from './wav-export-words';
 
 const NAME_FIELD_ID = 'sb-beat-name';
 
@@ -54,13 +55,6 @@ const WAV_ITEMS: Array<{ bitDepth: WavBitDepth; testId: string; label: string; n
   { bitDepth: 16, testId: 'export-wav-16', label: 'WAV loop, 16-bit', note: 'Stereo, one measure' },
 ];
 
-/** Why another WAV cannot be asked for yet, while one is under way. */
-function wavExportWait(wav: WavExport | null): string | null {
-  if (wav?.state === 'rendering') return 'One is rendering now';
-  if (wav?.state === 'saving') return 'One is being saved now';
-  return null;
-}
-
 function ExportMenu() {
   const runtime = useRuntime();
   const wait = useEditorState((state) => wavExportWait(state.wavExport));
@@ -99,19 +93,6 @@ function ExportMenu() {
       </Menu.Portal>
     </Menu.Root>
   );
-}
-
-function wavExportSaid(wav: WavExport): string {
-  switch (wav.state) {
-    case 'rendering':
-      return 'Rendering the WAV…';
-    case 'saving':
-      return 'Saving the WAV…';
-    case 'done':
-      return `WAV exported at ${new Date(wav.at).toLocaleTimeString()}`;
-    case 'error':
-      return 'The WAV export failed';
-  }
 }
 
 /**
@@ -166,7 +147,9 @@ export function Settings({ container, accounts }: SettingsProps) {
   const runtime = useRuntime();
   const draftKept = useEditorState((state) => state.draftState === 'saved');
   const [open, setOpen] = useState(false);
+  const [host, setHost] = useState<HTMLElement | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => setHost(container.current), [container]);
 
   return (
     <>
@@ -230,6 +213,7 @@ export function Settings({ container, accounts }: SettingsProps) {
           <p className="sb-hint">{closingNoteText({ accounts, kept: draftKept })}</p>
         </Group>
       </Modal>
+      <WavExportChip host={host} sheetOpen={open} openSheet={() => setOpen(true)} />
     </>
   );
 }
