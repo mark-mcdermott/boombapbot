@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -64,6 +65,17 @@ public class BoombapbotEnginePlugin extends Plugin {
             if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) onControl(() -> stopBeat());
         }
     };
+    /** A pause from the notification, the lock screen or a headset, sent by PlaybackService. */
+    private final BroadcastReceiver paused = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (PlaybackService.PAUSE.equals(intent.getAction())) onControl(() -> stopBeat());
+        }
+    };
+    /** Set while the app is not in front. */
+    private Away away;
+    /** Whether PlaybackService is keeping the app alive for the beat. */
+    private boolean serving = false;
 
     /**
      * Hands the phone's notices to the control thread. One that arrives after
@@ -86,16 +98,29 @@ public class BoombapbotEnginePlugin extends Plugin {
             new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
             ContextCompat.RECEIVER_NOT_EXPORTED
         );
+        ContextCompat.registerReceiver(getContext(), paused, new IntentFilter(PlaybackService.PAUSE), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
     protected void handleOnDestroy() {
         getContext().unregisterReceiver(becomingNoisy);
+        getContext().unregisterReceiver(paused);
         onControl(this::finish);
         control.shutdown();
     }
 
+    @Override
+    protected void handleOnStop() {
+        onControl(this::wentAway);
+    }
+
+    @Override
+    protected void handleOnStart() {
+        onControl(this::cameBack);
+    }
+
     private void report(Report report) {
+        if (away != null && !away.passes(report)) return;
         notifyListeners(REPORT_EVENT, report.json());
     }
 
@@ -164,6 +189,7 @@ public class BoombapbotEnginePlugin extends Plugin {
         looking = null;
         if (output != null) output.close();
         output = null;
+        serve(false);
     }
 
     /** The page is done with the engine: it goes, and the phone's sound is given back. */
@@ -204,7 +230,51 @@ public class BoombapbotEnginePlugin extends Plugin {
             return;
         }
         watch.look(output.engine, output, now(), this::report);
+        serve(output.engine.isPlaying());
         schedule(output.engine.isPlaying() ? PLAYING_PAUSE_MS : RESTING_PAUSE_MS);
+    }
+
+    /** Starts PlaybackService when the beat starts and stops it when the beat stops. */
+    private void serve(boolean playing) {
+        if (playing == serving) return;
+        serving = playing;
+        if (!playing) {
+            PlaybackService.stop(getContext());
+            return;
+        }
+        try {
+            PlaybackService.start(getContext());
+        } catch (IllegalStateException refused) {
+            // Android 12 and later refuse it to an app that is already out of the front.
+            Log.w(TAG, "The beat plays without PlaybackService: " + refused.getMessage());
+        }
+    }
+
+    // ---- The app in and out of the front ------------------------------------------------
+
+    private void wentAway() {
+        if (output == null) return;
+        away = new Away(now(), output.engine.framesRendered());
+    }
+
+    /** The page is told where the engine is. */
+    private void cameBack() {
+        Away was = away;
+        away = null;
+        if (was == null || output == null) return;
+        Engine engine = output.engine;
+        Log.i(
+            TAG,
+            String.format(
+                Locale.ROOT,
+                "Back in front after %.1f s: %d frames rendered meanwhile, peak %.2f, %s",
+                now() - was.since,
+                (long) (engine.framesRendered() - was.framesBefore),
+                was.peak(),
+                engine.isPlaying() ? "playing" : "stopped"
+            )
+        );
+        report(Report.position(engine.currentStep(), engine.currentPattern(), engine.isPlaying()));
     }
 
     /** Stops the beat where the phone wants quiet, and tells the page it ended. */

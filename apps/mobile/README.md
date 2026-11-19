@@ -33,7 +33,8 @@ own audio: AVAudioEngine on an iPhone, Oboe on Android.
     `AudioOutput.swift` sets `AVAudioSession` for playback and runs an
     `AVAudioEngine` whose `AVAudioSourceNode` render block calls
     `EngineRender`; `EnginePlugin.swift` makes every other call to the
-    engine on one queue of its own and answers the phone's notices.
+    engine on one queue of its own and answers the phone's notices;
+    `NowPlaying.swift` is what the lock screen shows while the beat plays.
 
   On Android it is a Gradle library module, `native-engine/android`, that
   `cap sync` adds to the app:
@@ -54,8 +55,9 @@ own audio: AVAudioEngine on an iPhone, Oboe on Android.
     `Watch` for what the page is told and how often, `AudioOutput` for the
     stream, and `BoombapbotEnginePlugin`, which makes every other call to
     the engine on one thread of its own and answers audio focus and the
-    phone's "becoming noisy". Its tests are `src/androidTest`, on a phone
-    or an emulator.
+    phone's "becoming noisy". `PlaybackService` keeps the app alive while
+    the beat plays out of the front. Its tests are `src/androidTest`, on a
+    phone or an emulator.
 - `src/native-engine.ts` is the bridge the editor asks for
   (`NativeEngineBridge`) over that plug-in, and starts the run that checks
   itself when one is asked for.
@@ -99,7 +101,8 @@ What the plug-in does when the phone changes its sound:
   stops. A sound that only asks for quiet for a moment (a "duck") is left
   to Android, which lowers the beat.
 - **Headphones pulled out** stop the beat, as the phone's own players do
-  (`oldDeviceUnavailable` on iOS, "becoming noisy" on Android).
+  (`oldDeviceUnavailable` on iOS, "becoming noisy" on Android). The
+  plug-in stops it itself and tells the page.
 - **Any other change of device.** On iOS, a change of route, or
   AVAudioEngine saying its configuration changed, makes the engine again
   at the new rate when the rate changed or the sound stopped. On Android
@@ -108,6 +111,44 @@ What the plug-in does when the phone changes its sound:
   the new engine the beat again and it plays on.
 - **The phone's audio starting over** (media services reset) makes
   everything again.
+
+When the app leaves the front, or the screen locks, a beat that plays
+keeps playing. The engine sequences on its own, so the page is not needed
+for that, and its web view may be asleep:
+
+- **iOS.** The app has the `audio` background mode in `Info.plist`, and
+  `AVAudioSession` stays `.playback` and active. While the beat plays, Now
+  Playing shows "РИТМ-12" by "boombapbot" with a pause (and the
+  play/pause and stop commands); pausing there stops the beat in the
+  plug-in and tells the page it ended. Once stopped, Now Playing is
+  cleared: play is only in the app, which tells the engine what to play.
+  A beat that stops while the app is away lets go of the phone's sound,
+  so that iOS may suspend the app, and takes it again on the app's return.
+- **Android.** While the beat plays, the plug-in runs `PlaybackService`, a
+  foreground service of type `mediaPlayback`, with a media session and a
+  media notification (the three bars, "РИТМ-12", "boombapbot", a pause).
+  Its pause, the lock screen's and a headset's go to the plug-in, which
+  stops the beat and tells the page; the service stops with the beat. The
+  library's manifest asks for `FOREGROUND_SERVICE`,
+  `FOREGROUND_SERVICE_MEDIA_PLAYBACK` and `POST_NOTIFICATIONS`. The app
+  does not ask for notifications at run time: Android 13 and later show a
+  media session's notification without it, as the emulator did.
+- **The page while away.** Only what changes the machine reaches it: an
+  ending, an error, a new engine, a sound taken, measures. The step, the
+  meter and the stats are let go, hundreds a second that would pile up in
+  a sleeping web view. On the app's return the page is told the step, so it
+  shows the machine playing or stopped where the engine is. The plug-in
+  logs how long the app was away, how many frames the engine rendered
+  meanwhile and their peak (`Back in front after …`, subsystem
+  `com.boombapbot.engine` on iOS, tag `BoombapbotEngine` on Android).
+- **The phone changing its sound while away.** A call stops the beat as in
+  front; the engine is made again on the app's return. On iOS a change of
+  route that stops AVAudioEngine starts it again with the same engine,
+  whose rate AVAudioEngine's mixer converts if the new route's differs,
+  because a sleeping page could not tell a new engine the beat; it is made
+  again at the new rate on the app's return. On Android a device that
+  leaves makes the engine again, as in front, and the beat plays on only
+  if the page is awake to tell it.
 
 Accounts, saved beats, the shop and the upgrade are left out on purpose, and
 so are the footer's pages. Nothing in the app talks to a server.
@@ -281,14 +322,51 @@ Nobody has listened to it or held it. The simulator and the emulator play
 through the Mac's speakers, and everything above about the native engine's
 sound is its numbers. Not checked: a real iPhone, a real Android phone, an iPad,
 the ringer switch, a phone call or another app taking the sound,
-headphones in or out, a Bluetooth route, the app coming back from the
-background, long playing; on Android, headphones, a Bluetooth device or
+headphones in or out, a Bluetooth route, long playing; on Android, headphones, a Bluetooth device or
 another app taking the sound for good, and a phone older than Android 8,
 where focus is asked for the old way. A simulator cannot make most of those happen:
 what the plug-in does then is built and not run, except making the engine
 again, which `reopen` runs by asking for it rather than by a real change
 of route. On the emulator no other app took a shared file: it has no
 account for Drive or Gmail.
+
+Background playing, on the same iPhone simulator and Android emulator
+on 2026-11-18:
+
+- **iOS.** Play by hand, then Home: 20 seconds later the app's process was
+  still using the CPU, and locking the screen kept it so. The simulator's
+  lock screen and Control Center draw no Now Playing, but iOS's
+  `mediaremoted` logged the app as Now Playing with its title, a rate of 1
+  and the commands. A pause sent through MediaRemote, as the lock screen
+  sends one (a small tool run in the simulator with `simctl spawn`),
+  reached the plug-in, which stopped the beat, paused AVAudioEngine and
+  turned the commands off. Back in the app after 90.5 seconds: about 74
+  seconds rendered at 48 kHz (3,559,936 frames, up to the pause), peak
+  0.68, and the page showed the machine stopped. Play again took the sound
+  back and played. Played, then Home for 19.6 seconds: 940,032 frames, so
+  in real time, peak 0.66, and on return the page showed it playing, the
+  step moving. Stopped, then Home: AVAudioEngine paused, but the simulator
+  did not suspend the app; it kept a little CPU. Whether a phone does is
+  not known.
+- **Android.** Play started `PlaybackService` in the foreground as
+  `mediaPlayback`, with the notification posted and the media session
+  playing, notification permission not granted. Home for 20 seconds, then
+  the screen off for 10: still in the foreground. The shade showed the
+  media controls, "РИТМ-12", "boombapbot", a pause; the pause stopped the
+  beat and the service. Back in the app after 47.3 seconds: 2,269,368
+  frames, peak 0.68, the machine shown stopped. Played, then Home for 14.6
+  seconds: 702,472 frames, so in real time, peak 0.66, and on return the
+  page showed it playing with the step lit. Played, Home, then a media
+  pause key (`input keyevent KEYCODE_MEDIA_PAUSE`): the beat and the
+  service stopped, and the page showed it on return.
+- The plug-in's tests: 7 pass on each, the new one being which reports go
+  to the page while the app is away. The `reopen` check run passes on
+  both, with the same peak of 0.66, and leaves no service running.
+
+Not tried: real phones, a real call, headphones or Bluetooth while the app
+is away, the change of route that iOS's plug-in recovers from out of the
+front, Android killing the app's screen while the service runs, playing
+for long, and the battery it costs.
 
 ## What is not right yet
 
@@ -324,9 +402,9 @@ account for Drive or Gmail.
 - **The ringer switch.** The plug-in sets `AVAudioSession` for playback,
   which should keep it sounding with the switch on silent. A simulator has
   no switch, so this is untried.
-- **Sound stops when the app leaves the front.** The app does not ask iOS
-  to play in the background (`UIBackgroundModes`). Whether a drum machine
-  should go on playing then is yours to decide.
+- **Play from the lock screen or the notification.** Only pause is
+  there. Playing again needs the page, which may be asleep, to tell the
+  engine what to play, so the controls go when the beat stops.
 - **Knob turns while the phone has the sound.** During a call the engine
   stays made and its sound is stopped, so what the page sends waits in its
   queue. A long run of knob turns then could fill it, and the page would
