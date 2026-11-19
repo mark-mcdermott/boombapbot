@@ -1,8 +1,11 @@
 #ifndef SNARE_FX_H
 #define SNARE_FX_H
 
-// The one effect on the mix: an echo, a reverb, a flanger or a chorus, added
-// to the dry signal ahead of the limiter.
+// The one effect on the mix, ahead of the limiter. An echo, a reverb, a
+// flanger, a chorus and vinyl noise are added to the dry signal, and how much
+// is the amount asked for. A crusher, tape, a pump, a filter and a phaser
+// work on the signal itself; with nothing asked for they pass it untouched,
+// so one effect can still fade out before the next begins.
 //
 // Rules it keeps, so that it changes nothing the engine promises:
 //   - every buffer is allocated when the engine is made, never in render;
@@ -33,6 +36,20 @@ inline double effectTailSeconds(int kind, double bpm) {
       return 0.12;
     case SNARE_EFFECT_CHORUS:
       return 0.04;
+    case SNARE_EFFECT_CRUSHER:
+      return 0.01;
+    case SNARE_EFFECT_TAPE:
+      return 0.05;
+    case SNARE_EFFECT_PUMP:
+      // Nothing rings on, but its gain takes this long to come back up.
+      return 0.5;
+    case SNARE_EFFECT_FILTER:
+      return 0.1;
+    case SNARE_EFFECT_VINYL:
+      // The noise holds on after the last sound, then fades.
+      return 1.6;
+    case SNARE_EFFECT_PHASER:
+      return 0.15;
     default:
       return 0.0;
   }
@@ -59,6 +76,26 @@ class Effect {
       allpassesLeft_[i].buffer.assign(scaled(kAllpassTuning[i], sampleRate), 0.0f);
       allpassesRight_[i].buffer.assign(scaled(kAllpassTuning[i] + kStereoSpread, sampleRate), 0.0f);
     }
+    crushEvery_ = kCrushHz >= sampleRate;
+    crushStep_ = crushEvery_ ? 0 : phaseStep(kCrushHz, sampleRate);
+    wowStep_ = phaseStep(kWowHz, sampleRate);
+    flutterStep_ = phaseStep(kFlutterHz, sampleRate);
+    tapeDamping_ = onePole(kTapeDampHz, sampleRate);
+    pumpTone_ = onePole(kPumpToneHz, sampleRate);
+    pumpAttack_ = timeConstant(kPumpAttackSeconds, sampleRate);
+    pumpRelease_ = timeConstant(kPumpReleaseSeconds, sampleRate);
+    filterTop_ = static_cast<float>(std::min(kFilterTopHz, 0.45 * sampleRate) / sampleRate);
+    filterFloor_ = static_cast<float>(std::min(kFilterFloorHz, 0.1 * sampleRate) / sampleRate);
+    vinylHoldFrames_ = static_cast<std::uint32_t>(kVinylHoldSeconds * sampleRate);
+    vinylRise_ = timeConstant(kVinylRiseSeconds, sampleRate);
+    vinylFade_ = timeConstant(kVinylFadeSeconds, sampleRate);
+    hissTone_ = onePole(kHissHz, sampleRate);
+    popDecay_ = static_cast<float>(std::exp(-1.0 / (kPopSeconds * sampleRate)));
+    popOdds_ = phaseStep(kPopsPerSecond, sampleRate);
+    tickOdds_ = phaseStep(kTicksPerSecond, sampleRate);
+    phaserStep_ = phaseStep(kPhaserHz, sampleRate);
+    phaserLow_ = static_cast<float>(std::min(kPhaserLowHz, 0.1 * sampleRate) / sampleRate);
+    phaserSpan_ = static_cast<float>(std::min(kPhaserHighHz, 0.4 * sampleRate) / sampleRate) - phaserLow_;
     setTempo(120.0);
     echoNow_ = echoTarget_;
   }
@@ -96,6 +133,24 @@ class Effect {
         case SNARE_EFFECT_CHORUS:
           chorus(left[i], right[i], wetLeft, wetRight);
           break;
+        case SNARE_EFFECT_VINYL:
+          vinyl(left[i], right[i], wetLeft, wetRight);
+          break;
+        case SNARE_EFFECT_CRUSHER:
+          crusher(left[i], right[i]);
+          continue;
+        case SNARE_EFFECT_TAPE:
+          tape(left[i], right[i]);
+          continue;
+        case SNARE_EFFECT_PUMP:
+          pump(left[i], right[i]);
+          continue;
+        case SNARE_EFFECT_FILTER:
+          filter(left[i], right[i]);
+          continue;
+        case SNARE_EFFECT_PHASER:
+          phaser(left[i], right[i]);
+          continue;
         default:
           break;
       }
@@ -126,6 +181,45 @@ class Effect {
   static constexpr float kDamp = 0.2f;
   static constexpr float kReverbInput = 0.015f;
   static constexpr float kReverbOutput = 1.0f;
+  // The crusher: how often it takes a new sample, and the levels each side of nothing.
+  static constexpr double kCrushHz = 12000.0;
+  static constexpr float kCrushLevels = 64.0f;
+  // Tape: its slow and its quick wobble, where its top rolls off, how hard it is driven.
+  static constexpr double kWowHz = 0.55;
+  static constexpr double kFlutterHz = 6.3;
+  static constexpr double kTapeDampHz = 6500.0;
+  static constexpr float kTapeDrive = 1.4f;
+  static constexpr float kTapeLevel = 0.6f;
+  // The pump listens to the low end and ducks everything under it.
+  static constexpr double kPumpToneHz = 150.0;
+  static constexpr double kPumpAttackSeconds = 0.008;
+  static constexpr double kPumpReleaseSeconds = 0.16;
+  static constexpr float kPumpDepth = 6.0f;
+  static constexpr float kPumpMakeup = 0.4f;
+  // The filter: where it stands open and shut, and how little it damps its own ring.
+  static constexpr double kFilterTopHz = 18000.0;
+  static constexpr double kFilterFloorHz = 180.0;
+  static constexpr float kFilterDamping = 1.0f / 3.0f;
+  static constexpr float kFilterFadeIn = 16.0f;
+  // Vinyl: what counts as sound, how long the noise holds on after it, and what the noise is made of.
+  static constexpr float kVinylFloor = 0.003f;
+  static constexpr double kVinylHoldSeconds = 0.75;
+  static constexpr double kVinylRiseSeconds = 0.02;
+  static constexpr double kVinylFadeSeconds = 0.12;
+  static constexpr double kHissHz = 5000.0;
+  static constexpr float kHissLevel = 0.012f;
+  static constexpr double kPopsPerSecond = 6.0;
+  static constexpr double kTicksPerSecond = 90.0;
+  static constexpr double kPopSeconds = 0.0004;
+  static constexpr float kPopLevel = 0.16f;
+  static constexpr float kTickLevel = 0.035f;
+  static constexpr std::uint32_t kNoiseSeed = 0x9e3779b9u;
+  // The phaser: how slowly it sweeps, between where, and how much of itself it hears.
+  static constexpr double kPhaserHz = 0.3;
+  static constexpr double kPhaserLowHz = 250.0;
+  static constexpr double kPhaserHighHz = 2800.0;
+  static constexpr float kPhaserFeedback = 0.55f;
+  static constexpr int kPhaserStages = 4;
 
   struct Comb {
     std::vector<float> buffer;
@@ -138,12 +232,42 @@ class Effect {
     std::size_t index = 0;
   };
 
+  // A low-pass of two poles that stays steady however fast it is swept.
+  struct Sweepable {
+    float first = 0.0f;
+    float second = 0.0f;
+  };
+
+  // One side of the phaser: what each stage holds, and what came out last.
+  struct Stages {
+    float held[kPhaserStages] = {};
+    float back = 0.0f;
+  };
+
   static std::size_t scaled(int samplesAt44100, double sampleRate) {
     return static_cast<std::size_t>((static_cast<std::int64_t>(samplesAt44100) * static_cast<std::int64_t>(sampleRate) + 22050) / 44100);
   }
 
   static std::uint32_t phaseStep(double hz, double sampleRate) {
     return static_cast<std::uint32_t>(hz / sampleRate * 4294967296.0);
+  }
+
+  // What a one-pole filter moves by each sample to turn over at a frequency.
+  static float onePole(double hz, double sampleRate) {
+    return static_cast<float>(1.0 - std::exp(-2.0 * kPi * hz / sampleRate));
+  }
+
+  // The same for something that follows its target in about so many seconds.
+  static float timeConstant(double seconds, double sampleRate) {
+    return static_cast<float>(1.0 - std::exp(-1.0 / (seconds * sampleRate)));
+  }
+
+  // Exactly the one at nothing and exactly the other at everything.
+  static float blend(float dry, float made, float amount) { return dry * (1.0f - amount) + made * amount; }
+
+  // Keeps a value that is dying away from turning into numbers too small to be quick with.
+  static void settle(float& value) {
+    if (std::fabs(value) < kQuiet) value = 0.0f;
   }
 
   static float approach(float value, float target, float coefficient) {
@@ -162,6 +286,13 @@ class Effect {
     return x * (1.0f - x2 / 6.0f * (1.0f - x2 / 20.0f * (1.0f - x2 / 42.0f)));
   }
 
+  // tan(pi * f) for a frequency given as a part of the sample rate, below
+  // half of it, from the same polynomial.
+  static float tangent(float ofRate) {
+    const std::uint32_t phase = static_cast<std::uint32_t>(ofRate * 2147483648.0f);
+    return sine(phase) / sine(phase + 0x40000000u);
+  }
+
   // Begins an effect from silence. Old samples in the delay line are left
   // where they are and simply never read again.
   void start(int kind) {
@@ -173,6 +304,30 @@ class Effect {
     flangerPhase_ = 0;
     chorusSlow_ = 0;
     chorusFast_ = 0;
+    // The crusher takes its first sample at once.
+    crushPhase_ = 0u - crushStep_;
+    heldLeft_ = 0.0f;
+    heldRight_ = 0.0f;
+    wowPhase_ = 0;
+    flutterPhase_ = 0;
+    tapeLeft_ = 0.0f;
+    tapeRight_ = 0.0f;
+    pumpLow1_ = 0.0f;
+    pumpLow2_ = 0.0f;
+    pumpEnvelope_ = 0.0f;
+    filterLeft_ = Sweepable{};
+    filterRight_ = Sweepable{};
+    // The same crackle every time, so a render can be made twice.
+    noise_ = kNoiseSeed;
+    vinylHold_ = 0;
+    vinylGate_ = 0.0f;
+    hissLeft_ = 0.0f;
+    hissRight_ = 0.0f;
+    popLeft_ = 0.0f;
+    popRight_ = 0.0f;
+    phaserPhase_ = 0;
+    phaserLeft_ = Stages{};
+    phaserRight_ = Stages{};
     if (kind != SNARE_EFFECT_REVERB) return;
     for (Comb& comb : combsLeft_) clear(comb);
     for (Comb& comb : combsRight_) clear(comb);
@@ -270,6 +425,158 @@ class Effect {
     wetRight = sumRight * kReverbOutput;
   }
 
+  // Fewer samples and fewer levels: each one is held until the next is due,
+  // and rounded to the nearest of a few.
+  static float coarse(float sample) {
+    const float scaled = std::min(1.0f, std::max(-1.0f, sample)) * kCrushLevels;
+    return static_cast<float>(static_cast<std::int32_t>(scaled + (scaled >= 0.0f ? 0.5f : -0.5f))) / kCrushLevels;
+  }
+
+  void crusher(float& left, float& right) {
+    const std::uint32_t before = crushPhase_;
+    crushPhase_ += crushStep_;
+    if (crushEvery_ || crushPhase_ < before) {
+      heldLeft_ = coarse(left);
+      heldRight_ = coarse(right);
+    }
+    left = blend(left, heldLeft_, wet_);
+    right = blend(right, heldRight_, wet_);
+  }
+
+  // What is loud is rounded off, and the level it comes out at is set to match.
+  static float warm(float sample) {
+    const float driven = std::min(1.0f, std::max(-1.0f, sample * kTapeDrive));
+    return (1.5f * driven - 0.5f * driven * driven * driven) * kTapeLevel;
+  }
+
+  // The signal a moment late, the moment wandering as a tape's speed does,
+  // with its top rolled off and its peaks rounded. All of it grows with the
+  // amount asked for, the lateness too, so at nothing it is the signal as it came.
+  void tape(float& left, float& right) {
+    write(left, right);
+    const float late = 1.0f + wet_ * milliseconds(1.3f + sine(wowPhase_) + 0.15f * sine(flutterPhase_));
+    wowPhase_ += wowStep_;
+    flutterPhase_ += flutterStep_;
+    const float heardLeft = tap(lineLeft_, late);
+    const float heardRight = tap(lineRight_, late);
+    tapeLeft_ += (heardLeft - tapeLeft_) * tapeDamping_;
+    tapeRight_ += (heardRight - tapeRight_) * tapeDamping_;
+    settle(tapeLeft_);
+    settle(tapeRight_);
+    left = blend(heardLeft, warm(tapeLeft_), wet_);
+    right = blend(heardRight, warm(tapeRight_), wet_);
+  }
+
+  // A compressor that hears only the low end. It comes down quickly enough
+  // to let the front of a hit through and comes back slowly, so everything
+  // ducks under the kick and swells back after it.
+  void pump(float& left, float& right) {
+    pumpLow1_ += (0.5f * (left + right) - pumpLow1_) * pumpTone_;
+    pumpLow2_ += (pumpLow1_ - pumpLow2_) * pumpTone_;
+    const float level = std::fabs(pumpLow2_);
+    pumpEnvelope_ += (level - pumpEnvelope_) * (level > pumpEnvelope_ ? pumpAttack_ : pumpRelease_);
+    settle(pumpLow1_);
+    settle(pumpLow2_);
+    settle(pumpEnvelope_);
+    const float gain = (1.0f + kPumpMakeup * wet_) / (1.0f + kPumpDepth * wet_ * pumpEnvelope_);
+    left *= gain;
+    right *= gain;
+  }
+
+  static float lowpass(Sweepable& state, float input, float a1, float a2, float a3) {
+    const float v3 = input - state.second;
+    const float v1 = a1 * state.first + a2 * v3;
+    const float v2 = state.second + a2 * state.first + a3 * v3;
+    state.first = 2.0f * v1 - state.first;
+    state.second = 2.0f * v2 - state.second;
+    settle(state.first);
+    settle(state.second);
+    return v2;
+  }
+
+  // A low-pass with a ring to it. The amount asked for is how far it is
+  // shut: wide open at nothing, down to the low end at everything.
+  void filter(float& left, float& right) {
+    const float open = 1.0f - wet_;
+    const float g = tangent(filterFloor_ + (filterTop_ - filterFloor_) * open * open * open);
+    const float a1 = 1.0f / (1.0f + g * (g + kFilterDamping));
+    const float a2 = g * a1;
+    const float a3 = g * a2;
+    // Wide open is not quite the signal as it came, so the last of the way there is a fade.
+    const float amount = std::min(1.0f, wet_ * kFilterFadeIn);
+    left = blend(left, lowpass(filterLeft_, left, a1, a2, a3), amount);
+    right = blend(right, lowpass(filterRight_, right, a1, a2, a3), amount);
+  }
+
+  std::uint32_t random() {
+    noise_ ^= noise_ << 13;
+    noise_ ^= noise_ >> 17;
+    noise_ ^= noise_ << 5;
+    return noise_;
+  }
+
+  // A random number as a sample, from -1 up to 1.
+  static float asSample(std::uint32_t number) {
+    return static_cast<float>(static_cast<std::int32_t>(number)) / 2147483648.0f;
+  }
+
+  // A record's surface: hiss, small ticks and the odd pop, a little apart on
+  // the two sides. It sounds only while there is something to hear and for a
+  // moment after, so a machine that has stopped is quiet.
+  void vinyl(float left, float right, float& wetLeft, float& wetRight) {
+    if (std::fabs(left) > kVinylFloor || std::fabs(right) > kVinylFloor) {
+      vinylHold_ = vinylHoldFrames_;
+    } else if (vinylHold_ > 0) {
+      --vinylHold_;
+    }
+    const float open = vinylHold_ > 0 ? 1.0f : 0.0f;
+    vinylGate_ += (open - vinylGate_) * (open > vinylGate_ ? vinylRise_ : vinylFade_);
+    if (open == 0.0f && vinylGate_ < kSettled) vinylGate_ = 0.0f;
+
+    hissLeft_ += (asSample(random()) - hissLeft_) * hissTone_;
+    hissRight_ += (asSample(random()) - hissRight_) * hissTone_;
+    const std::uint32_t chance = random();
+    if (chance < popOdds_ || chance - popOdds_ < tickOdds_) {
+      const std::uint32_t drawn = random();
+      const float size = (chance < popOdds_ ? kPopLevel : kTickLevel) * asSample(drawn);
+      const bool nearLeft = (drawn & 1u) != 0;
+      popLeft_ += size * (nearLeft ? 1.0f : 0.6f);
+      popRight_ += size * (nearLeft ? 0.6f : 1.0f);
+    }
+    wetLeft = vinylGate_ * (hissLeft_ * kHissLevel + popLeft_);
+    wetRight = vinylGate_ * (hissRight_ * kHissLevel + popRight_);
+    popLeft_ *= popDecay_;
+    popRight_ *= popDecay_;
+    settle(popLeft_);
+    settle(popRight_);
+  }
+
+  // Four stages that each turn the signal's phase round a frequency, with a
+  // little of what comes out fed back in.
+  static float turned(Stages& stages, float input, std::uint32_t phase, float low, float span) {
+    const float swing = 0.5f + 0.5f * sine(phase);
+    const float g = tangent(low + span * swing * swing);
+    const float a = (g - 1.0f) / (g + 1.0f);
+    float through = input + stages.back * kPhaserFeedback;
+    for (float& held : stages.held) {
+      const float out = a * through + held;
+      held = through - a * out;
+      settle(held);
+      through = out;
+    }
+    stages.back = through;
+    settle(stages.back);
+    return through;
+  }
+
+  // The signal against a copy whose phase is swept slowly: notches that
+  // travel up and down it, a quarter of a turn apart on the two sides.
+  void phaser(float& left, float& right) {
+    left = blend(left, 0.5f * (left + turned(phaserLeft_, left, phaserPhase_, phaserLow_, phaserSpan_)), wet_);
+    right = blend(right, 0.5f * (right + turned(phaserRight_, right, phaserPhase_ + 0x40000000u, phaserLow_, phaserSpan_)), wet_);
+    phaserPhase_ += phaserStep_;
+  }
+
   const float rate_;
   std::uint32_t mask_ = 0;
   std::vector<float> lineLeft_;
@@ -295,6 +602,54 @@ class Effect {
   std::uint32_t chorusFast_ = 0;
   std::uint32_t chorusStepSlow_ = 0;
   std::uint32_t chorusStepFast_ = 0;
+
+  bool crushEvery_ = false;
+  std::uint32_t crushPhase_ = 0;
+  std::uint32_t crushStep_ = 0;
+  float heldLeft_ = 0.0f;
+  float heldRight_ = 0.0f;
+
+  std::uint32_t wowPhase_ = 0;
+  std::uint32_t wowStep_ = 0;
+  std::uint32_t flutterPhase_ = 0;
+  std::uint32_t flutterStep_ = 0;
+  float tapeDamping_ = 1.0f;
+  float tapeLeft_ = 0.0f;
+  float tapeRight_ = 0.0f;
+
+  float pumpTone_ = 1.0f;
+  float pumpAttack_ = 1.0f;
+  float pumpRelease_ = 1.0f;
+  float pumpLow1_ = 0.0f;
+  float pumpLow2_ = 0.0f;
+  float pumpEnvelope_ = 0.0f;
+
+  float filterTop_ = 0.0f;
+  float filterFloor_ = 0.0f;
+  Sweepable filterLeft_;
+  Sweepable filterRight_;
+
+  std::uint32_t noise_ = kNoiseSeed;
+  std::uint32_t vinylHoldFrames_ = 0;
+  std::uint32_t vinylHold_ = 0;
+  float vinylRise_ = 1.0f;
+  float vinylFade_ = 1.0f;
+  float vinylGate_ = 0.0f;
+  float hissTone_ = 1.0f;
+  float hissLeft_ = 0.0f;
+  float hissRight_ = 0.0f;
+  float popDecay_ = 0.0f;
+  float popLeft_ = 0.0f;
+  float popRight_ = 0.0f;
+  std::uint32_t popOdds_ = 0;
+  std::uint32_t tickOdds_ = 0;
+
+  std::uint32_t phaserPhase_ = 0;
+  std::uint32_t phaserStep_ = 0;
+  float phaserLow_ = 0.0f;
+  float phaserSpan_ = 0.0f;
+  Stages phaserLeft_;
+  Stages phaserRight_;
 
   Comb combsLeft_[kCombs];
   Comb combsRight_[kCombs];

@@ -1,5 +1,6 @@
 // The effect on the mix, and the output level the meter reads.
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -12,7 +13,11 @@ using namespace snare::test;
 namespace {
 
 constexpr double kRate = 48000.0;
-constexpr int kEffects[] = {SNARE_EFFECT_DELAY, SNARE_EFFECT_REVERB, SNARE_EFFECT_FLANGER, SNARE_EFFECT_CHORUS};
+constexpr int kEffects[] = {SNARE_EFFECT_DELAY,  SNARE_EFFECT_REVERB, SNARE_EFFECT_FLANGER, SNARE_EFFECT_CHORUS,
+                            SNARE_EFFECT_CRUSHER, SNARE_EFFECT_TAPE,  SNARE_EFFECT_PUMP,    SNARE_EFFECT_FILTER,
+                            SNARE_EFFECT_VINYL,   SNARE_EFFECT_PHASER};
+// The ones that work on the sound itself, where the others add something to it.
+constexpr int kInserts[] = {SNARE_EFFECT_CRUSHER, SNARE_EFFECT_TAPE, SNARE_EFFECT_PUMP, SNARE_EFFECT_FILTER, SNARE_EFFECT_PHASER};
 
 // An engine whose first track plays a short burst on the first step of a measure.
 SnareEngine* burstEngine(double rate = kRate) {
@@ -31,6 +36,47 @@ SnareEngine* burstEngine(double rate = kRate) {
 double energy(const std::vector<float>& samples, std::size_t from, std::size_t to) {
   double sum = 0.0;
   for (std::size_t i = from; i < to && i < samples.size(); ++i) sum += static_cast<double>(samples[i]) * samples[i];
+  return sum;
+}
+
+// A sine, as a sound for a slot.
+std::vector<float> tone(double hz, double seconds, float level, double rate = kRate) {
+  std::vector<float> samples(static_cast<std::size_t>(rate * seconds));
+  for (std::size_t i = 0; i < samples.size(); ++i) {
+    samples[i] = level * static_cast<float>(std::sin(2.0 * 3.14159265358979323846 * hz * static_cast<double>(i) / rate));
+  }
+  return samples;
+}
+
+// An engine whose first track plays that sound once, on the first step.
+SnareEngine* soundEngine(const std::vector<float>& sound) {
+  SnareEngine* engine = snare_engine_create(kRate);
+  makeUnity(engine);
+  giveSound(engine, 0, sound, kRate);
+  SnarePattern pattern = shape(16);
+  pattern.rows[1] = 0b1;
+  snare_engine_set_pattern(engine, 0, &pattern);
+  snare_engine_set_tempo(engine, 120.0);
+  return engine;
+}
+
+// What a sound comes out as with an effect on, over one measure and a second more.
+snare::io::Rendered through(const std::vector<float>& sound, int effect, double wet, int frames = 144000) {
+  SnareEngine* engine = soundEngine(sound);
+  if (effect != SNARE_EFFECT_NONE) CHECK_EQ(snare_engine_set_effect(engine, effect, wet), SNARE_OK);
+  snare_engine_play_measures(engine, 1);
+  auto out = snare::io::render(engine, frames, 256);
+  snare_engine_destroy(engine);
+  return out;
+}
+
+// How much of a signal is its top: the energy of the difference between neighbours.
+double roughness(const std::vector<float>& samples, std::size_t from, std::size_t to) {
+  double sum = 0.0;
+  for (std::size_t i = from + 1; i < to && i < samples.size(); ++i) {
+    const double step = static_cast<double>(samples[i]) - samples[i - 1];
+    sum += step * step;
+  }
   return sum;
 }
 
@@ -156,11 +202,130 @@ SNARE_TEST(an_effect_runs_at_every_sample_rate) {
   }
 }
 
+SNARE_TEST(an_effect_with_its_knob_at_nothing_leaves_the_mix_as_it_was) {
+  const auto sound = tone(220.0, 0.4, 0.5f);
+  const auto plain = through(sound, SNARE_EFFECT_NONE, 0.0, 48000);
+  for (int effect : kEffects) {
+    const auto asked = through(sound, effect, 0.0, 48000);
+    for (std::size_t i = 0; i < plain.left.size(); ++i) {
+      CHECK(asked.left[i] == plain.left[i]);
+      CHECK(asked.right[i] == plain.right[i]);
+    }
+  }
+}
+
+SNARE_TEST(an_effect_that_works_on_the_sound_makes_nothing_out_of_silence) {
+  for (int effect : kInserts) {
+    SnareEngine* engine = snare_engine_create(kRate);
+    makeUnity(engine);
+    snare_engine_set_effect(engine, effect, 1.0);
+    snare_engine_play(engine);
+    const auto out = snare::io::render(engine, 48000, 256);
+    for (std::size_t i = 0; i < out.left.size(); ++i) CHECK(out.left[i] == 0.0f && out.right[i] == 0.0f);
+    snare_engine_destroy(engine);
+  }
+}
+
+SNARE_TEST(the_crusher_holds_each_sample_and_keeps_few_levels) {
+  // Quick enough that rounding alone would not make neighbouring samples the same.
+  const auto sound = tone(2777.0, 0.5, 0.5f);
+  const auto out = through(sound, SNARE_EFFECT_CRUSHER, 1.0, 24000);
+  // Held at a lower rate, most samples repeat the one before.
+  int held = 0;
+  std::vector<float> levels;
+  // Counted once the effect has come all the way up to full.
+  for (std::size_t i = 14400; i < 22000; ++i) {
+    if (out.left[i] == out.left[i - 1]) ++held;
+    if (std::find(levels.begin(), levels.end(), out.left[i]) == levels.end()) levels.push_back(out.left[i]);
+  }
+  CHECK(held > 5000);
+  CHECK(levels.size() > 8 && levels.size() < 80);
+}
+
+SNARE_TEST(tape_dulls_the_top_and_rounds_off_what_is_loud) {
+  // A square at 3 kHz: all edges.
+  std::vector<float> edges(24000);
+  for (std::size_t i = 0; i < edges.size(); ++i) edges[i] = (i % 16 < 8 ? 0.8f : -0.8f);
+  const auto plain = through(edges, SNARE_EFFECT_NONE, 0.0, 48000);
+  const auto taped = through(edges, SNARE_EFFECT_TAPE, 1.0, 48000);
+  CHECK(roughness(taped.left, 2000, 22000) < 0.5 * roughness(plain.left, 2000, 22000));
+  float peak = 0.0f;
+  for (std::size_t i = 2000; i < 22000; ++i) peak = std::max(peak, std::fabs(taped.left[i]));
+  CHECK(peak < 0.75f && peak > 0.2f);
+}
+
+SNARE_TEST(the_pump_lets_a_low_hit_through_and_then_ducks_under_it) {
+  const auto low = tone(60.0, 1.0, 0.6f);
+  const auto plain = through(low, SNARE_EFFECT_NONE, 0.0, 48000);
+  const auto pumped = through(low, SNARE_EFFECT_PUMP, 1.0, 48000);
+  // The first two milliseconds come through; a quarter of a second in, it is well down.
+  CHECK(energy(pumped.left, 0, 96) > 0.8 * energy(plain.left, 0, 96));
+  CHECK(energy(pumped.left, 12000, 24000) < 0.4 * energy(plain.left, 12000, 24000));
+  CHECK(energy(pumped.left, 12000, 24000) > 0.02 * energy(plain.left, 12000, 24000));
+}
+
+SNARE_TEST(the_filter_closes_as_its_knob_is_turned_up) {
+  std::vector<float> edges(24000);
+  for (std::size_t i = 0; i < edges.size(); ++i) edges[i] = (i % 16 < 8 ? 0.4f : -0.4f);
+  const double open = energy(through(edges, SNARE_EFFECT_NONE, 0.0, 48000).left, 2000, 22000);
+  // A little open, its resonance may lift what passes; it is never far above the sound as it was.
+  double last = open * 2.0;
+  for (double knob : {0.3, 0.6, 1.0}) {
+    const double heard = energy(through(edges, SNARE_EFFECT_FILTER, knob, 48000).left, 2000, 22000);
+    CHECK(heard < last);
+    last = heard;
+  }
+  // Fully up, a 3 kHz square is all but gone.
+  CHECK(last < 0.01 * open);
+}
+
+SNARE_TEST(vinyl_crackles_under_the_beat_the_same_way_each_time_and_stops_after_it) {
+  const auto sound = tone(220.0, 1.0, 0.3f);
+  const auto plain = through(sound, SNARE_EFFECT_NONE, 0.0);
+  const auto first = through(sound, SNARE_EFFECT_VINYL, 1.0);
+  const auto again = through(sound, SNARE_EFFECT_VINYL, 1.0);
+  CHECK(std::memcmp(first.left.data(), again.left.data(), sizeof(float) * first.left.size()) == 0);
+  double added = 0.0;
+  float loudest = 0.0f;
+  for (std::size_t i = 0; i < 48000; ++i) {
+    const float noise = first.left[i] - plain.left[i];
+    added += static_cast<double>(noise) * noise;
+    loudest = std::max(loudest, std::fabs(noise));
+  }
+  // There is noise, it has pops in it that stand well clear of the hiss, and none of it is loud.
+  const double hiss = std::sqrt(added / 48000.0);
+  CHECK(hiss > 0.0005 && hiss < 0.03);
+  CHECK(loudest > 4.0 * hiss && loudest < 0.25f);
+  // The two sides are not the same noise.
+  CHECK(std::memcmp(first.left.data(), first.right.data(), sizeof(float) * 48000) != 0);
+}
+
+SNARE_TEST(the_phaser_moves) {
+  // A steady tone through it changes in level as the sweep passes over it.
+  const auto sound = tone(900.0, 4.0, 0.4f);
+  SnareEngine* engine = soundEngine(sound);
+  snare_engine_set_tempo(engine, 40.0);
+  snare_engine_set_effect(engine, SNARE_EFFECT_PHASER, 1.0);
+  snare_engine_play_measures(engine, 1);
+  const auto out = snare::io::render(engine, 192000, 256);
+  snare_engine_destroy(engine);
+  double quietest = 1e9;
+  double loudest = 0.0;
+  for (std::size_t from = 4800; from + 4800 <= 187200; from += 4800) {
+    const double heard = energy(out.left, from, from + 4800);
+    quietest = std::min(quietest, heard);
+    loudest = std::max(loudest, heard);
+  }
+  CHECK(quietest > 0.0);
+  CHECK(loudest > 3.0 * quietest);
+}
+
 SNARE_TEST(bad_effect_settings_are_refused) {
   SnareEngine* engine = snare_engine_create(kRate);
   CHECK_EQ(snare_engine_set_effect(nullptr, SNARE_EFFECT_DELAY, 0.5), SNARE_ERR_BAD_ARGUMENT);
   CHECK_EQ(snare_engine_set_effect(engine, -1, 0.5), SNARE_ERR_BAD_ARGUMENT);
-  CHECK_EQ(snare_engine_set_effect(engine, SNARE_EFFECT_CHORUS + 1, 0.5), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(snare_engine_set_effect(engine, SNARE_EFFECT_LAST + 1, 0.5), SNARE_ERR_BAD_ARGUMENT);
+  CHECK_EQ(SNARE_EFFECT_LAST, SNARE_EFFECT_PHASER);
   CHECK_EQ(snare_engine_set_effect(engine, SNARE_EFFECT_DELAY, 1.5), SNARE_ERR_BAD_ARGUMENT);
   CHECK_EQ(snare_engine_set_effect(engine, SNARE_EFFECT_DELAY, -0.1), SNARE_ERR_BAD_ARGUMENT);
   snare_engine_destroy(engine);

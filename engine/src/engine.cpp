@@ -926,7 +926,7 @@ int32_t snare_engine_set_master_volume(SnareEngine* engine, double volume) {
 }
 
 int32_t snare_engine_set_effect(SnareEngine* engine, int32_t effect, double wet) {
-  if (!engine || effect < SNARE_EFFECT_NONE || effect > SNARE_EFFECT_CHORUS || !(wet >= 0.0 && wet <= 1.0)) {
+  if (!engine || effect < SNARE_EFFECT_NONE || effect > SNARE_EFFECT_LAST || !(wet >= 0.0 && wet <= 1.0)) {
     return SNARE_ERR_BAD_ARGUMENT;
   }
   snare::Command command;
