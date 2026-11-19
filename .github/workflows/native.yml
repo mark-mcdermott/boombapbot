@@ -141,6 +141,7 @@ jobs:
 
   android:
     name: Phone engine plug-in on Android
+    needs: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -169,12 +170,17 @@ jobs:
           cmake="$(sed -nE 's/.*version "([0-9.]+)".*/\1/p' apps/mobile/native-engine/android/build.gradle)"
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ndk" "cmake;$cmake"
 
-      - name: Generate the Capacitor plug-in projects
-        working-directory: apps/mobile
-        # The app's web assets are not needed to build the plug-in, only the folder they go in.
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-engine
+          path: build/wasm
+
+      # Capacitor writes the plug-in projects Gradle includes only beside a built page.
+      - name: Build the page and sync it into the Android project
         run: |
-          mkdir -p android/app/src/main/assets
-          pnpm exec cap update android
+          pnpm prepare:assets
+          pnpm --filter @boombapbot/mobile build
+          pnpm --filter @boombapbot/mobile exec cap sync android
 
       - name: Build the plug-in and its tests
         working-directory: apps/mobile/android
