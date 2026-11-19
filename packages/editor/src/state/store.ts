@@ -2,6 +2,8 @@ import type { ProjectBase } from '@boombapbot/contracts';
 
 export type AudioStatus = 'idle' | 'starting' | 'running' | 'suspended' | 'error';
 export type DraftOrigin = 'new' | 'restored' | 'recovered';
+/** Whether the draft is being kept: here, not at all, or by another tab that owns it. */
+export type DraftState = 'saved' | 'error' | 'elsewhere';
 
 export interface Notice {
   id: number;
@@ -40,7 +42,7 @@ export interface EditorState<Document extends ProjectBase = ProjectBase, Transie
   audioStatus: AudioStatus;
   audioError: string | null;
   draftOrigin: DraftOrigin;
-  draftState: 'saved' | 'error';
+  draftState: DraftState;
   draftSavedAt: number | null;
   notice: Notice | null;
   /** Null until a WAV has been asked for. */
@@ -194,10 +196,17 @@ export class EditorStore<Document extends ProjectBase = ProjectBase, Transient e
   }
 
   setDraftSaved(ok: boolean): void {
+    // A write that lands after another tab took the draft over does not change who keeps it.
+    if (this.state.draftState === 'elsewhere') return;
     this.set({
       draftState: ok ? 'saved' : 'error',
       draftSavedAt: ok ? this.now().getTime() : this.state.draftSavedAt,
     });
+  }
+
+  /** Another tab owns the draft, or this one has it back. */
+  setDraftElsewhere(elsewhere: boolean): void {
+    this.set({ draftState: elsewhere ? 'elsewhere' : 'saved' });
   }
 
   setWavExport(wavExport: WavExport | null): void {

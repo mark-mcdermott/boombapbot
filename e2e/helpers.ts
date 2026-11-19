@@ -46,6 +46,32 @@ export async function closeSettings(page: Page): Promise<void> {
   await expect(sheet).toHaveCount(0);
 }
 
+/**
+ * The draft the editor keeps in IndexedDB for a machine, parsed, or null.
+ * Read only once the editor has opened, so the database is never made here.
+ */
+export function storedDraft<Project = unknown>(page: Page, draftKey: string): Promise<Project | null> {
+  return page.evaluate(async (key) => {
+    if (!(await indexedDB.databases()).some((database) => database.name === 'boombapbot')) return null;
+    const settled = <T>(request: IDBRequest<T>) =>
+      new Promise<T>((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    const db = await settled(indexedDB.open('boombapbot'));
+    try {
+      if (!db.objectStoreNames.contains('current')) return null;
+      const transaction = db.transaction(['current', 'drafts']);
+      const id: unknown = await settled(transaction.objectStore('current').get(key));
+      if (typeof id !== 'string') return null;
+      const record = (await settled(transaction.objectStore('drafts').get(id))) as { text: string } | undefined;
+      return record ? (JSON.parse(record.text) as Project) : null;
+    } finally {
+      db.close();
+    }
+  }, draftKey);
+}
+
 export function debug<Project = unknown>(page: Page): Promise<DebugSnapshot<Project>> {
   return page.evaluate(() => window.__boombapbot!.debug() as unknown as DebugSnapshot<Project>);
 }

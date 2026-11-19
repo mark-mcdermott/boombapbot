@@ -7,12 +7,8 @@ import { NO_EFFECT, samePattern, sameValues, type EngineSetup, type ExportPlan }
 import { SnareWasm, type SynthSound } from './engine/wasm-engine';
 import type { WavBitDepth } from './engine/wav';
 import type { Machine, MachineHost, MachineSession, StartPlan } from './machine';
-import {
-  browserStorage,
-  loadDraft,
-  saveDraft,
-  type KeyValueStorage,
-} from './state/draft-storage';
+import type { KeyValueStorage } from './state/draft-storage';
+import { keyValueDrafts, noDrafts, pageDrafts, type Drafts } from './state/drafts';
 import { downloadFile, exportBaseName, projectFileName, readProjectFile, type SaveFile } from './state/project-io';
 import { EditorStore, newProjectId, wavExportUnderWay } from './state/store';
 
@@ -35,7 +31,14 @@ export interface RuntimeOptions<
   /** Base URL the site is served from, ending in a slash. */
   baseUrl: string;
   machine: Machine<Document, Transient, Session>;
+  /**
+   * A shell's own store for the draft, or null for none. Left out, the
+   * browser's IndexedDB keeps it, which `EditorRuntime.open` opens; a
+   * runtime constructed directly without a store or `drafts` keeps none.
+   */
   storage?: KeyValueStorage | null;
+  /** Drafts opened beforehand, as `EditorRuntime.open` does. */
+  drafts?: Drafts<Document>;
   /** Where an exported file goes. A download when not given. */
   save?: SaveFile;
   /** What plays the engine. The page's own worklet when not given. */
@@ -67,7 +70,7 @@ export class EditorRuntime<
   readonly session: Session;
   private readonly codec: ProjectCodec<Document>;
   private readonly baseUrl: string;
-  private readonly storage: KeyValueStorage | null;
+  private readonly drafts: Drafts<Document>;
   private readonly save: SaveFile;
   private readonly audio: EngineAudio;
   private manifest: Promise<AssetManifest> | null = null;
@@ -87,15 +90,29 @@ export class EditorRuntime<
   private playingPlan: StartPlan | null = null;
   private unsubscribe: (() => void) | null = null;
 
+  /** Opens the draft first: the shell's own store, or else the browser's IndexedDB. */
+  static async open<
+    Document extends ProjectBase,
+    Transient extends object,
+    Session extends MachineSession<Document, Transient>,
+  >(options: Omit<RuntimeOptions<Document, Transient, Session>, 'drafts'>): Promise<EditorRuntime<Document, Transient, Session>> {
+    const drafts =
+      options.storage === undefined
+        ? await pageDrafts(options.machine.document, createProjectCodec([options.machine.document]))
+        : undefined;
+    return new EditorRuntime({ ...options, drafts });
+  }
+
   constructor(options: RuntimeOptions<Document, Transient, Session>) {
     const { machine } = options;
     this.machine = machine;
     this.codec = createProjectCodec([machine.document]);
     this.baseUrl = options.baseUrl.endsWith('/') ? options.baseUrl : `${options.baseUrl}/`;
-    this.storage = options.storage === undefined ? browserStorage() : options.storage;
+    this.drafts =
+      options.drafts ?? (options.storage ? keyValueDrafts(options.storage, machine.document, this.codec) : noDrafts());
     this.save = options.save ?? downloadFile;
 
-    const draft = this.storage ? loadDraft(this.storage, machine.document, this.codec) : { status: 'empty' as const };
+    const draft = this.drafts.loaded;
     this.store = new EditorStore({
       project:
         draft.status !== 'restored'
@@ -114,7 +131,8 @@ export class EditorRuntime<
         draft.changes,
       );
     }
-    if (!this.storage) this.store.setDraftSaved(false);
+    if (!this.drafts.kept) this.store.setDraftSaved(false);
+    if (this.drafts.tab && !this.drafts.tab.here) this.store.setDraftElsewhere(true);
     if (draft.status === 'unreadable') {
       this.store.notify('error', machine.messages.unreadableDraft, draft.errors);
     }
@@ -169,9 +187,11 @@ export class EditorRuntime<
   /** Starts watching the store. Call once after construction. */
   attach(): void {
     if (this.unsubscribe) return;
+    const stopWrites = this.drafts.onWrite((ok) => this.store.setDraftSaved(ok));
+    const stopTab = this.drafts.tab?.subscribe((here) => this.store.setDraftElsewhere(!here));
     this.persist(this.store.getState().project);
     let previous = this.store.getState();
-    this.unsubscribe = this.store.subscribe(() => {
+    const stopStore = this.store.subscribe(() => {
       const before = previous;
       const next = this.store.getState();
       previous = next;
@@ -180,6 +200,11 @@ export class EditorRuntime<
       this.persist(next.project);
       this.syncAudio();
     });
+    this.unsubscribe = () => {
+      stopStore();
+      stopWrites();
+      stopTab?.();
+    };
     // Warm the caches so the first Play is quick. Sounds are synthesised once
     // audio starts, when its sample rate is known.
     void this.loadManifest().catch(() => undefined);
@@ -189,13 +214,33 @@ export class EditorRuntime<
   detach(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    void this.drafts.flush();
     void this.audio.dispose();
   }
 
   private persist(project: Document): void {
-    if (!this.storage) return;
-    const result = saveDraft(this.storage, this.machine.document, project);
-    this.store.setDraftSaved(result.ok);
+    this.drafts.write(project);
+  }
+
+  /**
+   * Keeps the draft in this tab instead of the one that owns it. That tab
+   * writes what it has and stops; its beat, the newest kept, comes onto this
+   * machine as one undo step, so what was here is not lost.
+   */
+  async workHere(): Promise<void> {
+    const tab = this.drafts.tab;
+    if (!tab || tab.here) return;
+    const latest = await tab.takeOver();
+    this.store.setDraftElsewhere(false);
+    const { project } = this.store.getState();
+    const kind = this.machine.document;
+    if (latest.status === 'restored' && kind.serialize(latest.project) !== kind.serialize(project)) {
+      this.store.replaceProject(latest.adopted ? asNewBeat(latest.project) : latest.project);
+      this.store.notify('info', 'This tab is saving the beat now. It has the other tab’s changes; Undo brings back what was here.');
+      return;
+    }
+    this.persist(project);
+    this.store.notify('info', 'This tab is saving the beat now.');
   }
 
   // ---- Assets -------------------------------------------------------------

@@ -504,10 +504,39 @@ What is left:
   the sheet is closed. A menu item that is switched off has had a look of
   its own since 2026-11-18: its name dimmed, no hand over it, and its note,
   which says why, as legible as before.
-- **Draft storage.** One draft in `localStorage`, written whole on every
-  change, knob moves included. Multiple projects want IndexedDB. Two tabs
-  editing at once overwrite each other. An account now holds several beats,
-  but the machine still works on one at a time.
+- **Draft storage.** Since 2026-11-18 the web editor keeps its draft in
+  IndexedDB (`packages/editor/src/state/drafts.ts`): one record for each
+  project id, and a note of which one each machine is working on. The
+  machine still works on one draft at a time. A beat it moved away from
+  stays in the database, and nothing lists those yet; a list of projects is
+  the owner's to design. A write waits for 400 ms without a change, and
+  never more than 2 seconds, so a knob drag is not written on every move. A
+  waiting write goes at once when the page is hidden or closed. A draft
+  left in `localStorage` moves across on the first visit, and the old copy
+  is removed only once IndexedDB has it; one left by the earlier machine is
+  read and left where it was. Where IndexedDB is missing or refuses, the
+  settings sheet says the browser is not saving drafts, the same line as
+  for missing storage before.
+  - **Two tabs.** One tab owns the draft, held by Web Locks; a
+    BroadcastChannel carries the hand-over, and settles the owner on its own
+    where Web Locks are missing. A tab that opens the draft while another
+    owns it says "This beat is open in another tab, which is saving it.
+    Changes here are not saved.", and writes nothing. Its button, "Work in
+    this tab", has the owner write what it has and stop; that beat comes
+    onto this tab as one undo step, with "This tab is saving the beat now.
+    It has the other tab’s changes; Undo brings back what was here." A tab
+    that does not answer within 1.5 seconds has the draft taken from it.
+    Nothing is merged, and a tab is never handed the draft without asking.
+  - The phone app's device store, or any store a shell hands in, works as
+    before and has no tab rule. The desktop app uses the web view's
+    IndexedDB.
+  - Verified by Vitest, against `fake-indexeddb`, and by Playwright in
+    Chromium: a draft moved out of `localStorage`, IndexedDB refused and
+    full, a change kept when the tab closes straight after it, and two
+    pages in one browser (the second told, writing nothing, then taking
+    over with the first one's newest change). Not tried: WebKit and
+    Firefox, a real private window, the desktop app, and a tab frozen in
+    the background.
 - **Stack items not used yet.** The build spec lists TanStack Query and
   Vercel Blob. Neither is installed: the account and shop modals fetch by
   hand, and a saved beat is a row in Postgres, not a file.

@@ -7,6 +7,7 @@ import type { KeyValueStorage } from '../state/draft-storage';
 import type { SaveFile } from '../state/project-io';
 import { RuntimeContext, useEditorState, useRuntime } from './context';
 import { CookieNotice } from './CookieNotice';
+import { DraftElsewhere } from './DraftElsewhere';
 import { Footer } from './Footer';
 import { Header } from './Header';
 import { NoticeBanner } from './StatusBar';
@@ -22,7 +23,7 @@ export interface BoombapbotEditorProps<
   machine: Machine<Document, Transient, Session>;
   /** Base URL the site is served from. */
   baseUrl?: string;
-  /** Where the draft is kept. The browser's own storage when not given. */
+  /** Where the draft is kept. The browser's IndexedDB when not given. */
   storage?: KeyValueStorage | null;
   /** Where an exported file goes. A download when not given. */
   save?: SaveFile;
@@ -130,6 +131,7 @@ function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
     >
       <Header baseUrl={baseUrl} />
       <NoticeBanner />
+      <DraftElsewhere accounts={!below} />
       <runtime.machine.Panel />
       <div className="sb-below-machine">
         {below ? (
@@ -147,14 +149,48 @@ function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
   );
 }
 
-/** The boombapbot beat editor. Client-only: it needs Web Audio and storage. */
+/**
+ * The boombapbot beat editor. Client-only: it needs Web Audio and storage.
+ * With no store of the shell's own it shows once the browser's has opened.
+ */
 export function BoombapbotEditor<
   Document extends ProjectBase,
   Transient extends object,
   Session extends MachineSession<Document, Transient>,
 >({ machine, baseUrl = '/', storage, save, audio, below }: BoombapbotEditorProps<Document, Transient, Session>) {
-  const [runtime] = useState(() => new EditorRuntime({ baseUrl, machine, storage, save, audio }));
+  const [runtime, setRuntime] = useState(() =>
+    storage === undefined ? null : new EditorRuntime({ baseUrl, machine, storage, save, audio }),
+  );
 
+  useEffect(() => {
+    if (runtime) return;
+    let mounted = true;
+    void EditorRuntime.open({ baseUrl, machine, save, audio }).then((opened) => {
+      if (mounted) setRuntime(opened);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [runtime, baseUrl, machine, save, audio]);
+
+  return runtime ? <OpenEditor runtime={runtime} baseUrl={baseUrl} below={below} /> : null;
+}
+
+interface OpenEditorProps<
+  Document extends ProjectBase,
+  Transient extends object,
+  Session extends MachineSession<Document, Transient>,
+> {
+  runtime: EditorRuntime<Document, Transient, Session>;
+  baseUrl: string;
+  below?: (settings: ReactNode) => ReactNode;
+}
+
+function OpenEditor<
+  Document extends ProjectBase,
+  Transient extends object,
+  Session extends MachineSession<Document, Transient>,
+>({ runtime, baseUrl, below }: OpenEditorProps<Document, Transient, Session>) {
   useEffect(() => {
     runtime.attach();
     window.__boombapbot = {

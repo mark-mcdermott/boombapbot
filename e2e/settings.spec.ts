@@ -129,12 +129,10 @@ test('everything can be cleared at once, stays cleared after a reload, and comes
 });
 
 test('a browser that stops keeping the draft says so, and names both ways to keep the beat', async ({ page }) => {
-  // Storage that was there when the page loaded and then takes nothing more, as a full one does.
+  // Storage that opens when the page loads and then takes nothing more, as a full one does.
   await page.addInitScript(() => {
-    const write = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (key: string, value: string) {
-      if (key !== 'boombapbot.probe') throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
-      write.call(this, key, value);
+    IDBObjectStore.prototype.put = () => {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
     };
   });
   await page.reload();
@@ -151,11 +149,13 @@ test('a browser that stops keeping the draft says so, and names both ways to kee
 test('a browser with no storage from the start says so before anything is written', async ({ page }) => {
   // A private window that blocks storage throws as soon as the page reaches for it.
   await page.addInitScript(() => {
-    Object.defineProperty(window, 'localStorage', {
-      get() {
-        throw new DOMException('Access is denied for this document.', 'SecurityError');
-      },
-    });
+    for (const name of ['localStorage', 'indexedDB']) {
+      Object.defineProperty(window, name, {
+        get() {
+          throw new DOMException('Access is denied for this document.', 'SecurityError');
+        },
+      });
+    }
   });
   await page.reload();
   await expect(page.getByTestId('editor')).toBeVisible();
