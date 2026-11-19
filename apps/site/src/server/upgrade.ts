@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { AUTH_RATE_LIMIT, STRIPE_WEBHOOK_SECRET, UPGRADE_OPEN } from 'astro:env/server';
 import {
   LICENSE_KEY_LENGTH,
@@ -8,9 +8,11 @@ import {
 } from '@boombapbot/contracts';
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import type Stripe from 'stripe';
+import { requestAddress } from './auth';
 import { getDb } from './db';
 import { license } from './db/schema';
 import { sendLicenseKeyEmail, sendLicenseKeyReminder } from './email';
+import { consumeRateLimit } from './rate-limit';
 import { isUpgraded, userByUuid, type SignedInUser } from './session';
 import { getStripe } from './shop/stripe';
 import { json } from './site';
@@ -23,6 +25,7 @@ const STATUS: Record<UpgradeRefusal, number> = {
   unknown_key: 404,
   key_taken: 409,
   invalid: 400,
+  too_many: 429,
 };
 
 const MESSAGES: Record<UpgradeRefusal, string> = {
@@ -33,6 +36,7 @@ const MESSAGES: Record<UpgradeRefusal, string> = {
   unknown_key: 'That is not a license key I know.',
   key_taken: 'That license key is already on another account.',
   invalid: 'That request could not be read.',
+  too_many: 'I have had that request a lot just now. Try again in an hour.',
 };
 
 /** The answer when a request is turned down: why, in a word and in a sentence. */
@@ -160,4 +164,16 @@ export async function remindKeys(address: string): Promise<void> {
     .where(and(eq(license.email, email), or(isNull(license.emailedAt), lte(license.emailedAt, lastSentBefore))))
     .returning({ key: license.key });
   for (const { key } of due) await sendLicenseKeyReminder(email, key);
+}
+
+/**
+ * Whether a request to email an address its keys may go ahead: three an hour
+ * for one address, five in ten minutes from one place. Nothing here depends
+ * on whether the address bought anything. The address is counted by its
+ * hash, so the table keeps no list of who asked.
+ */
+export async function mayRemindKeys(request: Request, address: string): Promise<boolean> {
+  if (!(await consumeRateLimit(await requestAddress(request), '/site/key-by-email/ip'))) return false;
+  const hashed = createHash('sha256').update(address.toLowerCase()).digest('hex');
+  return consumeRateLimit(hashed, '/site/key-by-email/address');
 }

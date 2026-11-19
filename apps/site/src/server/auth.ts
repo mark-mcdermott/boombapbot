@@ -1,11 +1,12 @@
-import { AUTH_RATE_LIMIT, BETTER_AUTH_SECRET } from 'astro:env/server';
+import { BETTER_AUTH_SECRET } from 'astro:env/server';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { createAuthMiddleware } from 'better-auth/api';
+import { createAuthMiddleware, getIP } from 'better-auth/api';
 import { getDb } from './db';
 import * as schema from './db/schema';
 import { LINK_LIFETIME_SECONDS, sendPasswordResetEmail, sendVerificationEmail } from './email';
 import { isRecord, withPublicIds } from './public-ids';
+import { RATE_LIMIT_ON, SITE_RATE_RULES } from './rate-limit';
 import { siteUrl } from './site';
 
 const DAY_SECONDS = 60 * 60 * 24;
@@ -83,11 +84,12 @@ async function build() {
     // switch it off. It counts in the database: counted in memory, each
     // server on Vercel would keep a count of its own. Asking who is logged in
     // is not counted. Every page asks that as it loads, and counting it would
-    // write to the database for each visitor, logged in or not.
+    // write to the database for each visitor, logged in or not. The site's
+    // own counted routes are named so their rows are kept long enough.
     rateLimit: {
-      enabled: import.meta.env.PROD && AUTH_RATE_LIMIT !== 'off',
+      enabled: RATE_LIMIT_ON,
       storage: 'database',
-      customRules: { '/get-session': false },
+      customRules: { '/get-session': false, ...SITE_RATE_RULES },
     },
 
     advanced: { database: { generateId: 'serial' } },
@@ -104,4 +106,14 @@ export function getAuth(): ReturnType<typeof build> {
     throw error;
   });
   return auth;
+}
+
+/**
+ * Where a request came from, as Better Auth works it out for its own rate
+ * limit: on Vercel, the one address in `x-forwarded-for`. With none to trust,
+ * every such request shares one name, as they share one count in Better Auth.
+ */
+export async function requestAddress(request: Request): Promise<string> {
+  const auth = await getAuth();
+  return getIP(request, auth.options) ?? 'no-trusted-ip';
 }

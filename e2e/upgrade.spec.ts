@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
 import { PASSWORD, ROW_ID, UUID, signedUp, signedUpRequest } from './account';
-import { ACCOUNTS_URL, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL } from './accounts-server';
+import { ACCOUNTS_URL, BROKEN_MAIL_PORT, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL } from './accounts-server';
 import { openEditor, scanner } from './helpers';
 import { mailTo, newAddress } from './mail';
 import { startServer, type SecondServer } from './second-server';
@@ -244,20 +244,21 @@ test('the key is emailed again to the address that bought it, and only there', a
   const address = newAddress();
   const key = await boughtWithoutAccount(request, address);
 
-  // This server runs with its limits off, so the key goes out again at once.
-  const asked = await remind(request, address.toUpperCase());
-  expect(asked.status()).toBe(202);
-  expect(await asked.json()).toEqual({ received: true });
-  expect(keysMailedTo(address)).toEqual([key, key]);
-  const reminder = mailTo(address, SUBJECT).at(-1)!;
-  expect(reminder.html).toContain(key);
-  expect(reminder.text).not.toBe(mailTo(address, SUBJECT)[0]!.text);
-
   // An address that bought nothing is answered the same way and sent nothing.
   const stranger = newAddress();
   const unknown = await remind(request, stranger);
   expect(unknown.status()).toBe(202);
   expect(await unknown.json()).toEqual({ received: true });
+
+  // This server runs with its limits off, so the key goes out again at once,
+  // just after the answer.
+  const asked = await remind(request, address.toUpperCase());
+  expect(asked.status()).toBe(202);
+  expect(await asked.json()).toEqual({ received: true });
+  await expect.poll(() => keysMailedTo(address)).toEqual([key, key]);
+  const reminder = mailTo(address, SUBJECT).at(-1)!;
+  expect(reminder.html).toContain(key);
+  expect(reminder.text).not.toBe(mailTo(address, SUBJECT)[0]!.text);
   expect(mailTo(stranger, /./)).toEqual([]);
 
   await refused(await remind(request, 'not an address'), 400, 'invalid');
@@ -492,5 +493,64 @@ test.describe('until the upgrade is switched on', () => {
       expect(answer.status()).toBe(202);
     }
     expect(keysMailedTo(address)).toEqual(sent);
+  });
+
+  /** Asks for the keys of `email` from a request that reached the site from `place`. */
+  const remindFrom = (place: string, email: string) =>
+    closed.post('/api/upgrade/key', { data: { email }, headers: { ...closedJson, 'x-forwarded-for': place } });
+
+  test('one address can ask for its key three times an hour, from anywhere', async () => {
+    const address = newAddress();
+    const places = ['198.51.100.1', '198.51.100.2', '198.51.100.3', '198.51.100.4'];
+    const answers = [];
+    for (const place of places) answers.push(await remindFrom(place, address));
+    expect(answers.map((answer) => answer.status())).toEqual([202, 202, 202, 429]);
+    expect(await answers.at(-1)!.json()).toEqual({
+      code: 'too_many',
+      message: 'I have had that request a lot just now. Try again in an hour.',
+    });
+    expect((await remindFrom('198.51.100.5', newAddress())).status()).toBe(202);
+  });
+
+  test('one place can ask for five addresses in ten minutes, and then no more', async () => {
+    const statuses = [];
+    for (let asked = 0; asked < 6; asked += 1) statuses.push((await remindFrom('198.51.100.20', newAddress())).status());
+    expect(statuses).toEqual([202, 202, 202, 202, 202, 429]);
+    expect((await remindFrom('198.51.100.21', newAddress())).status()).toBe(202);
+  });
+});
+
+test.describe('the key by email, whether or not the address bought anything', () => {
+  // A server whose outbox is a file, not a folder, so no email it tries can
+  // be sent. If the answer waited for the send, a buyer would be answered
+  // with an error and a stranger would not.
+  const brokenUrl = `http://127.0.0.1:${BROKEN_MAIL_PORT}`;
+  const brokenJson = { origin: brokenUrl, 'content-type': 'application/json' };
+  let server: SecondServer;
+
+  test.beforeAll(async ({ playwright }) => {
+    server = await startServer(playwright, BROKEN_MAIL_PORT, { EMAIL_OUTBOX: 'package.json' });
+  });
+
+  test.afterAll(async () => {
+    await server?.stop();
+  });
+
+  test('is answered the same, even when the email cannot be sent', async () => {
+    const buyer = newAddress();
+    const event = eventFor({ id: `cs_test_${crypto.randomUUID()}`, form: { 'metadata[purpose]': 'upgrade' } }, buyer);
+    // The license is recorded, and the key's email fails, so Stripe would be asked to try again.
+    expect((await paid(server.request, event)).status()).toBe(500);
+
+    const answer = async (email: string) => {
+      const response = await server.request.post('/api/upgrade/key', { data: { email }, headers: brokenJson });
+      const { date: _date, ...headers } = response.headers();
+      return { status: response.status(), headers, body: await response.text() };
+    };
+    const forBuyer = await answer(buyer);
+    const forStranger = await answer(newAddress());
+    expect(forBuyer).toEqual(forStranger);
+    expect(forBuyer.status).toBe(202);
+    expect(JSON.parse(forBuyer.body)).toEqual({ received: true });
   });
 });
