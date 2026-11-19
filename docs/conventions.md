@@ -13,8 +13,9 @@ store. On both phones it plays through the engine built natively.
 `apps/desktop` is a first slice of the desktop app, for macOS: the engine
 built natively behind the same editor. It runs on the Mac it was built on
 and is not signed. On Windows it compiles and its Rust tests pass in CI,
-and it has not run on a Windows machine. The rest of the build spec's wider
-scope (background sync, billing) is not started.
+and it has not run on a Windows machine. The paid upgrade, a one-time
+payment rather than billing, is built and switched off, and its six effects
+are in the engine only. Background sync is not started.
 
 ## Commands
 

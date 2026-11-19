@@ -520,6 +520,16 @@ What is left:
 ## Product
 
 Out of scope for v0.1 and not started: background sync and merging, user
-sample upload, the portable `.boombapbot` bundle with bundled samples, a mixer
-and effects beyond the machine's own knobs, stems, paid effects and billing,
-signing, store submission, release metrics.
+sample upload, the portable `.boombapbot` bundle with bundled samples, a
+mixer, stems, signing, store submission, release metrics.
+
+Started, and open to nobody yet (both under "Upgrade" above):
+
+- **Paid effects.** Six effects for the upgrade are built in the engine
+  (2026-11-18): a crusher, tape, a pump, a filter, vinyl and a phaser. No
+  control reaches them, a project cannot name them, and nothing gates them.
+- **Paying.** The build spec's billing is, by the owner's decision, a flat
+  one-time upgrade with no subscription: a Stripe checkout, a license key
+  and `isUpgraded` on the server, and the modal. It is built and switched
+  off (`UPGRADE_OPEN`), and has run against Stripe's stand-in in the tests,
+  never against Stripe itself.
