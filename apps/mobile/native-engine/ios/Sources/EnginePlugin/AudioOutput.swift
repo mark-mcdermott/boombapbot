@@ -67,6 +67,30 @@ final class AudioOutput {
         AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portName).joined(separator: ", ")
     }
 
+    /// Paused by `pause`, rather than stopped by the phone or for good.
+    private(set) var isPaused = false
+
+    /// Stops asking for buffers and lets go of the phone's sound, keeping the
+    /// engine, so that the phone may suspend an app that plays nothing.
+    func pause() throws {
+        guard !stopped, !isPaused else { return }
+        isPaused = true
+        audio.pause()
+        try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    /// Asks for buffers again, after a pause or after the phone stopped the sound.
+    func resume() throws {
+        guard !stopped else { throw EngineRefused(description: "The phone's sound was closed.") }
+        try AudioOutput.prepareSession()
+        do {
+            try audio.start()
+        } catch {
+            throw EngineRefused(description: "The phone's sound did not start again: \(error.localizedDescription)")
+        }
+        isPaused = false
+    }
+
     /// Stops the render block for good. Only then may the renderer and the engine go.
     func stop() {
         guard !stopped else { return }

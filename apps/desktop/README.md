@@ -193,8 +193,6 @@ and the buffers held a beat. The reports come as the worklet's do.
 - **The window opens at one size**, 1100 by 980, which is the machine and
   the settings button with nothing to scroll on this Mac. It does not
   remember where it was or how large.
-- **Words written for the site.** The settings sheet says the draft is saved
-  "in this browser".
 - **The brand** is the site's header with its link switched off.
 - **The icon** is the phone app's stand-in.
 - **Not signed.** Another Mac will refuse to open it without a warning. It

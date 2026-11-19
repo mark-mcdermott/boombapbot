@@ -114,6 +114,7 @@ export class EditorRuntime<
         draft.changes,
       );
     }
+    if (!this.storage) this.store.setDraftSaved(false);
     if (draft.status === 'unreadable') {
       this.store.notify('error', machine.messages.unreadableDraft, draft.errors);
     }

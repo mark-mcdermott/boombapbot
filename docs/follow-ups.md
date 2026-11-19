@@ -59,14 +59,22 @@ in this file has been built unless it says so.
    has read them. The line it shows when a draft cannot be written named
    only the export; since 2026-11-18, on the site, it names an account too:
    "To keep this beat, export the project file or save it to an account."
-   The owner has not read that wording. The phone app has no accounts and
-   keeps the line as it was. Two things are left:
-   - A browser whose storage is missing from the start (a private window
-     that blocks it) is never told. The line appears only once a write
-     has failed, and with no storage nothing is written, so the sheet goes
-     on saying "Draft will be saved in this browser".
-   - The closing note points to "the account button in the footer" in the
-     phone app as well, which has neither.
+   The owner has not read that wording. Since 2026-11-18 as well:
+   - Storage that is missing from the start (a private window that blocks
+     it, or `localStorage` that throws) is reported as soon as the editor
+     opens, with the same line and state as a failed write. A shell that
+     hands in its own store is not affected.
+   - In the phone and desktop apps the draft lines say "on this device"
+     instead of "in this browser", the line for a failed write reads "This
+     device is not saving drafts. Export the project to keep it.", and the
+     closing note names only the export, with no account or footer.
+   - The closing note leaves out "Your beat is saved … as you go" while the
+     draft cannot be written.
+
+   Unit tests cover the wording in both kinds of page and the missing
+   storage, and a Playwright test on the site blocks `localStorage` before
+   the page loads and checks the sheet. Neither app was opened to look at
+   the sheet; the owner has not read the new wording for the apps.
 6. **The pages of words.** Their design pass was done on 2026-11-17. What it
    left for the owner to decide is under "Accounts, upgrades and the shop".
 7. **Names left in the engine's header.** `engine.h` still names sixteen
@@ -351,16 +359,36 @@ What is left:
   call, have headphones pulled or a Bluetooth route chosen, and the
   emulator only fakes a call, so most of what the plug-in does then is
   built and has not run.
-- **32-bit Android phones** get no plug-in: the library is built for arm64
-  and x86_64 only.
-- **Background playing.** The app does not ask iOS to play when it is not
-  in front.
+- **32-bit Android phones**: the library is built for `armeabi-v7a` and
+  `x86` as well as `arm64-v8a` and `x86_64`, with no warnings and no
+  locking atomics, but nothing 32-bit has run. The emulators on an Apple
+  silicon Mac are 64-bit only; the plug-in's 6 tests pass on the arm64 one.
+  A 32-bit ARM phone is the test. `apps/mobile/README.md` has the details
+  and the size change.
+- **Background playing.** Built on 2026-11-18, as decided: a beat that
+  plays keeps playing when the app leaves the front or the screen locks.
+  On iOS the app has the `audio` background mode, shows the beat in Now
+  Playing and takes a pause from there; on Android a foreground service of
+  the media playback type keeps the app alive while the beat plays, with a
+  media notification whose pause stops it. Either way the pause stops the
+  beat in the plug-in and tells the page, and the page is told the step
+  again when the app comes back. Once stopped there is nothing to press
+  play on: playing again is done in the app. It ran in the iPhone
+  simulator and the Android emulator: the engine rendered in real time out
+  of the front and behind the lock screen, the pause stopped it, and the
+  page matched on return, playing or stopped. Not tried: real phones, a
+  real call out of the front, headphones or Bluetooth out of the front, how
+  long a phone lets it play, and what it costs in battery. In the
+  simulator iOS did not suspend the app after the beat stopped out of the
+  front, though the plug-in lets go of the sound then; a phone may differ.
 - **CI runs the plug-in's tests, not the app.** Since 2026-11-19
   `.github/workflows/native.yml` builds the engine for iOS as an
   XCFramework on a macOS runner and runs the plug-in's 6 Swift tests in an
   iPhone 17 Pro simulator, and builds the Android plug-in with the NDK and
-  CMake its `build.gradle` pins and runs its 6 instrumented tests in an
-  x86_64 emulator (API 35, through `reactivecircus/android-emulator-runner`).
+  CMake its `build.gradle` pins, for all four of its ABIs, and runs its 6
+  instrumented tests in an x86_64 emulator (API 35, through
+  `reactivecircus/android-emulator-runner`), which runs only the 64-bit
+  library: the 32-bit ones are built in CI and not run.
   It runs when the engine, the plug-in, the workflow or the lockfile
   change, and by hand. It does not build the app for either phone or run
   its check, and the tests make no sound.
@@ -416,8 +444,6 @@ What is left:
   app's stand-in) are stand-ins as well.
 - **Accounts, saved beats and the shop** are left out, as in the phone app,
   and for the same reasons: they ask the page's own address for `/api/...`.
-- **Words written for the site.** The settings sheet says the draft is saved
-  "in this browser".
 
 ## Web
 

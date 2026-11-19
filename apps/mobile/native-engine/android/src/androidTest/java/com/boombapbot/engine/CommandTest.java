@@ -1,6 +1,7 @@
 package com.boombapbot.engine;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -72,6 +73,19 @@ public class CommandTest {
         assertJson("{\"type\":\"level\",\"level\":0.25}", Report.level(0.25));
         assertJson("{\"type\":\"stats\",\"frames\":4800,\"peak\":0.5,\"peakEver\":0.75,\"voices\":2,\"stolen\":1}",
             Report.stats(4800, 0.5f, 0.75f, 2, 1));
+    }
+
+    @Test
+    public void awayThePageIsToldWhatChangesTheMachineAndNotWhatShowsItAtWork() {
+        Away away = new Away(10, 4800);
+        List<Report> passing = List.of(Report.ready(48000), Report.error("gone"), Report.sound(1), Report.ended(),
+            Report.measures(List.of(new Report.Measure(96, 1, 0, 0, -1))));
+        for (Report report : passing) assertTrue(report.toString(), away.passes(report));
+        List<Report> held = List.of(Report.position(3, 0, true), Report.level(0.2),
+            Report.stats(9600, 0.66f, 0.66f, 2, 0), Report.stats(14400, 0.4f, 0.66f, 2, 0));
+        for (Report report : held) assertFalse(report.toString(), away.passes(report));
+        assertEquals(0.66f, away.peak(), 0);
+        assertEquals(4800, away.framesBefore, 0);
     }
 
     /** The same fields with the same values, numbers compared as numbers. */
