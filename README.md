@@ -165,6 +165,7 @@ pnpm serve
 | Measure of sixteen steps or twelve (triplets) | Working |
 | Tempo, 40 to 300, and swing to 75% | Working |
 | Echo, reverb, flanger and chorus, with a mix knob | Working; their levels and ranges were set by measurement, not by ear |
+| A crusher, tape, a pump, a filter, vinyl and a phaser | In the engine only, for the upgrade: no control reaches them and no project can ask for them yet. Set by measurement; nobody has listened |
 | Screen and level meter | Working |
 | Power switch | Working |
 | The picture | 2000 pixels wide. The owner's originals are 3072 wide and the art should be cut again from those |
@@ -541,8 +542,9 @@ In the build spec's sequence, v0.1 covers the web half of "prove the platform
 stack" and most of "build one end-to-end beat". Next:
 
 1. Try РИТМ-12 where it has not been: on a real phone, in Safari and in
-   Firefox, and listen to it voice by voice and effect by effect. What the
-   build guesses at is listed in [`docs/follow-ups.md`](docs/follow-ups.md).
+   Firefox, and listen to its effects one by one, as the owner has to its
+   instruments. What the build guesses at is listed in
+   [`docs/follow-ups.md`](docs/follow-ups.md).
 2. Cut its art again from the owner's full-size pictures.
 3. Boot the same engine natively. On a Mac (`apps/desktop`, Tauri with
    CPAL) and on both phones (AVAudioEngine and Oboe behind the Capacitor

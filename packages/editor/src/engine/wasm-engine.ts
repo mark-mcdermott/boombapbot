@@ -121,7 +121,19 @@ export interface EngineTrack {
 }
 
 /** The one effect on the mix, as the engine numbers them. */
-export const EFFECT = { none: 0, delay: 1, reverb: 2, flanger: 3, chorus: 4 } as const;
+export const EFFECT = {
+  none: 0,
+  delay: 1,
+  reverb: 2,
+  flanger: 3,
+  chorus: 4,
+  crusher: 5,
+  tape: 6,
+  pump: 7,
+  filter: 8,
+  vinyl: 9,
+  phaser: 10,
+} as const;
 export type EffectKind = keyof typeof EFFECT;
 
 /** The effect added to the mix, and how much of it, from 0 to 1. */

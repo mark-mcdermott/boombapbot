@@ -114,7 +114,8 @@ SNARE_TEST(render_does_not_allocate_with_any_effect_on_or_changing) {
   long allocated = 0;
   long released = 0;
   for (int effect : {SNARE_EFFECT_DELAY, SNARE_EFFECT_REVERB, SNARE_EFFECT_FLANGER, SNARE_EFFECT_CHORUS,
-                     SNARE_EFFECT_NONE, SNARE_EFFECT_REVERB}) {
+                     SNARE_EFFECT_CRUSHER, SNARE_EFFECT_TAPE, SNARE_EFFECT_PUMP, SNARE_EFFECT_FILTER,
+                     SNARE_EFFECT_VINYL, SNARE_EFFECT_PHASER, SNARE_EFFECT_NONE, SNARE_EFFECT_REVERB}) {
     snare_engine_set_effect(engine, effect, 0.8);
     const Counted counted = renderCounted(engine, left, right, 400);
     allocated += counted.allocations;

@@ -55,6 +55,13 @@ extern "C" {
 #define SNARE_EFFECT_REVERB 2
 #define SNARE_EFFECT_FLANGER 3
 #define SNARE_EFFECT_CHORUS 4
+#define SNARE_EFFECT_CRUSHER 5
+#define SNARE_EFFECT_TAPE 6
+#define SNARE_EFFECT_PUMP 7
+#define SNARE_EFFECT_FILTER 8
+#define SNARE_EFFECT_VINYL 9
+#define SNARE_EFFECT_PHASER 10
+#define SNARE_EFFECT_LAST SNARE_EFFECT_PHASER
 #define SNARE_BPM_MIN 40.0
 #define SNARE_BPM_MAX 300.0
 
@@ -218,10 +225,13 @@ int32_t snare_engine_set_accent(SnareEngine* engine, double plain_gain,
 /* Output volume from 0 to 1, applied after the limiter. The first setting
  * applies at once; later changes are smoothed. */
 int32_t snare_engine_set_master_volume(SnareEngine* engine, double volume);
-/* The effect added to the mix ahead of the limiter, and how much of it, from
- * 0 to 1. SNARE_EFFECT_NONE is the dry mix alone, and costs nothing. A change
- * of effect fades the old one out before the new one begins. The echo keeps
- * time with the tempo. */
+/* The effect on the mix ahead of the limiter, and how much of it, from 0 to
+ * 1. SNARE_EFFECT_NONE is the dry mix alone, and costs nothing. The delay,
+ * reverb, flanger, chorus and vinyl are added to the mix. The crusher, tape,
+ * pump, filter and phaser work on the mix itself, and at 0 leave it as it
+ * was; for the filter the amount is how far it is shut. A change of effect
+ * fades the old one out before the new one begins. The echo keeps time with
+ * the tempo. */
 int32_t snare_engine_set_effect(SnareEngine* engine, int32_t effect, double wet);
 /* How long an effect rings on after its last hit, in seconds. */
 double snare_effect_tail_seconds(int32_t effect, double bpm);

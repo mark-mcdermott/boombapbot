@@ -40,6 +40,12 @@ inline int effectNamed(const std::string& name) {
   if (name == "reverb") return SNARE_EFFECT_REVERB;
   if (name == "flanger") return SNARE_EFFECT_FLANGER;
   if (name == "chorus") return SNARE_EFFECT_CHORUS;
+  if (name == "crusher") return SNARE_EFFECT_CRUSHER;
+  if (name == "tape") return SNARE_EFFECT_TAPE;
+  if (name == "pump") return SNARE_EFFECT_PUMP;
+  if (name == "filter") return SNARE_EFFECT_FILTER;
+  if (name == "vinyl") return SNARE_EFFECT_VINYL;
+  if (name == "phaser") return SNARE_EFFECT_PHASER;
   throw std::runtime_error("no such effect: " + name);
 }
 

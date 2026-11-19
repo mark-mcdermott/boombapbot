@@ -111,7 +111,9 @@ describe.skipIf(!built)('РИТМ-12, native against WebAssembly', () => {
 
   it('renders each effect the same, to within a few steps of 24-bit audio', () => {
     const plain = throughWasm(dry, 0);
-    for (const kind of ['delay', 'reverb', 'flanger', 'chorus'] as const) {
+    // The four the machine has, and the six the engine has beside them.
+    const kinds = ['delay', 'reverb', 'flanger', 'chorus', 'crusher', 'tape', 'pump', 'filter', 'vinyl', 'phaser'] as const;
+    for (const kind of kinds) {
       const setup: EngineSetup = { ...dry, effect: { kind, wet: 1 } };
       const played = throughWasm(setup, 0);
       const native = throughNative(setup, 0);
