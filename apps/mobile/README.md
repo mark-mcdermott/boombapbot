@@ -126,8 +126,9 @@ pnpm --filter @boombapbot/mobile android     # needs Android Studio's SDK and an
 in a browser the draft falls back to that browser's storage.
 
 Checks: `pnpm typecheck` and `pnpm test:unit` at the root cover this
-folder with the rest, and so does CI. CI does not build the native
-projects: iOS needs a macOS runner.
+folder with the rest, and so does CI. `.github/workflows/native.yml` runs
+the plug-in's tests below, in an iPhone simulator and an Android emulator.
+CI does not build the app for either phone or run its check.
 
 The plug-in's own tests run in a simulator, from `native-engine/`, once the
 engine for iOS is built:

@@ -117,7 +117,9 @@ pnpm --filter @boombapbot/desktop check:run
   engine again halfway, as a change of device does, and listens for three
   seconds more.
 - `pnpm typecheck` and `pnpm test:unit` at the root cover the page with the
-  rest, and so does CI. CI does not build the app or run `cargo test`.
+  rest, and so does CI. `.github/workflows/native.yml` builds the app on
+  macOS and Windows and runs `test:engine` on both; it does not run
+  `check:run`.
 
 ## What has been checked
 
@@ -178,7 +180,8 @@ and the buffers held a beat. The reports come as the worklet's do.
   presses Space and the settings sheet's buttons from inside the page.
 - **How long a tap takes to sound**, a knob turned while the beat plays,
   recording by tapping, and long playing.
-- **Another Mac, an Intel Mac, Windows.** It has run on one machine.
+- **Another Mac, an Intel Mac, Windows.** It has run on one machine. On
+  Windows it compiles and `test:engine` passes in CI, and that is all.
 - **A narrow window.** Under 900px wide the editor shows the phone's panel.
   That was not looked at here.
 

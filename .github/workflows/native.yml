@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: lukka/get-cmake@v3.31.6
+        with:
+          cmakeVersion: 3.31.6
 
       - name: Cache Emscripten
         uses: actions/cache@v4
@@ -119,6 +121,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: lukka/get-cmake@v3.31.6
+        with:
+          cmakeVersion: 3.31.6
 
       - name: Build the engine as an XCFramework
         run: ./scripts/build-engine-ios.sh ritm12 apps/mobile/native-engine/ios/BoombapbotEngine.xcframework

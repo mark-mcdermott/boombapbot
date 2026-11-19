@@ -355,9 +355,15 @@ What is left:
   and x86_64 only.
 - **Background playing.** The app does not ask iOS to play when it is not
   in front.
-- **CI.** Nothing builds the plug-in or runs its tests; that needs a macOS
-  runner for iOS, as the desktop app's checks do, and an emulator with the
-  NDK for Android.
+- **CI runs the plug-in's tests, not the app.** Since 2026-11-19
+  `.github/workflows/native.yml` builds the engine for iOS as an
+  XCFramework on a macOS runner and runs the plug-in's 6 Swift tests in an
+  iPhone 17 Pro simulator, and builds the Android plug-in with the NDK and
+  CMake its `build.gradle` pins and runs its 6 instrumented tests in an
+  x86_64 emulator (API 35, through `reactivecircus/android-emulator-runner`).
+  It runs when the engine, the plug-in, the workflow or the lockfile
+  change, and by hand. It does not build the app for either phone or run
+  its check, and the tests make no sound.
 
 ### Tauri (Windows and macOS)
 
@@ -381,13 +387,22 @@ What is left:
 - **The dialog that asks where to keep an export.** It has never been on a
   screen: the check writes exports to a folder of its own in place of
   asking. Import, which opens the system's file chooser, is untried too.
-- **Windows.** Not built. It needs MSVC and WebView2. `build.rs` already
-  looks where a Visual Studio generator puts the library, and CPAL's WASAPI
-  host follows the default device as CoreAudio's does, but none of it has
-  been compiled there.
-- **CI.** Nothing builds the app or runs its Rust tests. It needs a macOS
-  runner (and a Windows one), with Rust and the CMake the engine already
-  needs. The page's TypeScript and its unit tests do run in CI.
+- **Windows.** It compiles and its Rust tests pass in CI, since
+  2026-11-19, on `windows-latest` with MSVC from Visual Studio 2026 and
+  CMake 4.4: the engine is built by its CMake (which gives MSVC its own
+  warning, float and UTF-8 flags) and linked, `tauri build --no-bundle`
+  makes `boombapbot-desktop.exe`, and `cargo test`'s 9 tests pass. Nobody
+  has run the app on a Windows machine or listened to it, so WASAPI
+  output through CPAL, the page in WebView2, a change of device and the
+  exports are untried there. The engine's CTest suites and the
+  native-against-WASM comparison have not been run with MSVC. There is no
+  installer: the bundle's only target is the macOS `.app`.
+- **CI builds the app, and does not play it.** `.github/workflows/native.yml`
+  builds it on macOS (`tauri build`, the `.app`) and on Windows and runs
+  `cargo test` on both, when the engine, the app, the workflow or the
+  lockfile change, and by hand. It does not run `check:run`, which needs a
+  sound device, so nothing in CI plays the app, and nothing it builds is
+  kept.
 - **How long a tap takes to sound.** The stream asks for buffers of 256
   frames and got them on the Mac's own speakers; a tap also crosses Tauri's
   bridge and waits for the next buffer. Not measured, and not compared with
