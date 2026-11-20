@@ -86,12 +86,23 @@ pnpm --filter @boombapbot/desktop app
 ```
 
 That runs the app from a dev server on port 4341. The first build compiles
-Tauri and takes a few minutes. To build `boombapbot.app`, into
-`src-tauri/target/release/bundle/macos/`:
+Tauri and takes a few minutes. To build the app to hand over:
 
 ```bash
 pnpm --filter @boombapbot/desktop bundle
 ```
+
+On a Mac that makes `boombapbot.app` in
+`src-tauri/target/release/bundle/macos/` and a disk image of it,
+`boombapbot_0.1.0_aarch64.dmg`, in `bundle/dmg/`
+(`src-tauri/tauri.macos.conf.json`). On Windows it makes an installer,
+`boombapbot_0.1.0_x64-setup.exe`, in `bundle\nsis\`
+(`src-tauri/tauri.windows.conf.json`); the installer fetches WebView2 where
+Windows does not have it already. Each is built on its own system. A Mac
+does not build the Windows one as it stands: that would take Rust's
+`x86_64-pc-windows-msvc` target, `cargo-xwin` with Microsoft's C runtime and
+Windows SDK (under Microsoft's licence), and NSIS, none of which is
+installed here. CI builds both instead, below.
 
 Checks:
 
@@ -117,8 +128,10 @@ pnpm --filter @boombapbot/desktop check:run
   engine again halfway, as a change of device does, and listens for three
   seconds more.
 - `pnpm typecheck` and `pnpm test:unit` at the root cover the page with the
-  rest, and so does CI. `.github/workflows/native.yml` builds the app on
-  macOS and Windows and runs `test:engine` on both; it does not run
+  rest, and so does CI. `.github/workflows/native.yml` bundles the app on
+  macOS and Windows and runs `test:engine` on both, and keeps the disk image
+  and the installer for seven days as the run's artifacts
+  (`boombapbot-desktop-macOS`, `boombapbot-desktop-Windows`); it does not run
   `check:run`.
 
 ## What has been checked
@@ -181,7 +194,12 @@ and the buffers held a beat. The reports come as the worklet's do.
 - **How long a tap takes to sound**, a knob turned while the beat plays,
   recording by tapping, and long playing.
 - **Another Mac, an Intel Mac, Windows.** It has run on one machine. On
-  Windows it compiles and `test:engine` passes in CI, and that is all.
+  Windows it compiles, `test:engine` passes and the installer is built, all
+  in CI, and that is all: nobody has installed it or run it there. The disk
+  image is for Apple silicon only.
+- **The disk image by hand.** On 2026-11-20 it was mounted and the app in it
+  ran the `play` check with the same result as above. Nobody has dragged it
+  to Applications or opened it from Finder.
 - **A narrow window.** Under 900px wide the editor shows the phone's panel.
   That was not looked at here.
 
@@ -197,7 +215,8 @@ and the buffers held a beat. The reports come as the worklet's do.
 - **The icon** is the phone app's stand-in.
 - **Not signed.** Another Mac will refuse to open it without a warning. It
   needs an Apple developer team and a Developer ID certificate, and
-  notarising.
+  notarising. The Windows installer is not signed either, so SmartScreen
+  will warn before it runs.
 - **No menu of its own**, and nothing checks for a newer version.
 - **The check lives in the app.** `BOOMBAPBOT_DESKTOP_CHECK` works in a
   release build too. Without it the check's commands refuse.
