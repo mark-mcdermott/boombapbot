@@ -1920,6 +1920,13 @@ select.sb-input {
   margin-bottom: 0;
 }
 
+.sb-words[data-layout='note'] .sb-prose .sb-aside {
+  margin-top: 2.5em;
+  color: var(--color-faint);
+  font-size: 0.72em;
+  line-height: 1.7;
+}
+
 @media (max-width: 860px) {
   .sb-section {
     grid-template-columns: minmax(0, 1fr);
