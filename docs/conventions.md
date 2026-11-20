@@ -54,7 +54,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - `pnpm bench` measures the WebAssembly engine at its worst case.
 - The desktop app, which CI does not build. It needs Rust and
   `pnpm prepare:assets` first: `pnpm --filter @boombapbot/desktop app` runs
-  it from a dev server, `bundle` builds the `.app`, `test:engine` is
+  it from a dev server, `bundle` builds the `.app` and a `.dmg` (on Windows, an installer), `test:engine` is
   `cargo test` for its Rust, and `check:run` builds it and has it play a
   beat and report on itself. `check:run` makes sound.
 - The phone app's engine for iOS: `pnpm --filter @boombapbot/mobile

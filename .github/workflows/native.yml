@@ -70,10 +70,12 @@ jobs:
         include:
           - name: macOS
             os: macos-26
-            build: pnpm --filter @boombapbot/desktop bundle
+            packages: |
+              apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
           - name: Windows
             os: windows-latest
-            build: pnpm --filter @boombapbot/desktop exec tauri build --no-bundle
+            packages: |
+              apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -108,10 +110,18 @@ jobs:
         run: pnpm prepare:assets
 
       - name: Build the app
-        run: ${{ matrix.build }}
+        run: pnpm --filter @boombapbot/desktop bundle
 
       - name: Rust tests
         run: pnpm --filter @boombapbot/desktop test:engine
+
+      # Unsigned, for trying on a machine of that kind: the .dmg on macOS, the installer on Windows.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: boombapbot-desktop-${{ matrix.name }}
+          path: ${{ matrix.packages }}
+          if-no-files-found: error
+          retention-days: 7
 
   ios:
     name: Phone engine plug-in on iOS

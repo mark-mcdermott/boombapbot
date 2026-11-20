@@ -453,14 +453,16 @@ What is left:
   has run the app on a Windows machine or listened to it, so WASAPI
   output through CPAL, the page in WebView2, a change of device and the
   exports are untried there. The engine's CTest suites and the
-  native-against-WASM comparison have not been run with MSVC. There is no
-  installer: the bundle's only target is the macOS `.app`.
+  native-against-WASM comparison have not been run with MSVC. Since
+  2026-11-20 the bundle has an NSIS installer for Windows and a `.dmg` for
+  macOS, and CI keeps both as artifacts for seven days. Neither is signed,
+  and the installer has not been run on a Windows machine. A Mac does not
+  build the Windows one; `apps/desktop/README.md` says what that would take.
 - **CI builds the app, and does not play it.** `.github/workflows/native.yml`
-  builds it on macOS (`tauri build`, the `.app`) and on Windows and runs
-  `cargo test` on both, when the engine, the app, the workflow or the
-  lockfile change, and by hand. It does not run `check:run`, which needs a
-  sound device, so nothing in CI plays the app, and nothing it builds is
-  kept.
+  bundles it on macOS (the `.app` and the `.dmg`) and on Windows (the
+  installer) and runs `cargo test` on both, when the engine, the app, the
+  workflow or the lockfile change, and by hand. It does not run `check:run`,
+  which needs a sound device, so nothing in CI plays the app.
 - **How long a tap takes to sound.** The stream asks for buffers of 256
   frames and got them on the Mac's own speakers; a tap also crosses Tauri's
   bridge and waits for the next buffer. Not measured, and not compared with
