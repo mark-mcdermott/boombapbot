@@ -19,8 +19,6 @@ test.describe('the page around the machine', () => {
     await expect(page.getByTestId('nav-about')).toHaveAccessibleName('About');
     await expect(page.getByTestId('nav-docs')).toHaveAccessibleName('Docs');
     await expect(page.getByTestId('nav-manifesto')).toHaveAccessibleName('Manifesto');
-    // Credits has nothing on it yet, so nothing leads to it.
-    await expect(page.getByTestId('nav-credits')).toHaveCount(0);
     await expect(page.getByTestId('nav-policies')).toHaveAccessibleName('Policies');
     await expect(page.getByTestId('upgrade')).toHaveAccessibleName('Upgrade');
     await expect(page.getByTestId('cart')).toHaveAccessibleName('Cart');
@@ -252,9 +250,6 @@ test.describe('the page around the machine', () => {
     ['manifesto', 'Stay Stoked, Stay Woke'],
     ['policies', 'Policies'],
   ] as const;
-  // Credits is a page too, though nothing leads to it until it has something on it.
-  const everyPage = [...wordPages, ['credits', 'Credits']] as const;
-
   for (const [id, heading] of wordPages) {
     test(`the ${id} page is a page of its own with the same header and footer`, async ({ page }) => {
       await openEditor(page);
@@ -305,7 +300,7 @@ test.describe('the page around the machine', () => {
 
   }
 
-  for (const [id, heading] of everyPage) {
+  for (const [id, heading] of wordPages) {
     test(`the ${id} page fits a phone`, async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 });
       await page.goto(`/${id}`);
@@ -363,15 +358,9 @@ test.describe('the page around the machine', () => {
     expect(footer.y - (column.y + column.height)).toBeLessThanOrEqual(120);
   });
 
-  test('the credits page is still blank, stands at its address, and ends where it does', async ({ page }) => {
-    await page.goto('/credits');
-    await expect(page.locator('main')).toHaveText('Credits');
-    // It has the same masthead and footer as the others, with no name lit in either.
-    await expect(page.getByRole('navigation', { name: 'Pages' }).getByRole('link')).toHaveCount(5);
-    await expect(page.locator('[aria-current="page"]')).toHaveCount(0);
-    const blank = (await page.getByTestId('credits-blank').boundingBox())!;
-    const footer = (await page.locator('.sb-footer').boundingBox())!;
-    expect(footer.y - (blank.y + blank.height)).toBeLessThanOrEqual(120);
+  test('there is no credits page', async ({ page }) => {
+    const response = await page.goto('/credits');
+    expect(response!.status()).toBe(404);
   });
 
   test('the policies page says how the shop works before anything can be bought', async ({ page }) => {

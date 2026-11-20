@@ -1476,7 +1476,7 @@ select.sb-input {
 
 /* ---- Pages of words ------------------------------------------------------ */
 
-/* About, Docs, the manifesto, Credits and Policies. They borrow from the
+/* About, Docs, the manifesto and Policies. They borrow from the
    machine's picture: the cream of its lettering and keys, a lit lamp, and the
    fine outline it draws round each group of controls. */
 .sb-app.sb-words {
@@ -1821,16 +1821,6 @@ select.sb-input {
   font-family: var(--font-plate);
   font-size: 24px;
   line-height: 1.15;
-}
-
-/* A page with nothing written on it yet: the outline of a form, ruled and
-   empty. */
-.sb-blank {
-  max-width: 720px;
-  height: 217px;
-  margin-top: 44px;
-  padding: 0 28px;
-  background: repeating-linear-gradient(to bottom, transparent 0 53px, var(--engraved) 53px 54px) content-box;
 }
 
 /* The top of a page that opens on the machine: what it is, the way in, and
