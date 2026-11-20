@@ -52,7 +52,7 @@ test('logging in takes the right password and says so plainly when it is wrong',
   await logOut(page);
 
   await fill(page, 'account-log-in', { email: address, password: 'not the password' });
-  await expect(page.getByTestId('account-problem')).toHaveText('That email and password do not match an account.');
+  await expect(page.getByTestId('account-problem')).toHaveText('Incorrect email or password.');
   await expect(page.getByTestId('account-submit')).toBeEnabled();
 
   await fill(page, 'account-log-in', { password: PASSWORD });
@@ -79,7 +79,7 @@ test('a forgotten password is reset through an emailed link', async ({ page }) =
   await expect(page.getByTestId('account-notice')).toHaveText('Password changed. Log in with the new one.');
 
   await fill(page, 'account-log-in', { email: address, password: PASSWORD });
-  await expect(page.getByTestId('account-problem')).toContainText('do not match');
+  await expect(page.getByTestId('account-problem')).toHaveText('Incorrect email or password.');
   await fill(page, 'account-log-in', { password: changed });
   await expect(page.getByTestId('account-address')).toHaveText(address);
 });
@@ -152,7 +152,7 @@ test('an account is deleted with its password, and its saved beats go with it', 
 
   // The old password opens nothing, and the address is free to use again.
   await fill(page, 'account-log-in', { email: address, password: PASSWORD });
-  await expect(page.getByTestId('account-problem')).toHaveText('That email and password do not match an account.');
+  await expect(page.getByTestId('account-problem')).toHaveText('Incorrect email or password.');
   await page.getByTestId('account-to-sign-up').click();
   await fill(page, 'account-sign-up', { email: address, password: PASSWORD });
   await expect(page.getByTestId('account-check-inbox')).toContainText(address);

@@ -45,7 +45,7 @@ export async function attempt(call: () => Promise<{ error: Failure | null }>): P
 
 const EXPLANATIONS: Record<string, string> = {
   UNREACHABLE: 'I could not reach the server. Check your connection and try again.',
-  INVALID_EMAIL_OR_PASSWORD: 'That email and password do not match an account.',
+  INVALID_EMAIL_OR_PASSWORD: 'Incorrect email or password.',
   INVALID_PASSWORD: 'That is not your password.',
   INVALID_EMAIL: 'That does not look like an email address.',
   PASSWORD_TOO_SHORT: `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
