@@ -2,7 +2,6 @@ import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'r
 import { useAssetManifest } from '@boombapbot/editor';
 import {
   EFFECT_KINDS,
-  PATTERN_NAMES,
   STEPS,
   VOICES,
   bpmAtKnob,
@@ -15,15 +14,11 @@ import {
 import { shownRow } from '../session';
 import type { KeyWiring, KnobWiring, LampWiring } from './Controls';
 import { useEditorState, useRuntime, type Readout } from './context';
+import { LETTERING, useScript } from './lettering';
 import type { ScreenLine } from './Screen';
 
-/** Each effect as it is lettered and as it is said. */
-export const EFFECTS: Record<EffectKind, { shown: string; spoken: string }> = {
-  delay: { shown: 'ДИЛЭЙ', spoken: 'Delay' },
-  reverb: { shown: 'РЕВЕРБ', spoken: 'Reverb' },
-  flanger: { shown: 'ФЛЭНЖЕР', spoken: 'Flanger' },
-  chorus: { shown: 'ХОР', spoken: 'Chorus' },
-};
+/** Each effect as it is said. */
+export const EFFECT_NAMES: Record<EffectKind, string> = { delay: 'Delay', reverb: 'Reverb', flanger: 'Flanger', chorus: 'Chorus' };
 /** How long a line a control put on the screen stays there, in milliseconds. */
 const LINE_MS = 1400;
 
@@ -85,6 +80,10 @@ export function useWiring(): Wiring {
   const [taps, setTaps] = useState<Partial<Record<VoiceId, number>>>({});
   const line = useRef<ScreenLine>({ text: '', until: 0 });
   const frame = useRef<HTMLDivElement>(null);
+  const script = useScript();
+  const words = LETTERING[script];
+  /** A control's name says how it is lettered, while the lettering is not in English. */
+  const lettered = (word: string) => (script === 'russian' ? ` (${word})` : '');
 
   const artBase = manifest?.art ?? null;
   const readout = useMemo<Readout>(
@@ -106,7 +105,7 @@ export function useWiring(): Wiring {
   const sounding = playing && playingPattern >= 0 ? project.patterns[playingPattern] : undefined;
   // Chosen while another pattern plays: it takes over at the bar line.
   const waiting = playing && playingPattern >= 0 && playingPattern !== panel.pattern;
-  const pattern = PATTERN_NAMES[panel.pattern];
+  const pattern = words.patterns[panel.pattern];
 
   const focusStep = (index: number) =>
     frame.current?.querySelector<HTMLButtonElement>(`[data-step="${(index + STEPS) % STEPS}"]`)?.focus();
@@ -120,7 +119,7 @@ export function useWiring(): Wiring {
   const pressVoice = (voice: VoiceId) => {
     session.pressVoice(voice);
     setTaps((counts) => ({ ...counts, [voice]: (counts[voice] ?? 0) + 1 }));
-    readout.say(getVoice(voice).label, `${getVoice(voice).name} selected`);
+    readout.say(words.voices[voice].key, `${getVoice(voice).name} selected`);
   };
 
   const voices = VOICES.map((voice): VoiceWiring => {
@@ -129,7 +128,7 @@ export function useWiring(): Wiring {
     return {
       voice: voice.id,
       key: {
-        label: `${voice.name} (${voice.label})`,
+        label: `${voice.name}${lettered(words.voices[voice.id].key)}`,
         testId: `voice-${voice.id}`,
         pressed: voice.id === panel.selected,
         onPress: () => pressVoice(voice.id),
@@ -146,7 +145,7 @@ export function useWiring(): Wiring {
         value: mix.levels[voice.id],
         rest: 0.75,
         spoken: percent,
-        shown: (value) => `${voice.label} УРОВЕНЬ ${percent(value)}`,
+        shown: (value) => `${words.voices[voice.id].key} ${words.level} ${percent(value)}`,
         onChange: (value) => session.setLevel(voice.id, value),
       },
     };
@@ -172,7 +171,7 @@ export function useWiring(): Wiring {
     };
   });
 
-  const patterns = PATTERN_NAMES.map(
+  const patterns = words.patterns.map(
     (name, index): KeyWiring => ({
       label: `Pattern ${name}`,
       testId: `pattern-${index + 1}`,
@@ -181,21 +180,21 @@ export function useWiring(): Wiring {
       blink: waiting && index === panel.pattern,
       onPress: () => {
         session.selectPattern(index);
-        readout.say(`ПАТТЕРН ${name}`, `Pattern ${name}`);
+        readout.say(`${words.pattern} ${name}`, `Pattern ${name}`);
       },
     }),
   );
 
   const keys: Record<KeyName, KeyWiring> = {
     power: {
-      label: 'Power (СЕТЬ)',
+      label: `Power${lettered(words.power)}`,
       testId: 'power',
       pressed: power,
       lit: power,
       data: { 'data-rocker': 'true' },
       onPress: () => {
         runtime.setPower(!power);
-        readout.say(power ? 'СЕТЬ ВЫКЛ' : 'СЕТЬ ВКЛ', power ? 'Power off' : 'Power on');
+        readout.say(`${words.power} ${power ? words.off : words.on}`, power ? 'Power off' : 'Power on');
       },
     },
     play: { label: 'Play', testId: 'play', lit: playing, pressed: playing, onPress: () => void runtime.play() },
@@ -209,18 +208,18 @@ export function useWiring(): Wiring {
       onPress: () => {
         session.toggleRecording();
         if (!recording && !playing) void runtime.play();
-        readout.say(recording ? 'ЗАПИСЬ ВЫКЛ' : '● ЗАПИСЬ', recording ? 'Recording off' : 'Recording');
+        readout.say(recording ? `${words.recording} ${words.off}` : `● ${words.recording}`, recording ? 'Recording off' : 'Recording');
       },
     },
     mute: {
-      label: `Mute ${selected.name} (МУТ)`,
+      label: `Mute ${selected.name}${lettered(words.mute)}`,
       testId: 'mute',
       lit: mix.mutes[selected.id],
       pressed: mix.mutes[selected.id],
       onPress: () => {
         session.toggleMute();
         const muted = !mix.mutes[selected.id];
-        readout.say(`${selected.label} ${muted ? 'МУТ' : 'ЗВУК'}`, `${selected.name} ${muted ? 'muted' : 'sounding'}`);
+        readout.say(`${words.voices[selected.id].key} ${muted ? words.mute : words.sounding}`, `${selected.name} ${muted ? 'muted' : 'sounding'}`);
       },
     },
     dice: {
@@ -228,15 +227,15 @@ export function useWiring(): Wiring {
       testId: 'dice',
       onPress: () => {
         session.rollDice();
-        readout.say(`${selected.label} СЛУЧАЙНО`, `New row for ${selected.name}`);
+        readout.say(`${words.voices[selected.id].key} ${words.random}`, `New row for ${selected.name}`);
       },
     },
     clear: {
-      label: `Clear pattern ${pattern} (СБРОС)`,
+      label: `Clear pattern ${pattern}${lettered(words.clear)}`,
       testId: 'clear-pattern',
       onPress: () => {
         session.clearPattern();
-        readout.say(`ПАТТЕРН ${pattern} СБРОС`, `Pattern ${pattern} cleared`);
+        readout.say(`${words.pattern} ${pattern} ${words.clear}`, `Pattern ${pattern} cleared`);
       },
     },
     write: {
@@ -245,17 +244,17 @@ export function useWiring(): Wiring {
       data: { 'data-position': panel.write },
       onPress: () => {
         session.setWriteMode(accents ? 'hits' : 'accents');
-        readout.say(accents ? 'ЗАПИСЬ: УДАРЫ' : 'ЗАПИСЬ: АКЦЕНТЫ', accents ? 'Step keys write hits' : 'Step keys write accents');
+        readout.say(`${words.recording}: ${accents ? words.hits : words.accents}`, accents ? 'Step keys write hits' : 'Step keys write accents');
       },
     },
     effect: {
-      label: `Effect: ${EFFECTS[effect.kind].spoken}. Press for the next one.`,
+      label: `Effect: ${EFFECT_NAMES[effect.kind]}. Press for the next one.`,
       testId: 'effect',
       data: { 'data-position': effect.kind },
       onPress: () => {
         const next = EFFECT_KINDS[(EFFECT_KINDS.indexOf(effect.kind) + 1) % EFFECT_KINDS.length]!;
         session.setEffect(next);
-        readout.say(`ЭФФЕКТ: ${EFFECTS[next].shown}`, `Effect: ${EFFECTS[next].spoken}`);
+        readout.say(`${words.effect}: ${words.effects[next]}`, `Effect: ${EFFECT_NAMES[next]}`);
       },
     },
     size: {
@@ -264,18 +263,18 @@ export function useWiring(): Wiring {
       data: { 'data-position': size },
       onPress: () => {
         session.setSize(size === 16 ? 12 : 16);
-        readout.say(size === 16 ? 'РАЗМЕР 12 ТРИОЛИ' : 'РАЗМЕР 16 ПРЯМОЙ', size === 16 ? '12 steps, triplets' : '16 steps');
+        readout.say(`${words.size} ${size === 16 ? `12 ${words.triplets}` : `16 ${words.straight}`}`, size === 16 ? '12 steps, triplets' : '16 steps');
       },
     },
   };
 
-  const voiceKnob = (knob: 'pitch' | 'decay' | 'tone', lettered: string): KnobWiring => ({
+  const voiceKnob = (knob: 'pitch' | 'decay' | 'tone'): KnobWiring => ({
     label: `${selected.name} ${knob}`,
     testId: knob,
     value: knobs[knob],
     rest: 0.5,
     spoken: percent,
-    shown: (value) => `${lettered} ${percent(value)}`,
+    shown: (value) => `${words[knob]} ${percent(value)}`,
     onChange: (value) => session.setVoiceKnob(knob, value),
   });
 
@@ -302,7 +301,7 @@ export function useWiring(): Wiring {
         value: tempoKnob(project.tempo),
         rest: tempoKnob(104),
         spoken: (value) => `${bpmAtKnob(value)} beats a minute`,
-        shown: (value) => `ТЕМП ${bpmAtKnob(value)}`,
+        shown: (value) => `${words.tempo} ${bpmAtKnob(value)}`,
         onChange: (value) => session.setTempoKnob(value),
       },
       swing: {
@@ -311,7 +310,7 @@ export function useWiring(): Wiring {
         value: project.swing,
         rest: 0,
         spoken: (value) => `${Math.round(50 + value * 25)}%`,
-        shown: (value) => `СВИНГ ${Math.round(50 + value * 25)}%`,
+        shown: (value) => `${words.swing} ${Math.round(50 + value * 25)}%`,
         onChange: (value) => session.setSwing(value),
       },
       accent: {
@@ -320,19 +319,19 @@ export function useWiring(): Wiring {
         value: mix.accent,
         rest: 0.6,
         spoken: percent,
-        shown: (value) => `АКЦЕНТ ${percent(value)}`,
+        shown: (value) => `${words.accent} ${percent(value)}`,
         onChange: (value) => session.setAccent(value),
       },
-      pitch: voiceKnob('pitch', 'ПИТЧ'),
-      decay: voiceKnob('decay', 'ЗАТУХАНИЕ'),
-      tone: voiceKnob('tone', 'ТОН'),
+      pitch: voiceKnob('pitch'),
+      decay: voiceKnob('decay'),
+      tone: voiceKnob('tone'),
       mix: {
         label: 'Effect mix',
         testId: 'mix',
         value: effect.mix,
         rest: 0,
         spoken: percent,
-        shown: (value) => `СМЕСЬ ${percent(value)}`,
+        shown: (value) => `${words.mix} ${percent(value)}`,
         onChange: (value) => session.setEffectMix(value),
       },
       volume: {
@@ -341,7 +340,7 @@ export function useWiring(): Wiring {
         value: mix.volume,
         rest: 0.8,
         spoken: percent,
-        shown: (value) => `ГРОМКОСТЬ ${percent(value)}`,
+        shown: (value) => `${words.volume} ${percent(value)}`,
         onChange: (value) => session.setVolume(value),
       },
     },

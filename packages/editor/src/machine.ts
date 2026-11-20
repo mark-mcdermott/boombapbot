@@ -72,6 +72,8 @@ export interface Machine<
   StatusLines: ComponentType;
   /** Anything the machine has to say about itself in settings. */
   Notes: ComponentType;
+  /** The machine's own options in settings, each with its label, kept on this device. */
+  Options?: ComponentType;
   /** How the keyboard works on this machine, for the settings footnote. */
   keysHelp: ReactNode;
   messages: {

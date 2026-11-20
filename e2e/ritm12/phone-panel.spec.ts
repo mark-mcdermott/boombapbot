@@ -168,18 +168,17 @@ test('what is lettered on the phone’s panel has the picture’s drawing for it
   await expect.poll(() => loaded('')).toBe(true);
 });
 
-test('a control touched on the phone’s panel says in English what it is, under the screen, for a moment', async ({ page }) => {
+test('a control touched on the phone’s panel says in English what it is on the readout under the screen', async ({ page }) => {
   await openPhonePanel(page);
-  const caption = page.getByTestId('caption');
-  await expect(caption).toBeHidden();
+  const readout = page.getByTestId('readout');
+  await expect(readout).toHaveAttribute('data-text', '');
 
   await page.getByTestId('voice-snare').click();
-  await expect(caption).toBeVisible();
-  await expect(caption).toHaveText('Snare selected');
+  await expect(readout).toHaveAttribute('data-text', 'Snare selected');
 
   // A tab says what is behind it.
   await page.getByTestId('tab-tempo').click();
-  await expect(caption).toHaveText('Tempo: tempo, swing, accent and measure');
+  await expect(readout).toHaveAttribute('data-text', 'Tempo: tempo, swing, accent and measure');
 
   // A knob says where it stands when it is only touched, and nothing about the beat changes.
   const before = (await beat(page)).tempo;
@@ -187,19 +186,35 @@ test('a control touched on the phone’s panel says in English what it is, under
   await page.mouse.move(knob.x + knob.width / 2, knob.y + knob.height / 2);
   await page.mouse.down();
   await page.mouse.up();
-  await expect(caption).toHaveText(`Tempo: ${before} beats a minute`);
+  await expect(readout).toHaveAttribute('data-text', `Tempo: ${before} beats a minute`);
   expect((await beat(page)).tempo).toBe(before);
 
-  // It sits on the screen's frame, inside the panel, and goes again.
+  // It sits on the screen's frame, as wide as the glass, one line tall, and goes quiet again.
   const frame = (await page.locator('.rt-ph-crt').boundingBox())!;
-  const line = (await caption.boundingBox())!;
-  expect(line.y).toBeGreaterThan(frame.y + frame.height / 2);
-  expect(line.y + line.height).toBeLessThanOrEqual(frame.y + frame.height);
-  expect(line.x).toBeGreaterThanOrEqual(frame.x);
-  expect(line.x + line.width).toBeLessThanOrEqual(frame.x + frame.width);
-  await expect(caption).toBeHidden({ timeout: 6000 });
-  // The same words reach a screen reader from the live line, as before.
+  const glass = (await page.locator('.rt-ph-glass').boundingBox())!;
+  const strip = (await readout.boundingBox())!;
+  expect(strip.y).toBeGreaterThanOrEqual(glass.y + glass.height);
+  expect(strip.y + strip.height).toBeLessThanOrEqual(frame.y + frame.height);
+  expect(Math.abs(strip.x - glass.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(strip.width - glass.width)).toBeLessThanOrEqual(1);
+  expect(strip.height).toBeLessThan(30);
+  await expect(readout).toHaveAttribute('data-text', '', { timeout: 6000 });
+  // The same words reach a screen reader from the readout's live line.
   await expect(page.getByTestId('spoken')).toHaveText(`Tempo: ${before} beats a minute`);
+  await expect(page.getByTestId('spoken')).toHaveAttribute('aria-live', 'polite');
+});
+
+test('the phone’s panel can be lettered in English', async ({ page }) => {
+  await openPhonePanel(page);
+  await openSettings(page);
+  await page.getByTestId('lettering-english').click();
+  await closeSettings(page);
+
+  const lettered = (selector: string) => page.locator(selector).getAttribute('data-let');
+  await expect.poll(() => lettered('[data-tab="tempo"] .rt-ph-let')).toBe('TEMPO');
+  await expect(page.getByTestId('pattern-2').locator('.rt-ph-let')).toHaveAttribute('data-let', 'B.');
+  await expect(page.getByTestId('voice-kick').locator('.rt-ph-let')).toHaveAttribute('data-let', 'KICK');
+  await expect(page.getByTestId('tab-tempo')).toHaveAccessibleName('Tempo');
 });
 
 test('the phone’s power switch puts everything else out of reach', async ({ page }) => {
