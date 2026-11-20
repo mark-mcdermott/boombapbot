@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { closeSettings, openSettings } from '../helpers';
 import { beat, emptyPattern, openMachine, step, stepsOn } from './helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -110,6 +111,53 @@ test('knobs turn by keyboard and by dragging, and say where they stand', async (
   expect(now.voices.perc.pitch).toBeCloseTo(0.52, 5);
   expect(now.voices.kick.pitch).toBe(0.5);
   await expect(page.getByTestId('pitch')).toHaveAccessibleName('Perc pitch');
+});
+
+test('the readout under the screen says in English what a control is or did', async ({ page }) => {
+  const readout = page.getByTestId('readout');
+  const screen = (await page.getByTestId('screen').boundingBox())!;
+  const strip = (await readout.boundingBox())!;
+  // As wide as the screen, one line tall, just under it.
+  expect(Math.abs(strip.x - screen.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(strip.width - screen.width)).toBeLessThanOrEqual(2);
+  expect(strip.y).toBeGreaterThanOrEqual(screen.y + screen.height);
+  expect(strip.y - (screen.y + screen.height)).toBeLessThan(screen.height / 4);
+  expect(strip.height).toBeLessThan(screen.height / 6);
+
+  await page.getByTestId('voice-clap').click();
+  await expect(readout).toHaveAttribute('data-text', 'Clap selected');
+  await expect(page.getByTestId('spoken')).toHaveText('Clap selected');
+
+  // Reached by keyboard, a control puts its name up for as long as it has the focus.
+  await page.getByTestId('step-1').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('step-2')).toBeFocused();
+  await expect(readout).toHaveAttribute('data-text', /^Clap, step 2, (on|off)$/);
+});
+
+test('the picture can be lettered in English, and stays so', async ({ page }) => {
+  await expect(page.getByTestId('plate-labels')).toHaveCount(0);
+  await openSettings(page);
+  await page.getByTestId('lettering-english').click();
+  await expect(page.getByTestId('lettering-english')).toHaveAttribute('aria-checked', 'true');
+  await closeSettings(page);
+
+  const labels = page.getByTestId('plate-labels');
+  await expect(labels).toBeVisible();
+  await expect(labels).toHaveAttribute('aria-hidden', 'true');
+  await expect(labels.getByText('SEQUENCER', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('voice-kick')).toHaveAccessibleName('Kick');
+  // The labels are for the eye: every control is still within reach.
+  await page.getByTestId('voice-tom').click();
+  expect((await beat(page)).panel.selected).toBe('tom');
+
+  await page.reload();
+  await expect(page.getByTestId('plate-labels')).toBeVisible();
+  await openSettings(page);
+  await page.getByTestId('lettering-russian').click();
+  await closeSettings(page);
+  await expect(page.getByTestId('plate-labels')).toHaveCount(0);
+  await expect(page.getByTestId('voice-kick')).toHaveAccessibleName('Kick (БАС)');
 });
 
 test('scrolling the page over the machine does not turn a knob', async ({ page }) => {

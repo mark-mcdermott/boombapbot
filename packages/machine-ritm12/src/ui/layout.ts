@@ -31,29 +31,26 @@ export interface KnobPlace {
 
 export interface InstrumentPlace {
   voice: VoiceId;
-  /** As the screen names it, in three letters. */
-  short: string;
   button: Rect;
   knob: KnobPlace;
 }
 
 const LEVEL_X = 422;
-const instrument = (voice: VoiceId, short: string, button: Rect, knobY: number, pivot: Offset): InstrumentPlace => ({
+const instrument = (voice: VoiceId, button: Rect, knobY: number, pivot: Offset): InstrumentPlace => ({
   voice,
-  short,
   button,
   knob: { x: LEVEL_X, y: knobY, r: 30, kind: 'level', pivot },
 });
 
 export const INSTRUMENTS: readonly InstrumentPlace[] = [
-  instrument('kick', 'БАС', [150, 371, 309, 429], 398, [-4.1, -5]),
-  instrument('snare', 'МАЛ', [150, 450, 309, 507], 476, [-4, -2]),
-  instrument('clap', 'ХЛП', [150, 527, 309, 584], 553, [-4, 1]),
-  instrument('closed_hat', 'ХЭЗ', [150, 604, 309, 662], 631, [-4, 0]),
-  instrument('open_hat', 'ХЭО', [150, 682, 309, 739], 709, [-4, 0]),
-  instrument('tom', 'ТОМ', [150, 759, 309, 816], 786, [-3.6, 2]),
-  instrument('rim', 'РИМ', [150, 836, 309, 894], 864, [-3.9, 1]),
-  instrument('perc', 'ПРК', [150, 918, 310, 977], 946, [-3.9, 0]),
+  instrument('kick', [150, 371, 309, 429], 398, [-4.1, -5]),
+  instrument('snare', [150, 450, 309, 507], 476, [-4, -2]),
+  instrument('clap', [150, 527, 309, 584], 553, [-4, 1]),
+  instrument('closed_hat', [150, 604, 309, 662], 631, [-4, 0]),
+  instrument('open_hat', [150, 682, 309, 739], 709, [-4, 0]),
+  instrument('tom', [150, 759, 309, 816], 786, [-3.6, 2]),
+  instrument('rim', [150, 836, 309, 894], 864, [-3.9, 1]),
+  instrument('perc', [150, 918, 310, 977], 946, [-3.9, 0]),
 ];
 
 /** The lamp beside an instrument button: its centre across, and its radius. Its height is the button's middle. */
@@ -147,6 +144,9 @@ export const TIP_INSET = { top: 1.8, side: 1.4, bottom: 0.4 } as const;
 export const KNOB_SWEEP = 270;
 
 export const SCREEN = { rect: [931, 263, 1398, 536] as Rect, width: 467, height: 273 } as const;
+
+/** The readout let into the screen frame's lower lip, between its screws: as wide as the screen. */
+export const READOUT: Rect = [931, 567, 1398, 594];
 
 export const METER = {
   rect: [566, 384, 810, 510] as Rect,

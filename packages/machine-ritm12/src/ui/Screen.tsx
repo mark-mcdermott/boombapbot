@@ -1,14 +1,12 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { PATTERN_NAMES, VOICES, isStepOn, type Project } from '../document';
+import { VOICES, isStepOn, type Project } from '../document';
 import { useRuntime } from './context';
 import { INSTRUMENTS, METER, SCREEN, meterAngle } from './layout';
 import { boxOf } from './Controls';
+import { useLettering, type Lettering } from './lettering';
 
 const GREEN = '#66ff9c';
 const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
-/** What the screen types out when the machine is switched on. */
-const BOOT_LINES = ['НПО «БАРС-7»', 'РИТМ-12  РИТМИЧЕСКИЙ КОМПЬЮТЕР', '', 'ПРОВЕРКА ПАМЯТИ ........ ОК', 'ГОЛОСА 8    ПАТТЕРНЫ 4', '', 'ГОТОВ'];
-const EFFECT_NAMES: Record<Project['effect']['kind'], string> = { delay: 'ДИЛЭЙ', reverb: 'РЕВЕРБ', flanger: 'ФЛЭНЖЕР', chorus: 'ХОР' };
 /** Seconds the tube takes to light, and to finish typing its start-up lines. */
 const WARM = 0.45;
 const BOOTED = 2.3;
@@ -86,6 +84,9 @@ export function useScreen(
   const runtime = useRuntime();
   const onFrame = useRef(each);
   onFrame.current = each;
+  const words = useLettering();
+  const lettering = useRef(words);
+  lettering.current = words;
 
   useEffect(() => {
     const context = canvas.current?.getContext('2d');
@@ -102,7 +103,7 @@ export function useScreen(
         power = state.power;
         switchedAt = still ? -Infinity : now;
       }
-      drawScreen(context, shape, state.project, {
+      drawScreen(context, shape, state.project, lettering.current, {
         power,
         since: (now - switchedAt) / 1000,
         step: state.currentStep,
@@ -174,7 +175,7 @@ interface ScreenState {
   line: string | null;
 }
 
-function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Project, state: ScreenState): void {
+function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Project, words: Lettering, state: ScreenState): void {
   const { width, height, glow, head, grid, accent, foot, boot } = shape;
   const middle = { x: width / 2, y: height / 2 };
   g.setTransform(shape.density, 0, 0, shape.density, 0, 0);
@@ -218,7 +219,7 @@ function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Pr
   g.font = head.font;
   if (state.since < BOOTED) {
     let typed = Math.floor((state.since - WARM) * 62);
-    BOOT_LINES.forEach((text, index) => {
+    words.boot.forEach((text, index) => {
       g.fillText(text.slice(0, Math.max(0, typed)), boot.left, boot.top + index * boot.gap);
       typed -= text.length;
     });
@@ -226,9 +227,9 @@ function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Pr
   }
 
   const shown = project.patterns[project.panel.pattern]!;
-  g.fillText(`ПАТТЕРН ${PATTERN_NAMES[project.panel.pattern]}`, head.left, head.base);
+  g.fillText(`${words.pattern} ${words.patterns[project.panel.pattern]}`, head.left, head.base);
   g.textAlign = 'right';
-  g.fillText(`ТЕМП ${project.tempo}`, head.right, head.base);
+  g.fillText(`${words.tempo} ${project.tempo}`, head.right, head.base);
   g.textAlign = 'left';
   g.globalAlpha = 0.5;
   g.fillRect(head.left, head.rule, head.right - head.left, glow);
@@ -252,7 +253,7 @@ function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Pr
     const quiet = project.mix.mutes[instrument.voice] ? 0.3 : 1;
     g.shadowBlur = 6 * glow;
     g.globalAlpha = (selected ? 1 : 0.55) * quiet;
-    g.fillText(`${selected ? '▸' : ' '}${instrument.short}`, grid.label, y + grid.text);
+    g.fillText(`${selected ? '▸' : ' '}${words.voices[instrument.voice].short}`, grid.label, y + grid.text);
     for (let step = 0; step < project.size; step += 1) {
       const on = isStepOn(shown.steps[instrument.voice], step);
       g.globalAlpha = (on ? 1 : 0.2) * quiet;
@@ -273,6 +274,6 @@ function drawScreen(g: CanvasRenderingContext2D, shape: ScreenShape, project: Pr
   }
 
   g.font = foot.font;
-  const resting = `${project.size === 16 ? '16 ПРЯМОЙ' : '12 ТРИОЛИ'}  ${EFFECT_NAMES[project.effect.kind]}${state.recording ? '  ● ЗАПИСЬ' : ''}`;
+  const resting = `${project.size === 16 ? `16 ${words.straight}` : `12 ${words.triplets}`}  ${words.effects[project.effect.kind]}${state.recording ? `  ● ${words.recording}` : ''}`;
   g.fillText(state.line ?? resting, foot.left, foot.base);
 }

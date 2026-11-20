@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
 import { Segmented } from '@boombapbot/editor';
 import { EFFECT_KINDS, getVoice } from '../document';
-import { Key, Lamp, Patch, PointerKnob } from './Controls';
+import { Key, Lamp, Patch, PointerKnob, boxOf } from './Controls';
 import { ReadoutContext } from './context';
 import {
   BUTTONS,
@@ -13,11 +13,15 @@ import {
   PATTERN_KEYS,
   PLATE,
   POWER_LAMP,
+  READOUT,
   STEP_KEYS,
   SWITCHES,
   type Rect,
 } from './layout';
 import { PhonePanel } from './PhonePanel';
+import { useLettering, useScript } from './lettering';
+import { PLATE_LABELS } from './plate-labels';
+import { Readout } from './Readout';
 import { ScreenAndMeter } from './Screen';
 import { useWiring, type KnobName } from './wiring';
 
@@ -78,6 +82,8 @@ function PicturePanel() {
   const [fit, setFit] = useState(false);
   const scale = useStageScale(wiring.frame);
   const plate = readout.art('plate.webp');
+  const words = useLettering();
+  const english = useScript() === 'english';
 
   return (
     <ReadoutContext.Provider value={readout}>
@@ -94,7 +100,21 @@ function PicturePanel() {
                 return name ? <Patch key={kind} rect={PATCHES.effect} name={name} shown={wiring.effect === kind} /> : null;
               })}
 
+              {english ? (
+                <div className="rt-labels" aria-hidden="true" data-testid="plate-labels">
+                  {PLATE_LABELS.map((label, index) => (
+                    <span key={index} className="rt-label" style={{ ...boxOf(label.rect), fontSize: label.size }} data-on={label.on}>
+                      {label.text}
+                      {label.under ? <small>{label.under}</small> : null}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
               <ScreenAndMeter line={wiring.line} />
+              <div className="rt-readout-slot" style={boxOf(READOUT)}>
+                <Readout className="rt-readout-plate" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} power={power} cells={36} />
+              </div>
 
               <Key rect={BUTTONS.power} {...keys.power} />
               <Lamp place={POWER_LAMP} {...wiring.powerLamp} />
@@ -147,7 +167,7 @@ function PicturePanel() {
             onChange={wiring.pressVoice}
             options={INSTRUMENTS.map((instrument) => ({
               value: instrument.voice,
-              label: instrument.short,
+              label: words.voices[instrument.voice].short,
               name: getVoice(instrument.voice).name,
               testId: `strip-${instrument.voice}`,
             }))}
@@ -156,10 +176,6 @@ function PicturePanel() {
             {fit ? 'Zoom in' : 'Fit to screen'}
           </button>
         </div>
-
-        <p className="sb-visually-hidden" aria-live="polite" data-testid="spoken">
-          {wiring.spoken}
-        </p>
       </section>
     </ReadoutContext.Provider>
   );

@@ -1,15 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { EFFECT_KINDS } from '../document';
 import { Hand, Key, Lamp, useTurning, type KnobWiring, type LampWiring } from './Controls';
 import { ReadoutContext, useReadout } from './context';
 import { INSTRUMENTS, PHONE_KNOBS } from './layout';
+import { Readout } from './Readout';
 import { PhoneScreen } from './Screen';
-import { EFFECTS, useWiring } from './wiring';
+import { useLettering, useScript } from './lettering';
+import { useWiring } from './wiring';
 
 const TABS = [
-  { id: 'voice', lettered: 'ГОЛОС', spoken: 'Voice', holds: 'pitch, decay, tone and level' },
-  { id: 'tempo', lettered: 'ТЕМП', spoken: 'Tempo', holds: 'tempo, swing, accent and measure' },
-  { id: 'effect', lettered: 'ЭФФЕКТ', spoken: 'Effect', holds: 'the effect, its mix and the volume' },
+  { id: 'voice', spoken: 'Voice', holds: 'pitch, decay, tone and level' },
+  { id: 'tempo', spoken: 'Tempo', holds: 'tempo, swing, accent and measure' },
+  { id: 'effect', spoken: 'Effect', holds: 'the effect, its mix and the volume' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -31,30 +33,6 @@ function useGrowth(room: RefObject<HTMLElement | null>): number {
     return () => observer.disconnect();
   }, [room]);
   return growth;
-}
-
-/** How long what a control did stays under the screen in English, in milliseconds. */
-const CAPTION_MS = 2400;
-
-/**
- * What a control just did, in English, under the screen for a moment. The
- * lettering is Russian and is there to look at; this is for whoever can see
- * it and cannot read it. A screen reader has the same words from the live
- * line under the panel, so this is kept from it.
- */
-function Caption({ text, said }: { text: string; said: number }) {
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    if (said === 0) return undefined;
-    setShown(true);
-    const timer = window.setTimeout(() => setShown(false), CAPTION_MS);
-    return () => window.clearTimeout(timer);
-  }, [said]);
-  return (
-    <span className="rt-ph-caption" data-testid="caption" data-shown={shown || undefined}>
-      {text}
-    </span>
-  );
 }
 
 /** A knob's body is shown this wide, in the page's pixels, whatever size it was cut at. */
@@ -173,6 +151,8 @@ export function PhonePanel() {
   const room = useRef<HTMLElement>(null);
   const growth = useGrowth(room);
   const selected = wiring.voices.find((voice) => voice.voice === wiring.selected)!;
+  const words = useLettering();
+  const english = useScript() === 'english';
 
   const art = (file: string) => {
     const src = readout.art(`phone/${file}`);
@@ -180,7 +160,7 @@ export function PhonePanel() {
   };
   const openTab = (next: (typeof TABS)[number]) => {
     setTab(next.id);
-    readout.say(next.lettered, `${next.spoken}: ${next.holds}`);
+    readout.say(words[next.id], `${next.spoken}: ${next.holds}`);
   };
   const onTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
     const move = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
@@ -211,11 +191,11 @@ export function PhonePanel() {
             <PhoneLamp {...wiring.powerLamp} />
           </div>
 
-          <div className="rt-ph-crt" aria-hidden="true">
-            <div className="rt-ph-glass">
+          <div className="rt-ph-crt">
+            <div className="rt-ph-glass" aria-hidden="true">
               <PhoneScreen line={wiring.line} />
             </div>
-            <Caption text={wiring.spoken} said={wiring.said} />
+            <Readout className="rt-readout-phone" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} power={power} cells={28} />
           </div>
 
           {/* Everything but the power switch: dark and out of reach while the machine is off. */}
@@ -227,7 +207,14 @@ export function PhonePanel() {
                   <div key={instrument.voice} className="rt-ph-pad">
                     <PhoneLamp {...voice.lamp} />
                     <Key className="rt-ph-key rt-ph-cap" {...voice.key}>
-                      <Part file={`ink-${instrument.voice}.png`} />
+                      {english ? (
+                        <span className="rt-ph-ink-en">
+                          <Part file={`ink-${instrument.voice}.png`} />
+                          <Lettered text={words.voices[instrument.voice].key} />
+                        </span>
+                      ) : (
+                        <Part file={`ink-${instrument.voice}.png`} />
+                      )}
                     </Key>
                   </div>
                 );
@@ -236,11 +223,11 @@ export function PhonePanel() {
 
             <div className="rt-ph-group">
               <div className="rt-ph-head">
-                <Lettered text="СЕКВЕНСЕР" icon="sequencer" />
+                <Lettered text={words.sequencer} icon="sequencer" />
                 <Key className="rt-ph-key rt-ph-switch" {...keys.write}>
-                  <Lettered text="УДАРЫ" icon="hits" dim={wiring.write !== 'hits'} />
+                  <Lettered text={words.hits} icon="hits" dim={wiring.write !== 'hits'} />
                   <Part file={`write-${wiring.write}.png`} />
-                  <Lettered text="АКЦЕНТЫ" icon="accents" dim={wiring.write !== 'accents'} />
+                  <Lettered text={words.accents} icon="accents" dim={wiring.write !== 'accents'} />
                 </Key>
               </div>
               <div className="rt-ph-steps">
@@ -254,16 +241,16 @@ export function PhonePanel() {
 
             <div className="rt-ph-row">
               {wiring.patterns.map((pattern, index) => (
-                <Key key={index} className="rt-ph-key rt-ph-art rt-ph-pattern" {...pattern}>
-                  <Part file={`pattern-${index + 1}.webp`} />
+                <Key key={index} className={`rt-ph-key rt-ph-pattern ${english ? 'rt-ph-cap' : 'rt-ph-art'}`} {...pattern}>
+                  {english ? <Lettered text={`${words.patterns[index]}.`} /> : <Part file={`pattern-${index + 1}.webp`} />}
                 </Key>
               ))}
               <span className="rt-ph-rule" />
               <Key className="rt-ph-key rt-ph-art rt-ph-square" {...keys.dice}>
                 <Part file="dice.webp" />
               </Key>
-              <Key className="rt-ph-key rt-ph-art rt-ph-square" {...keys.clear}>
-                <Part file="clear.webp" />
+              <Key className={`rt-ph-key rt-ph-square ${english ? 'rt-ph-cap rt-ph-clear-en' : 'rt-ph-art'}`} {...keys.clear}>
+                {english ? <Lettered text={words.clear} /> : <Part file="clear.webp" />}
               </Key>
             </div>
 
@@ -279,7 +266,7 @@ export function PhonePanel() {
               </Key>
               <span className="rt-ph-rule" />
               <Key className="rt-ph-key rt-ph-cap rt-ph-mute" {...keys.mute}>
-                <Lettered text="МУТ" icon="mute" />
+                <Lettered text={words.mute} icon="mute" />
               </Key>
             </div>
 
@@ -292,7 +279,7 @@ export function PhonePanel() {
                     role="tab"
                     className="rt-ph-tab"
                     id={`rt-tab-${each.id}`}
-                    aria-label={`${each.spoken} (${each.lettered})`}
+                    aria-label={english ? each.spoken : `${each.spoken} (${words[each.id]})`}
                     aria-selected={each.id === tab}
                     aria-controls="rt-deck"
                     tabIndex={each.id === tab ? 0 : -1}
@@ -302,26 +289,26 @@ export function PhonePanel() {
                     onKeyDown={onTabKey}
                   >
                     <i />
-                    <Lettered text={each.lettered} icon={each.id} />
+                    <Lettered text={words[each.id]} icon={each.id} />
                   </button>
                 ))}
               </div>
               <div className="rt-ph-deck" role="tabpanel" id="rt-deck" aria-labelledby={`rt-tab-${tab}`} data-tab={tab}>
                 {tab === 'voice' ? (
                   <>
-                    <PhoneKnob name="pitch" lettered="ПИТЧ" icon="pitch" ends={['−12', '+12']} wiring={knobs.pitch} />
-                    <PhoneKnob name="decay" lettered="ЗАТУХАНИЕ" icon="decay" wiring={knobs.decay} />
-                    <PhoneKnob name="tone" lettered="ТОН" icon="tone" wiring={knobs.tone} />
-                    <PhoneKnob name="level" lettered="УРОВЕНЬ" icon="level" wiring={selected.level} />
+                    <PhoneKnob name="pitch" lettered={words.pitch} icon="pitch" ends={['−12', '+12']} wiring={knobs.pitch} />
+                    <PhoneKnob name="decay" lettered={words.decay} icon="decay" wiring={knobs.decay} />
+                    <PhoneKnob name="tone" lettered={words.tone} icon="tone" wiring={knobs.tone} />
+                    <PhoneKnob name="level" lettered={words.level} icon="level" wiring={selected.level} />
                   </>
                 ) : null}
                 {tab === 'tempo' ? (
                   <>
-                    <PhoneKnob name="tempo" lettered="ТЕМП" icon="tempo" wiring={knobs.tempo} />
-                    <PhoneKnob name="swing" lettered="СВИНГ" icon="swing" wiring={knobs.swing} />
-                    <PhoneKnob name="accent" lettered="АКЦЕНТ" icon="accent" wiring={knobs.accent} />
+                    <PhoneKnob name="tempo" lettered={words.tempo} icon="tempo" wiring={knobs.tempo} />
+                    <PhoneKnob name="swing" lettered={words.swing} icon="swing" wiring={knobs.swing} />
+                    <PhoneKnob name="accent" lettered={words.accent} icon="accent" wiring={knobs.accent} />
                     <div className="rt-ph-ctl">
-                      <Lettered text="РАЗМЕР" icon="size" />
+                      <Lettered text={words.size} icon="size" />
                       <Key className="rt-ph-key rt-ph-pick" {...keys.size}>
                         <Part file={`size-${wiring.size === 16 ? 16 : 12}.png`} />
                         <span className="rt-ph-names">
@@ -341,24 +328,20 @@ export function PhonePanel() {
                           {EFFECT_KINDS.map((kind) => (
                             <span key={kind} className="rt-ph-name" data-on={kind === wiring.effect || undefined}>
                               <i />
-                              <Lettered text={EFFECTS[kind].shown} icon={kind} dim={kind !== wiring.effect} />
+                              <Lettered text={words.effects[kind]} icon={kind} dim={kind !== wiring.effect} />
                             </span>
                           ))}
                         </span>
                       </Key>
                     </div>
-                    <PhoneKnob name="mix" lettered="СМЕСЬ" ends={['0', '100%']} wiring={knobs.mix} />
-                    <PhoneKnob name="volume" lettered="ГРОМКОСТЬ" icon="volume" wiring={knobs.volume} />
+                    <PhoneKnob name="mix" lettered={words.mix} ends={['0', '100%']} wiring={knobs.mix} />
+                    <PhoneKnob name="volume" lettered={words.volume} icon="volume" wiring={knobs.volume} />
                   </>
                 ) : null}
               </div>
             </div>
           </div>
         </div>
-
-        <p className="sb-visually-hidden" aria-live="polite" data-testid="spoken">
-          {wiring.spoken}
-        </p>
       </section>
     </ReadoutContext.Provider>
   );

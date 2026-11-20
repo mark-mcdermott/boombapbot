@@ -631,38 +631,6 @@
   border-radius: 13px;
 }
 
-/* What a control just did, in English, on the frame's lower lip for a moment. */
-.rt-ph-caption {
-  position: absolute;
-  top: calc(100% + 22px);
-  left: 50%;
-  max-width: calc(100% + 56px);
-  padding: 2px 9px 3px;
-  overflow: hidden;
-  border-radius: 9px;
-  background: rgb(8 6 3 / 0.72);
-  box-shadow: 0 0 0 1px rgb(220 202 164 / 0.22);
-  color: #f4efe8;
-  font-family: var(--font-plate);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transform: translateX(-50%);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.18s, visibility 0s 0.18s;
-  pointer-events: none;
-}
-
-.rt-ph-caption[data-shown] {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.12s;
-}
-
 /* The glass reaches under the frame's lip on every side, and keeps the screen's shape. */
 .rt-ph-glass {
   position: relative;
@@ -800,10 +768,49 @@
 }
 
 .rt-ph-mute .rt-ph-let {
-  color: var(--rt-ink);
   font-size: 15px;
+}
+
+.rt-ph-mute .rt-ph-let,
+.rt-ph-cap > .rt-ph-let,
+.rt-ph-ink-en .rt-ph-let {
+  color: var(--rt-ink);
   font-weight: 800;
   text-shadow: none;
+}
+
+.rt-ph-cap > .rt-ph-let {
+  font-size: 15px;
+}
+
+.rt-ph-clear-en > .rt-ph-let {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+
+/* In English an instrument key keeps its painted drawing and is lettered beside it. */
+.rt-ph-ink-en {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rt-ph .rt-ph-pad .rt-ph-ink-en img {
+  width: 28px;
+  height: 100%;
+  flex: none;
+  margin: 0;
+  object-fit: cover;
+  object-position: left center;
+}
+
+.rt-ph-ink-en .rt-ph-let {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
 }
 
 /* On a cream key the drawing is printed dark, like the key's lettering. */
@@ -1001,4 +1008,121 @@
   .rt-phone {
     margin: 0 -6px;
   }
+}
+
+/* ---- The readout under the screen: sixteen-segment characters behind smoked glass ---- */
+
+.rt-readout {
+  --rt-seg-on: #7dffd4;
+  --rt-seg-glow: rgb(70 255 196 / 0.75);
+  display: block;
+  box-sizing: border-box;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 3px;
+  background:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06), transparent 45%),
+    #020605;
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.95),
+    inset 0 0 0 1px rgb(0 0 0 / 0.8),
+    0 1px 0 rgb(214 190 140 / 0.18);
+}
+
+.rt-readout svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.rt-readout-off {
+  fill: var(--rt-seg-on);
+  opacity: 0.075;
+}
+
+.rt-readout-on {
+  fill: var(--rt-seg-on);
+  filter: drop-shadow(0 0 1.4px var(--rt-seg-glow));
+}
+
+.rt-readout[data-power='off'] .rt-readout-off {
+  opacity: 0.045;
+}
+
+.rt-readout-slot {
+  position: absolute;
+  padding: 3px 0;
+  box-sizing: border-box;
+}
+
+.rt-readout-plate {
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* On the phone it sits on the frame's lower lip, as wide as the glass. */
+.rt-readout-phone {
+  position: absolute;
+  top: calc(100% + 19px);
+  left: -16px;
+  right: -17px;
+  height: 19px;
+  padding: 1px 5px;
+}
+
+/* ---- In English: labels laid over the picture's Russian, as an importer would have fitted them ---- */
+
+.rt-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rt-label {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 4px;
+  background: linear-gradient(to bottom, #24221a, #15140f);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 -1px 0 rgb(0 0 0 / 0.6),
+    0 1px 2px rgb(0 0 0 / 0.55);
+  color: #ead9b0;
+  font-family: var(--font-plate);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rt-label small {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+.rt-label[data-on] {
+  background: linear-gradient(to bottom, #eadbb6, #d9c79c);
+  box-shadow: inset 0 0 0 1px rgb(80 60 30 / 0.18);
+  color: #2b2417;
+  font-weight: 800;
+}
+
+.rt-label[data-on='key'] {
+  font-size: 22px;
+  border-radius: 3px;
+}
+
+.rt-label[data-on='face'] {
+  background: #ece0c2;
+  box-shadow: none;
+  font-size: 17px;
 }

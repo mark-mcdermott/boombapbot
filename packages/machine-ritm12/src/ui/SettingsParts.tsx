@@ -1,6 +1,8 @@
-import { PATTERN_NAMES, countHits, isEmptyPattern } from '../document';
+import { Segmented } from '@boombapbot/editor';
+import { countHits, isEmptyPattern } from '../document';
 import { remembersAnything, selectedPattern } from '../session';
 import { useEditorState, useRuntime } from './context';
+import { setScript, useLettering, useScript, type Script } from './lettering';
 
 /** РИТМ-12's own buttons in settings, after undo and redo. */
 export function SettingsActions() {
@@ -31,11 +33,30 @@ export function SettingsActions() {
 /** РИТМ-12's own line in the settings status list. */
 export function StatusLines() {
   const hits = useEditorState((state) => countHits(selectedPattern(state.project)));
-  const name = useEditorState((state) => PATTERN_NAMES[state.project.panel.pattern]);
+  const patterns = useLettering().patterns;
+  const name = patterns[useEditorState((state) => state.project.panel.pattern)];
   return (
     <span data-testid="hit-count">
       {hits} {hits === 1 ? 'hit' : 'hits'} in pattern {name}
     </span>
+  );
+}
+
+const SCRIPTS: Array<{ value: Script; label: string; testId: string }> = [
+  { value: 'russian', label: 'Russian', testId: 'lettering-russian' },
+  { value: 'english', label: 'English', testId: 'lettering-english' },
+];
+
+/** Whether the machine is lettered in its own Russian or in English: its screen, keys and panel. */
+export function Options() {
+  const script = useScript();
+  return (
+    <>
+      <span className="sb-label">
+        Panel lettering
+      </span>
+      <Segmented label="Panel lettering" className="sb-segmented-fill" value={script} onChange={setScript} options={SCRIPTS} />
+    </>
   );
 }
 

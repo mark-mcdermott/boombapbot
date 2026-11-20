@@ -202,6 +202,11 @@ export function Settings({ container, accounts }: SettingsProps) {
           </div>
           <WavExportStatus />
         </Group>
+        {runtime.machine.Options && (
+          <Group>
+            <runtime.machine.Options />
+          </Group>
+        )}
         <Group>
           <runtime.machine.Notes />
         </Group>

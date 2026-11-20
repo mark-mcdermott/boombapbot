@@ -3,7 +3,7 @@ import { documentRitm12, type Project } from './document';
 import { engineSetup, exportPlan } from './engine';
 import { RESTING, SessionRitm12, memoryOf, type TransientRitm12 } from './session';
 import { Panel } from './ui/Panel';
-import { KeysHelp, Notes, SettingsActions, StatusLines } from './ui/SettingsParts';
+import { KeysHelp, Notes, Options, SettingsActions, StatusLines } from './ui/SettingsParts';
 import './styles.css';
 
 export * from './engine';
@@ -22,6 +22,7 @@ export const machineRitm12: Machine<Project, TransientRitm12, SessionRitm12> = {
   SettingsActions,
   StatusLines,
   Notes,
+  Options,
   keysHelp: <KeysHelp />,
   messages: {
     earlierVersion: 'What changed on the way is listed here.',
