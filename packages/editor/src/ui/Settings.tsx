@@ -140,10 +140,12 @@ interface SettingsProps {
   container: RefObject<HTMLElement | null>;
   /** Whether the page has an account to save a beat to. */
   accounts: boolean;
+  /** Whether the draft is kept by the device, as a shell's is. */
+  device: boolean;
 }
 
 /** The cog, and the modal behind it that holds everything but the machine. */
-export function Settings({ container, accounts }: SettingsProps) {
+export function Settings({ container, accounts, device }: SettingsProps) {
   const runtime = useRuntime();
   const draftKept = useEditorState((state) => state.draftState === 'saved');
   const [open, setOpen] = useState(false);
@@ -211,11 +213,11 @@ export function Settings({ container, accounts }: SettingsProps) {
           <runtime.machine.Notes />
         </Group>
         <Group>
-          <StatusBar accounts={accounts} />
+          <StatusBar accounts={accounts} device={device} />
         </Group>
         <Group>
           <p className="sb-footnote" data-testid="keys-help">{runtime.machine.keysHelp}</p>
-          <p className="sb-hint">{closingNoteText({ accounts, kept: draftKept })}</p>
+          <p className="sb-hint">{closingNoteText({ accounts, device, kept: draftKept })}</p>
         </Group>
       </Modal>
       <WavExportChip host={host} sheetOpen={open} openSheet={() => setOpen(true)} />

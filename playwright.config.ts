@@ -1,8 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
-import { ACCOUNTS_PORT, ACCOUNTS_URL, FAKE_SERVICES_PORT, FAKE_SERVICES_URL, serverEnv } from './e2e/accounts-server';
+import {
+  ACCOUNTS_PORT,
+  ACCOUNTS_URL,
+  APP_PORT,
+  APP_URL,
+  FAKE_SERVICES_PORT,
+  FAKE_SERVICES_URL,
+  serverEnv,
+} from './e2e/accounts-server';
 
 const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
 const withServer = /(accounts|beats|shop|upgrade)\.spec\.ts/;
+// The phone app's page, in a phone's browser, reaching the same built server from outside it.
+const app = /\/app\.spec\.ts/;
 // РИТМ-12's tests of its own panel are in e2e/ritm12. The tests in the e2e
 // folder itself are the site's, and drive the same machine.
 const panel = /\/ritm12\/.*\.spec\.ts/;
@@ -23,8 +33,9 @@ const desktop = { ...browser.desktop };
 const projects = [
   { name: 'ritm12', use: desktop, testMatch: panel, testIgnore: panelPhone },
   { name: 'ritm12-phone', use: { ...browser.phone }, testMatch: panelPhone },
-  { name: 'site', use: desktop, testIgnore: [withServer, panel] },
+  { name: 'site', use: desktop, testIgnore: [withServer, panel, app] },
   { name: 'server', use: { ...desktop, baseURL: ACCOUNTS_URL }, testMatch: withServer },
+  { name: 'app', use: { ...browser.phone, baseURL: APP_URL }, testMatch: app },
 ];
 
 // The tests run against the production build. Run `pnpm build` first.
@@ -64,10 +75,18 @@ export default defineConfig({
         // Every test signs up from one address, faster than the limiter allows.
         AUTH_RATE_LIMIT: 'off',
         UPGRADE_OPEN: 'on',
+        APP_ORIGINS: APP_URL,
       },
       // Never reused: its database and its secret belong to one run.
       reuseExistingServer: false,
       timeout: 20_000,
+    },
+    {
+      command: `pnpm --filter @boombapbot/mobile assets && pnpm --filter @boombapbot/mobile exec vite --host 127.0.0.1 --port ${APP_PORT} --strictPort`,
+      url: `${APP_URL}/boombapbot-pages.json`,
+      env: { VITE_SITE_URL: `${ACCOUNTS_URL}/` },
+      reuseExistingServer: false,
+      timeout: 30_000,
     },
     {
       command: `node e2e/fake-shop-services.mjs ${FAKE_SERVICES_PORT}`,

@@ -31,6 +31,7 @@ export default defineConfig({
       EMAIL_FROM: atRunTime(),
       EMAIL_OUTBOX: atRunTime(),
       AUTH_RATE_LIMIT: atRunTime(),
+      APP_ORIGINS: atRunTime(),
       STRIPE_SECRET_KEY: atRunTime(),
       STRIPE_WEBHOOK_SECRET: atRunTime(),
       STRIPE_API_URL: atRunTime(),

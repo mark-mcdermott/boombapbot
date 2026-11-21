@@ -44,31 +44,31 @@ describe('storage that is missing from the start', () => {
 
 describe('the draft status line', () => {
   it('names the browser and an account on the site', () => {
-    expect(draftStatusText({ state: 'saved', savedAt: null, accounts: true })).toBe(
+    expect(draftStatusText({ state: 'saved', savedAt: null, accounts: true, device: false })).toBe(
       'Draft will be saved in this browser',
     );
-    expect(draftStatusText({ state: 'error', savedAt: null, accounts: true })).toBe(
+    expect(draftStatusText({ state: 'error', savedAt: null, accounts: true, device: false })).toBe(
       'This browser is not saving drafts. To keep this beat, export the project file or save it to an account.',
     );
   });
 
   it('names the device and only the export in a shell', () => {
-    expect(draftStatusText({ state: 'saved', savedAt: null, accounts: false })).toBe(
+    expect(draftStatusText({ state: 'saved', savedAt: null, accounts: false, device: true })).toBe(
       'Draft will be saved on this device',
     );
-    expect(draftStatusText({ state: 'saved', savedAt: Date.now(), accounts: false })).toMatch(
+    expect(draftStatusText({ state: 'saved', savedAt: Date.now(), accounts: false, device: true })).toMatch(
       /^Draft saved on this device at /,
     );
-    expect(draftStatusText({ state: 'error', savedAt: null, accounts: false })).toBe(
+    expect(draftStatusText({ state: 'error', savedAt: null, accounts: false, device: true })).toBe(
       'This device is not saving drafts. Export the project to keep it.',
     );
   });
 
   it('names the other tab, or window, that is saving the beat', () => {
-    expect(draftStatusText({ state: 'elsewhere', savedAt: Date.now(), accounts: true })).toBe(
+    expect(draftStatusText({ state: 'elsewhere', savedAt: Date.now(), accounts: true, device: false })).toBe(
       'This beat is open in another tab, which is saving it. Changes here are not saved.',
     );
-    expect(draftStatusText({ state: 'elsewhere', savedAt: null, accounts: false })).toBe(
+    expect(draftStatusText({ state: 'elsewhere', savedAt: null, accounts: false, device: true })).toBe(
       'This beat is open in another window, which is saving it. Changes here are not saved.',
     );
   });
@@ -76,13 +76,13 @@ describe('the draft status line', () => {
 
 describe('the closing note', () => {
   it('points to the account button on the site', () => {
-    const note = closingNoteText({ accounts: true, kept: true });
+    const note = closingNoteText({ accounts: true, device: false, kept: true });
     expect(note).toContain('Your beat is saved in this browser as you go.');
     expect(note).toContain('save the beat to a free account from the account button in the footer');
   });
 
   it('has no account and no footer in a shell, and keeps the beat on the device', () => {
-    const note = closingNoteText({ accounts: false, kept: true });
+    const note = closingNoteText({ accounts: false, device: true, kept: true });
     expect(note).toContain('Your beat is saved on this device as you go.');
     expect(note).toContain('export the project file here.');
     expect(note).not.toMatch(/account|footer|browser/);
@@ -90,7 +90,21 @@ describe('the closing note', () => {
 
   it('does not promise the draft is saved when it cannot be', () => {
     for (const accounts of [true, false]) {
-      expect(closingNoteText({ accounts, kept: false })).not.toContain('saved');
+      expect(closingNoteText({ accounts, device: !accounts, kept: false })).not.toContain('saved');
     }
+  });
+});
+
+describe('a shell that reaches the site', () => {
+  it('keeps the draft on the device and offers the account', () => {
+    expect(draftStatusText({ state: 'saved', savedAt: null, accounts: true, device: true })).toBe(
+      'Draft will be saved on this device',
+    );
+    expect(draftStatusText({ state: 'error', savedAt: null, accounts: true, device: true })).toBe(
+      'This device is not saving drafts. To keep this beat, export the project file or save it to an account.',
+    );
+    const note = closingNoteText({ accounts: true, device: true, kept: true });
+    expect(note).toContain('on this device');
+    expect(note).toContain('free account');
   });
 });

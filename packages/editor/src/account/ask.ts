@@ -1,6 +1,6 @@
-import { UNREACHABLE, type Failure } from './client';
+import { UNREACHABLE, sessionHeaders, type Failure } from './client';
 
-// One request to this site's own server and what came of it. Every call
+// One request to the site's server and what came of it. Every call
 // made this way is started by a button in a modal; the machine never waits
 // on one.
 
@@ -35,7 +35,7 @@ export async function ask<Answer, Said extends object>(
   try {
     response = await fetch(url, {
       method,
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+      headers: { ...sessionHeaders(), ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
