@@ -844,7 +844,7 @@
   letter-spacing: 0.04em;
 }
 
-/* An instrument key keeps its painted drawing, and is lettered at one distance from it. */
+/* An instrument key carries its drawing, and is lettered at one distance from it. */
 .rt-ph-ink {
   display: flex;
   align-items: center;
@@ -857,11 +857,9 @@
 
 .rt-ph .rt-ph-pad .rt-ph-ink img {
   width: 28px;
-  height: 100%;
+  height: 28px;
   flex: none;
   margin: 0;
-  object-fit: cover;
-  object-position: left center;
 }
 
 .rt-ph-ink .rt-ph-let {
@@ -1247,6 +1245,7 @@
 @media (max-width: 390px) {
   .rt-ph .rt-ph-pad .rt-ph-ink img {
     width: 25px;
+    height: 25px;
   }
 
   .rt-ph-ink {
