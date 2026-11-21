@@ -82,6 +82,8 @@ export interface Failure {
 
 /** Better Auth's code for a log-in refused because the address is not confirmed yet. */
 export const EMAIL_NOT_VERIFIED = 'EMAIL_NOT_VERIFIED';
+/** Its code for a log-in refused for the address or the password, which it does not tell apart. */
+export const INVALID_EMAIL_OR_PASSWORD = 'INVALID_EMAIL_OR_PASSWORD';
 /** Its code for asking to confirm an address that already is. */
 export const EMAIL_ALREADY_VERIFIED = 'EMAIL_ALREADY_VERIFIED';
 
@@ -103,7 +105,7 @@ export async function attempt(call: () => Promise<{ error: Failure | null }>): P
 
 const EXPLANATIONS: Record<string, string> = {
   UNREACHABLE: 'I could not reach the server. Check your connection and try again.',
-  INVALID_EMAIL_OR_PASSWORD: 'Incorrect email or password.',
+  [INVALID_EMAIL_OR_PASSWORD]: 'Incorrect email or password.',
   INVALID_PASSWORD: 'That is not your password.',
   INVALID_EMAIL: 'That does not look like an email address.',
   PASSWORD_TOO_SHORT: `Use at least ${MIN_PASSWORD_LENGTH} characters.`,

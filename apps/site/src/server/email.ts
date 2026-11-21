@@ -62,6 +62,8 @@ interface LinkEmail {
   url: string;
   /** What happens if the reader did not ask for this. */
   otherwise: string;
+  /** False for a link to the site itself, which carries nothing that runs out. */
+  expires?: boolean;
 }
 
 const SIGN_OFF = 'boombapbot is one person and a lot of coffee.';
@@ -71,16 +73,17 @@ const NOTE_STYLE = 'font-size:14px;color:#5c554d';
 const KEY_STYLE =
   'font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;letter-spacing:0.04em;background:#f4efe8;padding:12px 16px;border-radius:8px';
 
-function linkEmail({ to, subject, lead, action, url, otherwise }: LinkEmail): EmailMessage {
+function linkEmail({ to, subject, lead, action, url, otherwise, expires = true }: LinkEmail): EmailMessage {
   const href = escapeHtml(url);
+  const note = expires ? `The link works for an hour. ${otherwise}` : otherwise;
   return {
     to,
     subject,
-    text: `${lead}\n\n${url}\n\nThe link works for an hour. ${otherwise}\n\n${SIGN_OFF}\n`,
+    text: `${lead}\n\n${url}\n\n${note}\n\n${SIGN_OFF}\n`,
     html: `<div style="${BODY_STYLE}">
   <p>${escapeHtml(lead)}</p>
   <p><a href="${href}" style="display:inline-block;background:#171513;color:#f4efe8;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600">${escapeHtml(action)}</a></p>
-  <p style="${NOTE_STYLE}">The link works for an hour. ${escapeHtml(otherwise)}</p>
+  <p style="${NOTE_STYLE}">${escapeHtml(note)}</p>
   <p style="${NOTE_STYLE}">${SIGN_OFF}</p>
 </div>`,
   };
@@ -108,6 +111,25 @@ export async function sendPasswordResetEmail(to: string, url: string): Promise<v
       action: 'Choose a new password',
       url,
       otherwise: 'If you did not ask for it, ignore this and your password stays as it is.',
+    }),
+  );
+}
+
+/**
+ * To an address that already has an account, when somebody signs up with it
+ * again. The page they signed up on says only to check the inbox, as it does
+ * for a new address, so this is where its owner learns what happened.
+ */
+export async function sendExistingAccountEmail(to: string, url: string): Promise<void> {
+  await sendEmail(
+    linkEmail({
+      to,
+      subject: 'You already have a boombapbot account',
+      lead: 'Someone, hopefully you, tried to make a boombapbot account with this address. It already has one, so no new account was made. Log in with the password you chose before, or choose a new one here.',
+      action: 'Choose a new password',
+      url,
+      otherwise: 'If that was not you, ignore this. Nobody got in and nothing changed.',
+      expires: false,
     }),
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type Rea
 import {
   EMAIL_ALREADY_VERIFIED,
   EMAIL_NOT_VERIFIED,
+  INVALID_EMAIL_OR_PASSWORD,
   MIN_PASSWORD_LENGTH,
   attempt,
   authClient,
@@ -38,7 +39,7 @@ type Go = (view: View, notice?: Notice) => void;
 
 /** Coming back from a link in an email: which one, and whether it still worked. */
 interface Arrival {
-  kind: 'verified' | 'reset';
+  kind: 'verified' | 'reset' | 'forgot';
   token: string | null;
   failed: boolean;
 }
@@ -46,11 +47,12 @@ interface Arrival {
 /** Reads what an emailed link left in the address, and takes it back out. */
 function takeArrival(): Arrival | null {
   const { account: kind, token, error } = takeParams(['account', 'token', 'error']);
-  if (kind !== 'verified' && kind !== 'reset') return null;
+  if (kind !== 'verified' && kind !== 'reset' && kind !== 'forgot') return null;
   return { kind, token, failed: error !== null };
 }
 
 function arrivalView({ kind, token, failed }: Arrival): [View, Notice?] {
+  if (kind === 'forgot') return [{ name: 'forgot' }];
   if (kind === 'verified') {
     return failed
       ? [{ name: 'log-in' }, { kind: 'error', text: 'That confirmation link has expired. Log in to get a new one.' }]
@@ -123,6 +125,7 @@ function Form({ testId, action, busy, submit, danger = false, children }: FormPr
 }
 
 function LogIn({ go }: { go: Go }) {
+  const [missed, setMissed] = useState(false);
   return (
     <>
       <p className="sb-modal-text">
@@ -140,12 +143,22 @@ function LogIn({ go }: { go: Go }) {
             return null;
           }
           if (!failure) go({ name: 'log-in' });
+          setMissed(failure?.code === INVALID_EMAIL_OR_PASSWORD);
           return failure;
         }}
       >
         <Field name="email" label="Email" autoComplete="email" />
         <Field name="password" label="Password" autoComplete="current-password" />
       </Form>
+      {missed && (
+        <p className="sb-modal-text sb-account-nudge" data-testid="account-missed">
+          Have an account but not sure of the password?{' '}
+          <LinkButton testId="account-missed-forgot" onClick={() => go({ name: 'forgot' })}>
+            Choose a new one
+          </LinkButton>
+          . It takes one email.
+        </p>
+      )}
       <p className="sb-account-links">
         <LinkButton testId="account-to-sign-up" onClick={() => go({ name: 'sign-up' })}>
           Make an account

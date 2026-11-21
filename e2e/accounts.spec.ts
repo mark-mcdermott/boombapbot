@@ -54,6 +54,8 @@ test('logging in takes the right password and says so plainly when it is wrong',
   await fill(page, 'account-log-in', { email: address, password: 'not the password' });
   await expect(page.getByTestId('account-problem')).toHaveText('Incorrect email or password.');
   await expect(page.getByTestId('account-submit')).toBeEnabled();
+  // A miss points at the way to a new password, which is what a forgotten one needs.
+  await expect(page.getByTestId('account-missed')).toContainText('Choose a new one');
 
   await fill(page, 'account-log-in', { password: PASSWORD });
   await expect(page.getByTestId('account-address')).toHaveText(address);
@@ -267,4 +269,57 @@ test.describe('with its limits on, as the live site has them', () => {
     expect((await askForReset('203.0.113.30')).status()).toBe(429);
     expect((await askForReset('203.0.113.31')).status()).toBe(200);
   });
+});
+
+test('signing up with an address that has an account says the same on the page and tells the inbox', async ({ page }) => {
+  const address = newAddress();
+  await signUp(page, address);
+  await confirm(page, address);
+  await logOut(page);
+
+  // The page says what it says for a new address, and no second account or confirmation is made.
+  await page.getByTestId('account-to-sign-up').click();
+  await fill(page, 'account-sign-up', { email: address, password: 'another password' });
+  await expect(page.getByTestId('account-check-inbox')).toContainText(address);
+  await expect.poll(() => mailTo(address, /already have/).length).toBe(1);
+  expect(mailTo(address, /Confirm/)).toHaveLength(1);
+
+  // The email says there is an account already, and gives nothing that expires or logs anyone in.
+  const mail = mailTo(address, /already have/)[0]!;
+  expect(mail.text).toContain('It already has one, so no new account was made.');
+  expect(mail.text).toContain(`${ACCOUNTS_URL}/?account=forgot`);
+  expect(mail.text).not.toContain('works for an hour');
+  expect(mail.text).not.toContain('token');
+  expect(mail.html).not.toMatch(/\bwe\b/i);
+
+  // Its link opens the way to a new password, and the old password still works.
+  await page.goto(await linkIn(address, /already have/));
+  await expect(page.getByTestId('account-forgot')).toBeVisible();
+  expect(new URL(page.url()).search).toBe('');
+  await page.getByTestId('account-to-log-in').click();
+  await fill(page, 'account-log-in', { email: address, password: PASSWORD });
+  await expect(page.getByTestId('account-address')).toHaveText(address);
+});
+
+test('signing up again with an address never confirmed sends its confirmation again', async ({ page }) => {
+  const address = newAddress();
+  await signUp(page, address);
+  await expect.poll(() => mailTo(address, /Confirm/).length).toBe(1);
+
+  await page.getByTestId('account-to-sign-up').click();
+  await fill(page, 'account-sign-up', { email: address, password: PASSWORD });
+  await expect(page.getByTestId('account-check-inbox')).toContainText(address);
+  await expect.poll(() => mailTo(address, /Confirm/).length).toBe(2);
+  expect(mailTo(address, /already have/)).toHaveLength(0);
+
+  await confirm(page, address);
+});
+
+test('a log-in that misses offers the way to a new password', async ({ page }) => {
+  await openAccount(page);
+  await expect(page.getByTestId('account-missed')).toHaveCount(0);
+  await fill(page, 'account-log-in', { email: newAddress(), password: PASSWORD });
+  await expect(page.getByTestId('account-problem')).toHaveText('Incorrect email or password.');
+  await page.getByTestId('account-missed-forgot').click();
+  await expect(page.getByTestId('account-forgot')).toBeVisible();
 });
