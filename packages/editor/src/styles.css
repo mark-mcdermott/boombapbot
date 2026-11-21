@@ -1084,6 +1084,12 @@
   font-size: 14px;
 }
 
+/* Said under the log-in form once a log-in has missed. */
+.sb-account-nudge {
+  margin: 14px 0 0;
+  font-size: 14px;
+}
+
 /* A link, or a button that reads as one. */
 .sb-app .sb-link {
   padding: 4px 0;

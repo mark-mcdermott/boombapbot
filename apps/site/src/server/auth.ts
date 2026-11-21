@@ -6,10 +6,10 @@ import { bearer } from 'better-auth/plugins';
 import { appOrigins } from './app-origins';
 import { getDb } from './db';
 import * as schema from './db/schema';
-import { LINK_LIFETIME_SECONDS, sendPasswordResetEmail, sendVerificationEmail } from './email';
+import { LINK_LIFETIME_SECONDS, sendExistingAccountEmail, sendPasswordResetEmail, sendVerificationEmail } from './email';
 import { isRecord, withPublicIds } from './public-ids';
 import { RATE_LIMIT_ON, SITE_RATE_RULES } from './rate-limit';
-import { siteUrl } from './site';
+import { afterResponse, siteUrl } from './site';
 
 const DAY_SECONDS = 60 * 60 * 24;
 
@@ -38,6 +38,27 @@ const hideRowIds = createAuthMiddleware(async (ctx) => {
   if (shaped !== answer && (isRecord(shaped) || Array.isArray(shaped))) return ctx.json(shaped);
 });
 
+/**
+ * Somebody signed up with an address that already has an account. They are
+ * told to check their inbox, as for a new address, so the page gives nothing
+ * away. The inbox's owner is told the rest: a confirmed account gets the way
+ * to a new password, and one never confirmed gets its confirmation link
+ * again. It goes after the answer, so the answer takes no longer for it.
+ */
+function tellExistingAccount(account: { email: string; emailVerified: boolean }, request: Request | undefined): void {
+  const origin = siteUrl() ?? (request && new URL(request.url).origin);
+  if (!origin) {
+    console.error('A sign-up for an existing account had no address to build its email from. Nothing was sent.');
+    return;
+  }
+  const told = account.emailVerified
+    ? sendExistingAccountEmail(account.email, `${origin}/?account=forgot`)
+    : getAuth().then((auth) =>
+        auth.api.sendVerificationEmail({ body: { email: account.email, callbackURL: `${origin}/?account=verified` } }),
+      );
+  afterResponse(told, 'The email for a sign-up with an existing address');
+}
+
 async function build() {
   const secret = BETTER_AUTH_SECRET;
   if (!secret) {
@@ -64,6 +85,7 @@ async function build() {
       sendResetPassword: async ({ user, url }) => {
         await sendPasswordResetEmail(user.email, url);
       },
+      onExistingUserSignUp: async ({ user }, request) => tellExistingAccount(user, request),
     },
 
     emailVerification: {
