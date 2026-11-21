@@ -1,4 +1,4 @@
-import type { Address, ProjectBase } from '@boombapbot/contracts';
+import type { Address, AvatarType, ProjectBase } from '@boombapbot/contracts';
 import { sql } from 'drizzle-orm';
 import { bigint, boolean, check, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
@@ -174,6 +174,27 @@ export const beatCount = pgTable(
     count: integer('count').notNull(),
   },
   (table) => [check('beat_counts_count_not_negative', sql`${table.count} >= 0`)],
+);
+
+/**
+ * An account's picture: one small square, as the page sent it, in base64.
+ * A new picture takes a new uuid, so the address it is served at never
+ * changes what it shows and can be cached for good. The account's `image`
+ * names that address.
+ */
+export const avatar = pgTable(
+  'avatars',
+  {
+    id: rowId(),
+    uuid: publicId(),
+    userId: owner().unique(),
+    type: text('type').$type<AvatarType>().notNull(),
+    data: text('data').notNull(),
+    createdAt: moment('created_at').notNull().defaultNow(),
+  },
+  (table) => [
+    check('avatars_type_known', sql`${table.type} in ('image/webp', 'image/jpeg', 'image/png')`),
+  ],
 );
 
 /**

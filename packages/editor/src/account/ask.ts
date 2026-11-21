@@ -19,6 +19,9 @@ export interface Reader<Answer> {
 /** For an answer whose arrival is all that matters. */
 export const ANY_ANSWER: Reader<unknown> = { safeParse: (value) => ({ success: true, data: value }) };
 
+/** A file goes as it is, under its own type; anything else as JSON. */
+const typeOf = (body: unknown): string => (body instanceof Blob ? body.type : 'application/json');
+
 /**
  * Sends a request and reads what came back: the answer in the shape `reader`
  * knows, or why not. A refusal is read with `refusal`; no answer at all is
@@ -35,8 +38,8 @@ export async function ask<Answer, Said extends object>(
   try {
     response = await fetch(url, {
       method,
-      headers: { ...sessionHeaders(), ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { ...sessionHeaders(), ...(body === undefined ? {} : { 'content-type': typeOf(body) }) },
+      body: body === undefined || body instanceof Blob ? body : JSON.stringify(body),
     });
   } catch {
     return { ok: false, failure: UNREACHABLE };

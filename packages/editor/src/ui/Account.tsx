@@ -1,6 +1,6 @@
 import { FREE_BEAT_LIMIT } from '@boombapbot/contracts';
 import { CircleUserRound } from 'lucide-react';
-import { useEffect, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode, type RefObject } from 'react';
 import {
   EMAIL_ALREADY_VERIFIED,
   EMAIL_NOT_VERIFIED,
@@ -11,10 +11,12 @@ import {
   isLinked,
   type Failure,
 } from '../account/client';
+import { removeAvatar, uploadAvatar } from '../account/avatar';
 import { deviceBeatLinks } from '../account/beat-links';
-import { signedInAccount } from '../account/session';
+import { signedInAccount, type SignedInAccount } from '../account/session';
 import { takeParams } from './arrival';
 import { LinkButton, Problem as SharedProblem, useAttempt } from './attempt';
+import { Avatar } from './Avatar';
 import { TextField } from './fields';
 import { Modal } from './Modal';
 import { SavedBeats } from './SavedBeats';
@@ -344,26 +346,80 @@ function DeleteAccount({ account, cancel, deleted }: DeleteAccountProps) {
   );
 }
 
+interface ProfileProps {
+  account: SignedInAccount;
+  baseUrl: string;
+  /** Asks again who is logged in, so every picture of the account on the page follows. */
+  changed(): Promise<unknown>;
+}
+
+/** Who is logged in and their picture, with the buttons that change it. */
+function Profile({ account, baseUrl, changed }: ProfileProps) {
+  const { waiting, problem, run } = useAttempt();
+  const file = useRef<HTMLInputElement>(null);
+  const change = (work: () => Promise<Failure | null>) =>
+    run(async () => {
+      const failure = await work();
+      if (!failure) await changed();
+      return failure;
+    });
+  const onPick = (event: ChangeEvent<HTMLInputElement>) => {
+    const picked = event.currentTarget.files?.[0];
+    // Emptied, so picking the same file again is still a change.
+    event.currentTarget.value = '';
+    if (picked) void change(() => uploadAvatar(baseUrl, picked));
+  };
+  return (
+    <div className="sb-profile">
+      <Avatar account={account} baseUrl={baseUrl} size={64} />
+      <div className="sb-profile-who">
+        <p className="sb-profile-label">Logged in as</p>
+        <p className="sb-profile-address">
+          <strong data-testid="account-address">{account.email}</strong>
+        </p>
+        <div className="sb-profile-actions">
+          <input ref={file} type="file" accept="image/*" hidden data-testid="avatar-file" onChange={onPick} />
+          <button
+            className="sb-button"
+            type="button"
+            data-testid="avatar-upload"
+            disabled={waiting}
+            onClick={() => file.current?.click()}
+          >
+            {waiting ? 'Saving…' : account.image ? 'Change picture' : 'Upload a picture'}
+          </button>
+          {account.image && !waiting && (
+            <LinkButton testId="avatar-remove" onClick={() => void change(() => removeAvatar(baseUrl))}>
+              Remove picture
+            </LinkButton>
+          )}
+        </div>
+        <SharedProblem text={problem} testId="avatar-problem" />
+      </div>
+    </div>
+  );
+}
+
 interface SignedInProps {
-  email: string;
-  /** The account's public id. */
-  account: string;
+  account: SignedInAccount;
   baseUrl: string;
   close(): void;
   deleted(): void;
+  changed(): Promise<unknown>;
 }
 
-function SignedIn({ email, account, baseUrl, close, deleted }: SignedInProps) {
+function SignedIn({ account, baseUrl, close, deleted, changed }: SignedInProps) {
   const { waiting, problem, run } = useAttempt();
   const [deleting, setDeleting] = useState(false);
-  if (deleting) return <DeleteAccount account={account} cancel={() => setDeleting(false)} deleted={deleted} />;
+  if (deleting) return <DeleteAccount account={account.id} cancel={() => setDeleting(false)} deleted={deleted} />;
   return (
     <div data-testid="account-signed-in">
+      <Profile account={account} baseUrl={baseUrl} changed={changed} />
       <p className="sb-modal-text">
-        Logged in as <strong data-testid="account-address">{email}</strong>. Saving puts a copy of the beat on the
-        machine in your account, so you can pick it up on another device. Nothing goes there until you save.
+        Saving puts a copy of the beat on the machine in your account, so you can pick it up on another device.
+        Nothing goes there until you save.
       </p>
-      <SavedBeats baseUrl={baseUrl} account={account} close={close} />
+      <SavedBeats baseUrl={baseUrl} account={account.id} close={close} />
       <div className="sb-form sb-account-leave">
         <Problem text={problem} />
         <button
@@ -436,9 +492,9 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
     if (account) {
       return (
         <SignedIn
-          email={account.email}
-          account={account.id}
+          account={account}
           baseUrl={baseUrl}
+          changed={() => session.refetch()}
           close={() => setOpen(false)}
           deleted={() => go({ name: 'log-in' }, { kind: 'ok', text: 'Your account and its saved beats are deleted.' })}
         />
@@ -472,9 +528,9 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
       tip="Account"
       title="Your account"
       testId="account"
-      icon={<CircleUserRound />}
+      icon={account ? <Avatar account={account} baseUrl={baseUrl} size={26} /> : <CircleUserRound />}
       container={container}
-      className={account ? 'sb-ico-account sb-signed-in' : 'sb-ico-account'}
+      className={account ? 'sb-signed-in' : 'sb-ico-account'}
       open={open}
       onOpenChange={setOpen}
     >

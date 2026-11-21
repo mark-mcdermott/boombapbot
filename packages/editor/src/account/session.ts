@@ -1,8 +1,12 @@
+import { isAvatarPath } from '@boombapbot/contracts';
+
 /** Who is logged in, as far as the page needs to know. */
 export interface SignedInAccount {
   email: string;
   /** The account's public id. */
   id: string;
+  /** Where the site serves the picture the account uploaded, from the site's root, or null when it has none. */
+  image: string | null;
 }
 
 /**
@@ -16,5 +20,7 @@ export function signedInAccount(answer: unknown): SignedInAccount | null {
   const { user } = answer;
   if (typeof user !== 'object' || user === null || !('email' in user) || !('id' in user)) return null;
   const { email, id } = user;
-  return typeof email === 'string' && typeof id === 'string' ? { email, id } : null;
+  if (typeof email !== 'string' || typeof id !== 'string') return null;
+  const image = 'image' in user && isAvatarPath(user.image) ? user.image : null;
+  return { email, id, image };
 }

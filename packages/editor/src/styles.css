@@ -1242,21 +1242,80 @@
   }
 }
 
-/* Logged in: a small light on the account button. */
-.sb-footer-icon.sb-signed-in {
-  position: relative;
+/* An account's picture: the one it uploaded, or its robot. */
+.sb-avatar {
+  display: block;
+  flex: none;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--color-raised);
+  box-shadow: 0 0 0 1px var(--color-line);
 }
 
-.sb-footer-icon.sb-signed-in::after {
-  content: '';
-  position: absolute;
-  top: 9px;
-  right: 9px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-ok);
-  box-shadow: 0 0 0 2px var(--color-bg);
+.sb-avatar :is(img, svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Logged in: the account button is the account's picture. */
+.sb-footer-icon.sb-signed-in .sb-avatar {
+  transition: box-shadow 160ms, transform 260ms var(--ease-spring);
+}
+
+.sb-footer-icon.sb-signed-in:is(:hover, :focus-visible, [data-popup-open]) .sb-avatar {
+  box-shadow: 0 0 0 2px var(--color-text);
+  transform: scale(1.06);
+}
+
+.sb-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.sb-profile-who {
+  min-width: 0;
+  flex: 1;
+}
+
+.sb-profile-label {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: 13px;
+}
+
+.sb-profile-address {
+  margin: 1px 0 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.sb-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.sb-profile-actions .sb-button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.sb-profile .sb-form-problem {
+  margin-top: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-footer-icon.sb-signed-in .sb-avatar {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* ---- Shop ---------------------------------------------------------------- */
@@ -2178,11 +2237,24 @@ select.sb-input {
   }
 
   /* What rode on an icon's corner follows its name instead. */
-  .sb-footer-badge,
-  .sb-footer-icon.sb-signed-in::after {
+  .sb-footer-badge {
     position: static;
     margin-left: 4px;
     box-shadow: none;
+  }
+
+  /* The account's picture stays, before its name. */
+  .sb-footer-icon.sb-signed-in {
+    gap: 7px;
+  }
+
+  .sb-footer-icon.sb-signed-in .sb-avatar {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .sb-footer-icon .sb-avatar svg {
+    display: block;
   }
 
   .sb-footer-badge {
