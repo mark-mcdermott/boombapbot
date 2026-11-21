@@ -10,7 +10,7 @@ import {
 } from './e2e/accounts-server';
 
 const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
-const withServer = /(accounts|beats|shop|upgrade)\.spec\.ts/;
+const withServer = /(accounts|avatars|beats|shop|upgrade)\.spec\.ts/;
 // The phone app's page, in a phone's browser, reaching the same built server from outside it.
 const app = /\/app\.spec\.ts/;
 // РИТМ-12's tests of its own panel are in e2e/ritm12. The tests in the e2e

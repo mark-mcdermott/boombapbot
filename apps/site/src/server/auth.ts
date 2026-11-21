@@ -1,7 +1,7 @@
 import { BETTER_AUTH_SECRET } from 'astro:env/server';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { createAuthMiddleware, getIP } from 'better-auth/api';
+import { APIError, createAuthMiddleware, getIP } from 'better-auth/api';
 import { bearer } from 'better-auth/plugins';
 import { appOrigins } from './app-origins';
 import { getDb } from './db';
@@ -36,6 +36,17 @@ const hideRowIds = createAuthMiddleware(async (ctx) => {
   if (answer instanceof Response || answer instanceof Error) return;
   const shaped = withPublicIds(answer);
   if (shaped !== answer && (isRecord(shaped) || Array.isArray(shaped))) return ctx.json(shaped);
+});
+
+/**
+ * An account's picture is set only by the site's own upload, which checks
+ * the bytes and serves them itself. Better Auth would take any address for
+ * one, and the page would then fetch it.
+ */
+const keepPictureOurs = createAuthMiddleware(async (ctx) => {
+  if (ctx.path === '/update-user' && isRecord(ctx.body) && 'image' in ctx.body) {
+    throw new APIError('BAD_REQUEST', { message: 'Change your picture from the account window.' });
+  }
 });
 
 /**
@@ -120,7 +131,7 @@ async function build() {
     plugins: [bearer()],
 
     advanced: { database: { generateId: 'serial' } },
-    hooks: { after: hideRowIds },
+    hooks: { before: keepPictureOurs, after: hideRowIds },
   });
 }
 

@@ -211,6 +211,16 @@ reads from the real Neon database once it is migrated. On the live site, on
 2026-11-16, the owner signed up and later reset a password: both emails
 arrived through Resend and their links worked.
 
+An account's picture is a robot's face drawn from its id until somebody
+uploads one. The page cuts an upload to a 256 pixel square and sends only
+that (`packages/editor/src/account/avatar.ts`); the server reads its kind
+from its bytes, keeps it in the `avatars` table, and serves it at
+`/api/avatars/<uuid>`, which the account's `image` names. Better Auth's own
+`update-user` is refused an `image`, so nothing else can be set as one.
+**Its migration (`apps/site/drizzle/0006_avatars.sql`) has not been run on
+the real database.** Until it is, uploading a picture there fails and
+everything else works as before: run `pnpm db:migrate`.
+
 The rate limit's table (`apps/site/drizzle/0004_rate_limits.sql`) has been
 in the real database since 2026-11-18, when the migration was run there,
 before the code that uses it was deployed.
