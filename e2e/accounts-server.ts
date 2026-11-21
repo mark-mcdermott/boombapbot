@@ -57,3 +57,7 @@ export const BROKEN_MAIL_PORT = Number(process.env.BOOMBAPBOT_E2E_BROKEN_MAIL_PO
 /** The phone app's page, served to a browser and pointed at the accounts server, as the app is at the site. */
 export const APP_PORT = Number(process.env.BOOMBAPBOT_E2E_APP_PORT ?? 4179);
 export const APP_URL = `http://127.0.0.1:${APP_PORT}`;
+
+/** The desktop app's page, served to a browser the same way. */
+export const DESKTOP_APP_PORT = Number(process.env.BOOMBAPBOT_E2E_DESKTOP_APP_PORT ?? 4180);
+export const DESKTOP_APP_URL = `http://127.0.0.1:${DESKTOP_APP_PORT}`;

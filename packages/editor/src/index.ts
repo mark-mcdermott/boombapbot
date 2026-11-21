@@ -1,6 +1,7 @@
 export { BoombapbotEditor, type BoombapbotEditorProps } from './ui/Editor';
 export {
   ShellSiteFooter,
+  shellAccountFooter,
   shellFooter,
   shellSiteFooter,
   type BelowMachine,

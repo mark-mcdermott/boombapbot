@@ -127,7 +127,7 @@ async function build() {
       customRules: { '/get-session': false, ...SITE_RATE_RULES },
     },
 
-    // The phone apps cannot keep the site's cookie, so they carry the session as a token.
+    // The phone and desktop apps cannot keep the site's cookie, so they carry the session as a token.
     plugins: [bearer()],
 
     advanced: { database: { generateId: 'serial' } },

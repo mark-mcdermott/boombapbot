@@ -17,8 +17,10 @@ The page, in `src/`:
 - `main.tsx` mounts `BoombapbotEditor` with РИТМ-12, as the site and the
   phone app do, and hands it two things of its own: `audio`, a
   `NativeAudioController` over the bridge below, and `save`. Served to a
-  browser (`pnpm dev`) it hands in neither, and is the editor as the site
-  has it.
+  browser (`pnpm dev`) it hands in neither. Either way it links the site's
+  server (`linkServer`) and puts the account button beside the settings.
+- `session-token.ts` keeps the token that says who is logged in, in the web
+  view's `localStorage`. Its tests are `test/`.
 - `tauri-engine.ts` is the bridge the editor asks a native shell for
   (`NativeEngineBridge`): `open`, `send`, `listen` and `close`, as three
   Tauri commands and one event.
@@ -67,9 +69,25 @@ the new rate, and to play on if it was playing.
 The page still loads the WebAssembly engine, for exports: a WAV renders in
 a Worker on the page and a MIDI file is made there, as on the site.
 
-Accounts, saved beats, the shop and the upgrade are left out on purpose, as
-in the phone app, and so are the footer's pages. Nothing in the app talks to
-a server.
+The account button beside the settings is the site's: log in, sign up,
+saved beats, log out, delete the account. The window's page is not served
+from the site, so the site's cookie cannot follow it. The server
+(`apps/site/src/middleware.ts`, `src/server/app-origins.ts`) lets the app's
+origins (`tauri://localhost` on macOS, `http://tauri.localhost` on Windows)
+call its API, and Better Auth's bearer plug-in answers a log-in with a
+token, which `linkServer` sends with every call. A sign-up's link is opened
+in the person's browser, on the site; the person then comes back and logs
+in. The site the app reaches is `VITE_SITE_URL` at build time, boombapbot.com
+when unset; the window's content security policy
+(`src-tauri/tauri.conf.json`) lets the page reach boombapbot.com and nothing
+else, so a build that names another site has to name it there too.
+
+A link that leads out of the window, such as the policies page in the
+account's words, opens in the person's own browser (`src-tauri/src/outside.rs`,
+with `tauri-plugin-opener`); the window stays on the machine. Only http and
+https addresses are handed on.
+
+The shop, the upgrade and the footer's pages are left out on purpose.
 
 ## Running it
 
@@ -128,7 +146,9 @@ pnpm --filter @boombapbot/desktop check:run
   engine again halfway, as a change of device does, and listens for three
   seconds more.
 - `pnpm typecheck` and `pnpm test:unit` at the root cover the page with the
-  rest, and so does CI. `.github/workflows/native.yml` bundles the app on
+  rest, and so does CI. `e2e/desktop-app.spec.ts` drives the page in a
+  browser against the built server, from another origin as the app is: the
+  footer, and an account from sign-up to deletion. `.github/workflows/native.yml` bundles the app on
   macOS and Windows and runs `test:engine` on both, and keeps the disk image
   and the installer for seven days as the run's artifacts
   (`boombapbot-desktop-macOS`, `boombapbot-desktop-Windows`); it does not run

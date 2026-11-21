@@ -3,7 +3,7 @@ import { appOrigins } from './server/app-origins';
 
 const API = '/api/';
 
-/** What a phone app's page is told it may send and read. No cookie crosses: its session is a token in a header. */
+/** What an app's page is told it may send and read. No cookie crosses: its session is a token in a header. */
 function allowed(origin: string): Record<string, string> {
   return {
     'access-control-allow-origin': origin,
@@ -16,7 +16,7 @@ function allowed(origin: string): Record<string, string> {
 }
 
 /**
- * Lets the phone apps, whose pages are not served from this site, call its
+ * Lets the phone and desktop apps, whose pages are not served from this site, call its
  * API. Who is asking is still each handler's own question. A request from
  * the site itself, or from anywhere else, passes through untouched.
  */
