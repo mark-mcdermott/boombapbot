@@ -117,12 +117,15 @@ test('the readout under the screen says in English what a control is or did', as
   const readout = page.getByTestId('readout');
   const screen = (await page.getByTestId('screen').boundingBox())!;
   const strip = (await readout.boundingBox())!;
-  // As wide as the screen, one line tall, just under it.
-  expect(Math.abs(strip.x - screen.x)).toBeLessThanOrEqual(2);
-  expect(Math.abs(strip.width - screen.width)).toBeLessThanOrEqual(2);
+  // A module of its own on the frame's lower lip: centred under the screen, wider than the glass, one line tall.
+  expect(Math.abs(strip.x + strip.width / 2 - (screen.x + screen.width / 2))).toBeLessThanOrEqual(3);
+  expect(strip.width).toBeGreaterThan(screen.width);
   expect(strip.y).toBeGreaterThanOrEqual(screen.y + screen.height);
   expect(strip.y - (screen.y + screen.height)).toBeLessThan(screen.height / 4);
-  expect(strip.height).toBeLessThan(screen.height / 6);
+  expect(strip.height).toBeLessThan(screen.height / 4);
+
+  // Left alone, it says where the machine stands rather than going blank.
+  await expect(readout).toHaveAttribute('data-shown', /^PATTERN A {2}KICK {2}\d+ BPM$/);
 
   await page.getByTestId('voice-clap').click();
   await expect(readout).toHaveAttribute('data-text', 'Clap selected');

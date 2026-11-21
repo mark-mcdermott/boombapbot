@@ -2192,8 +2192,8 @@ select.sb-input {
     flex-direction: column;
   }
 
-  /* The brand on a phone: the mascot a quarter larger and the wordmark a
-     tenth smaller than the lockup makes them, with no tagline, the mascot on
+  /* The brand on a phone: the mascot a touch larger and the wordmark a
+     third smaller than the lockup makes them, with no tagline, the mascot on
      the left and the wordmark against the right edge. The compact masthead
      of a page of words is its own arrangement and is left as it is. */
   .sb-header:not(.sb-masthead) .sb-brand-link {

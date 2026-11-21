@@ -120,7 +120,7 @@ export function Readout({ spoken, said, scope, idle, power, cells: count, classN
   const width = count * CELL.width;
 
   return (
-    <div className={`rt-readout ${className}`} data-testid="readout" data-power={power ? 'on' : 'off'} data-text={message?.text ?? ''}>
+    <div className={`rt-readout ${className}`} data-testid="readout" data-power={power ? 'on' : 'off'} data-text={message?.text ?? ''} data-shown={text}>
       <i className="rt-readout-screw" />
       <div className="rt-readout-glass">
         <svg viewBox={`-6 -5 ${width + 12} ${CELL.height + 10}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">

@@ -205,15 +205,14 @@ test('a control touched on the phone’s panel says in English what it is on the
   await expect(readout).toHaveAttribute('data-text', `Tempo: ${before} beats a minute`);
   expect((await beat(page)).tempo).toBe(before);
 
-  // It sits on the screen's frame, as wide as the glass, one line tall, and goes quiet again.
+  // It is a row of its own under the screen's frame, as wide as the frame, one line tall, and goes quiet again.
   const frame = (await page.locator('.rt-ph-crt').boundingBox())!;
-  const glass = (await page.locator('.rt-ph-glass').boundingBox())!;
   const strip = (await readout.boundingBox())!;
-  expect(strip.y).toBeGreaterThanOrEqual(glass.y + glass.height);
-  expect(strip.y + strip.height).toBeLessThanOrEqual(frame.y + frame.height);
-  expect(Math.abs(strip.x - glass.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(strip.width - glass.width)).toBeLessThanOrEqual(1);
-  expect(strip.height).toBeLessThan(30);
+  expect(strip.y).toBeGreaterThanOrEqual(frame.y + frame.height);
+  expect(strip.y - (frame.y + frame.height)).toBeLessThan(12);
+  expect(Math.abs(strip.x - frame.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(strip.width - frame.width)).toBeLessThanOrEqual(4);
+  expect(strip.height).toBeLessThan(44);
   await expect(readout).toHaveAttribute('data-text', '', { timeout: 6000 });
   // The same words reach a screen reader from the readout's live line.
   await expect(page.getByTestId('spoken')).toHaveText(`Tempo: ${before} beats a minute`);
