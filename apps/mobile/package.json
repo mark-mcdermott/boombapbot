@@ -5,7 +5,7 @@
   "type": "module",
   "description": "The phone apps: the shared editor with РИТМ-12 in a Capacitor shell for iOS and Android.",
   "scripts": {
-    "assets": "node ../../scripts/copy-app-assets.mjs .",
+    "assets": "node ../../scripts/copy-app-assets.mjs . && node ../../scripts/copy-app-pages.mjs .",
     "engine:ios": "../../scripts/build-engine-ios.sh ritm12 native-engine/ios/BoombapbotEngine.xcframework",
     "dev": "pnpm assets && vite",
     "build": "pnpm assets && vite build",
@@ -19,12 +19,14 @@
     "@boombapbot/machine-ritm12": "workspace:*",
     "@boombapbot/native-engine": "link:./native-engine",
     "@capacitor/android": "8.6.2",
+    "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.6.2",
     "@capacitor/filesystem": "8.1.5",
     "@capacitor/ios": "8.6.2",
     "@capacitor/preferences": "8.0.1",
     "@capacitor/share": "8.0.3",
     "@fontsource-variable/sofia-sans-condensed": "5.3.0",
+    "@fontsource/pt-serif": "5.3.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

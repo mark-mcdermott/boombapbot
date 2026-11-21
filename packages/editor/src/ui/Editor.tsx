@@ -13,6 +13,7 @@ import { Header } from './Header';
 import { NoticeBanner } from './StatusBar';
 import { PlayButton } from './PlayButton';
 import { Settings } from './Settings';
+import type { BelowMachine } from './ShellFooter';
 
 export interface BoombapbotEditorProps<
   Document extends ProjectBase,
@@ -33,11 +34,11 @@ export interface BoombapbotEditorProps<
    */
   audio?: AudioFactory;
   /**
-   * What sits under the machine in place of the site's notice and footer,
-   * handed the settings button. For a shell with no site behind it, which
-   * has no pages, shop or account to offer.
+   * What sits under the machine in place of the site's notice and footer.
+   * For a shell with no site behind it, which has no shop or account to
+   * offer.
    */
-  below?: (settings: ReactNode) => ReactNode;
+  below?: BelowMachine;
 }
 
 declare global {
@@ -90,7 +91,7 @@ function Dock() {
 interface EditorBodyProps {
   runtime: EditorRuntime;
   baseUrl: string;
-  below?: (settings: ReactNode) => ReactNode;
+  below?: BelowMachine;
 }
 
 function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
@@ -135,7 +136,7 @@ function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
       <runtime.machine.Panel />
       <div className="sb-below-machine">
         {below ? (
-          below(settings)
+          below(settings, modals)
         ) : (
           <>
             <CookieNotice baseUrl={baseUrl} />
@@ -183,7 +184,7 @@ interface OpenEditorProps<
 > {
   runtime: EditorRuntime<Document, Transient, Session>;
   baseUrl: string;
-  below?: (settings: ReactNode) => ReactNode;
+  below?: BelowMachine;
 }
 
 function OpenEditor<

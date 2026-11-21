@@ -150,15 +150,25 @@ for that, and its web view may be asleep:
   leaves makes the engine again, as in front, and the beat plays on only
   if the page is awake to tell it.
 
-Accounts, saved beats, the shop and the upgrade are left out on purpose, and
-so are the footer's pages. Nothing in the app talks to a server.
+Accounts, saved beats, the cart and the upgrade are left out on purpose.
+Nothing in the app talks to a server.
+
+Under the machine are the site's pages of words (about, docs, manifesto,
+policies), a link to the shop, and the settings. The pages are in the app:
+`scripts/copy-app-pages.mjs` lifts their words and pictures out of the built
+site into `public/`, so the site's `.astro` pages stay their one source, and
+`src/PageScreen.tsx` shows the one the address names (`#/docs`) in place of
+the machine, which stays as it is behind it. They read as the site's pages
+do, browser and all. "Merch" opens the shop on boombapbot.com in the phone's
+browser. Android's back button leaves a page for the machine, and from the
+machine puts the app away (`@capacitor/app`).
 
 ## Running it
 
 At the repository root, once the engine is built (`pnpm build:wasm`):
 
 ```bash
-pnpm prepare:assets
+pnpm build                                   # the site, whose pages of words the app carries
 pnpm --filter @boombapbot/mobile engine:ios  # the engine for iOS, once and after it changes; needs Xcode
 pnpm --filter @boombapbot/mobile sync        # web build, then copy into ios/ and android/
 pnpm --filter @boombapbot/mobile ios         # builds the engine for iOS again, syncs, asks which simulator

@@ -13,6 +13,37 @@ const PAGE_ICONS: Record<SitePageId, ReactNode> = {
   policies: <Scale />,
 };
 
+interface FooterPagesProps {
+  /** What a page's address starts with, ending in a slash. */
+  baseUrl: string;
+  /** Where the tips mount, so they inherit the page's theme. */
+  container: RefObject<HTMLElement | null>;
+  /** The page these links are on, if it is one of them. */
+  current?: SitePageId;
+}
+
+/** The links to the pages of words, each an icon with its name in a tip, or on a phone its name. */
+export function FooterPages({ baseUrl, container, current }: FooterPagesProps) {
+  return (
+    <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
+      {SITE_PAGES.map(({ id, label }) => (
+        <Tip key={id} label={label} container={container}>
+          <a
+            className={`sb-footer-icon sb-ico-${id}`}
+            href={`${baseUrl}${id}`}
+            data-testid={`nav-${id}`}
+            aria-label={label}
+            aria-current={current === id ? 'page' : undefined}
+          >
+            {PAGE_ICONS[id]}
+            <span className="sb-footer-word">{label}</span>
+          </a>
+        </Tip>
+      ))}
+    </nav>
+  );
+}
+
 interface FooterProps {
   /** Base URL the site is served from, ending in a slash. */
   baseUrl: string;
@@ -46,22 +77,7 @@ export function Footer({ baseUrl, container, current, settings }: FooterProps) {
       </p>
       <TipGroup>
         <div className="sb-footer-links">
-          <nav className="sb-footer-icons sb-footer-pages" aria-label="Site">
-            {SITE_PAGES.map(({ id, label }) => (
-              <Tip key={id} label={label} container={container}>
-                <a
-                  className={`sb-footer-icon sb-ico-${id}`}
-                  href={`${baseUrl}${id}`}
-                  data-testid={`nav-${id}`}
-                  aria-label={label}
-                  aria-current={current === id ? 'page' : undefined}
-                >
-                  {PAGE_ICONS[id]}
-                  <span className="sb-footer-word">{label}</span>
-                </a>
-              </Tip>
-            ))}
-          </nav>
+          <FooterPages baseUrl={baseUrl} container={container} current={current} />
           <div className="sb-footer-icons sb-footer-tools">
             <Upgrade baseUrl={baseUrl} container={container} logIn={() => setAccountOpen(true)} />
             <Shop baseUrl={baseUrl} container={container} />
