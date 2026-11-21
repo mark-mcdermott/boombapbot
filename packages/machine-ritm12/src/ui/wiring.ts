@@ -45,6 +45,8 @@ export interface Wiring {
   spoken: string;
   /** How many lines have been said. It moves on even when the same line is said again. */
   said: number;
+  /** What the readout shows while no control has anything to say: where the machine stands, in English. */
+  idle: string;
   power: boolean;
   powerLamp: LampWiring;
   /** Where each stepped control stands. */
@@ -284,6 +286,7 @@ export function useWiring(): Wiring {
     line,
     spoken: said.text,
     said: said.count,
+    idle: `PATTERN ${LETTERING.english.patterns[panel.pattern]}  ${LETTERING.english.voices[panel.selected].key}  ${project.tempo} BPM`,
     power,
     powerLamp: { glow: power ? 0.9 : 0, testId: 'lamp-power' },
     write: panel.write,

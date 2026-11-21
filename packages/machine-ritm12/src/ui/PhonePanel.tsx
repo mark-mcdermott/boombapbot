@@ -195,8 +195,9 @@ export function PhonePanel() {
             <div className="rt-ph-glass" aria-hidden="true">
               <PhoneScreen line={wiring.line} />
             </div>
-            <Readout className="rt-readout-phone" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} power={power} cells={28} />
           </div>
+
+          <Readout className="rt-readout-phone" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={26} />
 
           {/* Everything but the power switch: dark and out of reach while the machine is off. */}
           <div className="rt-ph-controls" inert={!power}>
@@ -207,14 +208,10 @@ export function PhonePanel() {
                   <div key={instrument.voice} className="rt-ph-pad">
                     <PhoneLamp {...voice.lamp} />
                     <Key className="rt-ph-key rt-ph-cap" {...voice.key}>
-                      {english ? (
-                        <span className="rt-ph-ink-en">
-                          <Part file={`ink-${instrument.voice}.png`} />
-                          <Lettered text={words.voices[instrument.voice].key} />
-                        </span>
-                      ) : (
+                      <span className="rt-ph-ink">
                         <Part file={`ink-${instrument.voice}.png`} />
-                      )}
+                        <Lettered text={words.voices[instrument.voice].key} />
+                      </span>
                     </Key>
                   </div>
                 );
@@ -233,7 +230,7 @@ export function PhonePanel() {
               <div className="rt-ph-steps">
                 {wiring.steps.map((step, index) => (
                   <Key key={index} className="rt-ph-key rt-ph-cap rt-ph-step" {...step}>
-                    {index + 1}
+                    <b>{index + 1}</b>
                   </Key>
                 ))}
               </div>
@@ -241,11 +238,10 @@ export function PhonePanel() {
 
             <div className="rt-ph-row">
               {wiring.patterns.map((pattern, index) => (
-                <Key key={index} className={`rt-ph-key rt-ph-pattern ${english ? 'rt-ph-cap' : 'rt-ph-art'}`} {...pattern}>
-                  {english ? <Lettered text={`${words.patterns[index]}.`} /> : <Part file={`pattern-${index + 1}.webp`} />}
+                <Key key={index} className="rt-ph-key rt-ph-cap rt-ph-pattern" {...pattern}>
+                  <Lettered text={`${words.patterns[index]}.`} />
                 </Key>
               ))}
-              <span className="rt-ph-rule" />
               <Key className="rt-ph-key rt-ph-art rt-ph-square" {...keys.dice}>
                 <Part file="dice.webp" />
               </Key>
@@ -255,16 +251,11 @@ export function PhonePanel() {
             </div>
 
             <div className="rt-ph-row">
-              <Key className="rt-ph-key rt-ph-art rt-ph-wide" {...keys.play}>
-                <Part file="play.webp" />
-              </Key>
-              <Key className="rt-ph-key rt-ph-art rt-ph-wide" {...keys.stop}>
-                <Part file="stop.webp" />
-              </Key>
-              <Key className="rt-ph-key rt-ph-art rt-ph-wide" {...keys.record}>
-                <Part file="record.webp" />
-              </Key>
-              <span className="rt-ph-rule" />
+              {(['play', 'stop', 'record'] as const).map((name) => (
+                <Key key={name} className="rt-ph-key rt-ph-cap rt-ph-wide" {...keys[name]}>
+                  <i className="rt-ph-glyph" data-glyph={name} />
+                </Key>
+              ))}
               <Key className="rt-ph-key rt-ph-cap rt-ph-mute" {...keys.mute}>
                 <Lettered text={words.mute} icon="mute" />
               </Key>

@@ -146,7 +146,7 @@ export const KNOB_SWEEP = 270;
 export const SCREEN = { rect: [931, 263, 1398, 536] as Rect, width: 467, height: 273 } as const;
 
 /** The readout let into the screen frame's lower lip, between its screws: as wide as the screen. */
-export const READOUT: Rect = [931, 567, 1398, 594];
+export const READOUT: Rect = [886, 545, 1438, 598];
 
 export const METER = {
   rect: [566, 384, 810, 510] as Rect,

@@ -113,7 +113,7 @@ function PicturePanel() {
 
               <ScreenAndMeter line={wiring.line} />
               <div className="rt-readout-slot" style={boxOf(READOUT)}>
-                <Readout className="rt-readout-plate" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} power={power} cells={36} />
+                <Readout className="rt-readout-plate" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
               </div>
 
               <Key rect={BUTTONS.power} {...keys.power} />
