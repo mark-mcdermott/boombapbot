@@ -226,7 +226,7 @@ export function PhonePanel() {
                 <Lettered text={words.sequencer} icon="sequencer" />
                 <Key className="rt-ph-key rt-ph-switch" {...keys.write}>
                   <Lettered text={words.hits} icon="hits" dim={wiring.write !== 'hits'} />
-                  <Part file={`write-${wiring.write}.png`} />
+                  <Part file="write-hits.png" className="rt-ph-turn" />
                   <Lettered text={words.accents} icon="accents" dim={wiring.write !== 'accents'} />
                 </Key>
               </div>
