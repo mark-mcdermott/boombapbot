@@ -4,6 +4,8 @@ import {
   ACCOUNTS_URL,
   APP_PORT,
   APP_URL,
+  DESKTOP_APP_PORT,
+  DESKTOP_APP_URL,
   FAKE_SERVICES_PORT,
   FAKE_SERVICES_URL,
   serverEnv,
@@ -13,6 +15,8 @@ const port = Number(process.env.BOOMBAPBOT_E2E_PORT ?? 4173);
 const withServer = /(accounts|beats|shop|upgrade)\.spec\.ts/;
 // The phone app's page, in a phone's browser, reaching the same built server from outside it.
 const app = /\/app\.spec\.ts/;
+// And the desktop app's page, the same way.
+const desktopApp = /\/desktop-app\.spec\.ts/;
 // РИТМ-12's tests of its own panel are in e2e/ritm12. The tests in the e2e
 // folder itself are the site's, and drive the same machine.
 const panel = /\/ritm12\/.*\.spec\.ts/;
@@ -33,9 +37,10 @@ const desktop = { ...browser.desktop };
 const projects = [
   { name: 'ritm12', use: desktop, testMatch: panel, testIgnore: panelPhone },
   { name: 'ritm12-phone', use: { ...browser.phone }, testMatch: panelPhone },
-  { name: 'site', use: desktop, testIgnore: [withServer, panel, app] },
+  { name: 'site', use: desktop, testIgnore: [withServer, panel, app, desktopApp] },
   { name: 'server', use: { ...desktop, baseURL: ACCOUNTS_URL }, testMatch: withServer },
   { name: 'app', use: { ...browser.phone, baseURL: APP_URL }, testMatch: app },
+  { name: 'desktop-app', use: { ...desktop, baseURL: DESKTOP_APP_URL }, testMatch: desktopApp },
 ];
 
 // The tests run against the production build. Run `pnpm build` first.
@@ -75,7 +80,7 @@ export default defineConfig({
         // Every test signs up from one address, faster than the limiter allows.
         AUTH_RATE_LIMIT: 'off',
         UPGRADE_OPEN: 'on',
-        APP_ORIGINS: APP_URL,
+        APP_ORIGINS: `${APP_URL},${DESKTOP_APP_URL}`,
       },
       // Never reused: its database and its secret belong to one run.
       reuseExistingServer: false,
@@ -84,6 +89,13 @@ export default defineConfig({
     {
       command: `pnpm --filter @boombapbot/mobile assets && pnpm --filter @boombapbot/mobile exec vite --host 127.0.0.1 --port ${APP_PORT} --strictPort`,
       url: `${APP_URL}/boombapbot-pages.json`,
+      env: { VITE_SITE_URL: `${ACCOUNTS_URL}/` },
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      command: `pnpm --filter @boombapbot/desktop assets && pnpm --filter @boombapbot/desktop exec vite --host 127.0.0.1 --port ${DESKTOP_APP_PORT} --strictPort`,
+      url: DESKTOP_APP_URL,
       env: { VITE_SITE_URL: `${ACCOUNTS_URL}/` },
       reuseExistingServer: false,
       timeout: 30_000,

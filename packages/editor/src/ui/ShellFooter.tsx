@@ -20,6 +20,36 @@ export function shellFooter(settings: ReactNode): ReactNode {
   );
 }
 
+interface ShellAccountFooterProps {
+  /** The site's address, ending in a slash (see `linkServer`). */
+  serverUrl: string;
+  container: RefObject<HTMLElement | null>;
+  settings: ReactNode;
+}
+
+function ShellAccountFooter({ serverUrl, container, settings }: ShellAccountFooterProps) {
+  const [accountOpen, setAccountOpen] = useState(false);
+  return (
+    <footer className="sb-footer">
+      <TipGroup>
+        <div className="sb-footer-icons sb-footer-tools">
+          {settings}
+          <Account baseUrl={serverUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />
+        </div>
+      </TipGroup>
+    </footer>
+  );
+}
+
+/**
+ * What sits under the machine in a shell that reaches the site's server and
+ * carries none of its pages: the settings, and beside them the account. Hand
+ * its result to `BoombapbotEditor` as `below`.
+ */
+export function shellAccountFooter(serverUrl: string): BelowMachine {
+  return (settings, container) => <ShellAccountFooter serverUrl={serverUrl} container={container} settings={settings} />;
+}
+
 /** What a shell that carries the pages of words leads to. */
 export interface ShellSite {
   /** What a page's address starts with inside the shell, ending in a slash. */

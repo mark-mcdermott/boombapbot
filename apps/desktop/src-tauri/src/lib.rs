@@ -7,6 +7,7 @@ pub mod engine;
 mod ffi;
 pub mod messages;
 mod output;
+mod outside;
 mod save;
 pub mod watch;
 
@@ -45,6 +46,7 @@ fn engine_close(bridge: State<'_, Bridge>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(outside::links())
         .manage(save::ExportPlace::default())
         .setup(|app| {
             let page = app.handle().clone();
