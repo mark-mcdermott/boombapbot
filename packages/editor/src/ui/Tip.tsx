@@ -34,7 +34,7 @@ export function Tip({ label, container, children }: TipProps) {
         <Tooltip.Positioner className="sb-tip-positioner" side="top" sideOffset={6} collisionPadding={8}>
           <Tooltip.Popup className="sb-tip" data-testid="tip" aria-hidden="true">
             <Tooltip.Arrow className="sb-tip-arrow" />
-            {label}
+            <span className="sb-tip-text">{label}</span>
           </Tooltip.Popup>
         </Tooltip.Positioner>
       </Tooltip.Portal>

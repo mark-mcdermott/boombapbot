@@ -934,6 +934,13 @@
   transition: none;
 }
 
+.sb-tip-text {
+  display: block;
+  max-width: min(320px, calc(100vw - 34px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sb-tip-arrow {
   width: 8px;
   height: 8px;

@@ -37,6 +37,9 @@ test('signing up needs the address confirmed, and the emailed link logs you in',
   // Still logged in after a reload, and logged out when asked.
   await page.reload();
   await expect(page.getByTestId('account')).toHaveAccessibleName('Account, logged in');
+  // Pointing at the picture says whose account it is.
+  await page.getByTestId('account').hover();
+  await expect(page.getByTestId('tip')).toHaveText(address);
   await page.getByTestId('account').click();
   await expect(page.getByTestId('account-address')).toHaveText(address);
   await logOut(page);

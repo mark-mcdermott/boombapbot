@@ -538,7 +538,7 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
   return (
     <Modal
       label={account ? 'Account, logged in' : 'Account'}
-      tip="Account"
+      tip={account?.email ?? 'Account'}
       title="Your account"
       testId="account"
       icon={account ? <Avatar account={account} baseUrl={baseUrl} size={26} /> : <CircleUserRound />}
