@@ -1,5 +1,12 @@
 export { BoombapbotEditor, type BoombapbotEditorProps } from './ui/Editor';
-export { shellFooter } from './ui/ShellFooter';
+export {
+  ShellSiteFooter,
+  shellFooter,
+  shellSiteFooter,
+  type BelowMachine,
+  type ShellSite,
+} from './ui/ShellFooter';
+export { SITE_PAGES, type SitePageId } from './ui/pages';
 export { SitePage, type SitePageLayout, type SitePageProps } from './ui/SitePage';
 export { RuntimeContext, useAssetManifest, useEditorState, useRuntime } from './ui/context';
 export { useKnob, type KnobOptions } from './ui/knob';

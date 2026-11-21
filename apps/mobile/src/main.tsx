@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { App } from '@capacitor/app';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
@@ -8,11 +9,15 @@ import {
   BoombapbotEditor,
   NativeAudioController,
   shellFooter,
+  shellSiteFooter,
   type AudioFactory,
   type KeyValueStorage,
+  type ShellSite,
 } from '@boombapbot/editor';
 import { machine } from '@boombapbot/machine-ritm12';
 import { openDeviceStorage } from './device-storage';
+import { PageScreen } from './PageScreen';
+import { PAGES_FILE, PAGES_URL, readPages, type CarriedPages } from './pages';
 import { ENGINE_PLUGIN, checkIfAsked, pluginEngine, type EnginePlugin } from './native-engine';
 import { shareThrough, type DeviceFiles } from './share-file';
 import './styles.css';
@@ -71,11 +76,28 @@ const audio: AudioFactory | undefined = enginePlugin
   ? (events) => new NativeAudioController(pluginEngine(enginePlugin), events)
   : undefined;
 
+/** The pages are in the app; the shop is on the site, and opens in the phone's browser. */
+const site: ShellSite = { pagesUrl: PAGES_URL, shopUrl: 'https://boombapbot.com/?cart=open' };
+
+/** The pages of words the app carries. Without them the machine is all there is, as it was. */
+async function carriedPages(): Promise<CarriedPages | null> {
+  try {
+    const answer = await fetch(`${import.meta.env.BASE_URL}${PAGES_FILE}`);
+    if (!answer.ok) throw new Error(`the pages file answered ${answer.status}`);
+    return readPages(await answer.json());
+  } catch (error) {
+    console.error('The pages of words could not be read, so the app goes without them.', error);
+    return null;
+  }
+}
+
 const root = document.getElementById('machine');
-if (!root) throw new Error('the page has no place for the machine');
+const machineScreen = document.getElementById('machine-screen');
+const pagesRoot = document.getElementById('pages');
+if (!root || !machineScreen || !pagesRoot) throw new Error('the page has no place for the machine');
 
 askToBeHeard();
-const storage = await draftStorage();
+const [storage, pages] = await Promise.all([draftStorage(), carriedPages()]);
 
 createRoot(root).render(
   <StrictMode>
@@ -85,9 +107,25 @@ createRoot(root).render(
       storage={storage}
       save={save}
       audio={audio}
-      below={shellFooter}
+      below={pages ? shellSiteFooter(site) : shellFooter}
     />
   </StrictMode>,
 );
+
+/** Android's back button leaves a page for where it was opened from, and from the machine puts the app away. */
+if (Capacitor.getPlatform() === 'android') {
+  void App.addListener('backButton', ({ canGoBack }) => {
+    if (canGoBack) window.history.back();
+    else void App.minimizeApp();
+  });
+}
+
+if (pages) {
+  createRoot(pagesRoot).render(
+    <StrictMode>
+      <PageScreen pages={pages} site={site} machineScreen={machineScreen} />
+    </StrictMode>,
+  );
+}
 
 if (enginePlugin) void checkIfAsked(enginePlugin).catch((error: unknown) => console.error('The check could not start.', error));

@@ -755,6 +755,15 @@
   transform: translateX(2px) rotate(-14deg);
 }
 
+/* Merch: the bag is picked up. */
+.sb-ico-merch svg {
+  transition-timing-function: var(--ease-spring);
+}
+
+.sb-ico-merch:is(:hover, :focus-visible) svg {
+  transform: translateY(-2px) rotate(-6deg);
+}
+
 /* About: the dot of the i hops. */
 .sb-ico-about:is(:hover, :focus-visible) svg :nth-child(3) {
   animation: sb-ico-hop 520ms ease-out;

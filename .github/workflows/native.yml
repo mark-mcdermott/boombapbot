@@ -189,10 +189,11 @@ jobs:
           name: wasm-engine
           path: build/wasm
 
-      # Capacitor writes the plug-in projects Gradle includes only beside a built page.
+      # Capacitor writes the plug-in projects Gradle includes only beside a built page,
+      # and the app's page carries the site's pages of words, lifted from the built site.
       - name: Build the page and sync it into the Android project
         run: |
-          pnpm prepare:assets
+          pnpm build
           pnpm --filter @boombapbot/mobile build
           pnpm --filter @boombapbot/mobile exec cap sync android
 
