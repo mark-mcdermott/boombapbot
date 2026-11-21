@@ -708,9 +708,21 @@
   padding: 0 4px;
 }
 
+/* One picture of the knob, whose line is painted 65 degrees round from
+   straight up. Here it lies flat: turned the rest of the way to point right,
+   at the accents, and mirrored to point left, at the hits. Mirrored, not
+   turned half round, so the light stays on its upper edge. */
 .rt-ph-switch img {
   width: 26px;
   height: 26px;
+}
+
+.rt-ph-switch .rt-ph-turn {
+  transform: scaleX(-1) rotate(25deg);
+}
+
+.rt-ph-switch[data-position='accents'] .rt-ph-turn {
+  transform: rotate(25deg);
 }
 
 .rt-ph-switch .rt-ph-let {

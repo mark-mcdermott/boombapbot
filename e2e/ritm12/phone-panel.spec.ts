@@ -85,7 +85,23 @@ test('on the phone’s panel a voice is chosen, its steps and accents are writte
   await expect(step(page, 13)).toHaveAccessibleName('Snare, step 13, on');
   expect(stepsOn((await beat(page)).patterns[2]!.steps.snare)).toEqual([5, 13]);
 
+  // The knob lies flat: left, at the hits, and once pressed right, at the accents.
+  // Its line is painted 65 degrees round from straight up; where that ends up is where it points.
+  const knob = page.getByTestId('write').locator('.rt-ph-turn');
+  const pointing = () =>
+    knob.evaluate((node) => {
+      const painted = (65 * Math.PI) / 180;
+      const { x, y } = new DOMMatrix(getComputedStyle(node).transform).transformPoint({ x: Math.sin(painted), y: -Math.cos(painted) });
+      return { x, y };
+    });
+  const left = await pointing();
+  expect(left.x).toBeCloseTo(-1, 2);
+  expect(left.y).toBeCloseTo(0, 2);
+
   await page.getByTestId('write').click();
+  const right = await pointing();
+  expect(right.x).toBeCloseTo(1, 2);
+  expect(right.y).toBeCloseTo(0, 2);
   await step(page, 1).click();
   const written = await beat(page);
   expect(written.panel.write).toBe('accents');

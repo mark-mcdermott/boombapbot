@@ -28,7 +28,6 @@ plate = Image.open(here / 'plate.webp').convert('RGB')
 # Where each patch is laid over the plate (PATCHES in layout.ts).
 PATCHES = {
     'power-on': (178, 1070),
-    'write-accents': (574, 656),
     'size-16': (674, 804),
     'effect-delay': (1415, 696),
     'effect-reverb': (1415, 696),
@@ -172,7 +171,6 @@ for name, (x, y, radius) in KNOBS.items():
 
 # The stepped controls, once for each position (SWITCHES in layout.ts).
 disc('write-hits', 604, 693, 42)
-disc('write-accents', 604, 693, 42, wearing('write-accents'))
 disc('size-12', 697, 827, 26)
 disc('size-16', 697, 827, 26, wearing('size-16'))
 disc('effect-chorus', 1470, 756, 54)
