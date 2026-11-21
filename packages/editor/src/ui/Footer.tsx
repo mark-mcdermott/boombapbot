@@ -1,4 +1,4 @@
-import { BookOpen, Heart, Info, Scale, ScrollText } from 'lucide-react';
+import { Heart, Info, Scale, ScrollText, createLucideIcon } from 'lucide-react';
 import { useState, type ReactNode, type RefObject } from 'react';
 import { Account } from './Account';
 import { SITE_PAGES, type SitePageId } from './pages';
@@ -6,9 +6,22 @@ import { Shop } from './Shop';
 import { Tip, TipGroup } from './Tip';
 import { Upgrade } from './Upgrade';
 
+/** Lucide's open book, with its right-hand page drawn again as a leaf that can turn. */
+const Book = createLucideIcon('book', [
+  [
+    'path',
+    {
+      d: 'M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z',
+      key: 'covers',
+    },
+  ],
+  ['path', { d: 'M12 5v16', key: 'spine' }],
+  ['path', { d: 'M12 5a5 5 0 0 1 4-1.998L20.001 3A2 2 0 0 1 22 5v12a2 2 0 0 1-1.999 2H16a5 5 0 0 0-4 2', key: 'leaf' }],
+]);
+
 const PAGE_ICONS: Record<SitePageId, ReactNode> = {
   about: <Info />,
-  docs: <BookOpen />,
+  docs: <Book />,
   manifesto: <ScrollText />,
   policies: <Scale />,
 };
