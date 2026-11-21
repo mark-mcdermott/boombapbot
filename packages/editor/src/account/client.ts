@@ -1,15 +1,73 @@
 import { createAuthClient } from 'better-auth/react';
 
+/** Where a shell keeps the token that says who is logged in. It answers at once: the shell reads its store before the page asks. */
+export interface TokenStore {
+  get(): string | null;
+  set(token: string | null): void;
+}
+
+/** The site's server as a shell reaches it: from a page the site does not serve, which its cookie cannot follow. */
+export interface ServerLink {
+  /** The site's address, ending in a slash. */
+  url: string;
+  token: TokenStore;
+}
+
+/** The header Better Auth's bearer plug-in answers a log-in with. */
+const TOKEN_HEADER = 'set-auth-token';
+const ENDS_SESSION = /\/(sign-out|delete-user)$/;
+
+let link: ServerLink | null = null;
 let client: ReturnType<typeof createAuthClient> | null = null;
 
 /**
- * Talks to /api/auth on this site. The session lives in a cookie the server
- * sets. It is made when first asked for, not when this file is read: it
- * refuses a page whose address is not http or https, which a phone app's is
- * not, and that page never asks.
+ * Points every call to the server at the site, carrying a token in place of
+ * the cookie. A shell calls it once, before anything asks who is logged in.
+ */
+export function linkServer(next: ServerLink): void {
+  if (client) throw new Error('the server was already asked something, so it is too late to say where it is');
+  link = next;
+}
+
+/** Whether the page is a shell reaching the site's server from outside it. */
+export const isLinked = (): boolean => link !== null;
+
+/** What keeps the beat on the machine, as the account's words name it: a shell's device, or the site's browser. */
+export const draftKeeper = (): string => (link ? 'this device' : 'this browser');
+
+/** Where that beat is kept, in the same words. */
+export const draftKeptWhere = (): string => (link ? 'on this device' : 'in this browser');
+
+/** What a request to the server carries to say who is asking, beyond the cookie a page of the site has. */
+export function sessionHeaders(): Record<string, string> {
+  const token = link?.token.get();
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
+function linkedClient({ url, token }: ServerLink): ReturnType<typeof createAuthClient> {
+  return createAuthClient({
+    baseURL: new URL(url).origin,
+    fetchOptions: {
+      credentials: 'omit',
+      auth: { type: 'Bearer', token: () => token.get() ?? undefined },
+      onSuccess: ({ request, response }) => {
+        const issued = response.headers.get(TOKEN_HEADER);
+        if (issued) token.set(issued);
+        else if (ENDS_SESSION.test(new URL(request.url).pathname)) token.set(null);
+      },
+    },
+  });
+}
+
+/**
+ * Talks to /api/auth on this site, where the session lives in a cookie the
+ * server sets, or on the site a shell is linked to. It is made when first
+ * asked for, not when this file is read: unlinked, it refuses a page whose
+ * address is not http or https, which a phone app's is not, and such a page
+ * links first or never asks.
  */
 export function authClient(): ReturnType<typeof createAuthClient> {
-  client ??= createAuthClient();
+  client ??= link ? linkedClient(link) : createAuthClient();
   return client;
 }
 

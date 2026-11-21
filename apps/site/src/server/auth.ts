@@ -2,6 +2,8 @@ import { BETTER_AUTH_SECRET } from 'astro:env/server';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { createAuthMiddleware, getIP } from 'better-auth/api';
+import { bearer } from 'better-auth/plugins';
+import { appOrigins } from './app-origins';
 import { getDb } from './db';
 import * as schema from './db/schema';
 import { LINK_LIFETIME_SECONDS, sendPasswordResetEmail, sendVerificationEmail } from './email';
@@ -47,7 +49,7 @@ async function build() {
     secret,
     // Where the links in an email point.
     baseURL: siteUrl(),
-    trustedOrigins: previewOrigins(),
+    trustedOrigins: [...previewOrigins(), ...appOrigins()],
     database: drizzleAdapter(await getDb(), { provider: 'pg', schema }),
 
     // Deleting needs the password again. The database takes the account's
@@ -91,6 +93,9 @@ async function build() {
       storage: 'database',
       customRules: { '/get-session': false, ...SITE_RATE_RULES },
     },
+
+    // The phone apps cannot keep the site's cookie, so they carry the session as a token.
+    plugins: [bearer()],
 
     advanced: { database: { generateId: 'serial' } },
     hooks: { after: hideRowIds },

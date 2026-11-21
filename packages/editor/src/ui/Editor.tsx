@@ -39,6 +39,11 @@ export interface BoombapbotEditorProps<
    * offer.
    */
   below?: BelowMachine;
+  /**
+   * Whether there is an account to save a beat to. The site has one. A
+   * shell says so when what it puts under the machine has the account button.
+   */
+  accounts?: boolean;
 }
 
 declare global {
@@ -92,9 +97,11 @@ interface EditorBodyProps {
   runtime: EditorRuntime;
   baseUrl: string;
   below?: BelowMachine;
+  accounts?: boolean;
 }
 
-function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
+function EditorBody({ runtime, baseUrl, below, accounts = !below }: EditorBodyProps) {
+  const device = Boolean(below);
   const audioStatus = useEditorState((state) => state.audioStatus);
   const playing = useEditorState((state) => state.playing);
   const modals = useRef<HTMLDivElement>(null);
@@ -122,7 +129,7 @@ function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [runtime]);
 
-  const settings = <Settings container={modals} accounts={!below} />;
+  const settings = <Settings container={modals} accounts={accounts} device={device} />;
   return (
     <div
       className="sb-app"
@@ -132,7 +139,7 @@ function EditorBody({ runtime, baseUrl, below }: EditorBodyProps) {
     >
       <Header baseUrl={baseUrl} />
       <NoticeBanner />
-      <DraftElsewhere accounts={!below} />
+      <DraftElsewhere device={device} />
       <runtime.machine.Panel />
       <div className="sb-below-machine">
         {below ? (
@@ -158,7 +165,7 @@ export function BoombapbotEditor<
   Document extends ProjectBase,
   Transient extends object,
   Session extends MachineSession<Document, Transient>,
->({ machine, baseUrl = '/', storage, save, audio, below }: BoombapbotEditorProps<Document, Transient, Session>) {
+>({ machine, baseUrl = '/', storage, save, audio, below, accounts }: BoombapbotEditorProps<Document, Transient, Session>) {
   const [runtime, setRuntime] = useState(() =>
     storage === undefined ? null : new EditorRuntime({ baseUrl, machine, storage, save, audio }),
   );
@@ -174,7 +181,7 @@ export function BoombapbotEditor<
     };
   }, [runtime, baseUrl, machine, save, audio]);
 
-  return runtime ? <OpenEditor runtime={runtime} baseUrl={baseUrl} below={below} /> : null;
+  return runtime ? <OpenEditor runtime={runtime} baseUrl={baseUrl} below={below} accounts={accounts} /> : null;
 }
 
 interface OpenEditorProps<
@@ -185,13 +192,14 @@ interface OpenEditorProps<
   runtime: EditorRuntime<Document, Transient, Session>;
   baseUrl: string;
   below?: BelowMachine;
+  accounts?: boolean;
 }
 
 function OpenEditor<
   Document extends ProjectBase,
   Transient extends object,
   Session extends MachineSession<Document, Transient>,
->({ runtime, baseUrl, below }: OpenEditorProps<Document, Transient, Session>) {
+>({ runtime, baseUrl, below, accounts }: OpenEditorProps<Document, Transient, Session>) {
   useEffect(() => {
     runtime.attach();
     window.__boombapbot = {
@@ -227,7 +235,7 @@ function OpenEditor<
   const shared = runtime as unknown as EditorRuntime;
   return (
     <RuntimeContext.Provider value={shared}>
-      <EditorBody runtime={shared} baseUrl={baseUrl} below={below} />
+      <EditorBody runtime={shared} baseUrl={baseUrl} below={below} accounts={accounts} />
     </RuntimeContext.Provider>
   );
 }

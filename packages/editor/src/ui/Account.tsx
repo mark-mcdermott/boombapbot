@@ -7,6 +7,8 @@ import {
   MIN_PASSWORD_LENGTH,
   attempt,
   authClient,
+  draftKeptWhere,
+  isLinked,
   type Failure,
 } from '../account/client';
 import { deviceBeatLinks } from '../account/beat-links';
@@ -207,7 +209,9 @@ function CheckInbox({ email, go, baseUrl }: { email: string; go: Go; baseUrl: st
   return (
     <div data-testid="account-check-inbox">
       <p className="sb-modal-text">
-        Check <strong>{email}</strong> for a link from me. Open it and you are in. It works for an hour.
+        Check <strong>{email}</strong> for a link from me.{' '}
+        {isLinked() ? 'Open it to confirm the address, then come back here and log in.' : 'Open it and you are in.'} It works
+        for an hour.
       </p>
       <p className="sb-modal-text">Nothing after a few minutes? Look in spam, then send it again.</p>
       <div className="sb-form">
@@ -312,7 +316,8 @@ function DeleteAccount({ account, cancel, deleted }: DeleteAccountProps) {
     <div data-testid="account-delete">
       <p className="sb-modal-text">
         This deletes your account and every beat saved in it, for good. I cannot bring them back. The beat on the
-        machine stays in this browser, and orders you placed stay on record without your account.
+        machine stays {draftKeptWhere()}, and orders you placed stay on record without your
+        account.
       </p>
       <Form
         testId="account-delete-form"
@@ -385,7 +390,7 @@ function Unreachable({ retry }: { retry(): void }) {
     <div data-testid="account-unreachable">
       <p className="sb-modal-text">
         I cannot reach the account server right now. The machine does not need it: everything you make is still
-        saved in this browser, and you can export the project file from settings.
+        saved {draftKeptWhere()}, and you can export the project file from settings.
       </p>
       <div className="sb-form">
         <button className="sb-button" type="button" data-testid="account-retry" onClick={retry}>

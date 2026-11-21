@@ -150,8 +150,19 @@ for that, and its web view may be asleep:
   leaves makes the engine again, as in front, and the beat plays on only
   if the page is awake to tell it.
 
-Accounts, saved beats, the cart and the upgrade are left out on purpose.
-Nothing in the app talks to a server.
+The cart and the upgrade are left out on purpose. The machine itself talks
+to no server; the account does, and only once its button is pressed.
+
+The account button beside the settings is the site's: log in, sign up,
+saved beats, log out, delete the account. The app's page is not served from
+the site, so the site's cookie cannot follow it. The server
+(`apps/site/src/middleware.ts`, `src/server/app-origins.ts`) lets the apps'
+origins call its API and Better Auth's bearer plug-in answers a log-in with a
+token, which `src/session-token.ts` keeps in the device's store and
+`linkServer` sends with every call. A sign-up's link is opened in the
+phone's browser, on the site; the person then comes back and logs in. The
+token is in the app's own preferences, not the keychain. The site the app
+reaches is `VITE_SITE_URL` at build time, boombapbot.com when unset.
 
 Under the machine are the site's pages of words (about, docs, manifesto,
 policies), a link to the shop, and the settings. The pages are in the app:
@@ -179,7 +190,10 @@ pnpm --filter @boombapbot/mobile android     # needs Android Studio's SDK and an
 in a browser the draft falls back to that browser's storage.
 
 Checks: `pnpm typecheck` and `pnpm test:unit` at the root cover this
-folder with the rest, and so does CI. `.github/workflows/native.yml` runs
+folder with the rest, and so does CI. `e2e/app.spec.ts` drives the app's
+page in a phone's browser against the built server, from another origin as
+the app is: the footer, a page of words, and an account from sign-up to
+deletion. `.github/workflows/native.yml` runs
 the plug-in's tests below, in an iPhone simulator and an Android emulator.
 CI does not build the app for either phone or run its check.
 

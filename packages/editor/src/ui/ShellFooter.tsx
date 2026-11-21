@@ -1,5 +1,6 @@
 import { ShoppingBag } from 'lucide-react';
-import type { ReactNode, RefObject } from 'react';
+import { useState, type ReactNode, type RefObject } from 'react';
+import { Account } from './Account';
 import { FooterPages } from './Footer';
 import type { SitePageId } from './pages';
 import { Tip, TipGroup } from './Tip';
@@ -25,6 +26,11 @@ export interface ShellSite {
   pagesUrl: string;
   /** The shop, which is on the site and opens outside the shell. */
   shopUrl: string;
+  /**
+   * The site's address, ending in a slash, if the shell reaches its server
+   * (see `linkServer`). With it the machine's screen has the account button.
+   */
+  serverUrl?: string;
 }
 
 interface ShellSiteFooterProps {
@@ -39,9 +45,11 @@ interface ShellSiteFooterProps {
 
 /**
  * The footer of a shell that carries the pages of words: the pages, the way
- * out to the shop, and the settings. It has no account, cart or upgrade.
+ * out to the shop, the settings, and beside the settings the account, where
+ * the shell reaches the site's server. It has no cart or upgrade.
  */
 export function ShellSiteFooter({ site, container, current, settings }: ShellSiteFooterProps) {
+  const [accountOpen, setAccountOpen] = useState(false);
   return (
     <footer className="sb-footer">
       <TipGroup>
@@ -62,6 +70,9 @@ export function ShellSiteFooter({ site, container, current, settings }: ShellSit
               </a>
             </Tip>
             {settings}
+            {settings && site.serverUrl && (
+              <Account baseUrl={site.serverUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />
+            )}
           </div>
         </div>
       </TipGroup>

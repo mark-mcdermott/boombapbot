@@ -3,7 +3,7 @@ import { useEditorState, useRuntime } from './context';
 import { draftElsewhereText } from './draft-words';
 
 /** Shown while another tab owns the draft, with the one way to bring it here. */
-export function DraftElsewhere({ accounts }: { accounts: boolean }) {
+export function DraftElsewhere({ device }: { device: boolean }) {
   const runtime = useRuntime();
   const elsewhere = useEditorState((state) => state.draftState === 'elsewhere');
   const [moving, setMoving] = useState(false);
@@ -28,7 +28,7 @@ export function DraftElsewhere({ accounts }: { accounts: boolean }) {
       aria-labelledby={questionId}
     >
       <div className="sb-notice-body">
-        <p id={questionId}>{draftElsewhereText({ accounts })}</p>
+        <p id={questionId}>{draftElsewhereText({ device })}</p>
         <div className="sb-draft-choices">
           <button
             className="sb-button"
@@ -37,7 +37,7 @@ export function DraftElsewhere({ accounts }: { accounts: boolean }) {
             disabled={moving}
             onClick={() => void workHere()}
           >
-            {moving ? 'Moving the beat here…' : `Work in this ${accounts ? 'tab' : 'window'}`}
+            {moving ? 'Moving the beat here…' : `Work in this ${device ? 'window' : 'tab'}`}
           </button>
         </div>
       </div>

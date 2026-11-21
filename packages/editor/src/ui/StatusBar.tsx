@@ -60,9 +60,10 @@ const AUDIO_TEXT: Record<string, string> = {
 interface StatusBarProps {
   /** Whether a beat can also be saved to an account here. A shell with no site behind it has none. */
   accounts: boolean;
+  device: boolean;
 }
 
-export function StatusBar({ accounts }: StatusBarProps) {
+export function StatusBar({ accounts, device }: StatusBarProps) {
   const audioStatus = useEditorState((state) => state.audioStatus);
   const audioError = useEditorState((state) => state.audioError);
   const draftState = useEditorState((state) => state.draftState);
@@ -70,7 +71,7 @@ export function StatusBar({ accounts }: StatusBarProps) {
   const draftOrigin = useEditorState((state) => state.draftOrigin);
   const { machine } = useRuntime();
 
-  const saved = draftStatusText({ state: draftState, savedAt: draftSavedAt, accounts });
+  const saved = draftStatusText({ state: draftState, savedAt: draftSavedAt, accounts, device });
 
   return (
     <div className="sb-status">

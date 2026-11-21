@@ -8,6 +8,7 @@ import { Share } from '@capacitor/share';
 import {
   BoombapbotEditor,
   NativeAudioController,
+  linkServer,
   shellFooter,
   shellSiteFooter,
   type AudioFactory,
@@ -19,6 +20,7 @@ import { openDeviceStorage } from './device-storage';
 import { PageScreen } from './PageScreen';
 import { PAGES_FILE, PAGES_URL, readPages, type CarriedPages } from './pages';
 import { ENGINE_PLUGIN, checkIfAsked, pluginEngine, type EnginePlugin } from './native-engine';
+import { openTokenStore } from './session-token';
 import { shareThrough, type DeviceFiles } from './share-file';
 import './styles.css';
 
@@ -76,8 +78,11 @@ const audio: AudioFactory | undefined = enginePlugin
   ? (events) => new NativeAudioController(pluginEngine(enginePlugin), events)
   : undefined;
 
-/** The pages are in the app; the shop is on the site, and opens in the phone's browser. */
-const site: ShellSite = { pagesUrl: PAGES_URL, shopUrl: 'https://boombapbot.com/?cart=open' };
+/** The site, whose server keeps the accounts. A build for a test names another. */
+const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'https://boombapbot.com/';
+
+/** The pages are in the app. The shop is on the site and opens in the phone's browser; the account is on its server. */
+const site: ShellSite = { pagesUrl: PAGES_URL, shopUrl: `${SITE_URL}?cart=open`, serverUrl: SITE_URL };
 
 /** The pages of words the app carries. Without them the machine is all there is, as it was. */
 async function carriedPages(): Promise<CarriedPages | null> {
@@ -97,7 +102,8 @@ const pagesRoot = document.getElementById('pages');
 if (!root || !machineScreen || !pagesRoot) throw new Error('the page has no place for the machine');
 
 askToBeHeard();
-const [storage, pages] = await Promise.all([draftStorage(), carriedPages()]);
+const [storage, pages, token] = await Promise.all([draftStorage(), carriedPages(), openTokenStore(Preferences)]);
+linkServer({ url: SITE_URL, token });
 
 createRoot(root).render(
   <StrictMode>
@@ -108,6 +114,7 @@ createRoot(root).render(
       save={save}
       audio={audio}
       below={pages ? shellSiteFooter(site) : shellFooter}
+      accounts={pages !== null}
     />
   </StrictMode>,
 );

@@ -2,7 +2,7 @@ import { beatLimitReached, formatKilobytes, type BeatSummary } from '@boombapbot
 import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { deviceBeatLinks } from '../account/beat-links';
 import { deleteBeat, fetchBeat, listBeats, replaceBeat, saveNewBeat, type Asked } from '../account/beats';
-import { explain } from '../account/client';
+import { draftKeeper, draftKeptWhere, explain } from '../account/client';
 import type { EditorRuntime } from '../runtime';
 import { RuntimeContext, useEditorState } from './context';
 
@@ -285,7 +285,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
             ) : full ? (
               `Your account is full: it holds ${ready.limit} beats. Delete one to save another.`
             ) : (
-              `This puts a copy of “${projectName}” in your account. The machine keeps working from this browser.`
+              `This puts a copy of “${projectName}” in your account. The machine keeps working from ${draftKeeper()}.`
             )}
           </p>
         )}
@@ -361,7 +361,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
       )}
       {ready && ready.beats.length === 0 && (
         <p className="sb-modal-text sb-beats-empty" data-testid="beats-empty">
-          Nothing saved yet. The beat on the machine is still kept in this browser, as before.
+          Nothing saved yet. The beat on the machine is still kept {draftKeptWhere()}, as before.
         </p>
       )}
       {ready && ready.beats.length > 0 && (
