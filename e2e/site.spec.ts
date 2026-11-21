@@ -207,10 +207,14 @@ test.describe('the page around the machine', () => {
       await page.getByTestId(id).hover();
       await expect.poll(() => drawing.evaluate((node) => getComputedStyle(node).transform)).not.toBe('none');
     }
+    // The cart, once tipped, lifts its front twice more.
+    expect(await page.getByTestId('cart').locator('svg').evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
+    await page.getByTestId('cart').hover();
+    expect(await page.getByTestId('cart').locator('svg').evaluate((node) => getComputedStyle(node).animationName)).toBe('sb-ico-wheelie');
     // These play once: one shape inside the icon is animated.
     const played: [string, number][] = [
       ['nav-about', 3],
-      ['nav-docs', 2],
+      ['nav-docs', 3],
       ['nav-manifesto', 1],
       ['nav-policies', 3],
       ['upgrade', 1],
