@@ -751,8 +751,23 @@
   transition-timing-function: var(--ease-spring);
 }
 
+/* Once it is up, the front lifts twice more, each less than the last, and it
+   comes to rest where it was. */
 .sb-ico-cart:is(:hover, :focus-visible, [data-popup-open]) svg {
   transform: translateX(2px) rotate(-14deg);
+  animation: sb-ico-wheelie 720ms 230ms ease-in-out;
+}
+
+@keyframes sb-ico-wheelie {
+  22% {
+    rotate: -10deg;
+  }
+  48% {
+    rotate: 0deg;
+  }
+  70% {
+    rotate: -5deg;
+  }
 }
 
 /* Merch: the bag is picked up. */
@@ -781,21 +796,35 @@
   }
 }
 
-/* Docs: the book shuts a little and falls open again. */
-.sb-ico-docs svg :nth-child(2) {
-  transform-origin: 12px 12px;
+/* Docs: a page turns, right to left. The page is a third shape drawn over
+   the right-hand one, seen only while it is turning; its free edge lifts as
+   it leaves one side and as it comes down on the other. */
+.sb-ico-docs svg :nth-child(3) {
+  transform-origin: 12px 21px;
+  opacity: 0;
 }
 
-.sb-ico-docs:is(:hover, :focus-visible) svg :nth-child(2) {
-  animation: sb-ico-open 560ms ease-out;
+.sb-ico-docs:is(:hover, :focus-visible) svg :nth-child(3) {
+  animation: sb-ico-leaf 640ms cubic-bezier(0.45, 0, 0.55, 1);
 }
 
-@keyframes sb-ico-open {
-  30% {
-    transform: scaleX(0.55);
+@keyframes sb-ico-leaf {
+  0% {
+    transform: skewY(0deg) scaleX(1);
+    opacity: 1;
   }
-  70% {
-    transform: scaleX(1.08);
+  25% {
+    transform: skewY(-18deg) scaleX(0.6);
+  }
+  50% {
+    transform: skewY(0deg) scaleX(0);
+  }
+  75% {
+    transform: skewY(18deg) scaleX(-0.6);
+  }
+  100% {
+    transform: skewY(0deg) scaleX(-1);
+    opacity: 1;
   }
 }
 
