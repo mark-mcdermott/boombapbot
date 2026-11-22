@@ -5,6 +5,7 @@
 //   ctest --test-dir build/vst3 --output-on-failure
 
 #include "BeatFile.h"
+#include "HeapTrap.h"
 #include "MachineRitm12.h"
 #include "Panel/StepKeys.h"
 #include "PluginProcessor.h"
@@ -868,6 +869,86 @@ void testSoundThreadFollowsKnobs() {
         "after releaseResources and prepareToPlay the plugin plays the same tom");
 }
 
+// ---- The audio thread and the heap, run once --------------------------------
+
+// A realtime processBlock must not touch the heap: an allocation can wait on
+// a lock another thread holds for as long as it likes. Everything a block
+// needs is made ready here first, and the trap counts heap calls only while
+// processBlock runs, on this thread. The plugin's own sound thread works
+// alongside and is free to allocate.
+void testAudioThreadKeepsOffTheHeap() {
+  const std::string context = "heap";
+  constexpr double rate = 48000.0;
+  constexpr int blockSize = 256;
+  constexpr int blocks = 3000;
+
+  const bool sees = heaptrap::seesTheHeap();
+  check(sees, context, "the trap counts a block taken from the heap and given back under it");
+  if (!sees) return;
+
+  // The one block that is allowed the heap: offline, with a sound to make
+  // again. The trap has to see it, or its silence below would mean nothing.
+  {
+    const std::unique_ptr<juce::AudioProcessor> offline = makeProcessor(rate, blockSize);
+    set(*offline, {"tom_pitch", 0.9f});
+    juce::AudioBuffer<float> block(2, blockSize);
+    juce::MidiBuffer none;
+    heaptrap::reset();
+    {
+      const heaptrap::Watch watch;
+      offline->processBlock(block, none);
+    }
+    check(heaptrap::calls() > 0, context,
+          text("an offline block that makes a sound again is seen to use the heap (%d calls)", heaptrap::calls()));
+  }
+
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize, Clock::realtime);
+  plugin(*processor).loadBeat(fourPatterns());
+  set(*processor, {"pattern", 1.0f});
+  Transport transport;
+  transport.bpm = 132.0;
+  processor->setPlayHead(&transport);
+
+  // Notes for every block, some of them on voices, with a long message among
+  // them that a careless reader would copy.
+  juce::MidiBuffer notes;
+  const juce::uint8 sysex[] = {0xf0, 0x7d, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0xf7};
+  notes.addEvent(sysex, static_cast<int>(sizeof(sysex)), 0);
+  for (const VoiceSpec& voice : kVoices) notes.addEvent(noteOn(0, voice.gmNote, 127).bytes.data(), 3, voice.gmNote);
+  notes.addEvent(noteOn(0, 60, 100).bytes.data(), 3, 200);
+  juce::MidiBuffer midi;
+  midi.ensureSize(4096);
+  juce::AudioBuffer<float> buffer(2, blockSize);
+
+  const std::array<Setting, 10> turns{{{"kick_level", 0.3f}, {"tom_pitch", 0.9f}, {"effect_kind", 2.0f},
+                                       {"effect_mix", 0.5f}, {"master_volume", 0.6f}, {"snare_mute", 1.0f},
+                                       {"accent", 0.2f}, {"swing", 0.7f}, {"pattern", 0.0f}, {"effect_kind", 4.0f}}};
+  heaptrap::reset();
+  bool sounded = false;
+  for (int block = 0; block < blocks; ++block) {
+    // The host's side of a block: knobs turned, the transport moved, started,
+    // stopped and looped, and the block's notes handed over.
+    if (block % 37 == 0) set(*processor, turns[static_cast<std::size_t>(block / 37) % turns.size()]);
+    transport.playing = block % 500 < 430;
+    transport.bpm = 90.0 + block % 120;
+    transport.beat = (block % 900) * blockSize / (rate * 60.0 / 132.0);
+    midi.clear();
+    if (block % 3 == 0) midi.addEvents(notes, 0, blockSize, 0);
+    buffer.clear();
+    {
+      const heaptrap::Watch watch;
+      processor->processBlock(buffer, midi);
+    }
+    sounded = sounded || buffer.getMagnitude(0, blockSize) > kAudible;
+    if (block % 200 == 0) juce::Thread::sleep(20);  // lets the sound thread hand over new sounds
+  }
+  processor->setPlayHead(nullptr);
+  check(sounded && heaptrap::calls() == 0, context,
+        text("%d realtime blocks with notes, the sequencer, a moving host and knobs turning make no heap call "
+             "on the audio thread (%d seen)",
+             blocks, heaptrap::calls()));
+}
+
 // ---- Lifecycle, run once ----------------------------------------------------
 
 void testSampleRateChange() {
@@ -1443,6 +1524,7 @@ int main() {
     }
   }
   testSoundThreadFollowsKnobs();
+  testAudioThreadKeepsOffTheHeap();
   testSampleRateChange();
   testUnsupportedSampleRate();
   testDescription();

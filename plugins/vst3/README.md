@@ -237,6 +237,14 @@ block size matters, it checks:
   nonsense one is the same as none; a tempo outside 40 to 300 is held at the
   nearer end; the tempo changes nothing while no effect is mixed in; and the
   tempo jumping about while the delay rings keeps the output in range;
+- the audio thread keeps off the heap: the test program replaces `new` and
+  `delete`, and on macOS `malloc`, `calloc`, `realloc` and `free` as its own
+  code calls them, and counts every call the thread inside `processBlock`
+  makes. The trap first has to count a block it takes itself, and an offline
+  block that re-synthesises a sound, which is allowed the heap. Then 3000
+  realtime blocks with notes on every voice, a SysEx message, the sequencer, a
+  host that starts, stops, loops and changes tempo, and knobs turning between
+  blocks must make none;
 - on a realtime clock the plugin's own thread makes the new sound, and it is
   heard without the audio thread synthesising anything;
 - the accent knob and the mutes do what the machine's do;
@@ -310,7 +318,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 483 checks as arm64 and again as
+- All nine CTest tests pass: the self-test's 486 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -332,9 +340,10 @@ signed the same way, but see below.
   SDK a plugin needs, and the validator is not among them. `pluginval` has not
   run either. The hosted check uses JUCE's host against JUCE's wrapper, which
   cannot catch a mistake both share.
-- **Realtime safety is by design and by reading, not by instrument.** Nothing
-  here traps an allocation or a lock on the audio thread, as the desktop app's
-  Rust tests do.
+- **Locks on the audio thread.** The self-test traps heap use there and finds
+  none, but nothing traps a lock, a system call or a page fault. What a system
+  library allocates inside itself is not seen either. That the audio thread
+  takes no lock is by design and by reading.
 - **The save and load keys.** Both open a file chooser, which no test can
   press. The tests write and read beats through the same code the keys call.
   Nobody has imported a plugin-saved beat on the live site; the site's reader
