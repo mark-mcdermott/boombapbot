@@ -48,6 +48,13 @@ export async function accountFromSignUpToDeletion(page: Page, context: BrowserCo
   await expect(page.getByTestId('account-address')).toHaveText(address);
   await expect(page.getByTestId('beats')).toContainText('Starter beat');
 
+  // A delete has no body. The site refuses one from another origin unless it names a type all the same.
+  const saved = page.getByTestId('beat').first();
+  await saved.getByTestId('beat-delete').click();
+  await saved.getByTestId('beat-delete-confirm').click();
+  await expect(page.getByTestId('beats-said')).toHaveText('Deleted “Starter beat” from your account.');
+  await expect(page.getByTestId('beat')).toHaveCount(0);
+
   await page.getByTestId('account-log-out').click();
   await expect(page.getByTestId('account-log-in')).toBeVisible();
   await fill(page, 'account-log-in', { email: address, password: PASSWORD });
