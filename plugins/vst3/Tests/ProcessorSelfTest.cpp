@@ -8,6 +8,7 @@
 #include "HeapTrap.h"
 #include "MachineRitm12.h"
 #include "Panel/StepKeys.h"
+#include "PatternMidi.h"
 #include "PluginProcessor.h"
 
 #include <algorithm>
@@ -1143,6 +1144,11 @@ void testPanel() {
   check(name != nullptr && machine.beatName().isEmpty() && name->getText() == "Untitled beat", context,
         "a name wiped out leaves the beat untitled");
 
+  check(dynamic_cast<juce::Button*>(titled(*window, "Pattern as MIDI")) != nullptr &&
+            dynamic_cast<juce::Button*>(titled(*window, "Save beat")) != nullptr &&
+            dynamic_cast<juce::Button*>(titled(*window, "Load beat")) != nullptr,
+        context, "the panel has its load, save and MIDI keys");
+
   machine.setStep(9, 0, 0, true);
   machine.setStep(0, 12, 0, true);
   machine.setStep(0, 0, 16, true);
@@ -1354,6 +1360,131 @@ void testSavingABeat() {
              kSavedFixture));
 }
 
+// ---- A pattern as MIDI, run once ---------------------------------------------
+
+struct MidiNote {
+  double tick;
+  int note;
+  int velocity;
+  int channel;
+};
+
+// The note-ons of a MIDI file's drum track, and what its header and tempo say.
+struct ReadMidi {
+  bool ok = false;
+  int tracks = 0;
+  int ticksPerBeat = 0;
+  double bpm = 0.0;
+  std::vector<MidiNote> notes;
+};
+
+ReadMidi readMidi(const juce::MemoryBlock& bytes) {
+  ReadMidi read;
+  juce::MemoryInputStream stream(bytes, false);
+  juce::MidiFile file;
+  if (!file.readFrom(stream)) return read;
+  read.ok = true;
+  read.tracks = file.getNumTracks();
+  read.ticksPerBeat = file.getTimeFormat();
+  for (int track = 0; track < file.getNumTracks(); ++track) {
+    for (const juce::MidiMessageSequence::MidiEventHolder* event : *file.getTrack(track)) {
+      const juce::MidiMessage& message = event->message;
+      if (message.isTempoMetaEvent()) read.bpm = 60.0 / message.getTempoSecondsPerQuarterNote();
+      if (message.isNoteOn()) {
+        read.notes.push_back({message.getTimeStamp(), message.getNoteNumber(), message.getVelocity(), message.getChannel()});
+      }
+    }
+  }
+  return read;
+}
+
+void testPatternAsMidi() {
+  const std::string context = "MIDI";
+  constexpr double rate = 48000.0;
+  constexpr int blockSize = 512;
+  using boombapbot::plugin::patternMidiFileName;
+  using boombapbot::plugin::plainVelocity;
+  using boombapbot::plugin::writePatternMidi;
+
+  // Straight sixteenths at a tempo where a MIDI tick is a whole number of
+  // frames, so the file's notes can be put on exact frames.
+  const juce::String straight = edited(fourPatterns(), [](const juce::var& beat) {
+    put(beat, "swing", 0.0);
+    put(beat, "tempo", static_cast<int>(kSequencerBpm));
+    put(beat["effect"], "mix", 0.0);
+  });
+  Beat beat;
+  boombapbot::plugin::readBeat(straight, beat);
+  const ReadMidi file = readMidi(writePatternMidi(beat, 1));
+
+  int hits = 0;
+  for (const boombapbot::plugin::StepRow row : beat.patterns[1].hits) hits += juce::BigInteger(row).countNumberOfSetBits();
+  const bool drums = std::all_of(file.notes.begin(), file.notes.end(), [](const MidiNote& note) {
+    const bool mapped = std::any_of(kVoices.begin(), kVoices.end(),
+                                    [&](const VoiceSpec& voice) { return voice.gmNote == note.note; });
+    return mapped && note.channel == 10;
+  });
+  check(file.ok && file.tracks == 2 && file.ticksPerBeat == SNARE_MIDI_PPQ && std::abs(file.bpm - kSequencerBpm) < 1e-6 &&
+            static_cast<int>(file.notes.size()) == hits && drums,
+        context,
+        text("pattern Б is a two-track MIDI file at the beat's tempo with a note for each of its %d hits, on the "
+             "voices' notes on channel 10 (%d notes, %.1f bpm)",
+             hits, static_cast<int>(file.notes.size()), file.bpm));
+
+  const int plain = plainVelocity(beat.accent);
+  const bool twoLoudnesses = std::all_of(file.notes.begin(), file.notes.end(), [&](const MidiNote& note) {
+    const int step = juce::roundToInt(note.tick / (SNARE_MIDI_PPQ / 4.0));
+    const bool accented = ((beat.patterns[1].accents >> step) & 1) != 0;
+    return note.velocity == (accented ? 127 : plain);
+  });
+  check(twoLoudnesses && plain == 81, context,
+        text("a hit on an accented step is written at 127 and a plain one at %d, as the site writes them", plain));
+  check(plainVelocity(0.0f) == kAccentVelocity - 1 && plainVelocity(1.0f) == 51, context,
+        text("with the accent knob fully left a plain hit is written at %d, just under what the plugin takes for "
+             "an accent",
+             kAccentVelocity - 1));
+
+  // The file played back into the plugin is the pattern the sequencer plays.
+  const double framesPerTick = framesPerBeat(rate) / SNARE_MIDI_PPQ;
+  std::vector<Event> notes;
+  for (const MidiNote& note : file.notes) {
+    notes.push_back(noteOn(juce::roundToInt(note.tick * framesPerTick), note.note, note.velocity, note.channel));
+  }
+  Transport transport;
+  const int total = measureFrames(rate);
+  const Played played{straight, 1, 0.0f};
+  check(juce::exactlyEqual(framesPerTick, std::floor(framesPerTick)) &&
+            identical(renderPlaying(*makeBeatProcessor(rate, blockSize, played, true), transport, 0.0, {}, total,
+                                    blockSize, rate),
+                      renderPlaying(*makeBeatProcessor(rate, blockSize, played, false), transport, 0.0, notes, total,
+                                    blockSize, rate)),
+        context, "its notes played back into the plugin render the same samples as the sequencer playing the pattern");
+
+  // Swing and triplets move the notes as they move the steps.
+  Beat swung = beat;
+  swung.swing = 0.5f;
+  const ReadMidi swungFile = readMidi(writePatternMidi(swung, 1));
+  const bool late = std::any_of(swungFile.notes.begin(), swungFile.notes.end(), [](const MidiNote& note) {
+    return juce::exactlyEqual(std::fmod(note.tick, SNARE_MIDI_PPQ / 4.0), 30.0);
+  });
+  Beat triplets = beat;
+  triplets.size = 12;
+  const ReadMidi tripletFile = readMidi(writePatternMidi(triplets, 1));
+  const bool onTriplets = !tripletFile.notes.empty() &&
+                          std::all_of(tripletFile.notes.begin(), tripletFile.notes.end(), [](const MidiNote& note) {
+                            return juce::exactlyEqual(std::fmod(note.tick, SNARE_MIDI_PPQ / 3.0), 0.0);
+                          });
+  check(late && onTriplets, context,
+        "with swing every second sixteenth is written late, and a twelve-step measure is written in triplets");
+
+  check(writePatternMidi(beat, 4).isEmpty() && writePatternMidi(beat, -1).isEmpty() &&
+            readMidi(writePatternMidi(Beat{}, 0)).ok && readMidi(writePatternMidi(Beat{}, 0)).notes.empty(),
+        context, "a pattern the beat does not have gives no file, and an empty one a file with no notes");
+  check(patternMidiFileName("Sunday at the garage", 1) == "sunday-at-the-garage-2.mid" &&
+            patternMidiFileName("", 0) == "boombapbot-beat-1.mid",
+        context, "the file is named for the beat and the pattern");
+}
+
 // ---- State, run once --------------------------------------------------------
 
 juce::MemoryBlock saveState(juce::AudioProcessor& processor) {
@@ -1558,6 +1689,7 @@ int main() {
   testPanel();
   testBeatFile();
   testSavingABeat();
+  testPatternAsMidi();
   testState();
   testVoicesMatchTheMachine();
 

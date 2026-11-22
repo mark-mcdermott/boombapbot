@@ -28,6 +28,8 @@ constexpr int kGroupTitle = 20;
 constexpr int kStatusHeight = 22;
 constexpr int kNameLabelWidth = 44;
 constexpr int kNameWidth = 260;
+constexpr int kMidiKeyWidth = 84;
+constexpr int kDragStartsAfter = 8;
 constexpr int kRefreshHz = 30;
 
 struct KnobWords {
@@ -87,6 +89,7 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
       clearKey_(words("СБРОС"), "Clear"),
       loadKey_(words("ЗАГРУЗКА"), "Load beat"),
       saveKey_(words("СОХРАНИТЬ"), "Save beat"),
+      midiKey_("MIDI", ""),
       sequencerAttachment_(owner.parameters(), ids::kSequencer, sequencerKey_),
       pitch_(words(kPitchWords.word), kPitchWords.english),
       tone_(words(kToneWords.word), kToneWords.english),
@@ -147,7 +150,16 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
   };
   loadKey_.onClick = [this] { chooseBeat(); };
   saveKey_.onClick = [this] { chooseWhereToSave(); };
-  for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_, &saveKey_}) {
+  // A click saves the shown pattern as a MIDI file; a drag carries the file
+  // out of the window, into the host or onto the desktop.
+  midiKey_.setTitle("Pattern as MIDI");
+  midiKey_.setTooltip("Click to save the shown pattern as a MIDI file, or drag it into the host");
+  midiKey_.addMouseListener(this, false);
+  midiKey_.onClick = [this] {
+    if (!midiKeyDragged_) chooseWhereToSaveMidi();
+    midiKeyDragged_ = false;
+  };
+  for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_, &saveKey_, &midiKey_}) {
     addAndMakeVisible(key);
   }
 
@@ -308,6 +320,8 @@ void BoombapbotEditor::resized() {
   juce::Rectangle<int> foot(kMargin, getHeight() - kStatusHeight - 8, getWidth() - 2 * kMargin, kStatusHeight);
   nameLabel_.setBounds(foot.removeFromLeft(kNameLabelWidth));
   name_.setBounds(foot.removeFromLeft(kNameWidth));
+  midiKey_.setBounds(foot.removeFromRight(kMidiKeyWidth));
+  foot.removeFromRight(12);
   foot.removeFromLeft(12);
   status_.setBounds(foot);
 }
@@ -359,6 +373,54 @@ void BoombapbotEditor::saveBeat(const juce::File& file) {
   } else {
     showProblem("The beat could not be saved to " + target.getFullPathName() + ".");
   }
+}
+
+juce::MemoryBlock BoombapbotEditor::shownPatternMidi() const {
+  const Beat beat = processor_.currentBeat();
+  return writePatternMidi(beat, beat.pattern);
+}
+
+juce::String BoombapbotEditor::shownPatternMidiName() const {
+  return patternMidiFileName(processor_.beatName(), processor_.currentBeat().pattern);
+}
+
+void BoombapbotEditor::chooseWhereToSaveMidi() {
+  const juce::File suggested =
+      juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(shownPatternMidiName());
+  chooser_ = std::make_unique<juce::FileChooser>("Save this pattern as MIDI", suggested, "*.mid");
+  const juce::Component::SafePointer<BoombapbotEditor> self(this);
+  chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
+                            juce::FileBrowserComponent::warnAboutOverwriting,
+                        [self](const juce::FileChooser& chooser) {
+                          const juce::File file = chooser.getResult();
+                          if (self == nullptr || file == juce::File()) return;
+                          const juce::File target = file.withFileExtension("mid");
+                          if (target.replaceWithData(self->shownPatternMidi().getData(),
+                                                     self->shownPatternMidi().getSize())) {
+                            self->showNote("Saved " + target.getFileName() + ".");
+                          } else {
+                            self->showProblem("The pattern could not be saved to " + target.getFullPathName() + ".");
+                          }
+                        });
+}
+
+// The file a drag carries has to be on disk before the drag starts.
+void BoombapbotEditor::dragMidiOut() {
+  const juce::MemoryBlock midi = shownPatternMidi();
+  const juce::File file = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile(shownPatternMidiName());
+  if (!file.replaceWithData(midi.getData(), midi.getSize())) {
+    showProblem("The pattern could not be written out to drag.");
+    return;
+  }
+  juce::DragAndDropContainer::performExternalDragDropOfFiles({file.getFullPathName()}, false, &midiKey_);
+}
+
+void BoombapbotEditor::mouseDrag(const juce::MouseEvent& event) {
+  if (event.eventComponent != &midiKey_ || midiKeyDragged_ || event.getDistanceFromDragStart() < kDragStartsAfter) {
+    return;
+  }
+  midiKeyDragged_ = true;
+  dragMidiOut();
 }
 
 void BoombapbotEditor::showNote(const juce::String& note) {

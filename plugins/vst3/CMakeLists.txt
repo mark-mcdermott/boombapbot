@@ -69,6 +69,8 @@ target_sources(boombapbot_plugin PRIVATE
   Source/Panel/StepKeys.cpp
   Source/Panel/StepKeys.h
   Source/ParameterIds.h
+  Source/PatternMidi.cpp
+  Source/PatternMidi.h
   Source/PluginEditor.cpp
   Source/PluginEditor.h
   Source/PluginProcessor.cpp
