@@ -217,9 +217,9 @@ that (`packages/editor/src/account/avatar.ts`); the server reads its kind
 from its bytes, keeps it in the `avatars` table, and serves it at
 `/api/avatars/<uuid>`, which the account's `image` names. Better Auth's own
 `update-user` is refused an `image`, so nothing else can be set as one.
-**Its migration (`apps/site/drizzle/0006_avatars.sql`) has not been run on
-the real database.** Until it is, uploading a picture there fails and
-everything else works as before: run `pnpm db:migrate`.
+Its table (`apps/site/drizzle/0006_avatars.sql`) has been in the real
+database since 2026-11-22, when the migration was run there; until then,
+uploading a picture on the live site failed.
 
 The rate limit's table (`apps/site/drizzle/0004_rate_limits.sql`) has been
 in the real database since 2026-11-18, when the migration was run there,
