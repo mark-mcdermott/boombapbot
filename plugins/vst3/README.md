@@ -7,6 +7,8 @@ VST3 instrument on the same engine the site, the phone apps and the desktop
 app play through (`engine/`, built natively for
 `packages/machine-ritm12`).
 
+![The plugin's panel with a beat loaded](panel.jpg)
+
 It is not a product build yet. See [Licensing](#licensing) before giving a
 build to anyone, and [Not verified](#not-verified) for what nobody has checked.
 
@@ -66,8 +68,8 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   effect, so a new instance is dry. Level and volume follow the machine's
   arithmetic (`src/document/machine.ts`): a level of 0 is silence, and volume
   is the knob to the power 1.5.
-- **A beat saved from the site plays in the host.** "Load beat..." in the
-  plugin window takes the `.boombapbot.json` file the site's project export
+- **A beat saved from the site plays in the host.** The load key
+  (ЗАГРУЗКА) on the panel takes the `.boombapbot.json` file the site's project export
   writes. Its four patterns are held by the plugin, and its knobs, levels,
   mutes, accent, swing, effect and the pattern its panel was on become the
   parameter values. Its tempo is not taken: in a host, the host keeps time. A
@@ -92,9 +94,27 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   is left unread. In one that is read, a value out of range is brought into
   it, a parameter it does not name goes to its resting value, and a version 1
   state, which has no patterns, loads with none.
-- The plugin window is a "Load beat..." bar over JUCE's
-  `GenericAudioProcessorEditor`: one slider for each parameter. Patterns
-  cannot be written or seen in it. A designed panel is a later slice.
+- **The window is a panel of the machine's own**, drawn for the plugin in the
+  olive, cream and amber of РИТМ-12's picture, lettered in the machine's
+  Russian with English under it. It is 920 by 624 and does not resize.
+  - *Step keys.* A row of sixteen for the accents and one for each voice,
+    showing the pattern the panel is on. A press turns a step on or off and a
+    drag along a row carries that on. A red lamp runs over the step the
+    sequencer is playing. With the measure at twelve steps the last four keys
+    go dark.
+  - *Voice keys.* A key for each voice plays it and puts its pitch, tone,
+    decay and level on the four voice knobs. Beside each is its mute.
+  - *The rest.* Pattern keys А Б В Г, 16 and 12 for the measure, the sequencer
+    switch, a key that clears the pattern the panel is on, the mix knobs
+    (volume, accent, swing), the effect keys and its mix, and the key that
+    loads a beat. Every parameter is on the panel; a double click puts a knob
+    back where it rests.
+  - A pattern can be written with no beat loaded. Steps written or cleared
+    here are saved with the host's project like the rest of the state. They
+    are not undone by the host's undo, and they cannot be saved back to a beat
+    file yet.
+  - The panel is drawn in code. It does not use the picture of the machine in
+    `packages/machine-ritm12/art`, which a later slice could.
 - The delay keeps time with the host: its echo is a dotted eighth note at the
   host's tempo, read from the playhead at every block and held within the
   engine's 40 to 300. A host that reports no tempo gets 104, the tempo of a new
@@ -222,6 +242,12 @@ block size matters, it checks:
   position is a hair off at every block, goes back when the host loops, and
   changes pattern at the bar line; a stopped host, no host clock, Sequencer
   off or no beat loaded each give silence;
+- the panel: a press and a drag on the step keys, by mouse events made for the
+  test, write the steps they should, and the pattern written plays the same
+  samples as that beat loaded from a file; the pattern, effect, measure, mute
+  and clear keys do what they say; a voice's key plays it and hands it the
+  knobs; the sequencer reports the step it is on; steps and voices the machine
+  does not have are turned down;
 - beat files: the fixture `four-patterns.project.json` loads and sets the
   parameters; twelve kinds of file that are not a beat are refused with a
   reason and change nothing; the beat survives save → load → save byte for
@@ -233,6 +259,14 @@ block size matters, it checks:
   eight kinds of bad state leave it untouched, and a state of ours that holds
   nonsense is brought into range;
 - the plugin's voice table against `ritm12.machine.json`.
+
+A second program (`Tests/WindowSnapshot.cpp`) paints the window to
+`build/vst3/window.png` with a beat loaded and fails if the picture is blank.
+It is how the panel can be looked at without a host:
+
+```sh
+build/vst3/boombapbot_window_snapshot panel.png path/to/a.boombapbot.json
+```
 
 On macOS the rest check the built bundle:
 
@@ -262,9 +296,9 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All eight CTest tests pass: the self-test's 460 checks as arm64 and again as
-  x86_64 under Rosetta, the signature, the architectures, the load check on
-  both and the hosted check on both.
+- All nine CTest tests pass: the self-test's 475 checks as arm64 and again as
+  x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
+  load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
   from `GetPluginFactory`, as arm64 and as x86_64.
 
@@ -287,9 +321,11 @@ signed the same way, but see below.
 - **Realtime safety is by design and by reading, not by instrument.** Nothing
   here traps an allocation or a lock on the audio thread, as the desktop app's
   Rust tests do.
-- **The file chooser and the "Load beat..." button.** The tests load a beat by
-  calling the processor; nobody has clicked the button, in a host or out of
-  one. The window has been looked at once, as a picture.
+- **The panel under a hand.** It has been looked at as a picture
+  (`panel.jpg` above is that picture) and its keys have been worked by the
+  tests, which make their own mouse events. Nobody has clicked it, in a host
+  or out of one: how the knobs feel, whether the lamp keeps up, how it looks
+  on a screen that is not Retina, and the file chooser are all untried.
 - **The sequencer against a real host's transport.** The tests play a host that
   reports an exact position. Whether FL Studio and others report one the
   plugin follows cleanly, through loops, tempo changes and odd signatures, is
@@ -307,8 +343,11 @@ signed the same way, but see below.
 
 ## Next slices
 
-- **A designed panel** in place of the generic sliders, with the step keys on
-  it, so a pattern can be seen and written in the plugin.
+- **Saving a beat.** A pattern written on the panel lives in the host's
+  project only. Writing it out as a `.boombapbot.json` the site can open would
+  close the loop.
+- **The picture.** The panel is drawn in code; the machine's own picture and
+  its parts are in `packages/machine-ritm12/art`.
 - **Beats from an account.** Only a file on disk can be loaded. Beats saved to
   a boombapbot account are out of reach.
 - **Time signatures and tempo changes inside a block.** A measure is four

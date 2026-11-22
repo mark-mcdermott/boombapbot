@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 
+#include "ParameterIds.h"
 #include "PluginEditor.h"
 
 #include <cmath>
@@ -22,7 +23,6 @@ constexpr std::array<std::int8_t, 128> makeNoteMap() {
 
 constexpr std::array<std::int8_t, 128> kNoteToTrack = makeNoteMap();
 
-// Parameter ids are baked into host sessions and saved states. Never rename one.
 struct KnobSpec {
   const char* id;
   const char* name;
@@ -30,25 +30,13 @@ struct KnobSpec {
 };
 
 constexpr std::array<KnobSpec, 4> kVoiceKnobs{{
-    {"pitch", "Pitch", kSoundKnobRest},
-    {"tone", "Tone", kSoundKnobRest},
-    {"decay", "Decay", kSoundKnobRest},
-    {"level", "Level", kLevelRest},
+    {ids::kPitch, "Pitch", kSoundKnobRest},
+    {ids::kTone, "Tone", kSoundKnobRest},
+    {ids::kDecay, "Decay", kSoundKnobRest},
+    {ids::kLevel, "Level", kLevelRest},
 }};
 
-constexpr const char* kVolumeId = "master_volume";
-constexpr const char* kEffectKindId = "effect_kind";
-constexpr const char* kEffectMixId = "effect_mix";
-constexpr const char* kAccentId = "accent";
-constexpr const char* kSwingId = "swing";
-constexpr const char* kPatternId = "pattern";
-constexpr const char* kSequencerId = "sequencer";
-constexpr const char* kMuteKnob = "mute";
 constexpr int kParameterVersion = 1;
-
-juce::String voiceParameterId(const VoiceSpec& voice, const char* knob) {
-  return juce::String(voice.id) + "_" + knob;
-}
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout() {
   const juce::NormalisableRange<float> knob(0.0f, 1.0f);
@@ -58,11 +46,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout() {
     auto group = std::make_unique<juce::AudioProcessorParameterGroup>(voice.id, voice.name, " | ");
     for (const KnobSpec& spec : kVoiceKnobs) {
       group->addChild(std::make_unique<juce::AudioParameterFloat>(
-          juce::ParameterID{voiceParameterId(voice, spec.id), kParameterVersion},
+          juce::ParameterID{ids::ofVoice(voice, spec.id), kParameterVersion},
           juce::String(voice.name) + " " + spec.name, knob, spec.rest));
     }
     group->addChild(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{voiceParameterId(voice, kMuteKnob), kParameterVersion}, juce::String(voice.name) + " Mute",
+        juce::ParameterID{ids::ofVoice(voice, ids::kMute), kParameterVersion}, juce::String(voice.name) + " Mute",
         false));
     layout.add(std::move(group));
   }
@@ -71,19 +59,19 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout() {
   for (const char* name : kEffectNames) effects.add(name);
   juce::StringArray patterns;
   for (const char* name : kPatternNames) patterns.add(juce::String::fromUTF8(name));
-  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kVolumeId, kParameterVersion},
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ids::kVolume, kParameterVersion},
                                                          "Volume", knob, kVolumeRest));
-  layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{kEffectKindId, kParameterVersion},
+  layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{ids::kEffectKind, kParameterVersion},
                                                           "Effect", effects, kEffectRest));
-  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kEffectMixId, kParameterVersion},
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ids::kEffectMix, kParameterVersion},
                                                          "Effect Mix", knob, kEffectMixRest));
-  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kAccentId, kParameterVersion}, "Accent",
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ids::kAccent, kParameterVersion}, "Accent",
                                                          knob, kAccentRest));
-  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kSwingId, kParameterVersion}, "Swing",
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{ids::kSwing, kParameterVersion}, "Swing",
                                                          knob, kSwingRest));
-  layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{kPatternId, kParameterVersion},
+  layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{ids::kPattern, kParameterVersion},
                                                           "Pattern", patterns, 0));
-  layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{kSequencerId, kParameterVersion},
+  layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{ids::kSequencer, kParameterVersion},
                                                         "Sequencer", true));
   return layout;
 }
@@ -152,17 +140,18 @@ BoombapbotAudioProcessor::BoombapbotAudioProcessor()
       soundThread_(std::make_unique<SoundThread>(*this)) {
   for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
     const auto value = [&](const char* knob) {
-      return parameters_.getRawParameterValue(voiceParameterId(kVoices[voice], knob));
+      return parameters_.getRawParameterValue(ids::ofVoice(kVoices[voice], knob));
     };
-    voiceParameters_[voice] = {value("pitch"), value("tone"), value("decay"), value("level"), value(kMuteKnob)};
+    voiceParameters_[voice] = {value(ids::kPitch), value(ids::kTone), value(ids::kDecay), value(ids::kLevel),
+                               value(ids::kMute)};
   }
-  volume_ = parameters_.getRawParameterValue(kVolumeId);
-  effectKind_ = parameters_.getRawParameterValue(kEffectKindId);
-  effectMix_ = parameters_.getRawParameterValue(kEffectMixId);
-  accent_ = parameters_.getRawParameterValue(kAccentId);
-  swing_ = parameters_.getRawParameterValue(kSwingId);
-  pattern_ = parameters_.getRawParameterValue(kPatternId);
-  sequencer_ = parameters_.getRawParameterValue(kSequencerId);
+  volume_ = parameters_.getRawParameterValue(ids::kVolume);
+  effectKind_ = parameters_.getRawParameterValue(ids::kEffectKind);
+  effectMix_ = parameters_.getRawParameterValue(ids::kEffectMix);
+  accent_ = parameters_.getRawParameterValue(ids::kAccent);
+  swing_ = parameters_.getRawParameterValue(ids::kSwing);
+  pattern_ = parameters_.getRawParameterValue(ids::kPattern);
+  sequencer_ = parameters_.getRawParameterValue(ids::kSequencer);
 }
 
 BoombapbotAudioProcessor::~BoombapbotAudioProcessor() { stopSoundThread(); }
@@ -347,6 +336,8 @@ void BoombapbotAudioProcessor::followHost(double beat, double blockBeats, const 
 void BoombapbotAudioProcessor::playStep(SnareEngine* engine, std::int64_t step, const StepGrid& grid) {
   const int place = grid.placeOf(step);
   if (place == 0) following_.pattern = chosenPattern();
+  shownStep_.store(place, std::memory_order_relaxed);
+  shownPattern_.store(following_.pattern, std::memory_order_relaxed);
 
   const PatternRows& rows = patterns_[static_cast<std::size_t>(following_.pattern)];
   const auto on = [place](const std::atomic<StepRow>& row) {
@@ -393,7 +384,9 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     followHost(host.beat, frames / beatFrames, grid);
   } else {
     following_.active = false;
+    shownStep_.store(-1, std::memory_order_relaxed);
   }
+  playAuditions(engine);
   // The frame the next step falls on, or `frames` when it is not in this block.
   const auto nextStepFrame = [&] {
     if (!sequencing) return frames;
@@ -530,6 +523,58 @@ void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInB
   holdPatterns(beat);
 }
 
+// ---- The panel's side ---------------------------------------------------------
+
+// A voice key pressed on the panel. The engine's queue belongs to the audio
+// thread, so the press is left as a bit for the next block to play.
+void BoombapbotAudioProcessor::audition(int voice) {
+  if (voice >= 0 && voice < kVoiceCount) auditions_.fetch_or(1u << voice, std::memory_order_relaxed);
+}
+
+void BoombapbotAudioProcessor::playAuditions(SnareEngine* engine) {
+  const std::uint32_t pressed = auditions_.exchange(0, std::memory_order_relaxed);
+  for (int voice = 0; pressed != 0 && voice < kVoiceCount; ++voice) {
+    if ((pressed >> voice) & 1u) snare_engine_trigger(engine, voiceTrack(voice), 1);
+  }
+}
+
+bool BoombapbotAudioProcessor::stepOn(int pattern, int row, int step) const {
+  if (pattern < 0 || pattern >= kPatternCount || row < 0 || row > kVoiceCount || step < 0 || step >= kSteps) return false;
+  const StepRow steps = patterns_[static_cast<std::size_t>(pattern)][static_cast<std::size_t>(row)].load(
+      std::memory_order_relaxed);
+  return ((steps >> step) & 1) != 0;
+}
+
+void BoombapbotAudioProcessor::setStep(int pattern, int row, int step, bool on) {
+  if (pattern < 0 || pattern >= kPatternCount || row < 0 || row > kVoiceCount || step < 0 || step >= kSteps) return;
+  std::atomic<StepRow>& steps = patterns_[static_cast<std::size_t>(pattern)][static_cast<std::size_t>(row)];
+  const auto bit = static_cast<StepRow>(1u << step);
+  if (on) {
+    steps.fetch_or(bit, std::memory_order_relaxed);
+  } else {
+    steps.fetch_and(static_cast<StepRow>(~bit), std::memory_order_relaxed);
+  }
+  updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+}
+
+void BoombapbotAudioProcessor::clearPattern(int pattern) {
+  if (pattern < 0 || pattern >= kPatternCount) return;
+  for (std::atomic<StepRow>& row : patterns_[static_cast<std::size_t>(pattern)]) row.store(0, std::memory_order_relaxed);
+  updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+}
+
+int BoombapbotAudioProcessor::measureSize() const { return beatSize_.load(std::memory_order_relaxed); }
+
+void BoombapbotAudioProcessor::setMeasureSize(int size) {
+  if (!validSize(size) || size == measureSize()) return;
+  beatSize_.store(size, std::memory_order_relaxed);
+  updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+  sendChangeMessage();
+}
+
+int BoombapbotAudioProcessor::playingStep() const { return shownStep_.load(std::memory_order_relaxed); }
+int BoombapbotAudioProcessor::playingPattern() const { return shownPattern_.load(std::memory_order_relaxed); }
+
 // ---- Beats --------------------------------------------------------------------
 
 void BoombapbotAudioProcessor::holdPatterns(const Beat& beat) {
@@ -567,18 +612,18 @@ juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
   for (std::size_t index = 0; index < kVoices.size(); ++index) {
     const VoiceSpec& voice = kVoices[index];
     const BeatVoice& knobs = beat.voices[index];
-    setParameterTo(voiceParameterId(voice, "pitch"), knobs.pitch);
-    setParameterTo(voiceParameterId(voice, "tone"), knobs.tone);
-    setParameterTo(voiceParameterId(voice, "decay"), knobs.decay);
-    setParameterTo(voiceParameterId(voice, "level"), knobs.level);
-    setParameterTo(voiceParameterId(voice, kMuteKnob), knobs.muted ? 1.0f : 0.0f);
+    setParameterTo(ids::ofVoice(voice, ids::kPitch), knobs.pitch);
+    setParameterTo(ids::ofVoice(voice, ids::kTone), knobs.tone);
+    setParameterTo(ids::ofVoice(voice, ids::kDecay), knobs.decay);
+    setParameterTo(ids::ofVoice(voice, ids::kLevel), knobs.level);
+    setParameterTo(ids::ofVoice(voice, ids::kMute), knobs.muted ? 1.0f : 0.0f);
   }
-  setParameterTo(kVolumeId, beat.volume);
-  setParameterTo(kAccentId, beat.accent);
-  setParameterTo(kSwingId, beat.swing);
-  setParameterTo(kEffectKindId, static_cast<float>(beat.effect));
-  setParameterTo(kEffectMixId, beat.effectMix);
-  setParameterTo(kPatternId, static_cast<float>(beat.pattern));
+  setParameterTo(ids::kVolume, beat.volume);
+  setParameterTo(ids::kAccent, beat.accent);
+  setParameterTo(ids::kSwing, beat.swing);
+  setParameterTo(ids::kEffectKind, static_cast<float>(beat.effect));
+  setParameterTo(ids::kEffectMix, beat.effectMix);
+  setParameterTo(ids::kPattern, static_cast<float>(beat.pattern));
 
   holdPatterns(beat);
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));

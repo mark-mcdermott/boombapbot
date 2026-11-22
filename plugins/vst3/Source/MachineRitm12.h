@@ -20,6 +20,7 @@ namespace boombapbot::plugin {
 struct VoiceSpec {
   const char* id;
   const char* name;
+  const char* label;  // as it is lettered on the panel, in UTF-8
   int gmNote;
   float trim;
   float pan;
@@ -30,14 +31,14 @@ inline constexpr int kVoiceCount = 8;
 
 // The two hats share choke group 1, so a closed hat cuts a ringing open hat.
 inline constexpr std::array<VoiceSpec, kVoiceCount> kVoices{{
-    {"kick", "Kick", 36, 0.9f, 0.0f, 0},
-    {"snare", "Snare", 38, 0.75f, 0.0f, 0},
-    {"clap", "Clap", 39, 0.7f, 0.0f, 0},
-    {"closed_hat", "Closed hat", 42, 0.4f, 0.2f, 1},
-    {"open_hat", "Open hat", 46, 0.4f, 0.2f, 1},
-    {"tom", "Tom", 45, 0.7f, -0.2f, 0},
-    {"rim", "Rim", 37, 0.6f, 0.15f, 0},
-    {"perc", "Perc", 56, 0.55f, -0.15f, 0},
+    {"kick", "Kick", "БАС", 36, 0.9f, 0.0f, 0},
+    {"snare", "Snare", "МАЛЫЙ", 38, 0.75f, 0.0f, 0},
+    {"clap", "Clap", "ХЛОП", 39, 0.7f, 0.0f, 0},
+    {"closed_hat", "Closed hat", "ХЭТ З", 42, 0.4f, 0.2f, 1},
+    {"open_hat", "Open hat", "ХЭТ О", 46, 0.4f, 0.2f, 1},
+    {"tom", "Tom", "ТОМ", 45, 0.7f, -0.2f, 0},
+    {"rim", "Rim", "РИМ", 37, 0.6f, 0.15f, 0},
+    {"perc", "Perc", "ПЕРК", 56, 0.55f, -0.15f, 0},
 }};
 
 constexpr int voiceTrack(int voice) { return voice + 1; }
