@@ -125,13 +125,11 @@ site its icon still opens a modal that says it is not open.
     raises it only while it is under the limit and inserts the beat only if
     it rose, and a delete lowers it in the statement that deletes the beat.
     Two saves at once queue on the account's row, so they cannot both take
-    the last place. **Its migration has not been run.**
+    the last place. **Its migration is run.**
     `apps/site/drizzle/0005_beat_counts.sql` adds the table and counts the
-    beats already saved; run it with `pnpm db:migrate` after the code is
-    merged and before it is deployed, because the new code fails to save or
-    delete without the table. A beat the old code saves between the
-    migration and the deploy is not counted, which would let that account
-    hold one more. Checked in the tests (thirty saves sent at once stop at
+    beats already saved. Looked at on 2026-11-22: the real database has the
+    table, and its counts add up to the beats saved, so none was saved
+    uncounted between the migration and the deploy. Checked in the tests (thirty saves sent at once stop at
     twenty, and a delete gives back one place) and against a real Postgres
     17 with thirty sessions at once: the new statement stopped at twenty
     and the count matched the rows, where the old count-then-insert let all
