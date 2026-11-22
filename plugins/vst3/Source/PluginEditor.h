@@ -8,6 +8,7 @@
 
 #include "Panel/PanelStyle.h"
 #include "Panel/StepKeys.h"
+#include "PatternMidi.h"
 #include "PluginProcessor.h"
 
 #include <array>
@@ -22,6 +23,7 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
 
   void paint(juce::Graphics& graphics) override;
   void resized() override;
+  void mouseDrag(const juce::MouseEvent& event) override;
 
  private:
   using Key = boombapbot::panel::Key;
@@ -40,6 +42,11 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   void chooseWhereToSave();
   void saveBeat(const juce::File& file);
   void showNote(const juce::String& note);
+  // The pattern the panel is on, as a MIDI file.
+  juce::MemoryBlock shownPatternMidi() const;
+  juce::String shownPatternMidiName() const;
+  void chooseWhereToSaveMidi();
+  void dragMidiOut();
   void showState();
   void showProblem(const juce::String& problem);
 
@@ -59,6 +66,8 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   Key clearKey_;
   Key loadKey_;
   Key saveKey_;
+  Key midiKey_;
+  bool midiKeyDragged_ = false;
   ButtonAttachment sequencerAttachment_;
 
   Knob pitch_;
@@ -79,6 +88,7 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   juce::Rectangle<int> mixGroup_;
   juce::Rectangle<int> effectGroup_;
   std::unique_ptr<juce::FileChooser> chooser_;
+  juce::TooltipWindow tooltips_{this};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BoombapbotEditor)
 };

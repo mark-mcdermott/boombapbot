@@ -83,6 +83,15 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   panel's name field. Knob positions are written to six places. The
   document has no "no effect", so a beat whose effect is Off is written as the
   delay with none of it mixed in.
+- **A pattern goes into the host as MIDI.** The MIDI key at the foot of the
+  panel writes the pattern the panel is on as a Standard MIDI File, one
+  measure long, with the engine's own exporter, the one behind the site's MIDI
+  export. A click saves it; a drag carries it out of the window, onto a track
+  of the host or the desktop. Its notes are the voices' own, so the file
+  plays this plugin. Accented steps are written at velocity 127 and plain
+  ones at the accent knob's gain, as the site writes them, except that a plain
+  hit is never written at 104 or more: played back into the plugin it has to
+  stay plain.
 - **The sequencer follows the host's transport.** While the host plays and
   Sequencer is on, the chosen pattern loops in step with the host's position,
   so it starts in the right place from anywhere in the song and goes back when
@@ -278,6 +287,11 @@ block size matters, it checks:
   beat in it; one too long for the site is cut to 80 letters; it and the voice
   the panel is on come back with the host's project; wiped out, the beat is
   untitled again;
+- a pattern as MIDI: the file is a two-track MIDI file at the beat's tempo
+  with a note for each hit, on the voices' notes on channel 10 at the two
+  velocities; its notes played back into the plugin render the same samples
+  as the sequencer playing the pattern; swing writes every second sixteenth
+  late and a twelve-step measure is written in triplets;
 - beat files: the fixture `four-patterns.project.json` loads and sets the
   parameters; twelve kinds of file that are not a beat are refused with a
   reason and change nothing; the beat survives save → load → save byte for
@@ -326,7 +340,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 491 checks as arm64 and again as
+- All nine CTest tests pass: the self-test's 499 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -352,6 +366,9 @@ signed the same way, but see below.
   none, but nothing traps a lock, a system call or a page fault. What a system
   library allocates inside itself is not seen either. That the audio thread
   takes no lock is by design and by reading.
+- **Dragging MIDI into a host.** The file is tested; the drag is not. Whether
+  FL Studio or any other host takes a file dragged out of a plugin's window
+  is unknown.
 - **The save and load keys.** Both open a file chooser, which no test can
   press. The tests write and read beats through the same code the keys call.
   Nobody has imported a plugin-saved beat on the live site; the site's reader
