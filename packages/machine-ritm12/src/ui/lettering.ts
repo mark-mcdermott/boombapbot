@@ -27,6 +27,7 @@ export interface Lettering {
   voice: string;
   size: string;
   sequencer: string;
+  status: string;
   hits: string;
   accents: string;
   mute: string;
@@ -70,6 +71,7 @@ export const LETTERING: Record<Script, Lettering> = {
     voice: 'ГОЛОС',
     size: 'РАЗМЕР',
     sequencer: 'СЕКВЕНСЕР',
+    status: 'СТАТУС',
     hits: 'УДАРЫ',
     accents: 'АКЦЕНТЫ',
     mute: 'МУТ',
@@ -111,6 +113,7 @@ export const LETTERING: Record<Script, Lettering> = {
     voice: 'VOICE',
     size: 'MEASURE',
     sequencer: 'SEQUENCER',
+    status: 'STATUS',
     hits: 'HITS',
     accents: 'ACCENTS',
     mute: 'MUTE',

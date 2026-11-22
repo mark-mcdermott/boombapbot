@@ -30,7 +30,7 @@ export const PLATE_LABELS: readonly PlateLabel[] = [
     on: 'key',
   })),
   { rect: [612, 296, 731, 327], text: 'LEVEL' },
-  { rect: [641, 449, 733, 472], text: 'LEVEL', on: 'face' },
+  { rect: [655, 406, 720, 423], text: 'LEVEL', on: 'face', size: 12 },
   { rect: [1504, 349, 1577, 377], text: english.tempo },
   { rect: [1641, 349, 1719, 377], text: english.swing },
   { rect: [1771, 347, 1866, 395], text: english.accent, under: 'STRENGTH' },
