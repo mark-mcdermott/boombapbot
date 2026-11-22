@@ -2,7 +2,7 @@
 // plugin as a host meets it, through the VST3 wrapper. It is no substitute
 // for Steinberg's validator or for a real host.
 //
-//   bundle_host_check <path to the .vst3 bundle>
+//   bundle_host_check <path to the .vst3 bundle> [a state with a beat in it]
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -58,7 +58,7 @@ float play(juce::AudioPluginInstance& plugin, bool kick, int blocks = 8) {
   return loudest;
 }
 
-// A host that reports one tempo.
+// A host that reports one tempo and, when it is playing, where it is in the song.
 class HostClock final : public juce::AudioPlayHead {
  public:
   explicit HostClock(double bpm) : bpm_(bpm) {}
@@ -67,9 +67,16 @@ class HostClock final : public juce::AudioPlayHead {
     PositionInfo position;
     position.setBpm(bpm_);
     position.setTimeSignature(TimeSignature{4, 4});
-    position.setIsPlaying(true);
+    position.setIsPlaying(playing);
+    position.setPpqPosition(beat);
+    position.setTimeInSamples(juce::roundToInt(beat * 60.0 / bpm_ * kRate));
     return position;
   }
+
+  double framesPerBeat() const { return kRate * 60.0 / bpm_; }
+
+  bool playing = true;
+  double beat = 0.0;
 
  private:
   double bpm_;
@@ -108,6 +115,54 @@ std::vector<float> playEcho(juce::VST3PluginFormat& format, const juce::PluginDe
   return heard;
 }
 
+// The fixture beat's panel is on pattern В, which holds two toms: on its third
+// step and its eleventh. At 120 that is a quarter of a second in.
+constexpr double kBeatBpm = 120.0;
+constexpr double kFirstHitSeconds = 0.25;
+
+// A host does not hand a plugin's state back bare. JUCE's host keeps what the
+// VST3 component gave it inside a document of its own, and that is what its
+// setStateInformation takes. This puts the plugin's state in such a document,
+// as JUCE's host would have saved it.
+juce::MemoryBlock asTheHostKeepsIt(const juce::MemoryBlock& pluginState) {
+  juce::XmlElement kept("VST3PluginState");
+  kept.createNewChildElement("IComponent")->addTextElement(pluginState.toBase64Encoding());
+  juce::MemoryBlock block;
+  juce::AudioProcessor::copyXmlToBinary(kept, block);
+  return block;
+}
+
+// A measure of the beat in a recalled state, played by a host's transport
+// alone, with no notes. Returns the frame its first sound is on, or -1.
+int firstSoundOfTheBeat(juce::VST3PluginFormat& format, const juce::PluginDescription& description,
+                        const juce::MemoryBlock& state, bool hostPlays, float& kickPitch) {
+  const std::unique_ptr<juce::AudioPluginInstance> plugin = host(format, description);
+  if (plugin == nullptr) return -1;
+  plugin->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+  HostClock clock(kBeatBpm);
+  clock.playing = hostPlays;
+  plugin->setPlayHead(&clock);
+
+  int firstSound = -1;
+  juce::AudioBuffer<float> buffer(2, kBlock);
+  juce::MidiBuffer midi;
+  const int blocks = juce::roundToInt(4.0 * clock.framesPerBeat()) / kBlock;
+  for (int block = 0; block < blocks; ++block) {
+    clock.beat = block * kBlock / clock.framesPerBeat();
+    buffer.clear();
+    midi.clear();
+    plugin->processBlock(buffer, midi);
+    for (int frame = 0; firstSound < 0 && frame < kBlock; ++frame) {
+      if (!juce::exactlyEqual(buffer.getSample(0, frame), 0.0f)) firstSound = block * kBlock + frame;
+    }
+  }
+  const juce::AudioProcessorParameter* const pitch = named(*plugin, "Kick Pitch");
+  kickPitch = pitch != nullptr ? pitch->getValue() : -1.0f;
+  plugin->setPlayHead(nullptr);
+  plugin->releaseResources();
+  return firstSound;
+}
+
 int ownParameters(juce::AudioPluginInstance& plugin) {
   int count = 0;
   for (const char* voice : {"Kick", "Snare", "Clap", "Closed hat", "Open hat", "Tom", "Rim", "Perc"}) {
@@ -124,8 +179,8 @@ int ownParameters(juce::AudioPluginInstance& plugin) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::fprintf(stderr, "usage: %s <path to the .vst3 bundle>\n", argv[0]);
+  if (argc < 2 || argc > 3) {
+    std::fprintf(stderr, "usage: %s <path to the .vst3 bundle> [a state with a beat in it]\n", argv[0]);
     return 2;
   }
   const juce::ScopedJuceInitialiser_GUI juceInitialiser;
@@ -196,6 +251,28 @@ int main(int argc, char** argv) {
   check(!fast.empty() && fast.size() == slow.size() && std::abs(partedSeconds - 0.375) < 0.01,
         "the delay follows the host's tempo: hosts at 120 and at 60 part ways 0.375 s after the hit (" +
             std::to_string(partedSeconds) + " s)");
+
+  // A beat in a recalled state, played by the host's transport through the
+  // wrapper: the host's position has to reach the sequencer for this to sound,
+  // and to sound on time.
+  if (argc == 3) {
+    juce::MemoryBlock beatState;
+    const bool read = juce::File::getCurrentWorkingDirectory()
+                          .getChildFile(juce::String::fromUTF8(argv[2]))
+                          .loadFileAsData(beatState);
+    check(read && beatState.getSize() > 0, "the state with a beat in it is read");
+    float kickPitch = -1.0f;
+    const int expected = juce::roundToInt(kFirstHitSeconds * kRate);
+    const juce::MemoryBlock kept = asTheHostKeepsIt(beatState);
+    const int played = firstSoundOfTheBeat(format, description, kept, true, kickPitch);
+    check(std::abs(kickPitch - 0.35f) < 1e-6f, "the recalled state sets the beat's knobs: Kick Pitch 0.35 (" +
+                                                   std::to_string(kickPitch) + ")");
+    check(played >= expected && played <= expected + 2,
+          "with the host playing and no notes, the beat's pattern sounds, first on its third step (frame " +
+              std::to_string(played) + ", expected " + std::to_string(expected) + ")");
+    const int stopped = firstSoundOfTheBeat(format, description, kept, false, kickPitch);
+    check(stopped == -1, "with the host stopped the pattern does not play");
+  }
 
   plugin->releaseResources();
   second->releaseResources();
