@@ -209,7 +209,7 @@ export function PhonePanel() {
                     <PhoneLamp {...voice.lamp} />
                     <Key className="rt-ph-key rt-ph-cap" {...voice.key}>
                       <span className="rt-ph-ink">
-                        <Part file={`ink-${instrument.voice}.png`} />
+                        <Part file={`ink-${instrument.voice}.svg`} />
                         <Lettered text={words.voices[instrument.voice].key} />
                       </span>
                     </Key>
