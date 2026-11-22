@@ -433,10 +433,9 @@ the build of the hang fix:
 - the step keys, the dice and the undo work while it plays;
 - a project saved and reopened brings the plugin back as it was;
 - a beat saved from the plugin opens on the site;
-- the window resizes.
-
-Dragging the MIDI key onto FL's playlist dropped nothing, and neither did the
-saved `.mid` dragged there from the Finder; see below.
+- the window resizes;
+- the MIDI key dragged onto the Channel Rack imports the shown pattern. FL's
+  playlist does not take it; see below.
 
 ## Not verified
 
@@ -445,8 +444,8 @@ saved `.mid` dragged there from the Finder; see below.
 - **MIDI into FL Studio.** A drag from the MIDI key onto FL's playlist shows
   FL's paintbrush and drops nothing, and the saved `.mid` dragged from the
   Finder does the same: the playlist is not where FL takes a MIDI file. The
-  saved `.mid` dragged from the Finder onto the Channel Rack does import.
-  Whether the MIDI key dragged straight there does too is untried.
+  Channel Rack is. The MIDI key dragged straight onto it imports the pattern,
+  and so does the saved `.mid` from the Finder. Other hosts are untried.
 - **A closed hat that may go missing.** In one session the owner sometimes did
   not hear the hat on the fifteenth step of a looping pattern. It was not
   pinned down.

@@ -500,18 +500,18 @@ hardware controller. That is steps 1 to 3 below; the rest are still to do.
 What is left:
 
 - **MIDI into FL Studio.** The owner went through the nine steps of trying it
-  in FL Studio 2026 (26.1.7, under Rosetta) on 2026-11-22, and eight held: it
+  in FL Studio 2026 (26.1.7, under Rosetta) on 2026-11-22, and they held: it
   scans and opens, notes play the voices, a parameter follows a hardware
   controller, a beat loads and its pattern plays with FL's transport, the step
   keys, dice and undo work while it plays, a project saved and reopened comes
-  back, a saved beat opens on the site, and the window resizes. The ninth did
-  not settle. Dragging the MIDI key onto FL's playlist shows FL's paintbrush
+  back, a saved beat opens on the site, and the window resizes. The ninth
+  took finding. Dragging the MIDI key onto FL's playlist shows FL's paintbrush
   and drops nothing, and so does dragging the saved `.mid` there from the
   Finder, so the plugin's drag does what the Finder's does and the playlist
-  is not where FL takes a MIDI file. The saved `.mid` dragged from the Finder
-  onto the Channel Rack does import. Still to try: the MIDI key dragged
-  straight onto the Channel Rack, without saving first. An automation clip,
-  as against a linked controller, is untried too.
+  is not where FL takes a MIDI file. The Channel Rack is: the MIDI key dragged
+  straight onto it imports the pattern, and so does the saved `.mid` from the
+  Finder. So all nine held, once the right place to drop was found. An
+  automation clip, as against a linked controller, is untried.
 - **A build FL has seen before.** FL crashed the first time, as the plugin was
   added: its plugin database still held the earlier spike's class ID under the
   same name. `plugins/vst3/README.md` says how to clear it.
