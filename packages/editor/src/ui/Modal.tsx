@@ -19,6 +19,8 @@ export interface ModalProps {
   /** Where the modal mounts, so it inherits the page's theme. */
   container: RefObject<HTMLElement | null>;
   className?: string;
+  /** A fixed, larger size, for a modal that is a page of its own. */
+  wide?: boolean;
   /** Set both to control it from outside; leave both out and it looks after itself. */
   open?: boolean;
   onOpenChange?(open: boolean): void;
@@ -51,6 +53,7 @@ export function Modal(props: ModalProps) {
             pointer it is left alone, so Space plays instead of reopening this. */}
         <Dialog.Popup
           className="sb-modal"
+          data-wide={props.wide ? '' : undefined}
           data-testid={`${testId}-modal`}
           finalFocus={(closeType) => closeType === 'keyboard'}
         >

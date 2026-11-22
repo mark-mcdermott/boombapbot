@@ -1267,11 +1267,6 @@
   padding: 0 12px;
 }
 
-.sb-account-leave {
-  margin-top: 22px;
-  padding-top: 18px;
-  border-top: 1px solid var(--color-line-soft);
-}
 
 @media (max-width: 480px) {
   .sb-beat {
@@ -1318,46 +1313,212 @@
   transform: scale(1.06);
 }
 
-.sb-profile {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 18px;
+/* ---- The account's page ---------------------------------------------------- */
+
+/* Logged in, the modal is a page of a fixed size: who it is down the left,
+   their beats on the right. Only the right side scrolls. */
+.sb-modal[data-wide] {
+  width: min(920px, calc(100vw - 24px));
+  height: min(640px, calc(100dvh - 24px));
 }
 
-.sb-profile-who {
-  min-width: 0;
+.sb-modal[data-wide] .sb-modal-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.sb-modal[data-wide] .sb-account-notice {
+  margin: 16px 24px 0;
+}
+
+.sb-account-page {
+  display: grid;
   flex: 1;
+  grid-template-columns: 264px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.sb-account-side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px 22px 22px;
+  border-right: 1px solid var(--color-line-soft);
+  border-bottom-left-radius: 15px;
+  background: color-mix(in srgb, var(--color-bg) 55%, var(--color-panel));
+}
+
+.sb-account-main {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 26px 28px;
+}
+
+.sb-account-heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sb-account-main .sb-beats {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sb-account-main .sb-beats .sb-form {
+  margin-top: 16px;
+}
+
+.sb-account-main .sb-button-primary {
+  align-self: flex-start;
+}
+
+.sb-account-main .sb-beats-empty {
+  margin-top: 20px;
+  padding: 44px 24px;
+  border: 1px dashed var(--color-line);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.sb-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .sb-profile-label {
-  margin: 0;
+  margin: 16px 0 0;
   color: var(--color-dim);
   font-size: 13px;
 }
 
 .sb-profile-address {
-  margin: 1px 0 0;
-  font-size: 16px;
+  max-width: 100%;
+  margin: 2px 0 0;
+  font-size: 15px;
   overflow-wrap: anywhere;
 }
 
 .sb-profile-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  gap: 6px 16px;
-  margin-top: 10px;
+  gap: 6px;
+  width: 100%;
+  margin-top: 16px;
   font-size: 14px;
 }
 
 .sb-profile-actions .sb-button {
-  min-height: 36px;
-  padding: 0 12px;
+  width: 100%;
 }
 
 .sb-profile .sb-form-problem {
-  margin-top: 8px;
+  margin-top: 10px;
+}
+
+/* Leaving sits at the foot of the side, away from everything else. */
+.sb-account-leave {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  font-size: 14px;
+}
+
+.sb-account-leave .sb-button {
+  width: 100%;
+}
+
+.sb-app .sb-account-leave .sb-link {
+  color: var(--color-dim);
+  font-weight: 500;
+}
+
+.sb-app .sb-account-leave .sb-link:hover {
+  color: var(--color-danger);
+  text-decoration-color: var(--color-danger);
+}
+
+/* Too narrow for two columns: who it is goes across the top, and the whole
+   page scrolls as one. */
+@media (max-width: 720px) {
+  .sb-modal[data-wide] .sb-modal-body {
+    overflow-y: auto;
+  }
+
+  .sb-account-page {
+    display: block;
+  }
+
+  .sb-account-side {
+    gap: 18px;
+    overflow: visible;
+    padding: 20px 20px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line-soft);
+    border-bottom-left-radius: 0;
+  }
+
+  .sb-profile {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 16px;
+    text-align: left;
+  }
+
+  .sb-profile .sb-avatar {
+    grid-row: span 3;
+    width: 72px !important;
+    height: 72px !important;
+  }
+
+  .sb-profile-label {
+    margin-top: 0;
+  }
+
+  .sb-profile-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 10px;
+  }
+
+  .sb-profile-actions .sb-button {
+    width: auto;
+    min-height: 36px;
+    padding: 0 12px;
+  }
+
+  .sb-profile .sb-form-problem {
+    grid-column: 1 / -1;
+  }
+
+  .sb-account-leave {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+
+  .sb-account-leave .sb-button {
+    width: auto;
+  }
+
+  .sb-account-main {
+    overflow: visible;
+    padding: 20px 20px 24px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
