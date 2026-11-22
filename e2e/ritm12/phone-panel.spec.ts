@@ -205,7 +205,8 @@ test('a control touched on the phone’s panel says in English what it is on the
   await expect(readout).toHaveAttribute('data-text', `Tempo: ${before} beats a minute`);
   expect((await beat(page)).tempo).toBe(before);
 
-  // It is a row of its own under the screen's frame, as wide as the frame, one line tall, and goes quiet again.
+  // It is a box of its own under the screen's frame, as wide as the frame, one line tall, with its name, and goes quiet again.
+  await expect(page.getByTestId('readout-name')).toHaveText('СТАТУС');
   const frame = (await page.locator('.rt-ph-crt').boundingBox())!;
   const strip = (await readout.boundingBox())!;
   expect(strip.y).toBeGreaterThanOrEqual(frame.y + frame.height);

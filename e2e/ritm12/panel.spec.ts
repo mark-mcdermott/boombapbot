@@ -21,7 +21,7 @@ test('the machine is its picture, with every control inside it', async ({ page }
   const images = await page.locator('.rt-plate, .rt-patch').evaluateAll((nodes) =>
     nodes.map((node) => ({ src: (node as HTMLImageElement).src, loaded: (node as HTMLImageElement).naturalWidth > 0 })),
   );
-  expect(images.length).toBe(7 + 8);
+  expect(images.length).toBe(7 + 8 + 1);
   expect(images.every((image) => image.loaded && image.src.includes('/machines/ritm12/'))).toBe(true);
   // Each instrument key wears its drawing, whatever the controls are set to.
   const drawings = page.locator('.rt-patch[src*="/patch/key-"]');
@@ -117,16 +117,17 @@ test('knobs turn by keyboard and by dragging, and say where they stand', async (
   await expect(page.getByTestId('pitch')).toHaveAccessibleName('Perc pitch');
 });
 
-test('the readout under the screen says in English what a control is or did', async ({ page }) => {
+test('the status readout has a box of its own, and says in English what a control is or did', async ({ page }) => {
   const readout = page.getByTestId('readout');
   const screen = (await page.getByTestId('screen').boundingBox())!;
+  const needle = (await page.locator('.rt-meter').boundingBox())!;
   const strip = (await readout.boundingBox())!;
-  // A module of its own on the frame's lower lip: centred under the screen, wider than the glass, one line tall.
-  expect(Math.abs(strip.x + strip.width / 2 - (screen.x + screen.width / 2))).toBeLessThanOrEqual(3);
-  expect(strip.width).toBeGreaterThan(screen.width);
-  expect(strip.y).toBeGreaterThanOrEqual(screen.y + screen.height);
-  expect(strip.y - (screen.y + screen.height)).toBeLessThan(screen.height / 4);
-  expect(strip.height).toBeLessThan(screen.height / 4);
+  // Its box is under the level meter's, clear of the screen and its frame, and is lettered with its name.
+  expect(strip.x + strip.width).toBeLessThan(screen.x);
+  expect(strip.y).toBeGreaterThan(needle.y + needle.height);
+  expect(Math.abs(strip.x + strip.width / 2 - (needle.x + needle.width / 2))).toBeLessThanOrEqual(3);
+  await expect(page.getByTestId('readout-name')).toHaveText('СТАТУС');
+  await expect(page.locator('.rt-patch[src*="/patch/status"]')).toBeVisible();
 
   // Left alone, it says where the machine stands rather than going blank.
   await expect(readout).toHaveAttribute('data-shown', /^PATTERN A {2}KICK {2}\d+ BPM$/);

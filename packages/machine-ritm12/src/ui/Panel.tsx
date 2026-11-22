@@ -13,7 +13,7 @@ import {
   PATTERN_KEYS,
   PLATE,
   POWER_LAMP,
-  READOUT,
+  STATUS,
   STEP_KEYS,
   SWITCHES,
   type Rect,
@@ -95,6 +95,7 @@ function PicturePanel() {
               {INSTRUMENTS.map(({ voice, ink }) => (
                 <Patch key={voice} rect={ink} name={`key-${voice}`} shown />
               ))}
+              <Patch rect={STATUS.patch} name="status" shown />
               <Patch rect={PATCHES.power} name="power-on" shown={power} />
               <Patch rect={PATCHES.write} name="write-accents" shown={wiring.write === 'accents'} />
               <Patch rect={PATCHES.size} name="size-16" shown={wiring.size === 16} />
@@ -115,8 +116,8 @@ function PicturePanel() {
               ) : null}
 
               <ScreenAndMeter line={wiring.line} />
-              <div className="rt-readout-slot" style={boxOf(READOUT)}>
-                <Readout className="rt-readout-plate" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
+              <div className="rt-readout-slot" style={boxOf(STATUS.box)}>
+                <Readout className="rt-readout-plate" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
               </div>
 
               <Key rect={BUTTONS.power} {...keys.power} />
@@ -137,7 +138,9 @@ function PicturePanel() {
                 })}
 
                 {STEP_KEYS.map((rect, index) => (
-                  <Key key={index} rect={rect} {...wiring.steps[index]!} />
+                  <Key key={index} rect={rect} {...wiring.steps[index]!}>
+                    <i className="rt-pip" />
+                  </Key>
                 ))}
                 {PATTERN_KEYS.map((rect, index) => (
                   <Key key={index} rect={rect} {...wiring.patterns[index]!} />

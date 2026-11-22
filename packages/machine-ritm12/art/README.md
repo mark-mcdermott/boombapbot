@@ -15,6 +15,10 @@ does not have.
   lays one over the plate. It also holds the end of each instrument key
   (`key-*.png`) with the instrument drawn as `instrument-icons.svg` has it,
   which the page always lays over the plate.
+- **`patch/status.png`** is the level meter's box done again with room
+  under it for the status readout: the meter smaller, and a second box
+  below, both from the plate's own paint. [`cut-status.py`](cut-status.py)
+  makes it, and the page always lays it over the plate.
 - **`instrument-icons.svg`** is the owner's drawing of the eight instruments
   in one picture. [`cut-icons.py`](cut-icons.py) cuts each from it, as the
   phone's `phone/ink-*.svg` and printed onto its key for `patch/key-*.png`.

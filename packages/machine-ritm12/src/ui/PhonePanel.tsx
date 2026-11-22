@@ -197,7 +197,7 @@ export function PhonePanel() {
             </div>
           </div>
 
-          <Readout className="rt-readout-phone" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={26} />
+          <Readout className="rt-readout-phone" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
 
           {/* Everything but the power switch: dark and out of reach while the machine is off. */}
           <div className="rt-ph-controls" inert={!power}>
@@ -230,6 +230,7 @@ export function PhonePanel() {
               <div className="rt-ph-steps">
                 {wiring.steps.map((step, index) => (
                   <Key key={index} className="rt-ph-key rt-ph-cap rt-ph-step" {...step}>
+                    <i className="rt-pip" />
                     <b>{index + 1}</b>
                   </Key>
                 ))}
