@@ -1180,6 +1180,16 @@
   margin-top: 12px;
 }
 
+/* A name and the button that saves under it, as one line. */
+.sb-beats-save {
+  display: flex;
+  gap: 8px;
+}
+
+.sb-beats-save .sb-button {
+  flex: none;
+}
+
 .sb-beats .sb-hint {
   font-size: 13px;
   line-height: 1.5;
@@ -1250,6 +1260,11 @@
 .sb-beat-name {
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+
+.sb-beat-rename {
+  height: 36px;
+  font-weight: 600;
 }
 
 .sb-beat-when,

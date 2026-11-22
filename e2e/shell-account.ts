@@ -39,20 +39,27 @@ export async function accountFromSignUpToDeletion(page: Page, context: BrowserCo
   await expect(page.getByTestId('account-address')).toHaveText(address);
   expect(await context.cookies()).toEqual([]);
 
+  await page.getByTestId('beats-save-name').fill('Pocket beat');
   await page.getByTestId('beats-save').click();
-  await expect(page.getByTestId('beats-said')).toContainText('to your account.');
+  await expect(page.getByTestId('beats-said')).toHaveText('Saved “Pocket beat” to your account.');
 
   await page.reload();
   await expect(page.getByTestId('editor')).toBeVisible();
   await openAccount(page);
   await expect(page.getByTestId('account-address')).toHaveText(address);
-  await expect(page.getByTestId('beats')).toContainText('Starter beat');
+  await expect(page.getByTestId('beats')).toContainText('Pocket beat');
+
+  // A new name goes by a method the site has to allow from another origin by name.
+  const saved = page.getByTestId('beat').first();
+  await saved.getByTestId('beat-edit').click();
+  await saved.getByTestId('beat-rename-name').fill('Pocket beat, renamed');
+  await saved.getByTestId('beat-rename-save').click();
+  await expect(page.getByTestId('beats-said')).toHaveText('Renamed “Pocket beat” to “Pocket beat, renamed”.');
 
   // A delete has no body. The site refuses one from another origin unless it names a type all the same.
-  const saved = page.getByTestId('beat').first();
   await saved.getByTestId('beat-delete').click();
   await saved.getByTestId('beat-delete-confirm').click();
-  await expect(page.getByTestId('beats-said')).toHaveText('Deleted “Starter beat” from your account.');
+  await expect(page.getByTestId('beats-said')).toHaveText('Deleted “Pocket beat, renamed” from your account.');
   await expect(page.getByTestId('beat')).toHaveCount(0);
 
   await page.getByTestId('account-log-out').click();

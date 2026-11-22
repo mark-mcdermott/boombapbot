@@ -1,7 +1,21 @@
 import type { APIRoute } from 'astro';
-import { ReplaceBeatRequestSchema, cloudCopyIsNewer } from '@boombapbot/contracts';
+import {
+  RenameBeatRequestSchema,
+  ReplaceBeatRequestSchema,
+  beatBytes,
+  beatTooLarge,
+  cloudCopyIsNewer,
+} from '@boombapbot/contracts';
 import { and, eq } from 'drizzle-orm';
-import { beatSummary, deleteBeat, ownedBeat, readBeatRequest, refuse, signedIn } from '../../../server/beats';
+import {
+  beatSummary,
+  deleteBeat,
+  ownedBeat,
+  readBeatChange,
+  readBeatRequest,
+  refuse,
+  signedIn,
+} from '../../../server/beats';
 import { getDb } from '../../../server/db';
 import { beat } from '../../../server/db/schema';
 import { json } from '../../../server/site';
@@ -57,6 +71,36 @@ export const PUT: APIRoute = async ({ request, params }) => {
 
   const [after] = await current();
   return after ? refuse('conflict', { updatedAt: after.updatedAt }) : refuse('not_found');
+};
+
+/**
+ * Gives a saved beat another name, in its row and in its project, which carry
+ * the same one. When it was saved stays as it was: the beat itself has not
+ * changed, so a device that has it is not behind. The row must still be the
+ * one just read, as with a save, so a save that lands in between is not undone.
+ */
+export const PATCH: APIRoute = async ({ request, params }) => {
+  const asked = await readBeatChange(request, RenameBeatRequestSchema);
+  if ('refusal' in asked) return asked.refusal;
+  const owned = ownedBeat(asked.user, params.id);
+  if (!owned) return refuse('not_found');
+
+  const db = await getDb();
+  const [before] = await db
+    .select({ id: beat.id, project: beat.project, updatedAt: beat.updatedAt })
+    .from(beat)
+    .where(owned)
+    .limit(1);
+  if (!before) return refuse('not_found');
+  const project = { ...before.project, name: asked.data.name };
+  const bytes = beatBytes(project);
+  if (beatTooLarge(bytes)) return refuse('too_large');
+  const [renamed] = await db
+    .update(beat)
+    .set({ name: project.name, project, bytes })
+    .where(and(eq(beat.id, before.id), eq(beat.updatedAt, before.updatedAt)))
+    .returning(beatSummary);
+  return renamed ? json({ beat: renamed }) : refuse('conflict');
 };
 
 /** Deletes a saved beat for good. */

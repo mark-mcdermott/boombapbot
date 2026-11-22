@@ -1,7 +1,17 @@
-import { beatLimitReached, formatKilobytes, type BeatSummary } from '@boombapbot/contracts';
-import { useContext, useEffect, useId, useRef, useState } from 'react';
+import { MAX_BEAT_NAME_LENGTH, beatLimitReached, formatKilobytes, type BeatSummary } from '@boombapbot/contracts';
+import { Save } from 'lucide-react';
+import { useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { deviceBeatLinks } from '../account/beat-links';
-import { deleteBeat, fetchBeat, listBeats, replaceBeat, saveNewBeat, type Asked } from '../account/beats';
+import {
+  defaultBeatName,
+  deleteBeat,
+  fetchBeat,
+  listBeats,
+  renameBeat,
+  replaceBeat,
+  saveNewBeat,
+  type Asked,
+} from '../account/beats';
 import { draftKeeper, draftKeptWhere, explain } from '../account/client';
 import type { EditorRuntime } from '../runtime';
 import { RuntimeContext, useEditorState } from './context';
@@ -12,7 +22,7 @@ type Loaded =
   | { state: 'ready'; beats: BeatSummary[]; limit: number };
 
 /** The one call to the server that is under way, and the beat it is about. */
-type Busy = { doing: 'saving' } | { doing: 'loading' | 'deleting'; beat: string } | null;
+type Busy = { doing: 'saving' } | { doing: 'loading' | 'renaming' | 'deleting'; beat: string } | null;
 
 /** A save the server held back: the cloud copy is newer than the one this device last had. */
 interface Conflict {
@@ -32,37 +42,80 @@ interface BeatRowProps {
   current: boolean;
   busy: Busy;
   onLoad(): void;
+  /** Answers whether the beat has its new name, so the row knows to stop asking for one. */
+  onRename(name: string): Promise<boolean>;
   onDelete(): void;
 }
 
-function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
-  const [confirming, setConfirming] = useState(false);
+/** What a row is showing in place of its buttons, if anything. */
+type Asking = 'name' | 'delete' | null;
+
+function BeatRow({ beat, current, busy, onLoad, onRename, onDelete }: BeatRowProps) {
+  const [asking, setAsking] = useState<Asking>(null);
+  const [draft, setDraft] = useState(beat.name);
+  const nameField = useRef<HTMLInputElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
   const deleteButton = useRef<HTMLButtonElement>(null);
   const keepButton = useRef<HTMLButtonElement>(null);
-  const wasConfirming = useRef(false);
+  const wasAsking = useRef<Asking>(null);
   const mine = busy && 'beat' in busy && busy.beat === beat.id ? busy.doing : null;
+  const wanted = draft.trim();
 
-  // Asking puts focus on the answer that loses nothing, and turning the
-  // question down puts it back where it came from. Both are done by hand: a
-  // browser that does not focus a button when it is clicked, as Safari does
-  // not, would otherwise leave focus behind on the modal.
+  // Asking puts focus where the answer goes: on the name, or on the answer
+  // that loses nothing. Leaving a question puts it back on the button that
+  // raised it. Both are done by hand: a browser that does not focus a button
+  // when it is clicked, as Safari does not, would otherwise leave focus
+  // behind on the modal.
   useEffect(() => {
-    if (confirming) keepButton.current?.focus();
-    else if (wasConfirming.current) deleteButton.current?.focus();
-    wasConfirming.current = confirming;
-  }, [confirming]);
+    if (asking === 'name') nameField.current?.select();
+    else if (asking === 'delete') keepButton.current?.focus();
+    else if (wasAsking.current === 'name') editButton.current?.focus();
+    else if (wasAsking.current === 'delete') deleteButton.current?.focus();
+    wasAsking.current = asking;
+  }, [asking]);
+
+  const rename = async () => {
+    if (!wanted || wanted === beat.name) {
+      setAsking(null);
+      return;
+    }
+    if (await onRename(wanted)) setAsking(null);
+  };
 
   return (
     <li className="sb-beat" data-testid="beat" aria-current={current ? 'true' : undefined}>
       <div className="sb-beat-what">
-        <span className="sb-beat-name" data-testid="beat-name-saved">
-          {beat.name}
-        </span>
+        {asking === 'name' ? (
+          <input
+            ref={nameField}
+            className="sb-input sb-beat-rename"
+            data-testid="beat-rename-name"
+            aria-label={`New name for ${beat.name}`}
+            value={draft}
+            maxLength={MAX_BEAT_NAME_LENGTH}
+            spellCheck={false}
+            autoComplete="off"
+            disabled={mine === 'renaming'}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void rename();
+              if (event.key === 'Escape') {
+                // Drop the edit, and keep the key from also closing the modal.
+                event.stopPropagation();
+                setAsking(null);
+              }
+            }}
+          />
+        ) : (
+          <span className="sb-beat-name" data-testid="beat-name-saved">
+            {beat.name}
+          </span>
+        )}
         <span className="sb-beat-when">
           Saved <When at={beat.updatedAt} /> · {formatKilobytes(beat.bytes)}
         </span>
       </div>
-      {confirming ? (
+      {asking === 'delete' && (
         <div key="question" className="sb-beat-actions" role="group" aria-label={`Delete ${beat.name}?`}>
           <span className="sb-beat-ask">Delete it for good?</span>
           <button
@@ -70,7 +123,7 @@ function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
             className="sb-button"
             type="button"
             data-testid="beat-delete-cancel"
-            onClick={() => setConfirming(false)}
+            onClick={() => setAsking(null)}
           >
             Keep it
           </button>
@@ -79,14 +132,37 @@ function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
             type="button"
             data-testid="beat-delete-confirm"
             onClick={() => {
-              setConfirming(false);
+              setAsking(null);
               onDelete();
             }}
           >
             Delete it
           </button>
         </div>
-      ) : (
+      )}
+      {asking === 'name' && (
+        <div key="name" className="sb-beat-actions">
+          <button
+            className="sb-button sb-button-primary"
+            type="button"
+            data-testid="beat-rename-save"
+            disabled={!wanted || mine === 'renaming'}
+            onClick={() => void rename()}
+          >
+            {mine === 'renaming' ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            className="sb-button"
+            type="button"
+            data-testid="beat-rename-cancel"
+            disabled={mine === 'renaming'}
+            onClick={() => setAsking(null)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {asking === null && (
         <div key="actions" className="sb-beat-actions">
           <button
             className="sb-button"
@@ -99,13 +175,27 @@ function BeatRow({ beat, current, busy, onLoad, onDelete }: BeatRowProps) {
             {mine === 'loading' ? 'Loading…' : 'Load'}
           </button>
           <button
+            ref={editButton}
+            className="sb-button"
+            type="button"
+            data-testid="beat-edit"
+            aria-label={`Edit the name of ${beat.name}`}
+            disabled={busy !== null}
+            onClick={() => {
+              setDraft(beat.name);
+              setAsking('name');
+            }}
+          >
+            Edit
+          </button>
+          <button
             ref={deleteButton}
             className="sb-button sb-button-danger"
             type="button"
             data-testid="beat-delete"
             aria-label={`Delete ${beat.name} from your account`}
             disabled={busy !== null}
-            onClick={() => setConfirming(true)}
+            onClick={() => setAsking('delete')}
           >
             {mine === 'deleting' ? 'Deleting…' : 'Delete'}
           </button>
@@ -127,14 +217,22 @@ interface SavedBeatsProps {
 function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { runtime: EditorRuntime }) {
   const projectId = useEditorState((state) => state.project.id);
   const projectName = useEditorState((state) => state.project.name);
+  // What the machine calls a beat nobody has named, which says nothing about the beat.
+  const starterName = useMemo(
+    () => runtime.machine.document.create({ id: projectId, now: new Date() }).name,
+    [runtime],
+  );
   const [list, setList] = useState<Loaded>({ state: 'loading' });
   const [busy, setBusy] = useState<Busy>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [said, setSaid] = useState('');
   const [conflict, setConflict] = useState<Conflict | null>(null);
+  const [name, setName] = useState('');
+  const [unnamed, setUnnamed] = useState(() => defaultBeatName(new Date()));
   const saveButton = useRef<HTMLButtonElement>(null);
   const questionId = useId();
   const links = deviceBeatLinks();
+  const linked = links.get(account, projectId)?.beat;
 
   const show = (asked: Asked<{ beats: BeatSummary[]; limit: number }>) => {
     if (!asked.ok) {
@@ -169,6 +267,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
 
   /** Saves what is on the machine: over `into`, or as a new beat when there is none. */
   const save = async (into: BeatSummary | null, overwrite = false) => {
+    runtime.store.setName(name.trim() || unnamed);
     const { project } = runtime.store.getState();
     const lastSeen = into ? links.get(account, project.id)?.seen : undefined;
     begin({ doing: 'saving' });
@@ -184,6 +283,8 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
       setList((now) =>
         now.state === 'ready' ? { ...now, beats: [beat, ...now.beats.filter((other) => other.id !== beat.id)] } : now,
       );
+      setName(beat.name);
+      setUnnamed(defaultBeatName(new Date()));
       setSaid(`Saved “${beat.name}” to your account.`);
       return;
     }
@@ -220,6 +321,33 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
     close();
   };
 
+  const rename = async (beat: BeatSummary, to: string): Promise<boolean> => {
+    begin({ doing: 'renaming', beat: beat.id });
+    const asked = await renameBeat(baseUrl, beat.id, to);
+    setBusy(null);
+    if (!asked.ok) {
+      const { failure } = asked;
+      setProblem(
+        failure.code === 'conflict' ? 'That beat was saved again just now. Give it the name once more.' : explain(failure),
+      );
+      if (failure.code === 'conflict' || failure.code === 'not_found') void refresh();
+      return false;
+    }
+    const renamed = asked.answer.beat;
+    setList((now) =>
+      now.state === 'ready'
+        ? { ...now, beats: now.beats.map((other) => (other.id === renamed.id ? renamed : other)) }
+        : now,
+    );
+    // The beat on the machine carries the same name, or its next save would put the old one back.
+    if (renamed.id === linked) {
+      runtime.store.setName(renamed.name);
+      setName(renamed.name);
+    }
+    setSaid(`Renamed “${beat.name}” to “${renamed.name}”.`);
+    return true;
+  };
+
   const remove = async (beat: BeatSummary) => {
     begin({ doing: 'deleting', beat: beat.id });
     const asked = await deleteBeat(baseUrl, beat.id);
@@ -234,8 +362,17 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
   };
 
   const ready = list.state === 'ready' ? list : null;
-  const link = links.get(account, projectId);
-  const target = (link && ready?.beats.find((beat) => beat.id === link.beat)) || null;
+  const target = ready?.beats.find((beat) => beat.id === linked) ?? null;
+  const targetId = target?.id;
+
+  // The name offered is the one the beat on the machine is saved under, or
+  // the one it was given, and none for a beat nobody has named. It follows
+  // which beat that is, not the list, so a name being typed is not written
+  // over when the list is fetched again.
+  useEffect(
+    () => setName(target?.name ?? (projectName === starterName ? '' : projectName)),
+    [targetId, projectId],
+  );
   const full = ready !== null && beatLimitReached(ready.beats.length, ready.limit);
   const saving = busy?.doing === 'saving';
   // The list is fetched again when a save is held back, so the question uses the name as it is now.
@@ -245,7 +382,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
     <section className="sb-beats" data-testid="beats" aria-labelledby={`${questionId}-title`}>
       <div className="sb-beats-head">
         <h3 className="sb-account-heading" id={`${questionId}-title`}>
-          Saved beats
+          My Beats
         </h3>
         {ready && (
           <span className="sb-beats-count" data-testid="beats-count">
@@ -254,19 +391,45 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
         )}
       </div>
 
-      <div className="sb-form">
-        <button
-          ref={saveButton}
-          className="sb-button sb-button-primary"
-          type="button"
-          data-testid="beats-save"
-          disabled={!ready || busy !== null || (full && !target)}
-          onClick={() => void save(target)}
-        >
-          {saving ? 'Saving…' : 'Save this beat to my account'}
-        </button>
+      <form
+        className="sb-form"
+        data-testid="beats-save-form"
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          void save(target);
+        }}
+      >
+        <div className="sb-field">
+          <label className="sb-label" htmlFor={`${questionId}-name`}>
+            Name
+          </label>
+          <div className="sb-beats-save">
+            <input
+              id={`${questionId}-name`}
+              className="sb-input"
+              data-testid="beats-save-name"
+              value={name}
+              placeholder={unnamed}
+              maxLength={MAX_BEAT_NAME_LENGTH}
+              spellCheck={false}
+              autoComplete="off"
+              aria-describedby={`${questionId}-hint`}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <button
+              ref={saveButton}
+              className="sb-button sb-button-primary"
+              type="submit"
+              data-testid="beats-save"
+              disabled={!ready || busy !== null || (full && !target)}
+            >
+              <Save aria-hidden="true" />
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
         {ready && (
-          <p className="sb-hint" data-testid="beats-save-hint">
+          <p className="sb-hint" id={`${questionId}-hint`} data-testid="beats-save-hint">
             {target ? (
               <>
                 This replaces “{target.name}”, saved <When at={target.updatedAt} />.{' '}
@@ -285,7 +448,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
             ) : full ? (
               `Your account is full: it holds ${ready.limit} beats. Delete one to save another.`
             ) : (
-              `This puts a copy of “${projectName}” in your account. The machine keeps working from ${draftKeeper()}.`
+              `This puts a copy of the beat on the machine in your account. The machine keeps working from ${draftKeeper()}.`
             )}
           </p>
         )}
@@ -334,11 +497,11 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
         <p className="sb-hint sb-beats-said" role="status" data-testid="beats-said">
           {said}
         </p>
-      </div>
+      </form>
 
       {list.state === 'loading' && (
         <p className="sb-modal-text" role="status" data-testid="beats-loading">
-          Fetching your saved beats…
+          Fetching your beats…
         </p>
       )}
       {list.state === 'failed' && (
@@ -373,6 +536,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
               current={beat.id === target?.id}
               busy={busy}
               onLoad={() => void load(beat)}
+              onRename={(to) => rename(beat, to)}
               onDelete={() => void remove(beat)}
             />
           ))}

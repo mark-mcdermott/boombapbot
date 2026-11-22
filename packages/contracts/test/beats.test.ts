@@ -3,6 +3,8 @@ import {
   BeatRefusalSchema,
   FREE_BEAT_LIMIT,
   MAX_BEAT_BYTES,
+  MAX_BEAT_NAME_LENGTH,
+  RenameBeatRequestSchema,
   ReplaceBeatRequestSchema,
   beatBytes,
   beatLimitReached,
@@ -75,5 +77,18 @@ describe('the conflict rule', () => {
     const refusal = BeatRefusalSchema.parse({ code: 'conflict', message: 'Newer.', updatedAt: seen });
     expect(refusal.updatedAt).toBe(seen);
     expect(BeatRefusalSchema.safeParse({ code: 'unheard-of', message: '' }).success).toBe(false);
+  });
+});
+
+describe('a new name for a saved beat', () => {
+  it('is trimmed, and is as long as a project’s name may be', () => {
+    expect(RenameBeatRequestSchema.parse({ name: '  Night shift  ' })).toEqual({ name: 'Night shift' });
+    expect(RenameBeatRequestSchema.safeParse({ name: 'x'.repeat(MAX_BEAT_NAME_LENGTH) }).success).toBe(true);
+  });
+
+  it('is refused when it is empty, only spaces, too long or not text', () => {
+    for (const name of ['', '   ', 'x'.repeat(MAX_BEAT_NAME_LENGTH + 1), 7, undefined]) {
+      expect(RenameBeatRequestSchema.safeParse({ name }).success).toBe(false);
+    }
   });
 });

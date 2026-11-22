@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BEAT_LINKS_KEY, BeatLinks } from '../src/account/beat-links';
+import { defaultBeatName } from '../src/account/beats';
 import type { KeyValueStorage } from '../src/state/draft-storage';
 
 class MemoryStorage implements KeyValueStorage {
@@ -75,5 +76,12 @@ describe('what this device remembers about saved beats', () => {
       links.set('account', 'project', { beat: 'beat-1', seen: SEEN });
       expect(links.get('account', 'project')).toEqual({ beat: 'beat-1', seen: SEEN });
     }
+  });
+});
+
+describe('the name of a beat saved without one', () => {
+  it('is the moment it was offered, to the second, on this device’s clock', () => {
+    expect(defaultBeatName(new Date(2026, 10, 22, 8, 4, 9))).toBe('beat-20261122-080409');
+    expect(defaultBeatName(new Date(2027, 0, 1, 23, 59, 59))).toBe('beat-20270101-235959');
   });
 });

@@ -105,6 +105,19 @@ function parseJson(text: string): unknown {
   }
 }
 
+/** Reads a request about a beat that carries no project: who is asking, and what they sent. */
+export async function readBeatChange<Body>(
+  request: Request,
+  schema: z.ZodType<Body>,
+): Promise<{ user: SignedInUser; data: Body } | Refused> {
+  const asked = await signedIn(request);
+  if ('refusal' in asked) return asked;
+  const text = await readBody(request);
+  if (text === null) return { refusal: refuse('too_large') };
+  const body = schema.safeParse(parseJson(text));
+  return body.success ? { user: asked.user, data: body.data } : { refusal: refuse('invalid') };
+}
+
 /**
  * Reads a beat to save: who is saving it, and the project, weighed and then
  * checked against the project schema. What comes back is either what the
@@ -114,21 +127,17 @@ export async function readBeatRequest<Body extends { project?: unknown }>(
   request: Request,
   schema: z.ZodType<Body>,
 ): Promise<{ user: SignedInUser; data: Body; project: ProjectBase; bytes: number } | Refused> {
-  const asked = await signedIn(request);
+  const asked = await readBeatChange(request, schema);
   if ('refusal' in asked) return asked;
-  const text = await readBody(request);
-  if (text === null) return { refusal: refuse('too_large') };
-  const body = schema.safeParse(parseJson(text));
-  if (!body.success) return { refusal: refuse('invalid') };
-  if (beatTooLarge(beatBytes(body.data.project))) return { refusal: refuse('too_large') };
+  if (beatTooLarge(beatBytes(asked.data.project))) return { refusal: refuse('too_large') };
   // Only this machine's own beats are stored. One it could take over is not
   // converted here: the page does that, where the person sees what changed.
-  const parsed = codec.parseOwned(body.data.project);
+  const parsed = codec.parseOwned(asked.data.project);
   if (!parsed.ok) {
-    const earlier = codec.parse(body.data.project).ok;
+    const earlier = codec.parse(asked.data.project).ok;
     return { refusal: refuse('invalid', earlier ? { message: FROM_AN_EARLIER_PAGE } : undefined) };
   }
-  return { user: asked.user, data: body.data, project: parsed.project, bytes: beatBytes(parsed.project) };
+  return { ...asked, project: parsed.project, bytes: beatBytes(parsed.project) };
 }
 
 /**
