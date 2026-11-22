@@ -129,8 +129,8 @@ site its icon still opens a modal that says it is not open.
     `apps/site/drizzle/0005_beat_counts.sql` adds the table and counts the
     beats already saved. Looked at on 2026-11-22: the real database has the
     table, and its counts add up to the beats saved, so none was saved
-    uncounted between the migration and the deploy. Checked in the tests (thirty saves sent at once stop at
-    twenty, and a delete gives back one place) and against a real Postgres
+    uncounted between the migration and the deploy. Checked in the tests
+    (thirty saves sent at once stop at twenty, and a delete gives back one place) and against a real Postgres
     17 with thirty sessions at once: the new statement stopped at twenty
     and the count matched the rows, where the old count-then-insert let all
     thirty in. The tests' in-process database runs one statement at a time,
