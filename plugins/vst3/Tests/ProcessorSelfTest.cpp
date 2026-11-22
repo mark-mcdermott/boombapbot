@@ -6,6 +6,7 @@
 
 #include "BeatFile.h"
 #include "MachineRitm12.h"
+#include "Panel/StepKeys.h"
 #include "PluginProcessor.h"
 
 #include <algorithm>
@@ -905,6 +906,144 @@ void testDescription() {
         "the plugin opens a window");
 }
 
+// ---- The panel, run once ----------------------------------------------------
+
+juce::Component* titled(juce::Component& parent, const juce::String& title) {
+  for (juce::Component* child : parent.getChildren()) {
+    if (child->getTitle() == title) return child;
+    if (juce::Component* const found = titled(*child, title)) return found;
+  }
+  return nullptr;
+}
+
+// Presses the key with this title as a click does, without a mouse.
+bool press(juce::Component& window, const juce::String& title) {
+  auto* const key = dynamic_cast<juce::Button*>(titled(window, title));
+  if (key == nullptr || !key->onClick) return false;
+  key->onClick();
+  return true;
+}
+
+juce::MouseEvent mouseAt(juce::Component& component, juce::Point<int> position, juce::Point<int> pressedAt,
+                         bool dragged) {
+  const juce::Time now = juce::Time::getCurrentTime();
+  return {juce::Desktop::getInstance().getMainMouseSource(),
+          position.toFloat(),
+          juce::ModifierKeys::leftButtonModifier,
+          juce::MouseInputSource::defaultPressure,
+          juce::MouseInputSource::defaultOrientation,
+          juce::MouseInputSource::defaultRotation,
+          juce::MouseInputSource::defaultTiltX,
+          juce::MouseInputSource::defaultTiltY,
+          &component,
+          &component,
+          now,
+          pressedAt.toFloat(),
+          now,
+          1,
+          dragged};
+}
+
+void testPanel() {
+  const std::string context = "panel";
+  constexpr double rate = 48000.0;
+  constexpr int blockSize = 512;
+  using boombapbot::panel::StepKeys;
+  constexpr int accents = BoombapbotAudioProcessor::kAccentsRow;
+  constexpr int kick = 0;
+  constexpr int tom = 5;
+
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize);
+  BoombapbotAudioProcessor& machine = plugin(*processor);
+  const std::unique_ptr<juce::AudioProcessorEditor> window(processor->createEditorIfNeeded());
+  auto* const steps = dynamic_cast<StepKeys*>(titled(*window, "Step keys"));
+  check(steps != nullptr, context, "the window has the step keys");
+  if (steps == nullptr) return;
+
+  // The step keys: screen row 0 is the accents, row 1 the kick, row 6 the tom.
+  const auto centre = [](int row, int step) { return StepKeys::keyBounds(row, step).getCentre(); };
+  steps->mouseDown(mouseAt(*steps, centre(1, 0), centre(1, 0), false));
+  check(machine.stepOn(0, kick, 0), context, "a press on the kick's first step key turns that step on");
+  steps->mouseDown(mouseAt(*steps, centre(6, 2), centre(6, 2), false));
+  steps->mouseDrag(mouseAt(*steps, centre(6, 3), centre(6, 2), true));
+  steps->mouseDrag(mouseAt(*steps, centre(4, 4), centre(6, 2), true));
+  check(machine.stepOn(0, tom, 2) && machine.stepOn(0, tom, 3) && machine.stepOn(0, tom, 4) &&
+            !machine.stepOn(0, 3, 4),
+        context, "a drag along the tom's keys turns on each step it passes and stays in its row");
+  steps->mouseDown(mouseAt(*steps, centre(6, 3), centre(6, 3), false));
+  steps->mouseDown(mouseAt(*steps, centre(0, 0), centre(0, 0), false));
+  check(!machine.stepOn(0, tom, 3) && machine.stepOn(0, accents, 0), context,
+        "a press on a lit key turns it off, and the top row writes the accents");
+
+  // What was written plays: the same as the beat it amounts to, loaded from a file.
+  const juce::String written = edited(fourPatterns(), [](const juce::var& beat) {
+    const juce::var& first = beat["patterns"][0];
+    for (const char* id : {"snare", "clap", "closed_hat", "open_hat", "rim", "perc"}) {
+      put(first["steps"], id, "................");
+    }
+    put(first["steps"], "kick", "x...............");
+    put(first["steps"], "tom", "..x.x...........");
+    put(first, "accents", "x...............");
+    put(beat, "swing", 0.0);
+    put(beat["voices"]["kick"], "pitch", 0.5);
+    put(beat["mix"]["levels"], "clap", 0.75);
+    put(beat["mix"]["mutes"], "rim", false);
+    put(beat["effect"], "mix", 0.0);
+    put(beat["panel"], "pattern", 0);
+  });
+  Transport transport;
+  const int total = 2 * measureFrames(rate);
+  const std::unique_ptr<juce::AudioProcessor> loaded = makeProcessor(rate, blockSize);
+  plugin(*loaded).loadBeat(written);
+  const Stereo byHand = renderPlaying(*processor, transport, 0.0, {}, total, blockSize, rate);
+  check(peak(byHand) > kAudible &&
+            identical(byHand, renderPlaying(*loaded, transport, 0.0, {}, total, blockSize, rate)),
+        context, "a pattern written on the step keys plays the same samples as that beat loaded from a file");
+  check(machine.playingStep() == 15 && machine.playingPattern() == 0, context,
+        text("after two measures the sequencer says it last played step 15 of pattern 0 (step %d, pattern %d)",
+             machine.playingStep(), machine.playingPattern()));
+  render(*processor, {}, blockSize, blockSize);
+  check(machine.playingStep() == -1, context, "with no host playing it says no step is playing");
+
+  // The keys.
+  check(press(*window, juce::String("Pattern ") + juce::String::fromUTF8("Б")) &&
+            juce::exactlyEqual(valueOf(*processor, "pattern"), 1.0f),
+        context, "the pattern key Б chooses pattern Б");
+  check(press(*window, "Flanger") && juce::exactlyEqual(valueOf(*processor, "effect_kind"), 3.0f), context,
+        "the flanger's key chooses the flanger");
+  check(press(*window, "Twelve triplet steps to the measure") && machine.measureSize() == 12 &&
+            press(*window, "Sixteen steps to the measure") && machine.measureSize() == 16,
+        context, "the 12 and 16 keys set how many steps a measure has");
+  auto* const mute = dynamic_cast<juce::Button*>(titled(*window, "Mute Rim"));
+  if (mute != nullptr) mute->setToggleState(true, juce::sendNotificationSync);
+  check(mute != nullptr && juce::exactlyEqual(valueOf(*processor, "rim_mute"), 1.0f), context,
+        "the rim's mute key mutes the rim");
+
+  render(*processor, {}, framesFor(3.0, rate), blockSize);
+  const bool pressed = press(*window, "Tom");
+  const Stereo auditioned = render(*processor, {}, framesFor(0.2, rate), blockSize);
+  check(pressed && peak(auditioned) > kAudible, context,
+        text("a voice's key plays the voice (peak %.4f)", static_cast<double>(peak(auditioned))));
+  auto* const pitch = dynamic_cast<juce::Slider*>(titled(*window, "Pitch"));
+  if (pitch != nullptr) pitch->setValue(0.9, juce::sendNotificationSync);
+  check(pitch != nullptr && std::abs(valueOf(*processor, "tom_pitch") - 0.9f) < 1e-6f &&
+            juce::exactlyEqual(valueOf(*processor, "kick_pitch"), 0.5f),
+        context, "and its knobs become that voice's: the pitch knob now turns the tom's pitch");
+
+  press(*window, "Pattern " + juce::String::fromUTF8("А"));
+  check(press(*window, "Clear") && !machine.stepOn(0, kick, 0) && !machine.stepOn(0, tom, 2) &&
+            !machine.stepOn(0, accents, 0),
+        context, "the clear key empties the pattern the panel is on");
+
+  machine.setStep(9, 0, 0, true);
+  machine.setStep(0, 12, 0, true);
+  machine.setStep(0, 0, 16, true);
+  machine.setMeasureSize(7);
+  machine.audition(40);
+  check(!machine.stepOn(0, 0, 0) && machine.measureSize() == 16 && finite(render(*processor, {}, 2048, blockSize)),
+        context, "steps, sizes and voices the machine does not have are turned down");
+}
+
 // ---- Beat files, run once ---------------------------------------------------
 
 void testBeatFile() {
@@ -1146,6 +1285,7 @@ void testVoicesMatchTheMachine() {
     const VoiceSpec& spec = kVoices[static_cast<std::size_t>(index)];
     const juce::var& voice = voices->getReference(index);
     const bool same = voice["id"].toString() == spec.id && voice["name"].toString() == spec.name &&
+                      voice["label"].toString() == juce::String::fromUTF8(spec.label) &&
                       static_cast<int>(voice["gmNote"]) == spec.gmNote &&
                       std::abs(static_cast<double>(voice["trim"]) - static_cast<double>(spec.trim)) < 1e-6 &&
                       std::abs(static_cast<double>(voice["pan"]) - static_cast<double>(spec.pan)) < 1e-6 &&
@@ -1190,6 +1330,7 @@ int main() {
   testSampleRateChange();
   testUnsupportedSampleRate();
   testDescription();
+  testPanel();
   testBeatFile();
   testState();
   testVoicesMatchTheMachine();

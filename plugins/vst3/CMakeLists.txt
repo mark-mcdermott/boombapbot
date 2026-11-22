@@ -64,6 +64,11 @@ target_sources(boombapbot_plugin PRIVATE
   Source/BeatFile.cpp
   Source/BeatFile.h
   Source/MachineRitm12.h
+  Source/Panel/PanelStyle.cpp
+  Source/Panel/PanelStyle.h
+  Source/Panel/StepKeys.cpp
+  Source/Panel/StepKeys.h
+  Source/ParameterIds.h
   Source/PluginEditor.cpp
   Source/PluginEditor.h
   Source/PluginProcessor.cpp
@@ -109,18 +114,28 @@ option(BOOMBAPBOT_VST3_BUILD_TESTS "Build the plugin's tests and register them w
 if(BOOMBAPBOT_VST3_BUILD_TESTS)
   enable_testing()
 
-  add_executable(boombapbot_plugin_selftest Tests/ProcessorSelfTest.cpp)
-  target_include_directories(boombapbot_plugin_selftest PRIVATE
-    Source
-    $<TARGET_PROPERTY:boombapbot_plugin,INCLUDE_DIRECTORIES>)
-  target_compile_definitions(boombapbot_plugin_selftest PRIVATE
-    $<TARGET_PROPERTY:boombapbot_plugin,COMPILE_DEFINITIONS>
-    BOOMBAPBOT_MACHINE_FILE="${MACHINE_RITM12_DIR}/data/ritm12.machine.json"
-    BOOMBAPBOT_FIXTURES_DIR="${MACHINE_RITM12_DIR}/fixtures")
-  target_link_libraries(boombapbot_plugin_selftest PRIVATE
-    boombapbot_plugin
-    juce::juce_recommended_warning_flags)
+  # A program made of the plugin's own code: it links what the plugin is made
+  # of rather than compiling it again.
+  function(boombapbot_plugin_program target source)
+    add_executable(${target} ${source})
+    target_include_directories(${target} PRIVATE
+      Source
+      $<TARGET_PROPERTY:boombapbot_plugin,INCLUDE_DIRECTORIES>)
+    target_compile_definitions(${target} PRIVATE
+      $<TARGET_PROPERTY:boombapbot_plugin,COMPILE_DEFINITIONS>
+      BOOMBAPBOT_MACHINE_FILE="${MACHINE_RITM12_DIR}/data/ritm12.machine.json"
+      BOOMBAPBOT_FIXTURES_DIR="${MACHINE_RITM12_DIR}/fixtures")
+    target_link_libraries(${target} PRIVATE
+      boombapbot_plugin
+      juce::juce_recommended_warning_flags)
+  endfunction()
+
+  boombapbot_plugin_program(boombapbot_plugin_selftest Tests/ProcessorSelfTest.cpp)
+  boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
   add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
+  add_test(NAME vst3.window_snapshot
+    COMMAND boombapbot_window_snapshot "${CMAKE_CURRENT_BINARY_DIR}/window.png"
+      "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
 
   if(APPLE)
     set(plugin_binary "$<TARGET_FILE:boombapbot_plugin_VST3>")

@@ -54,6 +54,22 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // The name of the beat whose patterns are held, or nothing.
   juce::String beatName() const;
 
+  // What the panel works: the parameters, the steps of the patterns, how many
+  // steps a measure has, a voice key pressed, and where the sequencer is.
+  // Rows 0 to 7 are the voices' hits and row 8 is the accents. None of these
+  // are for the audio thread.
+  static constexpr int kAccentsRow = boombapbot::plugin::kVoiceCount;
+  juce::AudioProcessorValueTreeState& parameters() { return parameters_; }
+  bool stepOn(int pattern, int row, int step) const;
+  void setStep(int pattern, int row, int step, bool on);
+  void clearPattern(int pattern);
+  int measureSize() const;
+  void setMeasureSize(int size);
+  void audition(int voice);
+  // The step the sequencer last played in its measure, or -1 when it is not playing.
+  int playingStep() const;
+  int playingPattern() const;
+
  private:
   struct EngineDeleter {
     void operator()(SnareEngine* engine) const { snare_engine_destroy(engine); }
@@ -105,6 +121,8 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // Plays the hits one step of the playing pattern holds. Audio thread only.
   void playStep(SnareEngine* engine, std::int64_t step, const boombapbot::plugin::StepGrid& grid);
   int chosenPattern() const;
+  // Plays the voice keys pressed on the panel since the last block. Audio thread only.
+  void playAuditions(SnareEngine* engine);
   void setParameterTo(const juce::String& id, float value);
   void holdPatterns(const boombapbot::plugin::Beat& beat);
   double tailSecondsAt(double bpm) const;
@@ -124,6 +142,9 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // the audio thread, a row at a time, with no lock.
   std::array<PatternRows, boombapbot::plugin::kPatternCount> patterns_{};
   std::atomic<int> beatSize_{boombapbot::plugin::kSizeRest};
+  std::atomic<std::uint32_t> auditions_{0};
+  std::atomic<int> shownStep_{-1};
+  std::atomic<int> shownPattern_{0};
   mutable std::mutex beatNameLock_;
   juce::String beatName_;
 
