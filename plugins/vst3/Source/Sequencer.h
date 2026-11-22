@@ -15,6 +15,12 @@
 
 namespace boombapbot::plugin {
 
+// The furthest from the start of the timeline a host's position is believed.
+// At the fastest tempo this is years of music, and steps this far out are
+// still told apart by a wide margin. Beyond it a position is somebody's
+// mistake, and turning one into a step number would overflow.
+inline constexpr double kSongBeatsMost = 1.0e9;
+
 struct StepGrid {
   int size = kSizeRest;
   int stepsPerBeat = 4;
@@ -32,7 +38,8 @@ struct StepGrid {
     return (static_cast<double>(step) + late) / stepsPerBeat;
   }
 
-  // The first step that falls on or after a beat.
+  // The first step that falls on or after a beat, which is no further out
+  // than kSongBeatsMost.
   std::int64_t firstStepFrom(double beat) const {
     std::int64_t step = static_cast<std::int64_t>(std::floor(beat * stepsPerBeat)) - 1;
     while (beatOf(step) < beat) ++step;

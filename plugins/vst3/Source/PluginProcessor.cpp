@@ -219,7 +219,8 @@ double BoombapbotAudioProcessor::tailSecondsAt(double bpm) const {
 }
 
 // What the host says about this block. A host with no tempo to give gets a new
-// project's, and one that does not say where it is in the song is not playing.
+// project's, and one that does not say where it is in the song, or names a
+// place no song reaches, is not playing.
 BoombapbotAudioProcessor::HostTime BoombapbotAudioProcessor::readHost() const {
   HostTime time{kTempoRest, false, 0.0};
   const juce::AudioPlayHead* const playHead = getPlayHead();
@@ -228,7 +229,7 @@ BoombapbotAudioProcessor::HostTime BoombapbotAudioProcessor::readHost() const {
   if (!position.hasValue()) return time;
 
   if (const auto bpm = position->getBpm(); bpm.hasValue() && std::isfinite(*bpm) && *bpm > 0.0) time.tempo = *bpm;
-  if (const auto beat = position->getPpqPosition(); beat.hasValue() && std::isfinite(*beat)) {
+  if (const auto beat = position->getPpqPosition(); beat.hasValue() && std::abs(*beat) <= kSongBeatsMost) {
     time.playing = position->getIsPlaying();
     time.beat = *beat;
   }

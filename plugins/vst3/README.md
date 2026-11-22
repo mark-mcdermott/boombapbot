@@ -230,6 +230,18 @@ codesign --verify --deep --strict --verbose=2 ~/Library/Audio/Plug-Ins/VST3/boom
 
 Then scan for plugins in the host. It is listed as "boombapbot", an instrument.
 
+**FL Studio and a build it has seen before.** FL keeps what it learned about a
+plugin, its class ID included, in its plugin database, and a rescan does not
+always replace it. If a bundle of the same name with another class ID was
+ever scanned (the earlier 808 spike was), FL asks the new bundle for the old
+class, finds nothing, and crashes as the plugin is added, with an access
+violation on the main thread. With FL closed, in
+`<FL user data>/Presets/Plugin database/Installed`, delete
+`Generators/VST3/boombapbot.nfo` and `boombapbot.fst`, the `boombapbot` line
+of `VerifiedIDs.nfo` and the `[Generators/VST3/boombapbot]` section of
+`.Plugins.ini`, then scan again with "Verify plugins" on. This happened on
+2026-11-22 and that cleared it.
+
 ## Tests
 
 `ctest` runs these. The first is the processor self-test
@@ -269,6 +281,13 @@ block size matters, it checks:
   first has to count a block it takes itself, and an offline block that
   re-synthesises a sound, which is allowed the heap. The realtime blocks must
   make none;
+- a host that misbehaves: 1008 blocks of every size from 0 to 8192 frames, at
+  positions from minus infinity to 1e300 beats and tempos from nothing to
+  infinity, with notes dated before and long after the block, all give sound
+  in range and come back, and the plugin plays in time afterwards. A position
+  more than a thousand million beats from the start of the timeline is taken
+  as a host that is not playing. This test found a hang: such a position
+  overflowed on its way to a step number;
 - on a realtime clock the plugin's own thread makes the new sound, and it is
   heard without the audio thread synthesising anything;
 - the accent knob and the mutes do what the machine's do;
@@ -365,6 +384,8 @@ On macOS the rest check the built bundle:
   parameters by name, it is silent without MIDI, note 36 plays the kick, a
   parameter the host sets reaches the sound, a second instance recalls the
   first one's state, and the delay follows the tempo the host reports. It is
+  then opens the plugin's window as a host does, the VST3 view in a real
+  window on the desktop, shown, resized and closed (not on a CI runner). It is
   also handed a state with the fixture beat in it, which a program made of
   the plugin's own code writes first (`Tests/StateWriter.cpp`), wrapped as
   JUCE's host keeps a VST3 state: the beat's knobs are recalled, and with the
@@ -387,7 +408,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All ten CTest tests pass: the self-test's 513 checks as arm64 and again as
+- All ten CTest tests pass: the self-test's 516 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -401,15 +422,33 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 The same build and tests also pass on GitHub's macOS 26 runner, which fetches
 JUCE itself (the `vst3` job in `.github/workflows/native.yml`).
 
-The earlier spike, on the old machine, loaded and played in FL Studio 2026 on
-this Mac once it was universal and signed again. This plugin is built and
-signed the same way, but see below.
+**In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
+the build of the hang fix:
+
+- the plugin scans and loads, and the panel shows at its right shape;
+- notes from the piano roll and from a keyboard play the eight voices;
+- a parameter linked to a hardware controller (Kick Level) follows it;
+- a beat exported from the site loads, and its pattern plays in time with
+  FL's transport in pattern mode, at 99 and at 100;
+- the step keys, the dice and the undo work while it plays;
+- a project saved and reopened brings the plugin back as it was;
+- a beat saved from the plugin opens on the site;
+- the window resizes;
+- the MIDI key dragged onto the Channel Rack imports the shown pattern. FL's
+  playlist does not take it; see below.
 
 ## Not verified
 
-- **No DAW has loaded this plugin.** Not FL Studio, not any other. Nobody has
-  seen the window, turned a knob in a host, automated a parameter or saved and
-  reopened a project with it.
+- **Other hosts.** FL Studio has run it (see above). No other host has loaded
+  it.
+- **MIDI into FL Studio.** A drag from the MIDI key onto FL's playlist shows
+  FL's paintbrush and drops nothing, and the saved `.mid` dragged from the
+  Finder does the same: the playlist is not where FL takes a MIDI file. The
+  Channel Rack is. The MIDI key dragged straight onto it imports the pattern,
+  and so does the saved `.mid` from the Finder. Other hosts are untried.
+- **A closed hat that may go missing.** In one session the owner sometimes did
+  not hear the hat on the fifteenth step of a looping pattern. It was not
+  pinned down.
 - **Steinberg's validator has not run.** JUCE bundles the parts of the VST3
   SDK a plugin needs, and the validator is not among them. `pluginval` has not
   run either. The hosted check uses JUCE's host against JUCE's wrapper, which
@@ -420,28 +459,20 @@ signed the same way, but see below.
   is not seen either. That the audio thread takes no lock is by design and by
   reading. The sanitizers have run the self-test only, never the plugin in a
   host, and never the x86_64 half.
-- **Dragging MIDI into a host.** The file is tested; the drag is not. Whether
-  FL Studio or any other host takes a file dragged out of a plugin's window
-  is unknown.
-- **The save and load keys.** Both open a file chooser, which no test can
-  press. The tests write and read beats through the same code the keys call.
-  Nobody has imported a plugin-saved beat on the live site; the site's reader
-  has opened one in its unit tests.
-- **The panel under a hand.** It has been looked at as a picture
-  (`panel.jpg` above is that picture) and its keys have been worked by the
-  tests, which make their own mouse events. Nobody has clicked it, in a host
-  or out of one: how the knobs feel, whether the lamp keeps up, how it looks
-  on a screen that is not Retina or at another size, whether a host lets its
-  window be dragged larger, and the file chooser are all untried.
-- **The sequencer against a real host's transport.** The tests play hosts of
-  their own that report an exact position, one of them JUCE's VST3 host
-  through the wrapper. Whether FL Studio and others report one the
-  plugin follows cleanly, through loops, tempo changes and odd signatures, is
-  unknown. Where a step falls exactly halfway between two frames, the plugin
-  and the engine's own sequencer can land it one frame apart.
-- **How it sounds.** The tests compare samples; nobody has listened. A knob
-  turned while its voice rings changes the next hit, not the ringing one, and
-  nobody has judged how that feels under automation.
+- **The tests and the keys with a chooser.** The load, save and MIDI keys open
+  a file chooser, which no test can press; the tests go through the code the
+  keys call. In FL Studio the owner has used the load and save keys.
+- **The panel on other screens.** It has been used in FL Studio on the owner's
+  Mac. How it looks on a screen that is not Retina is untried.
+- **The sequencer in song mode and odd signatures.** In FL Studio it has
+  followed the transport in pattern mode at two tempos. Song mode, tempo
+  automation and a signature other than 4/4 are untried there. Where a step
+  falls exactly halfway between two frames, the plugin and the engine's own
+  sequencer can land it one frame apart.
+- **How it sounds.** The tests compare samples. The owner has played it in FL
+  Studio and raised nothing but the hat above. A knob turned while its voice
+  rings changes the next hit, not the ringing one, and nobody has judged how
+  that feels under automation.
 - **Windows and Linux.** The CMake project has nothing against them, but it
   has only ever been built on macOS, and CI builds it there alone. The bundle
   checks are macOS only.

@@ -1,3 +1,7 @@
+Rosetta. On the same day the owner tried it in FL Studio 2026 and it worked:
+see the first item below for what was and was not settled. Nobody else has
+loaded it and no other host has.
+
 # Follow-ups after v0.1
 
 What v0.1 leaves for later, with the concrete prerequisites for each. Nothing
@@ -489,33 +493,35 @@ Everything known about it comes from tests: a self-test that drives the
 plugin without a host, JUCE's own VST3 host playing the built bundle, a trap
 for heap use on the audio thread, and the sanitizers. On 2026-11-22 all of
 them passed on the Mac it was built on, as arm64 and as x86_64 under
-Rosetta. No DAW has loaded it and nobody has heard it or touched its panel.
+Rosetta. On the same day the owner loaded it in FL Studio 2026: it scans and
+opens, the panel shows, notes play the eight voices and a parameter follows a
+hardware controller. That is steps 1 to 3 below; the rest are still to do.
 
 What is left:
 
-- **Try it in FL Studio.** This is the whole of what is unknown, and it needs
-  a person. `plugins/vst3/README.md` has the commands that copy the bundle
-  into `~/Library/Audio/Plug-Ins/VST3` and sign the copy. In FL's numbering
-  the kick is C3. Then, in order, each of these is a thing no test has done:
-  1. The plugin scans and opens, and the panel shows. The earlier spike made
-     FL crash when it was built for one architecture only; this build is
-     universal, and it is signed after every file is in place.
-  2. Notes from the piano roll play the eight voices, and a velocity of 104
-     or more is the accented hit.
-  3. The knobs turn under a mouse, a voice's key plays it, and automating a
-     parameter from FL moves the knob and the sound.
-  4. The load key opens a file chooser, and a beat exported from the site
-     loads. With FL playing, its pattern plays in time; looping a region,
-     starting from the middle of the song and changing FL's tempo keep it
-     there. The red lamp runs with it.
-  5. Step keys pressed while FL plays are heard at once. The dice and the
-     undo do what they say.
-  6. The project saved and reopened brings back the knobs, the patterns, the
-     beat's name and the size the window was left at.
-  7. The save key writes a file the site's import opens.
-  8. The MIDI key dragged onto a track drops a clip there. Whether FL takes a
-     file dragged out of a plugin's window at all is unknown.
-  9. The window drags larger and smaller, and the panel stays sharp.
+- **MIDI into FL Studio.** The owner went through the nine steps of trying it
+  in FL Studio 2026 (26.1.7, under Rosetta) on 2026-11-22, and they held: it
+  scans and opens, notes play the voices, a parameter follows a hardware
+  controller, a beat loads and its pattern plays with FL's transport, the step
+  keys, dice and undo work while it plays, a project saved and reopened comes
+  back, a saved beat opens on the site, and the window resizes. The ninth
+  took finding. Dragging the MIDI key onto FL's playlist shows FL's paintbrush
+  and drops nothing, and so does dragging the saved `.mid` there from the
+  Finder, so the plugin's drag does what the Finder's does and the playlist
+  is not where FL takes a MIDI file. The Channel Rack is: the MIDI key dragged
+  straight onto it imports the pattern, and so does the saved `.mid` from the
+  Finder. So all nine held, once the right place to drop was found. An
+  automation clip, as against a linked controller, is untried.
+- **A build FL has seen before.** FL crashed the first time, as the plugin was
+  added: its plugin database still held the earlier spike's class ID under the
+  same name. `plugins/vst3/README.md` says how to clear it.
+- **A closed hat that may go missing.** On 2026-11-22, with a beat of eight
+  closed hats to the measure looping in FL's pattern mode at 99 and 100, the
+  owner sometimes did not hear the hat on the fifteenth step, in some passes
+  and not others. It was not pinned down: it may be how FL reports its
+  position near the loop point, how a voice cuts its own last hit, or
+  nothing. If it comes back, a build that writes what the host says at every
+  block to a file is the way in.
 - **Listen to it.** The tests compare samples. A knob turned while its voice
   rings changes the next hit and not the ringing one; nobody has judged how
   that feels under automation, or how the delay sounds when the tempo moves.

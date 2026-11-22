@@ -163,6 +163,41 @@ int firstSoundOfTheBeat(juce::VST3PluginFormat& format, const juce::PluginDescri
   return firstSound;
 }
 
+void pump(int milliseconds) { juce::MessageManager::getInstance()->runDispatchLoopUntil(milliseconds); }
+
+// Opens the plugin's window as a host does: the VST3 view, put in a real
+// window on the desktop, shown, resized and closed.
+void openTheWindow(juce::VST3PluginFormat& format, const juce::PluginDescription& description) {
+  const std::unique_ptr<juce::AudioPluginInstance> plugin = host(format, description);
+  if (plugin == nullptr) return;
+  check(plugin->hasEditor(), "the hosted plugin says it has a window");
+  juce::AudioProcessorEditor* const view = plugin->createEditorIfNeeded();
+  check(view != nullptr, "the host is given the plugin's view");
+  if (view == nullptr) return;
+
+  std::printf("     the view asks for %d x %d\n", view->getWidth(), view->getHeight());
+  view->setOpaque(true);
+  view->addToDesktop(juce::ComponentPeer::windowHasTitleBar | juce::ComponentPeer::windowIsResizable);
+  view->setVisible(true);
+  pump(600);
+  const int width = view->getWidth();
+  const int height = view->getHeight();
+  check(width > 100 && height > 100, "shown in a window on the desktop, it has a size (" + std::to_string(width) +
+                                         " x " + std::to_string(height) + ")");
+  play(*plugin, true, 20);
+  view->setSize(width * 5 / 4, height * 5 / 4);
+  pump(400);
+  std::printf("     asked to be a quarter larger, it is %d x %d\n", view->getWidth(), view->getHeight());
+  play(*plugin, true, 20);
+  pump(200);
+  view->removeFromDesktop();
+  plugin->editorBeingDeleted(view);
+  delete view;
+  pump(100);
+  plugin->releaseResources();
+  check(true, "the window opened, was resized and closed");
+}
+
 int ownParameters(juce::AudioPluginInstance& plugin) {
   int count = 0;
   for (const char* voice : {"Kick", "Snare", "Clap", "Closed hat", "Open hat", "Tom", "Rim", "Perc"}) {
@@ -276,6 +311,13 @@ int main(int argc, char** argv) {
 
   plugin->releaseResources();
   second->releaseResources();
+  // A CI runner has no desktop to be sure of, so the window is opened only
+  // where a person's machine runs this.
+  if (juce::SystemStats::getEnvironmentVariable("CI", {}).isEmpty()) {
+    openTheWindow(format, description);
+  } else {
+    std::printf("skip the window is not opened on a CI runner\n");
+  }
   std::printf("%d failed\n", failures);
   return failures == 0 ? 0 : 1;
 }
