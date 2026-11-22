@@ -11,7 +11,6 @@ constexpr const char* kProjectFormat = "boombapbot.project";
 constexpr const char* kMachineId = "ritm12";
 // Named as the document names them, in the order of the engine's effects from 1.
 constexpr std::array<const char*, 4> kEffectKinds{{"delay", "reverb", "flanger", "chorus"}};
-constexpr int kNameLongest = 80;
 constexpr int kSlugLongest = 48;
 
 juce::Result wrong(const juce::String& what) { return juce::Result::fail(what); }
@@ -105,7 +104,7 @@ juce::Result checkKind(const juce::var& document) {
 juce::Result readDocument(const juce::var& document, Beat& out) {
   if (const juce::Result kind = checkKind(document); kind.failed()) return kind;
 
-  out.name = document["name"].toString().substring(0, kNameLongest);
+  out.name = tidyBeatName(document["name"].toString());
   if (out.name.isEmpty()) return wrong("name is missing.");
   if (const juce::Result tempo = readWhole(document["tempo"], "tempo", static_cast<int>(SNARE_BPM_MIN),
                                            static_cast<int>(SNARE_BPM_MAX), out.tempo);
@@ -185,6 +184,8 @@ StepRow rowFromText(const juce::String& text) {
   return row;
 }
 
+juce::String tidyBeatName(const juce::String& name) { return name.trim().substring(0, kBeatNameLongest).trim(); }
+
 BeatStamp newBeatStamp() { return {juce::Uuid().toDashedString(), juce::Time::getCurrentTime()}; }
 
 juce::String writeBeat(const Beat& beat, const BeatStamp& stamp) {
@@ -193,7 +194,8 @@ juce::String writeBeat(const Beat& beat, const BeatStamp& stamp) {
   put(document, "schemaVersion", kBeatSchemaVersion);
   put(document, "machine", kMachineId);
   put(document, "id", stamp.id);
-  put(document, "name", beat.name.isEmpty() ? juce::String(kUntitledBeat) : beat.name.substring(0, kNameLongest));
+  const juce::String name = tidyBeatName(beat.name);
+  put(document, "name", name.isEmpty() ? juce::String(kUntitledBeat) : name);
   put(document, "createdAt", isoMoment(stamp.written));
   put(document, "updatedAt", isoMoment(stamp.written));
   put(document, "tempo", juce::jlimit(static_cast<int>(SNARE_BPM_MIN), static_cast<int>(SNARE_BPM_MAX), beat.tempo));

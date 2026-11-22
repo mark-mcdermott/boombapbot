@@ -72,6 +72,8 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   Knob effectMix_;
   juce::OwnedArray<SliderAttachment> mixAttachments_;
 
+  juce::Label nameLabel_;
+  juce::Label name_;
   juce::Label status_;
   juce::Rectangle<int> voiceGroup_;
   juce::Rectangle<int> mixGroup_;
