@@ -538,7 +538,7 @@ are docked at the bottom of the screen.
 | `apps/site/` | Astro site: the machine as a client-only island, the pages of words, and the server routes for accounts, saved beats, the shop and the upgrade |
 | `apps/mobile/` | A first slice of the phone apps: the editor with РИТМ-12 in a Capacitor shell for iOS and Android. See its `README.md` |
 | `apps/desktop/` | A first slice of the desktop app, for macOS: the editor with РИТМ-12 in a Tauri window, playing through the engine built natively and CPAL. See its `README.md` |
-| `plugins/vst3/` | A first slice of the VST3 instrument: РИТМ-12's eight voices played from MIDI notes, with its knobs as host parameters, in a JUCE plugin on the engine built natively. See its `README.md` |
+| `plugins/vst3/` | The first slices of the VST3 instrument: РИТМ-12 as a JUCE plugin on the engine built natively, with a panel of its own, its knobs as host parameters, patterns that play in time with the host, and beats that load from the site and save back to it. See its `README.md` |
 | `e2e/` | Playwright tests: the site's, and РИТМ-12's own in `e2e/ritm12/` |
 | `scripts/` | Toolchain setup, builds, asset preparation, build check, benchmark |
 | `misc/assets/` | The owner's unedited pictures (ignored by git) |
