@@ -508,9 +508,10 @@ What is left:
   not settle. Dragging the MIDI key onto FL's playlist shows FL's paintbrush
   and drops nothing, and so does dragging the saved `.mid` there from the
   Finder, so the plugin's drag does what the Finder's does and the playlist
-  may simply not be where FL takes a MIDI file. Still to try: dropping it on
-  the plugin's channel in the Channel Rack, or into an open piano roll. An
-  automation clip, as against a linked controller, is untried too.
+  is not where FL takes a MIDI file. The saved `.mid` dragged from the Finder
+  onto the Channel Rack does import. Still to try: the MIDI key dragged
+  straight onto the Channel Rack, without saving first. An automation clip,
+  as against a linked controller, is untried too.
 - **A build FL has seen before.** FL crashed the first time, as the plugin was
   added: its plugin database still held the earlier spike's class ID under the
   same name. `plugins/vst3/README.md` says how to clear it.

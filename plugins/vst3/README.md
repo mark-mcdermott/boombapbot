@@ -444,8 +444,9 @@ saved `.mid` dragged there from the Finder; see below.
   it.
 - **MIDI into FL Studio.** A drag from the MIDI key onto FL's playlist shows
   FL's paintbrush and drops nothing, and the saved `.mid` dragged from the
-  Finder does the same, so the playlist may not be where FL takes a MIDI file.
-  Dropping it on the plugin's channel or into a piano roll is untried.
+  Finder does the same: the playlist is not where FL takes a MIDI file. The
+  saved `.mid` dragged from the Finder onto the Channel Rack does import.
+  Whether the MIDI key dragged straight there does too is untried.
 - **A closed hat that may go missing.** In one session the owner sometimes did
   not hear the hat on the fifteenth step of a looping pattern. It was not
   pinned down.
