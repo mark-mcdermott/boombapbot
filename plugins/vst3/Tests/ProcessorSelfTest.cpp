@@ -14,12 +14,14 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <functional>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -79,6 +81,21 @@ Event noteOff(int frame, int note, int channel = 1) {
           {static_cast<juce::uint8>(0x80 | (channel - 1)), static_cast<juce::uint8>(note),
            static_cast<juce::uint8>(0)}};
 }
+
+// ---- The window -----------------------------------------------------------------
+
+// Closes a window as a host does: the processor is told before it goes.
+struct WindowCloser {
+  void operator()(juce::AudioProcessorEditor* window) const {
+    if (window == nullptr) return;
+    window->processor.editorBeingDeleted(window);
+    delete window;
+  }
+};
+
+using Window = std::unique_ptr<juce::AudioProcessorEditor, WindowCloser>;
+
+Window open(juce::AudioProcessor& processor) { return Window(processor.createEditorIfNeeded()); }
 
 // ---- Parameters ---------------------------------------------------------------
 
@@ -871,41 +888,27 @@ void testSoundThreadFollowsKnobs() {
         "after releaseResources and prepareToPlay the plugin plays the same tom");
 }
 
-// ---- The audio thread and the heap, run once --------------------------------
+// ---- The audio thread at work, run once -------------------------------------
 
-// A realtime processBlock must not touch the heap: an allocation can wait on
-// a lock another thread holds for as long as it likes. Everything a block
-// needs is made ready here first, and the trap counts heap calls only while
-// processBlock runs, on this thread. The plugin's own sound thread works
-// alongside and is free to allocate.
-void testAudioThreadKeepsOffTheHeap() {
-  const std::string context = "heap";
+// What a host and a person do to the plugin while it plays, all at once: the
+// audio thread runs realtime blocks with notes, the sequencer and a transport
+// that starts, stops, loops and changes tempo; this thread turns knobs between
+// blocks; the plugin's sound thread re-synthesises; and a second thread works
+// the panel and saves and recalls the state. It is what the heap trap watches,
+// and what a build under the thread sanitizer checks for races.
+struct BusyRun {
+  bool sounded = false;
+  int heapCalls = 0;
+};
+
+BusyRun runBusyRealtimeBlocks() {
   constexpr double rate = 48000.0;
   constexpr int blockSize = 256;
   constexpr int blocks = 3000;
 
-  const bool sees = heaptrap::seesTheHeap();
-  check(sees, context, "the trap counts a block taken from the heap and given back under it");
-  if (!sees) return;
-
-  // The one block that is allowed the heap: offline, with a sound to make
-  // again. The trap has to see it, or its silence below would mean nothing.
-  {
-    const std::unique_ptr<juce::AudioProcessor> offline = makeProcessor(rate, blockSize);
-    set(*offline, {"tom_pitch", 0.9f});
-    juce::AudioBuffer<float> block(2, blockSize);
-    juce::MidiBuffer none;
-    heaptrap::reset();
-    {
-      const heaptrap::Watch watch;
-      offline->processBlock(block, none);
-    }
-    check(heaptrap::calls() > 0, context,
-          text("an offline block that makes a sound again is seen to use the heap (%d calls)", heaptrap::calls()));
-  }
-
   const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize, Clock::realtime);
-  plugin(*processor).loadBeat(fourPatterns());
+  BoombapbotAudioProcessor& machine = plugin(*processor);
+  machine.loadBeat(fourPatterns());
   set(*processor, {"pattern", 1.0f});
   Transport transport;
   transport.bpm = 132.0;
@@ -922,11 +925,33 @@ void testAudioThreadKeepsOffTheHeap() {
   midi.ensureSize(4096);
   juce::AudioBuffer<float> buffer(2, blockSize);
 
+  // The panel, worked from another thread for as long as the blocks run.
+  std::atomic<bool> done{false};
+  std::thread hands([&] {
+    juce::Random random(7);
+    juce::MemoryBlock state;
+    while (!done.load()) {
+      machine.rememberPatterns();
+      machine.setStep(random.nextInt(4), random.nextInt(9), random.nextInt(16), random.nextBool());
+      machine.audition(random.nextInt(8));
+      machine.rollDice(random.nextInt(4), random.nextInt(8), random);
+      machine.setMeasureSize(random.nextBool() ? 16 : 12);
+      if (random.nextInt(8) == 0) machine.undoPatterns();
+      if (random.nextInt(16) == 0) machine.clearPattern(random.nextInt(4));
+      machine.selectVoice(random.nextInt(8));
+      machine.setBeatName(random.nextBool() ? "one" : "another");
+      juce::ignoreUnused(machine.currentBeat(), machine.playingStep(), machine.beatName());
+      processor->getStateInformation(state);
+      if (random.nextInt(4) == 0) processor->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+      juce::Thread::sleep(1);
+    }
+  });
+
   const std::array<Setting, 10> turns{{{"kick_level", 0.3f}, {"tom_pitch", 0.9f}, {"effect_kind", 2.0f},
                                        {"effect_mix", 0.5f}, {"master_volume", 0.6f}, {"snare_mute", 1.0f},
                                        {"accent", 0.2f}, {"swing", 0.7f}, {"pattern", 0.0f}, {"effect_kind", 4.0f}}};
+  BusyRun run;
   heaptrap::reset();
-  bool sounded = false;
   for (int block = 0; block < blocks; ++block) {
     // The host's side of a block: knobs turned, the transport moved, started,
     // stopped and looped, and the block's notes handed over.
@@ -941,14 +966,56 @@ void testAudioThreadKeepsOffTheHeap() {
       const heaptrap::Watch watch;
       processor->processBlock(buffer, midi);
     }
-    sounded = sounded || buffer.getMagnitude(0, blockSize) > kAudible;
+    run.sounded = run.sounded || buffer.getMagnitude(0, blockSize) > kAudible;
     if (block % 200 == 0) juce::Thread::sleep(20);  // lets the sound thread hand over new sounds
   }
+  done.store(true);
+  hands.join();
   processor->setPlayHead(nullptr);
-  check(sounded && heaptrap::calls() == 0, context,
-        text("%d realtime blocks with notes, the sequencer, a moving host and knobs turning make no heap call "
-             "on the audio thread (%d seen)",
-             blocks, heaptrap::calls()));
+  run.heapCalls = heaptrap::calls();
+  return run;
+}
+
+// A realtime processBlock must not touch the heap: an allocation can wait on
+// a lock another thread holds for as long as it likes. The trap counts heap
+// calls only while processBlock runs, on the thread that runs it.
+//
+// Under a sanitizer the allocator is the sanitizer's and there is no trap.
+// The blocks still run: they are what the sanitizer is there to watch.
+void testAudioThreadAtWork() {
+  const std::string context = "audio thread";
+  if (!heaptrap::available()) {
+    check(runBusyRealtimeBlocks().sounded, context,
+          "3000 realtime blocks play while knobs turn, the panel is worked and the state is saved and recalled");
+    std::printf("skip [%s] no heap trap in a build under a sanitizer\n", context.c_str());
+    return;
+  }
+
+  const bool sees = heaptrap::seesTheHeap();
+  check(sees, context, "the trap counts a block taken from the heap and given back under it");
+  if (!sees) return;
+
+  // The one block that is allowed the heap: offline, with a sound to make
+  // again. The trap has to see it, or its silence below would mean nothing.
+  {
+    const std::unique_ptr<juce::AudioProcessor> offline = makeProcessor(48000.0, 256);
+    set(*offline, {"tom_pitch", 0.9f});
+    juce::AudioBuffer<float> block(2, 256);
+    juce::MidiBuffer none;
+    heaptrap::reset();
+    {
+      const heaptrap::Watch watch;
+      offline->processBlock(block, none);
+    }
+    check(heaptrap::calls() > 0, context,
+          text("an offline block that makes a sound again is seen to use the heap (%d calls)", heaptrap::calls()));
+  }
+
+  const BusyRun run = runBusyRealtimeBlocks();
+  check(run.sounded && run.heapCalls == 0, context,
+        text("3000 realtime blocks with notes, the sequencer, a moving host, knobs turning and the panel worked "
+             "from another thread make no heap call on the audio thread (%d seen)",
+             run.heapCalls));
 }
 
 // ---- Lifecycle, run once ----------------------------------------------------
@@ -984,7 +1051,7 @@ void testDescription() {
   check(processor->getTailLengthSeconds() > 1.0, context,
         text("the tail covers the longest sound and effect (%.2f s)", processor->getTailLengthSeconds()));
 
-  const std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorIfNeeded());
+  const Window editor = open(*processor);
   check(processor->hasEditor() && editor != nullptr && editor->getWidth() > 0 && editor->getHeight() > 0, context,
         "the plugin opens a window");
 }
@@ -1047,7 +1114,7 @@ void testPanel() {
 
   const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize);
   BoombapbotAudioProcessor& machine = plugin(*processor);
-  const std::unique_ptr<juce::AudioProcessorEditor> window(processor->createEditorIfNeeded());
+  const Window window = open(*processor);
   auto* const steps = dynamic_cast<StepKeys*>(titled(*window, "Step keys"));
   check(steps != nullptr, context, "the window has the step keys");
   if (steps == nullptr) return;
@@ -1184,7 +1251,7 @@ void testWindowSize() {
   const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(48000.0, 512);
   BoombapbotAudioProcessor& machine = plugin(*processor);
 
-  std::unique_ptr<juce::AudioProcessorEditor> window(processor->createEditorIfNeeded());
+  Window window = open(*processor);
   check(window->getWidth() == width && window->getHeight() == height && window->isResizable(), context,
         text("the window opens at the panel's own size, %d by %d, and can be resized (%d by %d, scale %.3f)", width,
              height, window->getWidth(), window->getHeight(), static_cast<double>(machine.windowScale())));
@@ -1198,7 +1265,7 @@ void testWindowSize() {
         "made half as large again, it shows the same panel through a scale of 1.5");
 
   window.reset();
-  window.reset(processor->createEditorIfNeeded());
+  window = open(*processor);
   check(window->getWidth() == width * 3 / 2 && window->getHeight() == height * 3 / 2, context,
         "closed and opened again, it comes back at the size it was left");
 
@@ -1206,7 +1273,7 @@ void testWindowSize() {
   processor->getStateInformation(saved);
   const std::unique_ptr<juce::AudioProcessor> recalled = makeProcessor(48000.0, 512);
   recalled->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
-  const std::unique_ptr<juce::AudioProcessorEditor> reopened(recalled->createEditorIfNeeded());
+  const Window reopened = open(*recalled);
   check(reopened->getWidth() == width * 3 / 2, context, "and so does the window of a plugin recalled from its state");
 
   machine.setWindowScale(9.0f);
@@ -1825,7 +1892,7 @@ int main() {
     }
   }
   testSoundThreadFollowsKnobs();
-  testAudioThreadKeepsOffTheHeap();
+  testAudioThreadAtWork();
   testSampleRateChange();
   testUnsupportedSampleRate();
   testDescription();

@@ -9,6 +9,10 @@
 
 namespace heaptrap {
 
+// False in a build under a sanitizer, which has the allocator to itself. Then
+// nothing is replaced and nothing is ever counted.
+bool available();
+
 // Watches the calling thread for as long as it lives. Other threads are not
 // counted, and only one thread can be watched at a time.
 class Watch {
