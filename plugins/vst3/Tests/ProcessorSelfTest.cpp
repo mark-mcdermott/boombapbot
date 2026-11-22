@@ -4,6 +4,7 @@
 //
 //   ctest --test-dir build/vst3 --output-on-failure
 
+#include "BeatFile.h"
 #include "MachineRitm12.h"
 #include "PluginProcessor.h"
 
@@ -12,12 +13,14 @@
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace {
 
+using boombapbot::plugin::Beat;
 using boombapbot::plugin::kAccentVelocity;
 using boombapbot::plugin::kEffectNames;
 using boombapbot::plugin::kVoiceCount;
@@ -566,6 +569,269 @@ void testTempoChangeWhilePlaying(const std::string& context, double rate, int bl
   processor->setPlayHead(nullptr);
 }
 
+// ---- Beats and the sequencer --------------------------------------------------
+
+juce::String fixture(const char* name) {
+  return juce::File(BOOMBAPBOT_FIXTURES_DIR).getChildFile(name).loadFileAsString();
+}
+
+const juce::String& fourPatterns() {
+  static const juce::String text = fixture("four-patterns.project.json");
+  return text;
+}
+
+// The beat file with something in it changed.
+juce::String edited(const juce::String& json, const std::function<void(const juce::var&)>& change) {
+  const juce::var document = juce::JSON::parse(json);
+  change(document);
+  return juce::JSON::toString(document);
+}
+
+void put(const juce::var& object, const char* key, const juce::var& value) {
+  if (juce::DynamicObject* const properties = object.getDynamicObject()) properties->setProperty(key, value);
+}
+
+BoombapbotAudioProcessor& plugin(juce::AudioProcessor& processor) {
+  return dynamic_cast<BoombapbotAudioProcessor&>(processor);
+}
+
+// A host's transport: where it is in the song at the start of each block.
+class Transport final : public juce::AudioPlayHead {
+ public:
+  juce::Optional<PositionInfo> getPosition() const override {
+    PositionInfo position;
+    position.setBpm(bpm);
+    position.setPpqPosition(beat);
+    position.setIsPlaying(playing);
+    return position;
+  }
+
+  double bpm = 100.0;
+  double beat = 0.0;
+  bool playing = true;
+};
+
+// This tempo gives a whole number of frames to the step at every rate tested,
+// and the swings used keep a swung step off the exact middle between two
+// frames. There the engine and the plugin may round to different sides, and a
+// hit can land one frame apart.
+constexpr double kSequencerBpm = 100.0;
+
+double framesPerBeat(double rate) { return rate * 60.0 / kSequencerBpm; }
+int measureFrames(double rate) { return framesFor(4.0 * 60.0 / kSequencerBpm, rate); }
+
+// Plays the processor on a host that starts at `startBeat` and plays on. With
+// `wobble`, the host's position is off by a different hair at every block, as
+// one worked out from a sample count can be.
+Stereo renderPlaying(juce::AudioProcessor& processor, Transport& transport, double startBeat,
+                     const std::vector<Event>& events, int totalFrames, int blockSize, double rate,
+                     double wobble = 0.0) {
+  Stereo out;
+  processor.setPlayHead(&transport);
+  for (int start = 0; start < totalFrames; start += blockSize) {
+    const int frames = std::min(blockSize, totalFrames - start);
+    const double hair = wobble * ((start / blockSize) % 3 - 1);
+    transport.beat = startBeat + start / framesPerBeat(rate) + hair;
+    std::vector<Event> inBlock;
+    for (const Event& event : events) {
+      if (event.frame >= start && event.frame < start + frames) inBlock.push_back({event.frame - start, event.bytes});
+    }
+    const Stereo block = render(processor, inBlock, frames, frames);
+    out.left.insert(out.left.end(), block.left.begin(), block.left.end());
+    out.right.insert(out.right.end(), block.right.begin(), block.right.end());
+  }
+  processor.setPlayHead(nullptr);
+  return out;
+}
+
+// The hits the engine's own sequencer plays for one pattern of a beat, looped
+// for `measures` measures from frame 0, as the notes that would play them.
+std::vector<Event> engineHits(const Beat& beat, int pattern, float swing, double rate, int measures) {
+  SnareEngine* const engine = snare_engine_create(rate);
+  SnarePattern rows{};
+  const boombapbot::plugin::BeatPattern& source = beat.patterns[static_cast<std::size_t>(pattern)];
+  rows.rows[0] = source.accents;
+  for (int voice = 0; voice < kVoiceCount; ++voice) {
+    rows.rows[boombapbot::plugin::voiceTrack(voice)] = source.hits[static_cast<std::size_t>(voice)];
+  }
+  rows.len1 = static_cast<std::uint8_t>(beat.size);
+  rows.steps_per_beat = static_cast<std::uint8_t>(boombapbot::plugin::stepsPerBeat(beat.size));
+  rows.swing = static_cast<std::uint8_t>(boombapbot::plugin::engineSwing(swing));
+  snare_engine_set_pattern(engine, 0, &rows);
+  snare_engine_set_tempo(engine, kSequencerBpm);
+  snare_engine_enable_event_log(engine, 4096);
+  snare_engine_cue_pattern(engine, 0);
+  snare_engine_play_measures(engine, measures);
+
+  std::vector<float> scratch(1024);
+  for (int rendered = 0; rendered < measures * measureFrames(rate) + 1024; rendered += 1024) {
+    snare_engine_render(engine, scratch.data(), scratch.data(), 1024);
+  }
+  std::vector<SnareEvent> log(static_cast<std::size_t>(snare_engine_event_count(engine)));
+  snare_engine_read_events(engine, log.data(), static_cast<int>(log.size()));
+  snare_engine_destroy(engine);
+
+  std::vector<Event> hits;
+  for (const SnareEvent& event : log) {
+    const VoiceSpec& voice = kVoices[static_cast<std::size_t>(event.track - 1)];
+    hits.push_back(noteOn(static_cast<int>(event.frame), voice.gmNote, event.accent != 0 ? 127 : 1));
+  }
+  return hits;
+}
+
+std::vector<Event> shifted(const std::vector<Event>& events, int byFrames, int from = 0, int to = 1 << 30) {
+  std::vector<Event> out;
+  for (const Event& event : events) {
+    if (event.frame >= from && event.frame < to) out.push_back({event.frame + byFrames, event.bytes});
+  }
+  return out;
+}
+
+void append(std::vector<Event>& events, const std::vector<Event>& more) {
+  events.insert(events.end(), more.begin(), more.end());
+}
+
+struct Played {
+  juce::String json;
+  int pattern;
+  float swing;
+};
+
+std::unique_ptr<juce::AudioProcessor> makeBeatProcessor(double rate, int blockSize, const Played& played,
+                                                        bool sequencer) {
+  std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize);
+  const juce::Result loaded = plugin(*processor).loadBeat(played.json);
+  jassert(loaded.wasOk());
+  juce::ignoreUnused(loaded);
+  set(*processor, {"pattern", static_cast<float>(played.pattern)});
+  set(*processor, {"swing", played.swing});
+  set(*processor, {"sequencer", sequencer ? 1.0f : 0.0f});
+  return processor;
+}
+
+// The plugin's sequencer on a playing host against the same plugin, its
+// sequencer off, played by notes on the frames the engine's own sequencer
+// plays the pattern at. The two must render the same samples.
+void testSequencerMatchesTheEngine(const std::string& context, double rate, int blockSize) {
+  const juce::String triplets = edited(fourPatterns(), [](const juce::var& beat) { put(beat, "size", 12); });
+  struct Case {
+    const char* name;
+    Played played;
+  };
+  const std::array<Case, 4> cases{{
+      {"pattern А with the beat's swing", {fourPatterns(), 0, 0.4f}},
+      {"pattern Б with no swing", {fourPatterns(), 1, 0.0f}},
+      {"pattern Б with heavy swing", {fourPatterns(), 1, 0.75f}},
+      {"pattern Б in twelve triplet steps", {triplets, 1, 0.4f}},
+  }};
+  constexpr int measures = 2;
+  const int total = measures * measureFrames(rate);
+
+  for (const Case& entry : cases) {
+    Beat beat;
+    boombapbot::plugin::readBeat(entry.played.json, beat);
+    const std::vector<Event> hits = engineHits(beat, entry.played.pattern, entry.played.swing, rate, measures);
+
+    Transport transport;
+    const std::unique_ptr<juce::AudioProcessor> sequenced = makeBeatProcessor(rate, blockSize, entry.played, true);
+    const std::unique_ptr<juce::AudioProcessor> noted = makeBeatProcessor(rate, blockSize, entry.played, false);
+    const Stereo bySequencer = renderPlaying(*sequenced, transport, 0.0, {}, total, blockSize, rate);
+    const Stereo byNotes = renderPlaying(*noted, transport, 0.0, hits, total, blockSize, rate);
+    check(!hits.empty() && peak(bySequencer) > kAudible && identical(bySequencer, byNotes), context,
+          text("%s: two measures on a playing host land every one of %d hits on the engine's own frame", entry.name,
+               static_cast<int>(hits.size())));
+  }
+}
+
+void testSequencerFollowsTheHost(const std::string& context, double rate, int blockSize) {
+  const Played played{fourPatterns(), 1, 0.4f};
+  Beat beat;
+  boombapbot::plugin::readBeat(played.json, beat);
+  const int measure = measureFrames(rate);
+  const std::vector<Event> loop = engineHits(beat, 1, played.swing, rate, 3);
+  Transport transport;
+  const auto sequenced = [&] { return makeBeatProcessor(rate, blockSize, played, true); };
+  const auto noted = [&] { return makeBeatProcessor(rate, blockSize, played, false); };
+
+  // Started in the middle of the song: beat 21.25 is a beat and a quarter
+  // into a measure.
+  const int skipped = framesFor(1.25 * 60.0 / kSequencerBpm, rate);
+  const int rest = 2 * measure - skipped;
+  check(identical(renderPlaying(*sequenced(), transport, 21.25, {}, rest, blockSize, rate),
+                  renderPlaying(*noted(), transport, 21.25, shifted(loop, -skipped, skipped), rest, blockSize, rate)),
+        context, "started at beat 21.25, the pattern is picked up from that place in its measure");
+
+  // Before the song starts, as a count-in has it.
+  check(identical(renderPlaying(*sequenced(), transport, -4.0, {}, 2 * measure, blockSize, rate),
+                  renderPlaying(*noted(), transport, -4.0, loop, 2 * measure, blockSize, rate)),
+        context, "started at beat -4, the measure before the song plays like any other");
+
+  check(identical(renderPlaying(*sequenced(), transport, 0.0, {}, 2 * measure, blockSize, rate),
+                  renderPlaying(*sequenced(), transport, 0.0, {}, 2 * measure, blockSize, rate, 1e-7)),
+        context, "a host whose position is a hair off at every block loses no hit and doubles none");
+
+  // A loop: two beats played, then the host jumps back to the start.
+  {
+    const int half = measure / 2;
+    const std::unique_ptr<juce::AudioProcessor> looped = sequenced();
+    Stereo heard = renderPlaying(*looped, transport, 0.0, {}, half, blockSize, rate);
+    const Stereo again = renderPlaying(*looped, transport, 0.0, {}, half, blockSize, rate);
+    heard.left.insert(heard.left.end(), again.left.begin(), again.left.end());
+    heard.right.insert(heard.right.end(), again.right.begin(), again.right.end());
+
+    std::vector<Event> twice = shifted(loop, 0, 0, half);
+    append(twice, shifted(loop, half, 0, half));
+    check(identical(heard, renderPlaying(*noted(), transport, 0.0, twice, 2 * half, blockSize, rate)), context,
+          "when the host loops back, the pattern goes back with it");
+  }
+
+  // A pattern chosen in the middle of a measure waits for the bar line.
+  {
+    const std::unique_ptr<juce::AudioProcessor> switched = sequenced();
+    const int half = measure / 2;
+    Stereo heard = renderPlaying(*switched, transport, 0.0, {}, half, blockSize, rate);
+    set(*switched, {"pattern", 0.0f});
+    const Stereo after = renderPlaying(*switched, transport, 2.0, {}, measure + half, blockSize, rate);
+    heard.left.insert(heard.left.end(), after.left.begin(), after.left.end());
+    heard.right.insert(heard.right.end(), after.right.begin(), after.right.end());
+
+    std::vector<Event> expected = shifted(loop, 0, 0, measure);
+    append(expected, shifted(engineHits(beat, 0, played.swing, rate, 1), measure));
+    check(identical(heard, renderPlaying(*noted(), transport, 0.0, expected, 2 * measure, blockSize, rate)), context,
+          "pattern А chosen halfway through a measure of Б takes over at the bar line");
+  }
+
+  // What keeps the sequencer quiet.
+  {
+    const std::unique_ptr<juce::AudioProcessor> stopped = sequenced();
+    transport.playing = false;
+    check(allZero(renderPlaying(*stopped, transport, 0.0, {}, measure, blockSize, rate)), context,
+          "a stopped host plays no pattern");
+    transport.playing = true;
+    check(allZero(render(*sequenced(), {}, measure, blockSize)), context, "with no host clock no pattern plays");
+    check(allZero(renderPlaying(*noted(), transport, 0.0, {}, measure, blockSize, rate)), context,
+          "with the sequencer off a playing host plays no pattern");
+    const std::unique_ptr<juce::AudioProcessor> empty = makeProcessor(rate, blockSize);
+    check(allZero(renderPlaying(*empty, transport, 0.0, {}, measure, blockSize, rate)), context,
+          "with no beat loaded a playing host plays nothing");
+  }
+}
+
+void testAccentAndMutes(const std::string& context, double rate, int blockSize) {
+  const int total = framesFor(0.1, rate);
+  const auto level = [&](int velocity, const std::vector<Setting>& settings) {
+    return peak(renderFresh(rate, blockSize, {noteOn(0, kSnare, velocity)}, total, settings));
+  };
+  const float accented = level(127, {});
+  check(juce::exactlyEqual(level(1, {{"accent", 0.0f}}), accented), context,
+        "with the accent knob fully left a plain hit is as loud as an accented one");
+  check(level(1, {{"accent", 1.0f}}) < level(1, {}) * 0.8f, context,
+        "with the accent knob fully right a plain hit is quieter than with it at rest");
+  check(juce::exactlyEqual(level(127, {{"snare_mute", 1.0f}}), 0.0f) &&
+            juce::exactlyEqual(level(127, {{"kick_mute", 1.0f}}), accented),
+        context, "a muted voice is silent and the others are as they were");
+}
+
 // ---- The sound thread, run once ---------------------------------------------
 
 // With a realtime clock the audio thread makes no sounds: a thread of the
@@ -627,9 +893,9 @@ void testUnsupportedSampleRate() {
 void testDescription() {
   const std::string context = "description";
   const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(48000.0, 512);
-  const int expected = kVoiceCount * 4 + 3;
+  const int expected = kVoiceCount * 5 + 7;
   check(processor->getParameters().size() == expected, context,
-        text("the plugin has %d parameters: four knobs for each of %d voices, volume, effect and its mix (%d found)",
+        text("the plugin has %d parameters: four knobs and a mute for each of %d voices, and seven more (%d found)",
              expected, kVoiceCount, processor->getParameters().size()));
   check(processor->getTailLengthSeconds() > 1.0, context,
         text("the tail covers the longest sound and effect (%.2f s)", processor->getTailLengthSeconds()));
@@ -637,6 +903,92 @@ void testDescription() {
   const std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorIfNeeded());
   check(processor->hasEditor() && editor != nullptr && editor->getWidth() > 0 && editor->getHeight() > 0, context,
         "the plugin opens a window");
+}
+
+// ---- Beat files, run once ---------------------------------------------------
+
+void testBeatFile() {
+  const std::string context = "beat file";
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(48000.0, 512);
+  const auto state = [&] {
+    juce::MemoryBlock block;
+    processor->getStateInformation(block);
+    return block;
+  };
+  const juce::MemoryBlock before = state();
+
+  struct Refused {
+    const char* name;
+    juce::String json;
+  };
+  const auto with = [](const std::function<void(const juce::var&)>& change) { return edited(fourPatterns(), change); };
+  const std::array<Refused, 12> refused{{
+      {"text that is not JSON", "x.x.x.x. this is not a beat"},
+      {"an empty file", ""},
+      {"JSON that is not a beat", "{\"format\": \"something.else\", \"schemaVersion\": 3}"},
+      {"a list", "[1, 2, 3]"},
+      {"a beat of the earlier machine", fixture("earlier-v2.project.json")},
+      {"a beat from a newer version", with([](const juce::var& beat) { put(beat, "schemaVersion", 4); })},
+      {"a beat for another machine", with([](const juce::var& beat) { put(beat, "machine", "808"); })},
+      {"a row of fifteen steps", with([](const juce::var& beat) { put(beat["patterns"][0]["steps"], "kick", "x.............."); })},
+      {"a row with a letter that is no step", with([](const juce::var& beat) { put(beat["patterns"][3], "accents", "x......X........"); })},
+      {"a knob past its end", with([](const juce::var& beat) { put(beat["mix"], "volume", 1.5); })},
+      {"a size the machine does not have", with([](const juce::var& beat) { put(beat, "size", 10); })},
+      {"a voice with no level", with([](const juce::var& beat) { put(beat["mix"], "levels", juce::var(new juce::DynamicObject())); })},
+  }};
+  for (const Refused& file : refused) {
+    const juce::Result result = plugin(*processor).loadBeat(file.json);
+    check(result.failed() && result.getErrorMessage().isNotEmpty() && state() == before, context,
+          text("%s is refused and changes nothing: \"%s\"", file.name, result.getErrorMessage().toRawUTF8()));
+  }
+
+  const juce::Result loaded = plugin(*processor).loadBeat(fourPatterns());
+  check(loaded.wasOk() && plugin(*processor).beatName() == "Four patterns fixture", context,
+        text("the fixture loads and the plugin holds its name: %s", plugin(*processor).beatName().toRawUTF8()));
+  const auto is = [&](const char* id, float value) { return std::abs(valueOf(*processor, id) - value) < 1e-6f; };
+  check(is("kick_pitch", 0.35f) && is("clap_level", 0.5f) && is("rim_mute", 1.0f) && is("kick_mute", 0.0f) &&
+            is("master_volume", 0.8f) && is("accent", 0.6f) && is("swing", 0.4f) && is("effect_kind", 2.0f) &&
+            is("effect_mix", 0.3f) && is("pattern", 2.0f),
+        context, "its knobs, mutes, swing, effect and the pattern its panel was on become the parameters");
+
+  // The beat rides in the plugin's state.
+  const juce::MemoryBlock saved = state();
+  const std::unique_ptr<juce::XmlElement> xml =
+      juce::AudioProcessor::getXmlFromBinary(saved.getData(), static_cast<int>(saved.getSize()));
+  const juce::XmlElement* const beat = xml != nullptr ? xml->getChildByName("Beat") : nullptr;
+  check(beat != nullptr && beat->getNumChildElements() == 4 &&
+            beat->getFirstChildElement()->getStringAttribute("kick") == "x.....x...x....." &&
+            beat->getFirstChildElement()->getStringAttribute("accents") == "x.......x.....x.",
+        context, "the saved state holds its four patterns as rows of steps");
+
+  const std::unique_ptr<juce::AudioProcessor> recalled = makeProcessor(48000.0, 512);
+  recalled->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+  juce::MemoryBlock again;
+  recalled->getStateInformation(again);
+  check(again == saved && plugin(*recalled).beatName() == "Four patterns fixture", context,
+        "save -> load -> save with a beat held is byte-for-byte identical");
+
+  Transport transport;
+  const int total = 2 * measureFrames(48000.0);
+  check(identical(renderPlaying(*processor, transport, 0.0, {}, total, 512, 48000.0),
+                  renderPlaying(*recalled, transport, 0.0, {}, total, 512, 48000.0)),
+        context, "the recalled plugin plays the same pattern, sample for sample");
+
+  // A state from before the plugin held beats: version 1, no patterns.
+  juce::XmlElement old(*xml);
+  old.setAttribute("schemaVersion", 1);
+  old.deleteAllChildElements();
+  for (const char* later : {"accent", "swing", "pattern", "sequencer", "rim_mute"}) old.removeAttribute(later);
+  juce::MemoryBlock oldBlob;
+  juce::AudioProcessor::copyXmlToBinary(old, oldBlob);
+  const std::unique_ptr<juce::AudioProcessor> older = makeProcessor(48000.0, 512);
+  plugin(*older).loadBeat(fourPatterns());
+  older->setStateInformation(oldBlob.getData(), static_cast<int>(oldBlob.getSize()));
+  const auto rests = [&](const char* id, float value) { return std::abs(valueOf(*older, id) - value) < 1e-6f; };
+  check(plugin(*older).beatName().isEmpty() && rests("kick_pitch", 0.35f) && rests("swing", 0.0f) &&
+            rests("pattern", 0.0f) && rests("sequencer", 1.0f) && rests("rim_mute", 0.0f) &&
+            allZero(renderPlaying(*older, transport, 0.0, {}, total, 512, 48000.0)),
+        context, "a version 1 state still loads: its knobs are kept, the new ones rest and no pattern plays");
 }
 
 // ---- State, run once --------------------------------------------------------
@@ -694,11 +1046,11 @@ void testState() {
   const juce::MemoryBlock restState = saveState(*untouched);
   const std::unique_ptr<juce::XmlElement> restXml = xmlOf(restState);
   const bool versioned = restXml != nullptr && restXml->hasTagName("BoombapbotPluginState") &&
-                         restXml->getIntAttribute("schemaVersion") == 1 &&
+                         restXml->getIntAttribute("schemaVersion") == 2 &&
                          restXml->getStringAttribute("machine") == "ritm12" &&
                          restXml->getNumAttributes() == 2 + untouched->getParameters().size();
   check(versioned, context,
-        text("a saved state carries schemaVersion 1, machine ritm12 and every parameter (%d attributes)",
+        text("a saved state carries schemaVersion 2, machine ritm12 and every parameter (%d attributes)",
              restXml != nullptr ? restXml->getNumAttributes() : 0));
 
   const std::unique_ptr<juce::AudioProcessor> source = makeProcessor(rate, blockSize);
@@ -727,7 +1079,7 @@ void testState() {
   };
   const juce::MemoryBlock otherPlugin = retagged("SomeOtherPlugin");
   const juce::MemoryBlock noVersion = with("schemaVersion", "0");
-  const juce::MemoryBlock newerVersion = with("schemaVersion", "2");
+  const juce::MemoryBlock newerVersion = with("schemaVersion", "3");
   const juce::MemoryBlock otherMachine = with("machine", "808");
 
   struct Refused {
@@ -827,11 +1179,18 @@ int main() {
     testEffects(context, rate, 512);
     testDelayFollowsHostTempo(context, rate, 512);
     testTempoChangeWhilePlaying(context, rate, 512);
+    testAccentAndMutes(context, rate, 512);
+    for (const int blockSize : {64, 512}) {
+      const std::string blocks = text("%.0f Hz, block %d", rate, blockSize);
+      testSequencerMatchesTheEngine(blocks, rate, blockSize);
+      testSequencerFollowsTheHost(blocks, rate, blockSize);
+    }
   }
   testSoundThreadFollowsKnobs();
   testSampleRateChange();
   testUnsupportedSampleRate();
   testDescription();
+  testBeatFile();
   testState();
   testVoicesMatchTheMachine();
 

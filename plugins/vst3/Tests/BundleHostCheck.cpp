@@ -18,7 +18,7 @@ namespace {
 constexpr double kRate = 48000.0;
 constexpr int kBlock = 512;
 constexpr int kKickNote = 36;
-constexpr int kOwnParameters = 35;
+constexpr int kOwnParameters = 47;
 
 int failures = 0;
 
@@ -111,11 +111,11 @@ std::vector<float> playEcho(juce::VST3PluginFormat& format, const juce::PluginDe
 int ownParameters(juce::AudioPluginInstance& plugin) {
   int count = 0;
   for (const char* voice : {"Kick", "Snare", "Clap", "Closed hat", "Open hat", "Tom", "Rim", "Perc"}) {
-    for (const char* knob : {"Pitch", "Tone", "Decay", "Level"}) {
+    for (const char* knob : {"Pitch", "Tone", "Decay", "Level", "Mute"}) {
       if (named(plugin, (std::string(voice) + " " + knob).c_str()) != nullptr) ++count;
     }
   }
-  for (const char* name : {"Volume", "Effect", "Effect Mix"}) {
+  for (const char* name : {"Volume", "Effect", "Effect Mix", "Accent", "Swing", "Pattern", "Sequencer"}) {
     if (named(plugin, name) != nullptr) ++count;
   }
   return count;
