@@ -131,6 +131,7 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
   endfunction()
 
   boombapbot_plugin_program(boombapbot_plugin_selftest Tests/ProcessorSelfTest.cpp)
+  target_sources(boombapbot_plugin_selftest PRIVATE Tests/HeapTrap.cpp Tests/HeapTrap.h)
   boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
   add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
   add_test(NAME vst3.window_snapshot
