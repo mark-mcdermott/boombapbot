@@ -11,6 +11,9 @@ export const FREE_BEAT_LIMIT = 20;
 export const MAX_BEAT_BYTES = 64 * 1024;
 
 /** What a project weighs when saved: the bytes of its JSON, written compactly. */
+/** The longest name a beat may have, as a project's own name. */
+export const MAX_BEAT_NAME_LENGTH = 80;
+
 export function beatBytes(project: unknown): number {
   return new TextEncoder().encode(JSON.stringify(project) ?? '').length;
 }
@@ -69,6 +72,11 @@ export const ReplaceBeatRequestSchema = SaveBeatRequestSchema.extend({
   lastSeen: z.iso.datetime(),
   /** Set once the person has been asked and chose to replace a newer cloud copy. */
   overwrite: z.boolean().default(false),
+});
+
+/** A new name for a saved beat. Nothing else about the beat changes. */
+export const RenameBeatRequestSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_BEAT_NAME_LENGTH),
 });
 
 /** Why the server refused, for the page to act on. The message is for the person. */

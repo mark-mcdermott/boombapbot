@@ -50,6 +50,20 @@ export function replaceBeat(
   return ask(address(baseUrl, id), BeatSavedAnswerSchema, 'PUT', { project, lastSeen, overwrite });
 }
 
+/** Gives a saved beat another name. When it was saved does not change, so no device is put behind by it. */
+export function renameBeat(baseUrl: string, id: string, name: string): Promise<Asked<{ beat: BeatSummary }>> {
+  return ask(address(baseUrl, id), BeatSavedAnswerSchema, 'PATCH', { name });
+}
+
+const twoDigits = (value: number) => String(value).padStart(2, '0');
+
+/** The name a beat is saved under when none is typed: the moment, to the second, on this device's clock. */
+export function defaultBeatName(now: Date): string {
+  const day = [now.getFullYear(), twoDigits(now.getMonth() + 1), twoDigits(now.getDate())].join('');
+  const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(twoDigits).join('');
+  return `beat-${day}-${time}`;
+}
+
 export function fetchBeat(baseUrl: string, id: string): Promise<Asked<{ beat: BeatSummary; project?: unknown }>> {
   return ask(address(baseUrl, id), BeatAnswerSchema);
 }

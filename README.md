@@ -231,19 +231,24 @@ A free account holds up to 20 beats, each at most 64 KB of project JSON.
 Both numbers are constants in `packages/contracts/src/beats.ts`, enforced
 by the server.
 
-- Saving is explicit. "Save this beat to my account" in the account modal
-  sends the project on the machine; nothing is sent otherwise, and there is
-  no background sync. The draft in the browser stays the working copy.
+- Saving is explicit. "Save" under "My Beats" in the account modal sends
+  the project on the machine; nothing is sent otherwise, and there is no
+  background sync. The draft in the browser stays the working copy.
+- A beat is saved under the name in the field beside the button, which
+  becomes the project's name on the machine too. Left empty, it is
+  `beat-<date>-<time>`, as the field shows; a beat that already has a name
+  of its own is offered that one.
 - The list under the button shows each beat's name, when it was saved and
-  its size, with a button to load it and one to delete it. Deleting asks
-  first. Loading takes the same road as importing a project file: it is
+  its size, with buttons to load it, edit its name and delete it. Deleting
+  asks first. A new name changes the row and the project stored in it, not
+  when it was saved, so no other device is put behind by it. Loading takes the same road as importing a project file: it is
   validated, and undo brings back the beat that was on the machine.
 - Saving a beat that was loaded from the account, or saved to it before,
   replaces that copy. The last save wins, with one guard: if the copy in
   the account was saved after the one this device last loaded or saved, the
   page says so and asks whether to replace it or keep the cloud copy.
-- The routes are `GET` and `POST /api/beats`, and `GET`, `PUT` and `DELETE
-  /api/beats/<uuid>`. Each needs a session and only reaches the caller's
+- The routes are `GET` and `POST /api/beats`, and `GET`, `PUT`, `PATCH` (a
+  new name) and `DELETE /api/beats/<uuid>`. Each needs a session and only reaches the caller's
   own rows. What is stored is the project after the project codec has checked
   it, and only a РИТМ-12 beat is stored.
 - Beats saved while the site was the earlier machine are still in the table
@@ -346,7 +351,7 @@ Run in this order; later steps use what earlier ones build.
 | `pnpm typecheck` | TypeScript across packages, tests and the Astro site |
 | `pnpm test:unit` | Vitest against the WASM build: РИТМ-12's project schema, what its controls do, its engine setup and its reader for the earlier machine's beats, which become new beats; РИТМ-12 through the native engine and the WASM one from the same setup (every pattern of its fixture, swing, triplets, each effect, and byte-identical MIDI) and each of its sounds; offline rendering, songs, intros and fill-ins with a setup written by hand; the editor playing through a controller a shell hands it, with stand-ins for one that takes samples and one that makes its own sounds, and the controller of a native engine against a fake bridge (the order of commands, an engine made again being told the beat again); the desktop app's page asking only for commands the app has, and the phone app's only for what its engine plug-in has; WAV and MIDI contents; a WAV export's Worker job against the same render on the main thread, byte for byte; who a session answer says is logged in; the engine's export list against its header and the TypeScript bridge; drafts (kept in IndexedDB, moved out of `localStorage`, and which tab keeps them), import, the limits and the conflict rule for saved beats, and what a device remembers about them |
 | `pnpm build` | Production Astro build, then `scripts/check-build.mjs`: the worklet and the engine resolve in the built site, the engine is the one built for the machine and needs no shared memory, no sample files ship, and the panel art is byte for byte what is committed, with no other machine's beside it |
-| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, a draft that cannot be written, a draft moved out of `localStorage`, a change kept when the tab closes, two tabs on one draft, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts (and, on a second server with the limits on and its database in a folder, an address turned away after three tries, the check of who is logged in left uncounted, and the count still there after the server is started again), the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed, and its modal: buying with and without an account, the wait for Stripe, the key shown and copied, a key entered, a lost key asked for, and the closed modal), and saved beats (save, list, load, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
+| `pnpm test:e2e` | Playwright against the production build in headless Chromium. РИТМ-12's panel: every key, knob and switch, the write and size switches, the effect, mute, dice and clear, power, playback and the bar-line pattern change, recording by tapping, the meter, WAV and MIDI exports with the Worker held up and failing, the draft, a draft and a file of the earlier machine opening converted, the picture on a phone that asks for it, the phone's panel (the view following the screen's width and keeping the beat, its keys' size, writing and playing a pattern, the three tabs of knobs, power, and an accessibility scan of each tab), and an accessibility scan. The site: the page layout and settings sheet, a draft that cannot be written, a draft moved out of `localStorage`, a change kept when the tab closes, two tabs on one draft, the header and footer, the modals, the pages of words (one heading each, the masthead and its names, a phone's width, About's picture, the manifesto's column, an accessibility scan) the spaces a line break must not swallow, and a host that answers for the account server without being one. Against the built server with its database in memory: accounts (and, on a second server with the limits on and its database in a folder, an address turned away after three tries, the check of who is logged in left uncounted, and the count still there after the server is started again), the shop, the upgrade (checkout, one key for one payment, the key by email and from the account, entering a key, the switch that keeps it closed, and its modal: buying with and without an account, the wait for Stripe, the key shown and copied, a key entered, a lost key asked for, and the closed modal), and saved beats (save under a name or the default one, list, load, rename, replace with and without the conflict question, delete, both limits, one account against another's beats, row ids, the machine with the server gone, a beat of the earlier machine loading as a new beat, and one refused on save) |
 
 `pnpm test` runs the engine, unit and browser suites after a build.
 `.github/workflows/ci.yml` runs the whole list on every push and pull request.

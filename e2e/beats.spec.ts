@@ -37,10 +37,16 @@ async function stored(request: APIRequestContext, id: string): Promise<{ beat: S
   return (await request.get(`/api/beats/${id}`)).json();
 }
 
-/** Saves the beat on the machine through the modal, which must be open. */
-async function saveFromMachine(page: Page, name = 'Starter beat'): Promise<void> {
+/** The name a beat is saved under when none is typed. */
+const UNNAMED = /^beat-\d{8}-\d{6}$/;
+
+/** Saves the beat on the machine through the modal, which must be open: under `name`, or under the one already offered. */
+async function saveFromMachine(page: Page, name?: string): Promise<void> {
+  if (name !== undefined) await page.getByTestId('beats-save-name').fill(name);
   await page.getByTestId('beats-save').click();
-  await expect(page.getByTestId('beats-said')).toHaveText(`Saved “${name}” to your account.`);
+  await expect(page.getByTestId('beats-said')).toHaveText(
+    name === undefined ? /^Saved “.+” to your account\.$/ : `Saved “${name}” to your account.`,
+  );
 }
 
 async function closeAccount(page: Page): Promise<void> {
@@ -67,15 +73,17 @@ test('a beat is saved to the account, listed there, and loaded back onto the mac
   await signedUp(page);
   await expect(page.getByTestId('beats-count')).toHaveText(`0 of ${LIMIT}`);
   await expect(page.getByTestId('beats-empty')).toContainText('Nothing saved yet');
-  await expect(page.getByTestId('beats-save-hint')).toContainText('This puts a copy of “Starter beat” in your account');
+  await expect(page.getByTestId('beats-save-hint')).toContainText(
+    'This puts a copy of the beat on the machine in your account',
+  );
   const atSave = await project(page);
 
-  await saveFromMachine(page);
+  await saveFromMachine(page, 'Dusty loop');
   await expect(page.getByTestId('beats-count')).toHaveText(`1 of ${LIMIT}`);
   await expect(page.getByTestId('beats-empty')).toHaveCount(0);
   const row = page.getByTestId('beat');
   await expect(row).toHaveCount(1);
-  await expect(row.getByTestId('beat-name-saved')).toHaveText('Starter beat');
+  await expect(row.getByTestId('beat-name-saved')).toHaveText('Dusty loop');
   await expect(row).toContainText(/Saved .+ · \d+ KB/);
 
   // What the account holds is the project the machine had.
@@ -92,7 +100,7 @@ test('a beat is saved to the account, listed there, and loaded back onto the mac
   await row.getByTestId('beat-load').click();
   await expect(page.getByTestId('account-modal')).toHaveCount(0);
   await expect(page.getByTestId('notice')).toContainText(
-    'Loaded “Starter beat” from your account. Undo brings back the previous beat.',
+    'Loaded “Dusty loop” from your account. Undo brings back the previous beat.',
   );
   const loaded = await project(page);
   expect(loaded.patterns).toEqual(atSave.patterns);
@@ -138,8 +146,8 @@ test('logged in, the account modal is a page of one size, with the account besid
 
 test('saving again replaces the same beat, and asks first when the copy in the account is newer', async ({ page }) => {
   await signedUp(page);
-  await saveFromMachine(page);
-  await expect(page.getByTestId('beats-save-hint')).toContainText('This replaces “Starter beat”');
+  await saveFromMachine(page, 'First beat');
+  await expect(page.getByTestId('beats-save-hint')).toContainText('This replaces “First beat”');
   await expect(page.getByTestId('beat')).toHaveAttribute('aria-current', 'true');
   const [first] = await listed(page.request);
 
@@ -180,10 +188,10 @@ test('saving again replaces the same beat, and asks first when the copy in the a
   // Asked again, and this time told to replace it.
   await page.getByTestId('beats-save').click();
   await page.getByTestId('beats-replace').click();
-  await expect(page.getByTestId('beats-said')).toHaveText('Saved “Starter beat” to your account.');
+  await expect(page.getByTestId('beats-said')).toHaveText('Saved “First beat” to your account.');
   await expect(question).toHaveCount(0);
   const replaced = await stored(page.request, second!.id);
-  expect(replaced.beat.name).toBe('Starter beat');
+  expect(replaced.beat.name).toBe('First beat');
   expect(tomSteps(replaced.project)).toContain(2);
   await expect(page.getByTestId('beats-count')).toHaveText(`1 of ${LIMIT}`);
 
@@ -197,9 +205,80 @@ test('saving again replaces the same beat, and asks first when the copy in the a
   await expect(page.getByTestId('beat')).toHaveCount(2);
 });
 
+test('a beat is saved under the name typed, or the moment when none is, and renamed from its row', async ({ page }) => {
+  await signedUp(page);
+  await expect(page.getByTestId('beats').getByRole('heading')).toHaveText('My Beats');
+  const name = page.getByTestId('beats-save-name');
+  const save = page.getByTestId('beats-save');
+  await expect(save).toHaveText('Save');
+  await expect(save.locator('svg')).toBeVisible();
+  // A button beside the name, not a bar across the page.
+  expect((await save.boundingBox())!.width).toBeLessThan(160);
+
+  // Nothing typed: the beat takes the name the field offers.
+  await expect(name).toHaveValue('');
+  const offered = (await name.getAttribute('placeholder'))!;
+  expect(offered).toMatch(UNNAMED);
+  await saveFromMachine(page, undefined);
+  const row = page.getByTestId('beat');
+  await expect(row.getByTestId('beat-name-saved')).toHaveText(offered);
+  expect((await project(page)).name).toBe(offered);
+
+  // Saved again under a name of its own, by the Enter key: the same beat, renamed.
+  await expect(name).toHaveValue(offered);
+  await name.fill('  Dusty loop  ');
+  await name.press('Enter');
+  await expect(page.getByTestId('beats-said')).toHaveText('Saved “Dusty loop” to your account.');
+  await expect(row).toHaveCount(1);
+  await expect(row.getByTestId('beat-name-saved')).toHaveText('Dusty loop');
+  const [before] = await listed(page.request);
+
+  // Edit asks for a name in the row. Escape drops it and leaves the modal open.
+  await row.getByTestId('beat-edit').click();
+  const field = row.getByTestId('beat-rename-name');
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue('Dusty loop');
+  await field.fill('Thrown away');
+  await field.press('Escape');
+  await expect(page.getByTestId('account-modal')).toBeVisible();
+  await expect(row.getByTestId('beat-name-saved')).toHaveText('Dusty loop');
+  await expect(row.getByTestId('beat-edit')).toBeFocused();
+
+  await row.getByTestId('beat-edit').click();
+  await field.fill('Night shift');
+  await row.getByTestId('beat-rename-save').click();
+  await expect(row.getByTestId('beat-name-saved')).toHaveText('Night shift');
+  await expect(page.getByTestId('beats-said')).toHaveText('Renamed “Dusty loop” to “Night shift”.');
+
+  // The name changed in the account and in the project kept there; when it was saved did not.
+  const after = await stored(page.request, before!.id);
+  expect(after.beat.name).toBe('Night shift');
+  expect(after.project.name).toBe('Night shift');
+  expect(after.beat.updatedAt).toBe(before!.updatedAt);
+
+  // The beat on the machine goes by it too, so saving again does not put the old name back.
+  expect((await project(page)).name).toBe('Night shift');
+  await expect(name).toHaveValue('Night shift');
+  await saveFromMachine(page);
+  await expect(page.getByTestId('beats-conflict')).toHaveCount(0);
+  await expect(row.getByTestId('beat-name-saved')).toHaveText('Night shift');
+
+  // A second beat is renamed without touching the one on the machine.
+  await saved(await post(page.request, { project: fixture('Other beat') }));
+  await closeAccount(page);
+  await reopenAccount(page);
+  const other = row.first();
+  await expect(other.getByTestId('beat-name-saved')).toHaveText('Other beat');
+  await other.getByTestId('beat-edit').click();
+  await other.getByTestId('beat-rename-name').fill('Other name');
+  await other.getByTestId('beat-rename-name').press('Enter');
+  await expect(page.getByTestId('beats-said')).toHaveText('Renamed “Other beat” to “Other name”.');
+  expect((await project(page)).name).toBe('Night shift');
+});
+
 test('a saved beat is deleted only once the question is answered', async ({ page }) => {
   await signedUp(page);
-  await saveFromMachine(page);
+  await saveFromMachine(page, 'First beat');
   const row = page.getByTestId('beat');
 
   await row.getByTestId('beat-delete').click();
@@ -212,13 +291,14 @@ test('a saved beat is deleted only once the question is answered', async ({ page
   await row.getByTestId('beat-delete').click();
   await row.getByTestId('beat-delete-confirm').click();
   await expect(row).toHaveCount(0);
-  await expect(page.getByTestId('beats-said')).toHaveText('Deleted “Starter beat” from your account.');
+  await expect(page.getByTestId('beats-said')).toHaveText('Deleted “First beat” from your account.');
   await expect(page.getByTestId('beats-empty')).toBeVisible();
   await expect(page.getByTestId('beats-count')).toHaveText(`0 of ${LIMIT}`);
   expect(await listed(page.request)).toHaveLength(0);
 
   // The machine still has its beat, and saving it now makes a new one.
-  expect((await project(page)).name).toBe('Starter beat');
+  expect((await project(page)).name).toBe('First beat');
+  await expect(page.getByTestId('beats-save-name')).toHaveValue('First beat');
   await expect(page.getByTestId('beats-save-hint')).toContainText('This puts a copy');
   await saveFromMachine(page);
   await expect(page.getByTestId('beat')).toHaveCount(1);
@@ -338,9 +418,11 @@ test('a beat the earlier machine saved loads as a new beat, and the one in the a
 
   // It is a new beat here, so saving it adds one and replaces nothing.
   await reopenAccount(page);
-  await expect(page.getByTestId('beats-save-hint')).toContainText('This puts a copy of “Mixed rhythms fixture” in your account');
+  await expect(page.getByTestId('beats-save-hint')).toContainText('This puts a copy of the beat on the machine');
   await expect(page.getByTestId('beat')).not.toHaveAttribute('aria-current', 'true');
-  await saveFromMachine(page, 'Mixed rhythms fixture');
+  // A beat that came with a name is offered it.
+  await expect(page.getByTestId('beats-save-name')).toHaveValue('Mixed rhythms fixture');
+  await saveFromMachine(page);
   await expect(page.getByTestId('beats-count')).toHaveText(`2 of ${LIMIT}`);
   expect((await listed(page.request)).find((other) => other.id === kept!.id)).toEqual(kept);
 });
@@ -423,6 +505,12 @@ test('the saved beats have no detectable accessibility violations', async ({ pag
   await reopenAccount(page);
   await expect(page.getByTestId('beat')).toHaveCount(2);
   expect(await scan()).toEqual([]);
+
+  // A name being changed.
+  await page.getByTestId('beat').first().getByTestId('beat-edit').click();
+  await expect(page.getByTestId('beat-rename-name')).toBeFocused();
+  expect(await scan()).toEqual([]);
+  await page.getByTestId('beat-rename-cancel').click();
 
   // The question before deleting.
   await page.getByTestId('beat').first().getByTestId('beat-delete').click();
@@ -510,6 +598,30 @@ test.describe('what the server answers about beats', () => {
     expect((await stored(mine, beat.id)).project.name).toBe('Mine alone');
     await mine.dispose();
     await theirs.dispose();
+  });
+
+  test('a beat is renamed by its owner alone, and only to a name it can have', async ({ playwright }) => {
+    const mine = await playwright.request.newContext({ baseURL: ACCOUNTS_URL });
+    const theirs = await playwright.request.newContext({ baseURL: ACCOUNTS_URL });
+    const nobody = await playwright.request.newContext({ baseURL: ACCOUNTS_URL });
+    await signedUpRequest(mine);
+    await signedUpRequest(theirs);
+    const beat = await saved(await post(mine, { project: fixture('Mine alone') }));
+    const rename = (as: APIRequestContext, name: unknown) =>
+      as.patch(`/api/beats/${beat.id}`, { data: { name } });
+
+    const renamed = await saved(await rename(mine, '  Mine, renamed  '));
+    expect(renamed).toMatchObject({ id: beat.id, name: 'Mine, renamed', updatedAt: beat.updatedAt });
+    expect((await stored(mine, beat.id)).project.name).toBe('Mine, renamed');
+    expect(renamed.bytes).toBeGreaterThan(beat.bytes);
+
+    for (const name of ['', '   ', 'x'.repeat(81), 7, undefined]) {
+      expect((await rename(mine, name)).status(), String(name)).toBe(400);
+    }
+    expect((await rename(theirs, 'Taken over')).status()).toBe(404);
+    expect((await rename(nobody, 'Taken over')).status()).toBe(401);
+    expect((await mine.patch('/api/beats/not-a-uuid', { data: { name: 'x' } })).status()).toBe(404);
+    expect((await stored(mine, beat.id)).beat.name).toBe('Mine, renamed');
   });
 
   test('a replace is held back when the copy in the account is newer, unless told to overwrite', async ({ request }) => {
