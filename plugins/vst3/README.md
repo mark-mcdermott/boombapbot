@@ -113,7 +113,9 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   state, which has no patterns, loads with none.
 - **The window is a panel of the machine's own**, drawn for the plugin in the
   olive, cream and amber of РИТМ-12's picture, lettered in the machine's
-  Russian with English under it. It is 920 by 624 and does not resize.
+  Russian with English under it. It is laid out at 920 by 624, and the window can be dragged from 0.7 to 2
+  times that, keeping its shape; the panel is drawn through a scale. The size
+  it was left at is saved with the plugin.
   - *Step keys.* A row of sixteen for the accents and one for each voice,
     showing the pattern the panel is on. A press turns a step on or off and a
     drag along a row carries that on. A red lamp runs over the step the
@@ -299,6 +301,9 @@ block size matters, it checks:
   velocities; its notes played back into the plugin render the same samples
   as the sequencer playing the pattern; swing writes every second sixteenth
   late and a twelve-step measure is written in triplets;
+- the window's size: it opens at the panel's own, shows the same panel
+  through a scale when made larger, and comes back at the size it was left,
+  after closing and after a recall from the plugin's state;
 - the dice and the undo: over 4000 throws the dice hit each kind of step as
   often as the site's do and touch no other voice; undo walks back through 64
   changes; a clear, a throw, a new measure size, a drag on the step keys and
@@ -352,7 +357,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 508 checks as arm64 and again as
+- All nine CTest tests pass: the self-test's 513 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -389,7 +394,8 @@ signed the same way, but see below.
   (`panel.jpg` above is that picture) and its keys have been worked by the
   tests, which make their own mouse events. Nobody has clicked it, in a host
   or out of one: how the knobs feel, whether the lamp keeps up, how it looks
-  on a screen that is not Retina, and the file chooser are all untried.
+  on a screen that is not Retina or at another size, whether a host lets its
+  window be dragged larger, and the file chooser are all untried.
 - **The sequencer against a real host's transport.** The tests play a host that
   reports an exact position. Whether FL Studio and others report one the
   plugin follows cleanly, through loops, tempo changes and odd signatures, is

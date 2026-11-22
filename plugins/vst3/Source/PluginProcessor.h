@@ -83,6 +83,10 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // The voice whose key was pressed last on the panel. It is saved with a beat.
   void selectVoice(int voice);
   int selectedVoice() const;
+  // How large the window was left, as a scale of the panel's own size. It is
+  // saved with the plugin.
+  float windowScale() const;
+  void setWindowScale(float scale);
   // The step the sequencer last played in its measure, or -1 when it is not playing.
   int playingStep() const;
   int playingPattern() const;
@@ -172,6 +176,7 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   std::atomic<int> beatSize_{boombapbot::plugin::kSizeRest};
   std::atomic<std::uint32_t> auditions_{0};
   std::atomic<int> selectedVoice_{0};
+  std::atomic<float> windowScale_{boombapbot::plugin::kWindowScaleRest};
   std::atomic<double> hostTempo_{boombapbot::plugin::kTempoRest};
   std::atomic<int> shownStep_{-1};
   std::atomic<int> shownPattern_{0};

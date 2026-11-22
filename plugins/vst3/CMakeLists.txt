@@ -64,6 +64,8 @@ target_sources(boombapbot_plugin PRIVATE
   Source/BeatFile.cpp
   Source/BeatFile.h
   Source/MachineRitm12.h
+  Source/Panel/Panel.cpp
+  Source/Panel/Panel.h
   Source/Panel/PanelStyle.cpp
   Source/Panel/PanelStyle.h
   Source/Panel/StepKeys.cpp

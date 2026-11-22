@@ -91,6 +91,8 @@ constexpr const char* kBeatTag = "Beat";
 constexpr const char* kBeatName = "name";
 constexpr const char* kBeatSize = "size";
 constexpr const char* kBeatSelected = "selected";
+constexpr const char* kWindowTag = "Window";
+constexpr const char* kWindowScale = "scale";
 constexpr const char* kPatternTag = "Pattern";
 constexpr const char* kPatternAccents = "accents";
 constexpr std::size_t kAccentRow = kVoiceCount;
@@ -484,6 +486,7 @@ void BoombapbotAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
       pattern->setAttribute(kVoices[voice].id, rowText(rows[voice].load(std::memory_order_relaxed)));
     }
   }
+  state.createNewChildElement(kWindowTag)->setAttribute(kWindowScale, static_cast<double>(windowScale()));
   copyXmlToBinary(state, destData);
 }
 
@@ -531,6 +534,10 @@ void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInB
   }
   selectVoice(beat.selectedVoice);
   holdPatterns(beat);
+
+  const juce::XmlElement* const window = state->getChildByName(kWindowTag);
+  const double scale = window != nullptr ? window->getDoubleAttribute(kWindowScale, kWindowScaleRest) : kWindowScaleRest;
+  setWindowScale(std::isfinite(scale) ? static_cast<float>(scale) : kWindowScaleRest);
 }
 
 // ---- The panel's side ---------------------------------------------------------
@@ -643,6 +650,12 @@ void BoombapbotAudioProcessor::selectVoice(int voice) {
 }
 
 int BoombapbotAudioProcessor::selectedVoice() const { return selectedVoice_.load(std::memory_order_relaxed); }
+
+float BoombapbotAudioProcessor::windowScale() const { return windowScale_.load(std::memory_order_relaxed); }
+
+void BoombapbotAudioProcessor::setWindowScale(float scale) {
+  windowScale_.store(juce::jlimit(kWindowScaleLeast, kWindowScaleMost, scale), std::memory_order_relaxed);
+}
 
 int BoombapbotAudioProcessor::measureSize() const { return beatSize_.load(std::memory_order_relaxed); }
 

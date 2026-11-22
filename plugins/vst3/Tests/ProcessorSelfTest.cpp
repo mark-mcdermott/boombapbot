@@ -7,6 +7,7 @@
 #include "BeatFile.h"
 #include "HeapTrap.h"
 #include "MachineRitm12.h"
+#include "Panel/Panel.h"
 #include "Panel/StepKeys.h"
 #include "PatternMidi.h"
 #include "PluginProcessor.h"
@@ -1174,6 +1175,48 @@ void testPanel() {
         context, "steps, sizes and voices the machine does not have are turned down");
 }
 
+// ---- The window's size, run once ---------------------------------------------
+
+void testWindowSize() {
+  const std::string context = "window";
+  constexpr int width = BoombapbotPanel::kWidth;
+  constexpr int height = BoombapbotPanel::kHeight;
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(48000.0, 512);
+  BoombapbotAudioProcessor& machine = plugin(*processor);
+
+  std::unique_ptr<juce::AudioProcessorEditor> window(processor->createEditorIfNeeded());
+  check(window->getWidth() == width && window->getHeight() == height && window->isResizable(), context,
+        text("the window opens at the panel's own size, %d by %d, and can be resized (%d by %d, scale %.3f)", width,
+             height, window->getWidth(), window->getHeight(), static_cast<double>(machine.windowScale())));
+
+  window->setSize(width * 3 / 2, height * 3 / 2);
+  juce::Component* const panel = window->getChildComponent(0);
+  const bool panelScaled = panel != nullptr && panel->getWidth() == width && panel->getHeight() == height &&
+                           std::abs(panel->getTransform().mat00 - 1.5f) < 1e-4f &&
+                           std::abs(panel->getTransform().mat11 - 1.5f) < 1e-4f;
+  check(panelScaled && std::abs(machine.windowScale() - 1.5f) < 1e-4f, context,
+        "made half as large again, it shows the same panel through a scale of 1.5");
+
+  window.reset();
+  window.reset(processor->createEditorIfNeeded());
+  check(window->getWidth() == width * 3 / 2 && window->getHeight() == height * 3 / 2, context,
+        "closed and opened again, it comes back at the size it was left");
+
+  juce::MemoryBlock saved;
+  processor->getStateInformation(saved);
+  const std::unique_ptr<juce::AudioProcessor> recalled = makeProcessor(48000.0, 512);
+  recalled->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+  const std::unique_ptr<juce::AudioProcessorEditor> reopened(recalled->createEditorIfNeeded());
+  check(reopened->getWidth() == width * 3 / 2, context, "and so does the window of a plugin recalled from its state");
+
+  machine.setWindowScale(9.0f);
+  const bool heldAtMost = juce::exactlyEqual(machine.windowScale(), boombapbot::plugin::kWindowScaleMost);
+  machine.setWindowScale(0.01f);
+  check(heldAtMost && juce::exactlyEqual(machine.windowScale(), boombapbot::plugin::kWindowScaleLeast), context,
+        text("the scale is held between %.1f and %.1f", static_cast<double>(boombapbot::plugin::kWindowScaleLeast),
+             static_cast<double>(boombapbot::plugin::kWindowScaleMost)));
+}
+
 // ---- The dice and the undo, run once ----------------------------------------
 
 void testDiceAndUndo() {
@@ -1787,6 +1830,7 @@ int main() {
   testUnsupportedSampleRate();
   testDescription();
   testPanel();
+  testWindowSize();
   testDiceAndUndo();
   testBeatFile();
   testSavingABeat();

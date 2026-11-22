@@ -97,6 +97,11 @@ inline int engineSwing(float swing) { return static_cast<int>(std::lround(static
 // A plain hit's gain for where the accent knob stands; an accented hit is at 1.
 inline double plainGain(float accent) { return 1.0 - 0.6 * static_cast<double>(accent); }
 
+// How much larger or smaller than its own size the panel may be shown.
+inline constexpr float kWindowScaleRest = 1.0f;
+inline constexpr float kWindowScaleLeast = 0.7f;
+inline constexpr float kWindowScaleMost = 2.0f;
+
 // The effect choices in the order the parameter lists them. A choice's index
 // is the engine's number for it.
 inline constexpr std::array<const char*, 5> kEffectNames{{"Off", "Delay", "Reverb", "Flanger", "Chorus"}};
