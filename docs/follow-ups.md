@@ -489,7 +489,9 @@ Everything known about it comes from tests: a self-test that drives the
 plugin without a host, JUCE's own VST3 host playing the built bundle, a trap
 for heap use on the audio thread, and the sanitizers. On 2026-11-22 all of
 them passed on the Mac it was built on, as arm64 and as x86_64 under
-Rosetta. No DAW has loaded it and nobody has heard it or touched its panel.
+Rosetta. On the same day the owner loaded it in FL Studio 2026: it scans and
+opens, the panel shows, notes play the eight voices and a parameter follows a
+hardware controller. That is steps 1 to 3 below; the rest are still to do.
 
 What is left:
 
@@ -497,12 +499,13 @@ What is left:
   a person. `plugins/vst3/README.md` has the commands that copy the bundle
   into `~/Library/Audio/Plug-Ins/VST3` and sign the copy. In FL's numbering
   the kick is C3. Then, in order, each of these is a thing no test has done:
-  1. The plugin scans and opens, and the panel shows. The earlier spike made
+  1. (Done 2026-11-22.) The plugin scans and opens, and the panel shows. The earlier spike made
      FL crash when it was built for one architecture only; this build is
      universal, and it is signed after every file is in place.
-  2. Notes from the piano roll play the eight voices, and a velocity of 104
+  2. (Done 2026-11-22.) Notes from the piano roll play the eight voices, and a velocity of 104
      or more is the accented hit.
-  3. The knobs turn under a mouse, a voice's key plays it, and automating a
+  3. (Linking a parameter to a controller done 2026-11-22; an automation
+     clip not yet.) The knobs turn under a mouse, a voice's key plays it, and automating a
      parameter from FL moves the knob and the sound.
   4. The load key opens a file chooser, and a beat exported from the site
      loads. With FL playing, its pattern plays in time; looping a region,

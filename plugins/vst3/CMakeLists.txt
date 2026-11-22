@@ -169,6 +169,7 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     target_sources(boombapbot_bundle_host_check PRIVATE Tests/BundleHostCheck.cpp)
     target_compile_definitions(boombapbot_bundle_host_check PRIVATE
       JUCE_PLUGINHOST_VST3=1
+      JUCE_MODAL_LOOPS_PERMITTED=1
       JUCE_WEB_BROWSER=0
       JUCE_USE_CURL=0)
     target_link_libraries(boombapbot_bundle_host_check PRIVATE

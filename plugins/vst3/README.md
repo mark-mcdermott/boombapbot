@@ -230,6 +230,18 @@ codesign --verify --deep --strict --verbose=2 ~/Library/Audio/Plug-Ins/VST3/boom
 
 Then scan for plugins in the host. It is listed as "boombapbot", an instrument.
 
+**FL Studio and a build it has seen before.** FL keeps what it learned about a
+plugin, its class ID included, in its plugin database, and a rescan does not
+always replace it. If a bundle of the same name with another class ID was
+ever scanned (the earlier 808 spike was), FL asks the new bundle for the old
+class, finds nothing, and crashes as the plugin is added, with an access
+violation on the main thread. With FL closed, in
+`<FL user data>/Presets/Plugin database/Installed`, delete
+`Generators/VST3/boombapbot.nfo` and `boombapbot.fst`, the `boombapbot` line
+of `VerifiedIDs.nfo` and the `[Generators/VST3/boombapbot]` section of
+`.Plugins.ini`, then scan again with "Verify plugins" on. This happened on
+2026-11-22 and that cleared it.
+
 ## Tests
 
 `ctest` runs these. The first is the processor self-test
@@ -372,6 +384,8 @@ On macOS the rest check the built bundle:
   parameters by name, it is silent without MIDI, note 36 plays the kick, a
   parameter the host sets reaches the sound, a second instance recalls the
   first one's state, and the delay follows the tempo the host reports. It is
+  then opens the plugin's window as a host does, the VST3 view in a real
+  window on the desktop, shown, resized and closed (not on a CI runner). It is
   also handed a state with the fixture beat in it, which a program made of
   the plugin's own code writes first (`Tests/StateWriter.cpp`), wrapped as
   JUCE's host keeps a VST3 state: the beat's knobs are recalled, and with the
@@ -408,15 +422,19 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 The same build and tests also pass on GitHub's macOS 26 runner, which fetches
 JUCE itself (the `vst3` job in `.github/workflows/native.yml`).
 
-The earlier spike, on the old machine, loaded and played in FL Studio 2026 on
-this Mac once it was universal and signed again. This plugin is built and
-signed the same way, but see below.
+**In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
+the build of the hang fix: the plugin scans and loads, the panel shows at its
+right shape, notes from the piano roll and from a keyboard play the eight
+voices, and a parameter linked to a hardware controller (Kick Level) follows
+it. That is the first three of the nine steps in `docs/follow-ups.md`. The
+rest of that list is still to do.
 
 ## Not verified
 
-- **No DAW has loaded this plugin.** Not FL Studio, not any other. Nobody has
-  seen the window, turned a knob in a host, automated a parameter or saved and
-  reopened a project with it.
+- **Most of what a person does with it in a host.** FL Studio has loaded it,
+  played it and linked a parameter (see above). Loading a beat there, the
+  sequencer on FL's transport, a project saved and reopened, saving a beat,
+  the MIDI drag and resizing are untried, and no other host has loaded it.
 - **Steinberg's validator has not run.** JUCE bundles the parts of the VST3
   SDK a plugin needs, and the validator is not among them. `pluginval` has not
   run either. The hosted check uses JUCE's host against JUCE's wrapper, which
