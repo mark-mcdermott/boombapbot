@@ -1116,6 +1116,33 @@ void testPanel() {
             !machine.stepOn(0, accents, 0),
         context, "the clear key empties the pattern the panel is on");
 
+  // The beat's name, typed on the panel.
+  auto* const name = dynamic_cast<juce::Label*>(titled(*window, "Beat name"));
+  check(name != nullptr && name->isEditable() && name->getText() == "Untitled beat" && machine.beatName().isEmpty(),
+        context, "a beat with no name shows as Untitled beat, in a field that can be typed in");
+  if (name != nullptr) name->setText("  Sunday at the garage  ", juce::sendNotificationSync);
+  using boombapbot::plugin::writeBeat;
+  check(name != nullptr && machine.beatName() == "Sunday at the garage" && name->getText() == "Sunday at the garage" &&
+            juce::JSON::parse(writeBeat(machine.currentBeat(), boombapbot::plugin::newBeatStamp()))["name"].toString() ==
+                "Sunday at the garage" &&
+            boombapbot::plugin::beatFileName(machine.beatName()) == "sunday-at-the-garage.boombapbot.json",
+        context, "a name typed there names the beat, the file it is saved to and the beat inside the file");
+  if (name != nullptr) name->setText(juce::String::repeatedString("long ", 40), juce::sendNotificationSync);
+  check(machine.beatName().length() == 79 && !machine.beatName().endsWithChar(' '), context,
+        text("a name too long for the site is cut to what it takes (%d letters)", machine.beatName().length()));
+  {
+    press(*window, "Perc");
+    juce::MemoryBlock saved;
+    processor->getStateInformation(saved);
+    const std::unique_ptr<juce::AudioProcessor> recalled = makeProcessor(rate, blockSize);
+    recalled->setStateInformation(saved.getData(), static_cast<int>(saved.getSize()));
+    check(plugin(*recalled).beatName() == machine.beatName() && plugin(*recalled).selectedVoice() == 7, context,
+          "the name and the voice the panel is on come back with the host's project");
+  }
+  if (name != nullptr) name->setText("   ", juce::sendNotificationSync);
+  check(name != nullptr && machine.beatName().isEmpty() && name->getText() == "Untitled beat", context,
+        "a name wiped out leaves the beat untitled");
+
   machine.setStep(9, 0, 0, true);
   machine.setStep(0, 12, 0, true);
   machine.setStep(0, 0, 16, true);

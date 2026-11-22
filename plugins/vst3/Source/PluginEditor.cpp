@@ -26,6 +26,8 @@ constexpr int kGroupPadding = 10;
 constexpr int kGroupGap = 12;
 constexpr int kGroupTitle = 20;
 constexpr int kStatusHeight = 22;
+constexpr int kNameLabelWidth = 44;
+constexpr int kNameWidth = 260;
 constexpr int kRefreshHz = 30;
 
 struct KnobWords {
@@ -157,9 +159,32 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
   mixAttachments_.add(new SliderAttachment(parameters, ids::kSwing, swing_));
   mixAttachments_.add(new SliderAttachment(parameters, ids::kEffectMix, effectMix_));
 
+  // The beat's name, which a click lets a person type over.
+  nameLabel_.setText("Beat", juce::dontSendNotification);
+  nameLabel_.setFont(boombapbot::panel::lettering(12.0f, true));
+  nameLabel_.setColour(juce::Label::textColourId, colours::engraved);
+  name_.setTitle("Beat name");
+  name_.setFont(boombapbot::panel::lettering(12.0f));
+  name_.setEditable(true);
+  name_.setColour(juce::Label::backgroundColourId, juce::Colour(0x38000000));
+  name_.setColour(juce::Label::outlineColourId, juce::Colour(0x2affe8b4));
+  name_.setColour(juce::Label::backgroundWhenEditingColourId, colours::well);
+  name_.setColour(juce::Label::textWhenEditingColourId, colours::cream);
+  name_.setColour(juce::Label::outlineWhenEditingColourId, colours::amber);
+  name_.onTextChange = [this] {
+    processor_.setBeatName(name_.getText());
+    showState();
+  };
+  name_.onEditorShow = [this] {
+    if (juce::TextEditor* const editor = name_.getCurrentTextEditor()) {
+      editor->setInputRestrictions(kBeatNameLongest);
+      if (processor_.beatName().isEmpty()) editor->clear();
+    }
+  };
   status_.setFont(boombapbot::panel::lettering(12.0f));
   status_.setMinimumHorizontalScale(1.0f);
-  addAndMakeVisible(status_);
+  status_.setJustificationType(juce::Justification::centredRight);
+  for (juce::Label* label : {&nameLabel_, &name_, &status_}) addAndMakeVisible(label);
 
   selectVoice(processor_.selectedVoice());
   showState();
@@ -280,7 +305,11 @@ void BoombapbotEditor::resized() {
     effectKeys_->key(index + 1).setBounds(row.removeFromRight(half));
   }
 
-  status_.setBounds(kMargin, getHeight() - kStatusHeight - 6, getWidth() - 2 * kMargin, kStatusHeight);
+  juce::Rectangle<int> foot(kMargin, getHeight() - kStatusHeight - 8, getWidth() - 2 * kMargin, kStatusHeight);
+  nameLabel_.setBounds(foot.removeFromLeft(kNameLabelWidth));
+  name_.setBounds(foot.removeFromLeft(kNameWidth));
+  foot.removeFromLeft(12);
+  status_.setBounds(foot);
 }
 
 void BoombapbotEditor::changeListenerCallback(juce::ChangeBroadcaster*) { showState(); }
@@ -303,7 +332,11 @@ void BoombapbotEditor::loadBeat(const juce::File& file) {
     return;
   }
   const juce::Result loaded = processor_.loadBeat(file.loadFileAsString());
-  if (loaded.failed()) showProblem(loaded.getErrorMessage());
+  if (loaded.failed()) {
+    showProblem(loaded.getErrorMessage());
+  } else {
+    showNote("Loaded " + file.getFileName() + ".");
+  }
 }
 
 void BoombapbotEditor::chooseWhereToSave() {
@@ -335,10 +368,8 @@ void BoombapbotEditor::showNote(const juce::String& note) {
 
 void BoombapbotEditor::showState() {
   const juce::String name = processor_.beatName();
-  status_.setColour(juce::Label::textColourId, colours::cream.withAlpha(0.75f));
-  status_.setText(name.isEmpty() ? "No beat loaded. Press the step keys to write a pattern, or load a beat saved from the site."
-                                 : "Beat: " + name,
-                  juce::dontSendNotification);
+  name_.setColour(juce::Label::textColourId, colours::cream.withAlpha(name.isEmpty() ? 0.45f : 0.95f));
+  name_.setText(name.isEmpty() ? juce::String(kUntitledBeat) : name, juce::dontSendNotification);
   if (selectedVoice_ != processor_.selectedVoice()) selectVoice(processor_.selectedVoice());
   const int size = processor_.measureSize();
   sixteenKey_.setToggleState(size == 16, juce::dontSendNotification);

@@ -55,6 +55,9 @@ StepRow rowFromText(const juce::String& text);
 
 inline constexpr const char* kBeatFileSuffix = ".boombapbot.json";
 inline constexpr const char* kUntitledBeat = "Untitled beat";
+inline constexpr int kBeatNameLongest = 80;
+// A name as a beat keeps one: no space at either end, and no longer than the site takes.
+juce::String tidyBeatName(const juce::String& name);
 
 // Which beat a file is and when it was written. The site tells beats apart by id.
 struct BeatStamp {

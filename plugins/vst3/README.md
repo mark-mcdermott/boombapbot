@@ -79,8 +79,8 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   writes the plugin as a `.boombapbot.json` the site's import opens: the four
   patterns, every knob, the mutes, the measure, the pattern and voice the
   panel is on, and the host's tempo as a whole number. Each save is a new beat
-  to the site, with an id and a date of its own, named for the beat that was
-  loaded or "Untitled beat". Knob positions are written to six places. The
+  to the site, with an id and a date of its own, under the name in the
+  panel's name field. Knob positions are written to six places. The
   document has no "no effect", so a beat whose effect is Off is written as the
   delay with none of it mixed in.
 - **The sequencer follows the host's transport.** While the host plays and
@@ -117,6 +117,10 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
     (volume, accent, swing), the effect keys and its mix, and the key that
     loads a beat. Every parameter is on the panel; a double click puts a knob
     back where it rests.
+  - *The name.* The field at the foot shows the beat's name. A click lets a
+    name be typed: it names the beat in the host's project, the file a save
+    suggests and the beat inside that file. With none it reads "Untitled
+    beat". The line beside it says what a load or a save did, or why not.
   - A pattern can be written with no beat loaded. Steps written or cleared
     here are saved with the host's project like the rest of the state. They
     are not undone by the host's undo.
@@ -270,6 +274,10 @@ block size matters, it checks:
   `packages/machine-ritm12/fixtures/saved-by-plugin.project.json`, which the
   site's own unit tests (`plugin-beat.test.ts`) open with the site's reader
   and compare with the fixture, so the two sides cannot drift apart unseen;
+- the name field: a name typed there names the beat, the saved file and the
+  beat in it; one too long for the site is cut to 80 letters; it and the voice
+  the panel is on come back with the host's project; wiped out, the beat is
+  untitled again;
 - beat files: the fixture `four-patterns.project.json` loads and sets the
   parameters; twelve kinds of file that are not a beat are refused with a
   reason and change nothing; the beat survives save → load → save byte for
@@ -318,7 +326,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 486 checks as arm64 and again as
+- All nine CTest tests pass: the self-test's 491 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -370,8 +378,6 @@ signed the same way, but see below.
 
 ## Next slices
 
-- **Naming a beat.** A beat saved from the plugin keeps the name of the one
-  loaded, or is "Untitled beat". The panel has nowhere to type a name.
 - **The picture.** The panel is drawn in code; the machine's own picture and
   its parts are in `packages/machine-ritm12/art`.
 - **Beats from an account.** Only a file on disk can be loaded. Beats saved to

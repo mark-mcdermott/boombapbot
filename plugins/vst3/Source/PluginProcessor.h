@@ -53,6 +53,7 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   juce::Result loadBeat(const juce::String& json);
   // The name of the beat whose patterns are held, or nothing.
   juce::String beatName() const;
+  void setBeatName(const juce::String& name);
   // The plugin as a beat: its patterns, and its parameters as the beat's knobs,
   // at the tempo the host last gave. Not for the audio thread.
   boombapbot::plugin::Beat currentBeat() const;

@@ -89,6 +89,7 @@ constexpr int kCurrentStateSchemaVersion = 2;
 constexpr const char* kBeatTag = "Beat";
 constexpr const char* kBeatName = "name";
 constexpr const char* kBeatSize = "size";
+constexpr const char* kBeatSelected = "selected";
 constexpr const char* kPatternTag = "Pattern";
 constexpr const char* kPatternAccents = "accents";
 constexpr std::size_t kAccentRow = kVoiceCount;
@@ -473,6 +474,7 @@ void BoombapbotAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
   juce::XmlElement* const beat = state.createNewChildElement(kBeatTag);
   beat->setAttribute(kBeatName, beatName());
   beat->setAttribute(kBeatSize, beatSize_.load(std::memory_order_relaxed));
+  beat->setAttribute(kBeatSelected, kVoices[static_cast<std::size_t>(selectedVoice())].id);
   for (const PatternRows& rows : patterns_) {
     juce::XmlElement* const pattern = beat->createNewChildElement(kPatternTag);
     pattern->setAttribute(kPatternAccents, rowText(rows[kAccentRow].load(std::memory_order_relaxed)));
@@ -508,7 +510,11 @@ void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInB
 
   Beat beat;
   if (const juce::XmlElement* const saved = state->getChildByName(kBeatTag)) {
-    beat.name = saved->getStringAttribute(kBeatName);
+    beat.name = tidyBeatName(saved->getStringAttribute(kBeatName));
+    const juce::String selected = saved->getStringAttribute(kBeatSelected);
+    for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+      if (selected == kVoices[voice].id) beat.selectedVoice = static_cast<int>(voice);
+    }
     const int size = saved->getIntAttribute(kBeatSize, kSizeRest);
     beat.size = validSize(size) ? size : kSizeRest;
     std::size_t index = 0;
@@ -521,6 +527,7 @@ void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInB
       }
     }
   }
+  selectVoice(beat.selectedVoice);
   holdPatterns(beat);
 }
 
@@ -597,6 +604,17 @@ void BoombapbotAudioProcessor::holdPatterns(const Beat& beat) {
     const std::lock_guard<std::mutex> lock(beatNameLock_);
     beatName_ = beat.name;
   }
+  sendChangeMessage();
+}
+
+void BoombapbotAudioProcessor::setBeatName(const juce::String& name) {
+  const juce::String tidy = tidyBeatName(name);
+  {
+    const std::lock_guard<std::mutex> lock(beatNameLock_);
+    if (tidy == beatName_) return;
+    beatName_ = tidy;
+  }
+  updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
   sendChangeMessage();
 }
 
