@@ -12,9 +12,7 @@
 
 .rt-scroll {
   overflow-x: auto;
-  border: 1px solid var(--color-line-soft);
-  border-radius: var(--radius);
-  background: #0b0906;
+  background: var(--color-bg);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -25,6 +23,17 @@
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* The photograph has no edge: it goes dark into the page, as a lit bench does in a dark room. */
+.rt-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, var(--color-bg), transparent 7%, transparent 93%, var(--color-bg)),
+    linear-gradient(to bottom, var(--color-bg), transparent 9%, transparent 90%, var(--color-bg));
+  pointer-events: none;
 }
 
 .rt-stage {
@@ -626,7 +635,7 @@
 .rt-ph-crt {
   position: relative;
   border-style: solid;
-  border-width: 37px 41px 46px 42px;
+  border-width: 30px 34px 36px 35px;
   border-image: var(--rt-bezel) 88 97 109 101;
   border-radius: 13px;
 }
@@ -634,7 +643,7 @@
 /* The glass reaches under the frame's lip on every side, and keeps the screen's shape. */
 .rt-ph-glass {
   position: relative;
-  margin: -17px -17px -17px -16px;
+  margin: -14px -14px -13px -13px;
   aspect-ratio: 304 / 128;
   overflow: hidden;
   border-radius: 15px;
@@ -742,41 +751,76 @@
   line-height: 1;
 }
 
+/* A key's lettering is printed on top of its light, so a lit key reads as well as a dark one. */
+.rt-ph-step > b,
+.rt-ph-pattern > .rt-ph-let {
+  position: relative;
+  z-index: 2;
+  font-weight: 800;
+}
+
+.rt-ph-key[data-lit] > b,
+.rt-ph-key[data-lit].rt-ph-pattern > .rt-ph-let {
+  color: #2a1300;
+}
+
 /* ---- Patterns, dice and clear; then the transport and mute ---- */
 
 .rt-ph-row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 0 3px;
+  gap: 6px;
+  padding: 0 7px;
 }
 
-.rt-ph-rule {
+.rt-ph .rt-ph-pattern {
   flex: 1;
-  min-width: 8px;
-  height: 1px;
-  margin: 0 7px;
-  background: var(--rt-engraved);
+  min-width: 0;
+  height: 44px;
 }
 
-.rt-ph-pattern {
-  width: 50px;
-  height: 42px;
+.rt-ph-pattern > .rt-ph-let {
+  font-size: 19px;
+  letter-spacing: 0.02em;
 }
 
 .rt-ph-square {
-  width: 43px;
-  height: 42px;
-}
-
-.rt-ph-wide {
-  width: 74px;
+  width: 46px;
   height: 44px;
 }
 
+.rt-ph .rt-ph-wide,
 .rt-ph .rt-ph-mute {
-  width: 78px;
-  height: 44px;
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+}
+
+/* The transport's marks, printed on the key in its ink. */
+.rt-ph-glyph {
+  display: block;
+  width: 17px;
+  height: 17px;
+  background: var(--rt-ink);
+  opacity: 0.92;
+}
+
+.rt-ph-glyph[data-glyph='play'] {
+  width: 18px;
+  height: 20px;
+  clip-path: polygon(8% 0, 100% 50%, 8% 100%);
+}
+
+.rt-ph-glyph[data-glyph='stop'] {
+  border-radius: 1.5px;
+}
+
+.rt-ph-glyph[data-glyph='record'] {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 34%, #a8392a, #7c2014 70%);
+  box-shadow: inset 0 0 0 1px rgb(60 12 6 / 0.5);
 }
 
 .rt-ph-mute .rt-ph-let {
@@ -785,7 +829,7 @@
 
 .rt-ph-mute .rt-ph-let,
 .rt-ph-cap > .rt-ph-let,
-.rt-ph-ink-en .rt-ph-let {
+.rt-ph-ink .rt-ph-let {
   color: var(--rt-ink);
   font-weight: 800;
   text-shadow: none;
@@ -800,18 +844,18 @@
   letter-spacing: 0.04em;
 }
 
-/* In English an instrument key keeps its painted drawing and is lettered beside it. */
-.rt-ph-ink-en {
+/* An instrument key keeps its painted drawing, and is lettered at one distance from it. */
+.rt-ph-ink {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 5px;
-  width: 100%;
+  width: calc(100% + 8px);
+  margin: 0 -4px;
   height: 100%;
   overflow: hidden;
 }
 
-.rt-ph .rt-ph-pad .rt-ph-ink-en img {
+.rt-ph .rt-ph-pad .rt-ph-ink img {
   width: 28px;
   height: 100%;
   flex: none;
@@ -820,9 +864,9 @@
   object-position: left center;
 }
 
-.rt-ph-ink-en .rt-ph-let {
-  font-size: 12.5px;
-  letter-spacing: 0.04em;
+.rt-ph-ink .rt-ph-let {
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 /* On a cream key the drawing is printed dark, like the key's lettering. */
@@ -845,15 +889,30 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  height: 38px;
+  height: 40px;
   margin: 0;
   padding: 0;
   border: 0;
   border-radius: 6px;
-  background: linear-gradient(#1d1a11, #131008);
-  box-shadow: inset 0 1px 3px #000, 0 1px 0 rgb(255 240 200 / 0.14);
+  /* A key of dark bakelite, standing proud of the panel until it is pressed. */
+  background: linear-gradient(to bottom, #4a4130, #2e2719 55%, #221c11);
+  box-shadow:
+    inset 0 1px 0 rgb(255 236 190 / 0.3),
+    inset 0 -3px 0 rgb(0 0 0 / 0.45),
+    inset 0 0 0 1px rgb(12 9 4 / 0.9),
+    0 3px 4px rgb(0 0 0 / 0.75);
+  transition: transform 80ms, box-shadow 80ms;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.rt-ph-tab[aria-selected='true'] {
+  transform: translateY(2px);
+  background: linear-gradient(to bottom, #1c170e, #262014);
+  box-shadow:
+    inset 0 2px 5px #000,
+    inset 0 0 0 1px rgb(12 9 4 / 0.9),
+    0 1px 0 rgb(255 236 190 / 0.14);
 }
 
 .rt-ph-tab .rt-ph-let {
@@ -1022,23 +1081,69 @@
   }
 }
 
-/* ---- The readout under the screen: sixteen-segment characters behind smoked glass ---- */
+/* ---- The readout under the screen: a backlit liquid-crystal module in its own steel frame ---- */
 
 .rt-readout {
-  --rt-seg-on: #7dffd4;
-  --rt-seg-glow: rgb(70 255 196 / 0.75);
-  display: block;
+  --rt-lcd-lit: #b4bd4e;
+  --rt-lcd-ink: #1b2206;
+  display: flex;
+  align-items: center;
+  gap: 4%;
   box-sizing: border-box;
   height: 100%;
-  overflow: hidden;
-  border-radius: 3px;
+  padding: 0 1.6%;
+  border-radius: 5px;
+  /* The frame: pressed steel gone brown, like the screen's own. */
   background:
-    linear-gradient(to bottom, rgb(255 255 255 / 0.06), transparent 45%),
-    #020605;
+    linear-gradient(to bottom, rgb(255 226 170 / 0.16), transparent 22%, transparent 70%, rgb(0 0 0 / 0.45)),
+    linear-gradient(to right, #3b3122, #4a3d29 18%, #40351f 60%, #2f2719);
   box-shadow:
-    inset 0 1px 3px rgb(0 0 0 / 0.95),
-    inset 0 0 0 1px rgb(0 0 0 / 0.8),
-    0 1px 0 rgb(214 190 140 / 0.18);
+    inset 0 0 0 1px rgb(20 14 6 / 0.9),
+    inset 0 1px 0 1px rgb(255 226 170 / 0.22),
+    0 2px 4px rgb(0 0 0 / 0.7),
+    0 0 0 1px rgb(12 9 4 / 0.8);
+  container-type: size;
+}
+
+.rt-readout-screw {
+  flex: none;
+  border-radius: 50%;
+  background:
+    linear-gradient(48deg, transparent 43%, rgb(8 5 2 / 0.9) 43% 57%, transparent 57%),
+    radial-gradient(circle at 35% 30%, #a08c66, #4a3d27 70%);
+  box-shadow: 0 0 0 1px rgb(10 7 3 / 0.85), 0 1px 1px rgb(255 226 170 / 0.2);
+  width: 16cqh;
+  height: 16cqh;
+}
+
+.rt-readout-glass {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 76%;
+  overflow: hidden;
+  border-radius: 2.5px;
+  background:
+    radial-gradient(ellipse 120% 160% at 50% 40%, transparent 55%, rgb(38 46 6 / 0.38)),
+    linear-gradient(to bottom, #c2ca5c, var(--rt-lcd-lit) 45%, #a3ad41);
+  box-shadow:
+    inset 0 2px 3px rgb(20 26 2 / 0.75),
+    inset 0 0 0 1px rgb(14 18 2 / 0.85),
+    0 0 0 1.5px #0d0a05,
+    0 1px 0 2px rgb(255 226 170 / 0.16),
+    0 0 14px rgb(180 189 78 / 0.22);
+  transition: background-color 0.3s, filter 0.3s;
+}
+
+/* The glass over the crystal: a glare along the top, and the grain of its polariser. */
+.rt-readout-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.2), transparent 30%),
+    repeating-linear-gradient(to right, transparent 0 1px, rgb(30 38 6 / 0.05) 1px 2px);
+  pointer-events: none;
 }
 
 .rt-readout svg {
@@ -1048,38 +1153,37 @@
 }
 
 .rt-readout-off {
-  fill: var(--rt-seg-on);
+  fill: var(--rt-lcd-ink);
   opacity: 0.075;
 }
 
 .rt-readout-on {
-  fill: var(--rt-seg-on);
-  filter: drop-shadow(0 0 1.4px var(--rt-seg-glow));
+  fill: var(--rt-lcd-ink);
+  opacity: 0.93;
+  filter: drop-shadow(0.5px 0.7px 0.3px rgb(40 50 8 / 0.4));
 }
 
-.rt-readout[data-power='off'] .rt-readout-off {
-  opacity: 0.045;
+/* Switched off, the backlight is out and the crystal is the grey-green it is by daylight. */
+.rt-readout[data-power='off'] .rt-readout-glass {
+  background: linear-gradient(to bottom, #565c3c, #4a5033);
+  box-shadow:
+    inset 0 2px 3px rgb(10 12 2 / 0.8),
+    inset 0 0 0 1px rgb(14 18 2 / 0.85),
+    0 0 0 1.5px #0d0a05,
+    0 1px 0 2px rgb(255 226 170 / 0.12);
 }
 
 .rt-readout-slot {
   position: absolute;
-  padding: 3px 0;
   box-sizing: border-box;
 }
 
-.rt-readout-plate {
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-/* On the phone it sits on the frame's lower lip, as wide as the glass. */
+/* On the phone it is a row of its own under the screen. */
 .rt-readout-phone {
-  position: absolute;
-  top: calc(100% + 19px);
-  left: -16px;
-  right: -17px;
-  height: 19px;
-  padding: 1px 5px;
+  height: 38px;
+  margin: 0 1px;
+  gap: 9px;
+  padding: 0 9px;
 }
 
 /* ---- In English: labels laid over the picture's Russian, as an importer would have fitted them ---- */
@@ -1137,4 +1241,20 @@
   background: #ece0c2;
   box-shadow: none;
   font-size: 17px;
+}
+
+/* On a narrow phone the instrument keys are narrower, and their lettering with them. */
+@media (max-width: 390px) {
+  .rt-ph .rt-ph-pad .rt-ph-ink img {
+    width: 25px;
+  }
+
+  .rt-ph-ink {
+    gap: 4px;
+  }
+
+  .rt-ph-ink .rt-ph-let {
+    font-size: 11.5px;
+    letter-spacing: 0;
+  }
 }

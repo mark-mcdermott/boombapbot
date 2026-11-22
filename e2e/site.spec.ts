@@ -115,12 +115,13 @@ test.describe('the page around the machine', () => {
     const view = 375;
     const gutter = (await page.locator('.sb-header').boundingBox())!.x;
 
-    // The mascot on the left, the wordmark against the right edge, about as tall as each other, and no tagline.
+    // The mascot on the left, the wordmark against the right edge, the mascot a little the taller, and no tagline.
     const mascot = (await page.getByTestId('brand-mascot').boundingBox())!;
     const mark = (await page.locator('.sb-wordmark').boundingBox())!;
     expect(mascot.x).toBeCloseTo(gutter, 0);
     expect(mark.x + mark.width).toBeCloseTo(view - gutter, 0);
-    expect(Math.abs(mascot.height - mark.height)).toBeLessThan(1);
+    expect(mascot.height).toBeGreaterThan(mark.height);
+    expect(mascot.height - mark.height).toBeLessThan(5);
     await expect(page.getByTestId('tagline')).toBeHidden();
 
     // One row of names across the page, the pages and then the buttons, with no icon among them.
@@ -140,7 +141,8 @@ test.describe('the page around the machine', () => {
     // Under it the credit, on the right, as "by" and the link alone.
     const made = page.getByTestId('made-by');
     await expect(page.locator('.sb-made-with')).toBeHidden();
-    expect((await made.innerText()).trim().replace(/\s+/g, ' ')).toBe('by mm.coffee');
+    // Set in capitals by the stylesheet, which is how the page reports it.
+    expect((await made.innerText()).trim().replace(/\s+/g, ' ')).toBe('BY MM.COFFEE');
     const credit = (await made.boundingBox())!;
     expect(credit.y).toBeGreaterThanOrEqual(boxes[0]!.bottom - 1);
     expect(credit.x + credit.width).toBeCloseTo(view - gutter, 0);

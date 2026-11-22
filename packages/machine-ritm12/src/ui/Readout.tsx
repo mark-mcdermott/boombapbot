@@ -77,6 +77,8 @@ interface ReadoutProps {
   said: number;
   /** The panel, whose controls put their names up when the keyboard reaches them. */
   scope: RefObject<HTMLElement | null>;
+  /** What it shows while nothing has been said: where the machine stands. */
+  idle: string;
   power: boolean;
   /** How many characters it has. A longer line runs across it. */
   cells: number;
@@ -91,11 +93,12 @@ interface ReadoutProps {
  * hears what controls say but not the names of those it moves to, since it
  * announces those itself.
  */
-export function Readout({ spoken, said, scope, power, cells: count, className }: ReadoutProps) {
+export function Readout({ spoken, said, scope, idle, power, cells: count, className }: ReadoutProps) {
   const [message, clear] = useMessage(spoken, said, scope);
   const reduced = useReducedMotion();
   const [offset, setOffset] = useState(0);
-  const cells = useMemo(() => cellsOf(readable(message?.text ?? '')), [message]);
+  const text = power ? (message?.text ?? idle) : '';
+  const cells = useMemo(() => cellsOf(readable(text)), [text]);
   const runs = cells.length > count && !reduced;
   const last = cells.length - count;
 
@@ -117,24 +120,25 @@ export function Readout({ spoken, said, scope, power, cells: count, className }:
   const width = count * CELL.width;
 
   return (
-    <div className={`rt-readout ${className}`} data-testid="readout" data-power={power ? 'on' : 'off'} data-text={message?.text ?? ''}>
-      <svg viewBox={`-4 -1 ${width + 8} ${CELL.height + 2}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-        <defs>
-          <path id={ghost} d={ALL_SEGMENTS} />
-        </defs>
-        <g transform={`translate(${-Math.tan((LEAN * Math.PI) / 180) * CELL.height / 2} 0) skewX(${LEAN})`}>
-          {shown.map((cell, index) => {
-            const x = index * CELL.width;
-            return (
-              <g key={index} transform={`translate(${x} 0)`}>
+    <div className={`rt-readout ${className}`} data-testid="readout" data-power={power ? 'on' : 'off'} data-text={message?.text ?? ''} data-shown={text}>
+      <i className="rt-readout-screw" />
+      <div className="rt-readout-glass">
+        <svg viewBox={`-6 -5 ${width + 12} ${CELL.height + 10}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <defs>
+            <path id={ghost} d={ALL_SEGMENTS} />
+          </defs>
+          <g transform={`translate(${-Math.tan((LEAN * Math.PI) / 180) * CELL.height / 2} 0) skewX(${LEAN})`}>
+            {shown.map((cell, index) => (
+              <g key={index} transform={`translate(${index * CELL.width} 0)`}>
                 <use href={`#${ghost}`} className="rt-readout-off" />
                 <rect className={cell.point ? 'rt-readout-on' : 'rt-readout-off'} x={POINT.x} y={POINT.y} width={POINT.size} height={POINT.size} />
                 {cell.lit.length ? <path className="rt-readout-on" d={litPath(cell)} /> : null}
               </g>
-            );
-          })}
-        </g>
-      </svg>
+            ))}
+          </g>
+        </svg>
+      </div>
+      <i className="rt-readout-screw" />
       <span className="sb-visually-hidden" aria-live="polite" data-testid="spoken">
         {spoken}
       </span>
