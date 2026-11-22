@@ -84,6 +84,13 @@ inline constexpr int kSizeRest = 16;
 constexpr bool validSize(int size) { return size == 16 || size == 12; }
 constexpr int stepsPerBeat(int size) { return size == 16 ? 4 : 3; }
 
+// How likely the dice are to put a hit on a step: likelier on the beat. As in
+// src/session.ts of the machine's package.
+constexpr double diceChance(int step, int size) {
+  if (step % stepsPerBeat(size) == 0) return 0.55;
+  return step % 2 == 0 ? 0.3 : 0.14;
+}
+
 // The swing knob in the engine's units: fully right is the most there is.
 inline int engineSwing(float swing) { return static_cast<int>(std::lround(static_cast<double>(swing) * SNARE_SWING_MAX)); }
 

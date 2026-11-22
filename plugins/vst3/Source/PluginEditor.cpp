@@ -29,6 +29,7 @@ constexpr int kStatusHeight = 22;
 constexpr int kNameLabelWidth = 44;
 constexpr int kNameWidth = 260;
 constexpr int kMidiKeyWidth = 84;
+constexpr int kFootKeyWidth = 84;
 constexpr int kDragStartsAfter = 8;
 constexpr int kRefreshHz = 30;
 
@@ -90,6 +91,8 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
       loadKey_(words("ЗАГРУЗКА"), "Load beat"),
       saveKey_(words("СОХРАНИТЬ"), "Save beat"),
       midiKey_("MIDI", ""),
+      diceKey_(words("СЛУЧАЙНО"), ""),
+      undoKey_(words("ОТМЕНА"), ""),
       sequencerAttachment_(owner.parameters(), ids::kSequencer, sequencerKey_),
       pitch_(words(kPitchWords.word), kPitchWords.english),
       tone_(words(kToneWords.word), kToneWords.english),
@@ -144,10 +147,13 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
   sixteenKey_.onClick = [this] { processor_.setMeasureSize(16); };
   twelveKey_.onClick = [this] { processor_.setMeasureSize(12); };
   sequencerKey_.setClickingTogglesState(true);
-  clearKey_.onClick = [this] {
-    processor_.clearPattern(juce::roundToInt(processor_.parameters().getRawParameterValue(ids::kPattern)->load()));
-    steps_.refresh();
-  };
+  clearKey_.onClick = [this] { processor_.clearPattern(shownPattern()); };
+  diceKey_.setTitle("Dice");
+  diceKey_.setTooltip("Throw the dice: a new row for the selected voice, likelier on the beat");
+  diceKey_.onClick = [this] { processor_.rollDice(shownPattern(), selectedVoice_, dice_); };
+  undoKey_.setTitle("Undo");
+  undoKey_.setTooltip("Take back the last change to the patterns");
+  undoKey_.onClick = [this] { processor_.undoPatterns(); };
   loadKey_.onClick = [this] { chooseBeat(); };
   saveKey_.onClick = [this] { chooseWhereToSave(); };
   // A click saves the shown pattern as a MIDI file; a drag carries the file
@@ -159,7 +165,8 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
     if (!midiKeyDragged_) chooseWhereToSaveMidi();
     midiKeyDragged_ = false;
   };
-  for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_, &saveKey_, &midiKey_}) {
+  for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_, &saveKey_, &midiKey_,
+                   &diceKey_, &undoKey_}) {
     addAndMakeVisible(key);
   }
 
@@ -208,6 +215,10 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
 BoombapbotEditor::~BoombapbotEditor() {
   stopTimer();
   processor_.removeChangeListener(this);
+}
+
+int BoombapbotEditor::shownPattern() const {
+  return juce::roundToInt(processor_.parameters().getRawParameterValue(ids::kPattern)->load());
 }
 
 // The four knobs of a voice work whichever voice's key was pressed last.
@@ -321,6 +332,10 @@ void BoombapbotEditor::resized() {
   nameLabel_.setBounds(foot.removeFromLeft(kNameLabelWidth));
   name_.setBounds(foot.removeFromLeft(kNameWidth));
   midiKey_.setBounds(foot.removeFromRight(kMidiKeyWidth));
+  foot.removeFromRight(6);
+  diceKey_.setBounds(foot.removeFromRight(kFootKeyWidth));
+  foot.removeFromRight(6);
+  undoKey_.setBounds(foot.removeFromRight(kFootKeyWidth));
   foot.removeFromRight(12);
   foot.removeFromLeft(12);
   status_.setBounds(foot);
@@ -434,6 +449,7 @@ void BoombapbotEditor::showState() {
   name_.setText(name.isEmpty() ? juce::String(kUntitledBeat) : name, juce::dontSendNotification);
   if (selectedVoice_ != processor_.selectedVoice()) selectVoice(processor_.selectedVoice());
   const int size = processor_.measureSize();
+  undoKey_.setEnabled(processor_.canUndoPatterns());
   sixteenKey_.setToggleState(size == 16, juce::dontSendNotification);
   twelveKey_.setToggleState(size == 12, juce::dontSendNotification);
   steps_.refresh();

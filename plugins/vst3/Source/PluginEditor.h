@@ -37,6 +37,7 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   void changeListenerCallback(juce::ChangeBroadcaster* source) override;
   void timerCallback() override;
   void selectVoice(int voice);
+  int shownPattern() const;
   void chooseBeat();
   void loadBeat(const juce::File& file);
   void chooseWhereToSave();
@@ -67,6 +68,9 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   Key loadKey_;
   Key saveKey_;
   Key midiKey_;
+  Key diceKey_;
+  Key undoKey_;
+  juce::Random dice_;
   bool midiKeyDragged_ = false;
   ButtonAttachment sequencerAttachment_;
 

@@ -130,9 +130,16 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
     name be typed: it names the beat in the host's project, the file a save
     suggests and the beat inside that file. With none it reads "Untitled
     beat". The line beside it says what a load or a save did, or why not.
+  - *The dice* (СЛУЧАЙНО) throw a new row for the voice the panel is on in the
+    shown pattern, likelier on the beat: 55% on a beat, 30% between beats and
+    14% off them, as the site's dice do.
+  - *Undo* (ОТМЕНА). The host's undo does not reach the patterns, so the
+    panel has its own. A press and drag on the step keys, a clear, a throw of
+    the dice, a new measure size and loading a beat are each one step back,
+    64 at the most. It does not undo a knob; the host's undo does that. There
+    is no redo, and the history is not saved with the project.
   - A pattern can be written with no beat loaded. Steps written or cleared
-    here are saved with the host's project like the rest of the state. They
-    are not undone by the host's undo.
+    here are saved with the host's project like the rest of the state.
   - The panel is drawn in code. It does not use the picture of the machine in
     `packages/machine-ritm12/art`, which a later slice could.
 - The delay keeps time with the host: its echo is a dotted eighth note at the
@@ -292,6 +299,11 @@ block size matters, it checks:
   velocities; its notes played back into the plugin render the same samples
   as the sequencer playing the pattern; swing writes every second sixteenth
   late and a twelve-step measure is written in triplets;
+- the dice and the undo: over 4000 throws the dice hit each kind of step as
+  often as the site's do and touch no other voice; undo walks back through 64
+  changes; a clear, a throw, a new measure size, a drag on the step keys and
+  loading a beat are each one step back, checked against the plugin's saved
+  state byte for byte;
 - beat files: the fixture `four-patterns.project.json` loads and sets the
   parameters; twelve kinds of file that are not a beat are refused with a
   reason and change nothing; the beat survives save → load → save byte for
@@ -340,7 +352,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 499 checks as arm64 and again as
+- All nine CTest tests pass: the self-test's 508 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory

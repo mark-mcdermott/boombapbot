@@ -3,6 +3,7 @@
 #include "ParameterIds.h"
 #include "PluginEditor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
@@ -99,6 +100,7 @@ double framesPerBeat(double tempo, double sampleRate) {
   return sampleRate * 60.0 / juce::jlimit(SNARE_BPM_MIN, SNARE_BPM_MAX, tempo);
 }
 
+constexpr std::size_t kHistoryLongest = 64;
 constexpr int kSoundPollMilliseconds = 15;
 constexpr int kSoundThreadStopMilliseconds = 5000;
 
@@ -562,13 +564,78 @@ void BoombapbotAudioProcessor::setStep(int pattern, int row, int step, bool on) 
   } else {
     steps.fetch_and(static_cast<StepRow>(~bit), std::memory_order_relaxed);
   }
-  updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+  patternsChanged();
 }
 
 void BoombapbotAudioProcessor::clearPattern(int pattern) {
   if (pattern < 0 || pattern >= kPatternCount) return;
+  rememberPatterns();
   for (std::atomic<StepRow>& row : patterns_[static_cast<std::size_t>(pattern)]) row.store(0, std::memory_order_relaxed);
+  patternsChanged();
+}
+
+void BoombapbotAudioProcessor::rollDice(int pattern, int voice, juce::Random& random) {
+  if (pattern < 0 || pattern >= kPatternCount || voice < 0 || voice >= kVoiceCount) return;
+  rememberPatterns();
+  const int size = measureSize();
+  StepRow row = 0;
+  for (int step = 0; step < size; ++step) {
+    if (random.nextDouble() < diceChance(step, size)) row = static_cast<StepRow>(row | (1u << step));
+  }
+  patterns_[static_cast<std::size_t>(pattern)][static_cast<std::size_t>(voice)].store(row, std::memory_order_relaxed);
+  patternsChanged();
+}
+
+void BoombapbotAudioProcessor::patternsChanged() {
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+  sendChangeMessage();
+}
+
+BoombapbotAudioProcessor::PatternsThen BoombapbotAudioProcessor::patternsNow() const {
+  PatternsThen now;
+  for (std::size_t pattern = 0; pattern < patterns_.size(); ++pattern) {
+    for (std::size_t row = 0; row < patterns_[pattern].size(); ++row) {
+      now.rows[pattern][row] = patterns_[pattern][row].load(std::memory_order_relaxed);
+    }
+  }
+  now.size = measureSize();
+  return now;
+}
+
+// A moment that is the same as the last one remembered is not kept twice.
+void BoombapbotAudioProcessor::rememberPatterns() {
+  const PatternsThen now = patternsNow();
+  const std::lock_guard<std::mutex> lock(historyLock_);
+  if (!history_.empty() && history_.back() == now) return;
+  if (history_.size() == kHistoryLongest) history_.erase(history_.begin());
+  history_.push_back(now);
+}
+
+bool BoombapbotAudioProcessor::canUndoPatterns() const {
+  const PatternsThen now = patternsNow();
+  const std::lock_guard<std::mutex> lock(historyLock_);
+  return std::any_of(history_.begin(), history_.end(), [&](const PatternsThen& then) { return !(then == now); });
+}
+
+// Goes back to the last remembered moment that differs from this one.
+bool BoombapbotAudioProcessor::undoPatterns() {
+  const PatternsThen now = patternsNow();
+  PatternsThen then;
+  {
+    const std::lock_guard<std::mutex> lock(historyLock_);
+    while (!history_.empty() && history_.back() == now) history_.pop_back();
+    if (history_.empty()) return false;
+    then = history_.back();
+    history_.pop_back();
+  }
+  for (std::size_t pattern = 0; pattern < patterns_.size(); ++pattern) {
+    for (std::size_t row = 0; row < patterns_[pattern].size(); ++row) {
+      patterns_[pattern][row].store(then.rows[pattern][row], std::memory_order_relaxed);
+    }
+  }
+  beatSize_.store(then.size, std::memory_order_relaxed);
+  patternsChanged();
+  return true;
 }
 
 void BoombapbotAudioProcessor::selectVoice(int voice) {
@@ -581,6 +648,7 @@ int BoombapbotAudioProcessor::measureSize() const { return beatSize_.load(std::m
 
 void BoombapbotAudioProcessor::setMeasureSize(int size) {
   if (!validSize(size) || size == measureSize()) return;
+  rememberPatterns();
   beatSize_.store(size, std::memory_order_relaxed);
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
   sendChangeMessage();
@@ -677,6 +745,7 @@ juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
   setParameterTo(ids::kEffectMix, beat.effectMix);
   setParameterTo(ids::kPattern, static_cast<float>(beat.pattern));
 
+  rememberPatterns();
   selectVoice(beat.selectedVoice);
   holdPatterns(beat);
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));

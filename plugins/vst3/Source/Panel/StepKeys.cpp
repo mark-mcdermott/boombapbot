@@ -84,6 +84,7 @@ void StepKeys::paint(juce::Graphics& graphics) {
 void StepKeys::mouseDown(const juce::MouseEvent& event) {
   dragFrom_ = cellAt(event.getPosition());
   if (dragFrom_.row < 0) return;
+  processor_.rememberPatterns();
   dragTurnsOn_ = !processor_.stepOn(pattern_, processorRow(dragFrom_.row), dragFrom_.step);
   processor_.setStep(pattern_, processorRow(dragFrom_.row), dragFrom_.step, dragTurnsOn_);
   refresh();

@@ -990,6 +990,15 @@ void testDescription() {
 
 // ---- The panel, run once ----------------------------------------------------
 
+// One row of a pattern as the plugin holds it: bit n is step n.
+boombapbot::plugin::StepRow rowOf(const BoombapbotAudioProcessor& machine, int pattern, int row) {
+  boombapbot::plugin::StepRow steps = 0;
+  for (int step = 0; step < boombapbot::plugin::kSteps; ++step) {
+    if (machine.stepOn(pattern, row, step)) steps = static_cast<boombapbot::plugin::StepRow>(steps | (1u << step));
+  }
+  return steps;
+}
+
 juce::Component* titled(juce::Component& parent, const juce::String& title) {
   for (juce::Component* child : parent.getChildren()) {
     if (child->getTitle() == title) return child;
@@ -1144,6 +1153,13 @@ void testPanel() {
   check(name != nullptr && machine.beatName().isEmpty() && name->getText() == "Untitled beat", context,
         "a name wiped out leaves the beat untitled");
 
+  steps->mouseDown(mouseAt(*steps, centre(3, 9), centre(3, 9), false));
+  steps->mouseDrag(mouseAt(*steps, centre(3, 11), centre(3, 9), true));
+  const bool wrote = machine.stepOn(0, 2, 9) && machine.stepOn(0, 2, 11);
+  check(wrote && press(*window, "Undo") && !machine.stepOn(0, 2, 9) && !machine.stepOn(0, 2, 11), context,
+        "the undo key takes back a press and drag on the step keys in one go");
+  check(press(*window, "Dice") && press(*window, "Undo") && rowOf(machine, 0, 7) == 0, context,
+        "the dice key throws for the voice the panel is on, and undo takes the throw back");
   check(dynamic_cast<juce::Button*>(titled(*window, "Pattern as MIDI")) != nullptr &&
             dynamic_cast<juce::Button*>(titled(*window, "Save beat")) != nullptr &&
             dynamic_cast<juce::Button*>(titled(*window, "Load beat")) != nullptr,
@@ -1156,6 +1172,90 @@ void testPanel() {
   machine.audition(40);
   check(!machine.stepOn(0, 0, 0) && machine.measureSize() == 16 && finite(render(*processor, {}, 2048, blockSize)),
         context, "steps, sizes and voices the machine does not have are turned down");
+}
+
+// ---- The dice and the undo, run once ----------------------------------------
+
+void testDiceAndUndo() {
+  const std::string context = "dice and undo";
+  constexpr int tom = 5;
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(48000.0, 512);
+  BoombapbotAudioProcessor& machine = plugin(*processor);
+  machine.loadBeat(fourPatterns());
+  const juce::MemoryBlock loaded = [&] {
+    juce::MemoryBlock block;
+    processor->getStateInformation(block);
+    return block;
+  }();
+
+  // Many throws, counted: how often each kind of step gets a hit.
+  juce::Random random(12);
+  constexpr int throws = 4000;
+  std::array<int, boombapbot::plugin::kSteps> hits{};
+  bool othersLeft = true;
+  const boombapbot::plugin::StepRow kick = rowOf(machine, 1, 0);
+  for (int count = 0; count < throws; ++count) {
+    machine.rollDice(1, tom, random);
+    for (int step = 0; step < boombapbot::plugin::kSteps; ++step) hits[static_cast<std::size_t>(step)] += machine.stepOn(1, tom, step);
+    othersLeft = othersLeft && rowOf(machine, 1, 0) == kick;
+  }
+  const auto share = [&](int step) { return static_cast<double>(hits[static_cast<std::size_t>(step)]) / throws; };
+  check(std::abs(share(0) - 0.55) < 0.03 && std::abs(share(8) - 0.55) < 0.03 && std::abs(share(2) - 0.3) < 0.03 &&
+            std::abs(share(7) - 0.14) < 0.03 && othersLeft,
+        context,
+        text("the dice put a hit on the beat %.0f%% of the time, between beats %.0f%% and off them %.0f%%, as the "
+             "site's do, and touch no other voice",
+             100.0 * share(0), 100.0 * share(2), 100.0 * share(7)));
+
+  machine.setMeasureSize(12);
+  bool pastTheMeasure = false;
+  for (int count = 0; count < 200; ++count) {
+    machine.rollDice(1, tom, random);
+    pastTheMeasure = pastTheMeasure || (rowOf(machine, 1, tom) >> 12) != 0;
+  }
+  check(!pastTheMeasure, context, "in a twelve-step measure the dice leave the last four steps alone");
+
+  // Every one of those was a step back; the history keeps the last 64.
+  int undone = 0;
+  while (machine.undoPatterns()) ++undone;
+  check(undone == 64 && !machine.canUndoPatterns(), context,
+        text("undo walks back through the changes it remembers, 64 at the most (%d taken back)", undone));
+
+  // One at a time, on a new plugin: each kind of change is one step back.
+  const std::unique_ptr<juce::AudioProcessor> fresh = makeProcessor(48000.0, 512);
+  BoombapbotAudioProcessor& panel = plugin(*fresh);
+  check(!panel.canUndoPatterns() && !panel.undoPatterns(), context, "a new plugin has nothing to undo");
+  panel.loadBeat(fourPatterns());
+  juce::MemoryBlock afterLoad;
+  fresh->getStateInformation(afterLoad);
+  check(afterLoad == loaded, context, "two plugins given the same beat save the same state");
+
+  const auto backTo = [&](const juce::MemoryBlock& wanted) {
+    juce::MemoryBlock now;
+    const bool undid = panel.undoPatterns();
+    fresh->getStateInformation(now);
+    return undid && now == wanted;
+  };
+  panel.clearPattern(0);
+  const bool clearUndone = !panel.stepOn(0, 0, 0) && backTo(afterLoad);
+  panel.rollDice(0, tom, random);
+  const bool diceUndone = backTo(afterLoad);
+  panel.setMeasureSize(12);
+  const bool sizeUndone = panel.measureSize() == 12 && backTo(afterLoad);
+  // A press and a drag on the step keys: remembered once, when the press began.
+  panel.rememberPatterns();
+  panel.setStep(0, 2, 5, true);
+  panel.setStep(0, 2, 6, true);
+  panel.setStep(0, 2, 7, true);
+  const bool dragUndone = backTo(afterLoad);
+  check(clearUndone && diceUndone && sizeUndone && dragUndone, context,
+        "a clear, a throw of the dice, a new measure size and a drag across the step keys are each one step back");
+
+  // Loading a beat is a step back too: the patterns from before come back.
+  panel.setStep(3, 0, 1, true);
+  panel.loadBeat(fourPatterns());
+  check(panel.undoPatterns() && panel.stepOn(3, 0, 1), context,
+        "undo after loading a beat brings back the patterns that were there");
 }
 
 // ---- Beat files, run once ---------------------------------------------------
@@ -1687,6 +1787,7 @@ int main() {
   testUnsupportedSampleRate();
   testDescription();
   testPanel();
+  testDiceAndUndo();
   testBeatFile();
   testSavingABeat();
   testPatternAsMidi();
