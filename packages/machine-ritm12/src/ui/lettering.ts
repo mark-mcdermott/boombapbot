@@ -1,6 +1,5 @@
-import { useSyncExternalStore } from 'react';
-import { browserStorage } from '@boombapbot/editor';
 import type { EffectKind, VoiceId } from '../document';
+import { remembered } from './remembered';
 
 /** The language the machine's own lettering is in: on its screen, its keys and its panel. */
 export type Script = 'russian' | 'english';
@@ -129,48 +128,13 @@ export const LETTERING: Record<Script, Lettering> = {
   },
 };
 
-const KEY = 'boombapbot.ritm12.lettering';
-const listeners = new Set<() => void>();
-
-function storedScript(): Script {
-  return browserStorage()?.getItem(KEY) === 'english' ? 'english' : 'russian';
-}
-
-let script: Script | null = null;
-
-function currentScript(): Script {
-  script ??= storedScript();
-  return script;
-}
+const script = remembered<Script>('boombapbot.ritm12.lettering', 'russian', ['english']);
 
 /** Changes the machine's lettering everywhere at once, and remembers it on this device. */
-export function setScript(next: Script): void {
-  script = next;
-  const storage = browserStorage();
-  if (next === 'english') storage?.setItem(KEY, next);
-  else storage?.removeItem(KEY);
-  listeners.forEach((listener) => listener());
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  // Another tab changing it changes it here too.
-  const onStorage = (event: StorageEvent) => {
-    if (event.key !== KEY) return;
-    script = storedScript();
-    listener();
-  };
-  window.addEventListener('storage', onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener('storage', onStorage);
-  };
-}
+export const setScript = script.set;
 
 /** The language the machine is lettered in now. */
-export function useScript(): Script {
-  return useSyncExternalStore(subscribe, currentScript, () => 'russian');
-}
+export const useScript = script.use;
 
 /** The machine's words, in the language it is lettered in now. */
 export function useLettering(): Lettering {

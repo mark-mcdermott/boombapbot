@@ -233,6 +233,72 @@
   visibility: visible;
 }
 
+/* ---- The desk lamp ------------------------------------------------------- */
+
+/* The same pictures as the room has them with its lamp out, laid over the lit ones. */
+.rt-night {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.rt-night[data-shown] {
+  opacity: 1;
+}
+
+.rt-desk-lamp {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50% 50% 46% 46%;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Under a pointer the shade catches a little light, so that a lamp that is out can be found again. */
+.rt-desk-lamp::before {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 214 150 / 0.22), transparent);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.rt-desk-lamp:hover::before {
+  opacity: 1;
+}
+
+.rt-desk-lamp:focus-visible {
+  outline: 3px solid #ffd27a;
+  outline-offset: -6px;
+}
+
+/* What the page draws in the lamp's light goes dim with it: knobs' pointer lines and the English labels. */
+.rt-knob img,
+.rt-labels {
+  transition: filter 0.5s ease;
+}
+
+.rt-frame[data-lamp='out'] .rt-knob img,
+.rt-frame[data-lamp='out'] .rt-labels {
+  filter: brightness(0.62) saturate(0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-night,
+  .rt-knob img,
+  .rt-labels {
+    transition: none;
+  }
+}
+
 /* ---- Knobs --------------------------------------------------------------- */
 
 .rt-knob {
