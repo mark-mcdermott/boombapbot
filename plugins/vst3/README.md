@@ -1,7 +1,8 @@
 # boombapbot VST3 instrument
 
-A first slice of boombapbot as a plugin: РИТМ-12's eight voices, played from
-MIDI notes, with the machine's knobs as host parameters. It is a JUCE 8.0.9
+The first slices of boombapbot as a plugin: РИТМ-12's eight voices, played
+from MIDI notes or from the patterns of a beat saved from the site, in time
+with the host, with the machine's knobs as host parameters. It is a JUCE 8.0.9
 VST3 instrument on the same engine the site, the phone apps and the desktop
 app play through (`engine/`, built natively for
 `packages/machine-ritm12`).
@@ -36,14 +37,16 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
 - The machine has two loudnesses, a plain hit and an accented one, so velocity
   picks one: 104 and above is an accented hit. That is halfway between the
   velocities the editor's MIDI export writes (81 and 127) with the accent knob
-  where a new project has it. The accent knob itself is not a parameter yet.
+  where a new project has it. The Accent parameter sets how far a plain hit
+  sits below an accented one; the threshold stays at 104 wherever it stands.
 - Hits land on the note's sample offset inside the block. The engine applies
   queued triggers at the start of a render call, so `processBlock` splits the
   block at each note-on and renders the pieces in turn.
 - A closed hat cuts a ringing open hat, as on the machine: the two share a
   choke group.
-- 35 host-automatable parameters (`AudioProcessorValueTreeState`), all from 0
-  to 1 like the machine's knobs, resting where a new project has them:
+- 47 host-automatable parameters (`AudioProcessorValueTreeState`), all from 0
+  to 1 like the machine's knobs unless the table says otherwise, resting where
+  a new project has them:
 
   | Parameter | Ids | At rest |
   | --- | --- | --- |
@@ -52,25 +55,51 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   | Volume | `master_volume` | 0.8 |
   | Effect: Off, Delay, Reverb, Flanger, Chorus | `effect_kind` | Delay |
   | Effect Mix | `effect_mix` | 0 |
+  | Mute for each voice, on or off | `kick_mute`, … | off |
+  | Accent | `accent` | 0.6 |
+  | Swing | `swing` | 0 |
+  | Pattern: А, Б, В, Г | `pattern` | А |
+  | Sequencer, on or off | `sequencer` | on |
 
   The voice ids are `kick`, `snare`, `clap`, `closed_hat`, `open_hat`, `tom`,
   `rim` and `perc`. As on the machine, an effect with its mix at 0 is no
   effect, so a new instance is dry. Level and volume follow the machine's
   arithmetic (`src/document/machine.ts`): a level of 0 is silence, and volume
   is the knob to the power 1.5.
-- State: every parameter, saved as one small versioned XML element
-  (`<BoombapbotPluginState schemaVersion="1" machine="ritm12" kick_pitch="0.5" …/>`).
-  A state that is not this plugin's, is for another machine or comes from a
-  newer version is left unread. In one that is read, a value out of range is
-  brought into it and a parameter it does not name goes to its resting value.
-- The plugin window is JUCE's `GenericAudioProcessorEditor`: one slider for
-  each parameter. A designed panel is a later slice.
+- **A beat saved from the site plays in the host.** "Load beat..." in the
+  plugin window takes the `.boombapbot.json` file the site's project export
+  writes. Its four patterns are held by the plugin, and its knobs, levels,
+  mutes, accent, swing, effect and the pattern its panel was on become the
+  parameter values. Its tempo is not taken: in a host, the host keeps time. A
+  file that is not a РИТМ-12 beat changes nothing and the window says why; a
+  beat of the earlier machine has to be opened on the site and saved again.
+- **The sequencer follows the host's transport.** While the host plays and
+  Sequencer is on, the chosen pattern loops in step with the host's position,
+  so it starts in the right place from anywhere in the song and goes back when
+  the host loops. A measure is four of the host's beats, counted from the
+  start of its timeline: sixteen sixteenths, or twelve triplet eighths if the
+  beat was saved that way. Swing delays every second sixteenth as the engine
+  does. A pattern chosen while another plays takes over at the next bar line.
+  When the host stops, so does the pattern, and hits already sounding ring
+  out. Notes from the host play on top at any time. The steps are timed by the
+  plugin from the host's position and played as single hits; the engine's own
+  sequencer, which counts from where it was started, is not used.
+- State: every parameter and the held beat's patterns, saved as one small
+  versioned XML element
+  (`<BoombapbotPluginState schemaVersion="2" machine="ritm12" kick_pitch="0.5" …>`
+  with a `<Beat>` of four `<Pattern>` rows inside). A state that is cut short,
+  is not this plugin's, is for another machine or comes from a newer version
+  is left unread. In one that is read, a value out of range is brought into
+  it, a parameter it does not name goes to its resting value, and a version 1
+  state, which has no patterns, loads with none.
+- The plugin window is a "Load beat..." bar over JUCE's
+  `GenericAudioProcessorEditor`: one slider for each parameter. Patterns
+  cannot be written or seen in it. A designed panel is a later slice.
 - The delay keeps time with the host: its echo is a dotted eighth note at the
   host's tempo, read from the playhead at every block and held within the
   engine's 40 to 300. A host that reports no tempo gets 104, the tempo of a new
   project. The delay glides to a new time rather than jumping, and the tail the
-  plugin reports grows as the tempo slows. Nothing else follows the host yet:
-  the plugin does not read its transport or position.
+  plugin reports grows as the tempo slows.
 
 ### Threads
 
@@ -88,6 +117,13 @@ that could wait: no allocation, no locks. The plugin keeps to it this way.
   thread reads the parameters' atomics and the host's playhead at the start of
   each block and queues what has changed, along with the note triggers. The engine's command queue has one
   producer, and once the plugin is playing that is the audio thread alone.
+- **The sequencer** runs on the audio thread: at each block it reads the host's
+  position, works out which steps fall inside the block and queues their hits
+  at their frames, merged in order with the host's notes. It remembers the
+  step that comes next while the host plays on, and finds its place afresh
+  when the host has jumped. The patterns are plain atomics, written a row at a
+  time when a beat or a state is loaded and read without a lock. Reading a
+  beat file happens on the thread that asked for it, never the audio thread.
 - **An offline render** (`isNonRealtime()`) has no deadline, so `processBlock`
   brings the sounds up to date itself before it renders a block. A bounce
   therefore plays the knobs exactly as they stand at each block, and the same
@@ -176,6 +212,20 @@ block size matters, it checks:
   tempo jumping about while the delay rings keeps the output in range;
 - on a realtime clock the plugin's own thread makes the new sound, and it is
   heard without the audio thread synthesising anything;
+- the accent knob and the mutes do what the machine's do;
+- the sequencer against the engine's own: for three patterns and swings and a
+  triplet beat, two measures on a playing host render the same samples as the
+  same plugin played by notes on the frames the engine's sequencer logs for
+  that pattern, in blocks of 64 and of 512;
+- the sequencer picks the pattern up mid-measure when started at beat 21.25,
+  plays the measure before beat 0, loses and doubles no hit when the host's
+  position is a hair off at every block, goes back when the host loops, and
+  changes pattern at the bar line; a stopped host, no host clock, Sequencer
+  off or no beat loaded each give silence;
+- beat files: the fixture `four-patterns.project.json` loads and sets the
+  parameters; twelve kinds of file that are not a beat are refused with a
+  reason and change nothing; the beat survives save → load → save byte for
+  byte and plays the same; a version 1 state still loads;
 - a sample rate change, an unsupported rate, the parameter count, the tail and
   that the window opens;
 - state: it is versioned, save → load → save is byte for byte the same with
@@ -192,7 +242,7 @@ On macOS the rest check the built bundle:
   (`Tests/BundleLoadCheck.cpp`);
 - the plugin through its VST3 wrapper, in JUCE's own VST3 host
   (`Tests/BundleHostCheck.cpp`): the bundle scans as one instrument called
-  boombapbot with no input and a stereo output, the host sees the 35
+  boombapbot with no input and a stereo output, the host sees the 47
   parameters by name, it is silent without MIDI, note 36 plays the kick, a
   parameter the host sets reaches the sound, a second instance recalls the
   first one's state, and the delay follows the tempo the host reports.
@@ -212,7 +262,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All eight CTest tests pass: the self-test's 355 checks as arm64 and again as
+- All eight CTest tests pass: the self-test's 460 checks as arm64 and again as
   x86_64 under Rosetta, the signature, the architectures, the load check on
   both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -237,6 +287,14 @@ signed the same way, but see below.
 - **Realtime safety is by design and by reading, not by instrument.** Nothing
   here traps an allocation or a lock on the audio thread, as the desktop app's
   Rust tests do.
+- **The file chooser and the "Load beat..." button.** The tests load a beat by
+  calling the processor; nobody has clicked the button, in a host or out of
+  one. The window has been looked at once, as a picture.
+- **The sequencer against a real host's transport.** The tests play a host that
+  reports an exact position. Whether FL Studio and others report one the
+  plugin follows cleanly, through loops, tempo changes and odd signatures, is
+  unknown. Where a step falls exactly halfway between two frames, the plugin
+  and the engine's own sequencer can land it one frame apart.
 - **How it sounds.** The tests compare samples; nobody has listened. A knob
   turned while its voice rings changes the next hit, not the ringing one, and
   nobody has judged how that feels under automation.
@@ -249,14 +307,13 @@ signed the same way, but see below.
 
 ## Next slices
 
-- **The internal sequencer, in time with the host.** The engine has РИТМ-12's
-  four patterns, swing and accents; the plugin does not use them. Playing one
-  means following the host's transport and position, which the plugin does not
-  read yet, and deciding where a pattern comes from while there is no panel to
-  write one on: a beat saved from the site is the likely answer.
-- **A designed panel** in place of the generic sliders.
-- **What the machine has and the plugin does not yet:** the accent knob, mutes
-  and swing.
+- **A designed panel** in place of the generic sliders, with the step keys on
+  it, so a pattern can be seen and written in the plugin.
+- **Beats from an account.** Only a file on disk can be loaded. Beats saved to
+  a boombapbot account are out of reach.
+- **Time signatures and tempo changes inside a block.** A measure is four
+  beats whatever the host's signature says, and the tempo is read once a
+  block.
 - **Other formats and platforms:** AU, CLAP, Windows and Linux builds.
 
 ## Licensing

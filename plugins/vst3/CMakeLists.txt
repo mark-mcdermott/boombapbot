@@ -61,9 +61,14 @@ juce_add_plugin(boombapbot_plugin
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
 target_sources(boombapbot_plugin PRIVATE
+  Source/BeatFile.cpp
+  Source/BeatFile.h
   Source/MachineRitm12.h
+  Source/PluginEditor.cpp
+  Source/PluginEditor.h
   Source/PluginProcessor.cpp
-  Source/PluginProcessor.h)
+  Source/PluginProcessor.h
+  Source/Sequencer.h)
 
 target_compile_definitions(boombapbot_plugin PUBLIC
   JUCE_WEB_BROWSER=0
@@ -110,7 +115,8 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     $<TARGET_PROPERTY:boombapbot_plugin,INCLUDE_DIRECTORIES>)
   target_compile_definitions(boombapbot_plugin_selftest PRIVATE
     $<TARGET_PROPERTY:boombapbot_plugin,COMPILE_DEFINITIONS>
-    BOOMBAPBOT_MACHINE_FILE="${MACHINE_RITM12_DIR}/data/ritm12.machine.json")
+    BOOMBAPBOT_MACHINE_FILE="${MACHINE_RITM12_DIR}/data/ritm12.machine.json"
+    BOOMBAPBOT_FIXTURES_DIR="${MACHINE_RITM12_DIR}/fixtures")
   target_link_libraries(boombapbot_plugin_selftest PRIVATE
     boombapbot_plugin
     juce::juce_recommended_warning_flags)

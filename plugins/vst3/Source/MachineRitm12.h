@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 
 namespace boombapbot::plugin {
 
@@ -60,15 +61,33 @@ inline double levelGain(const VoiceSpec& voice, float level) {
 
 inline double masterGain(float volume) { return std::pow(static_cast<double>(volume), 1.5); }
 
-// The accent knob sets how far a plain hit sits below an accented one.
 inline constexpr double kAccentedGain = 1.0;
-inline constexpr double kPlainGain = 1.0 - 0.6 * static_cast<double>(kAccentRest);
 
 // The machine has two loudnesses, so a note is an accented hit from this
 // velocity up. It is halfway between the velocities the editor's MIDI export
 // writes with the accent knob at rest: 81 for a plain hit and 127 for an
 // accented one.
 inline constexpr int kAccentVelocity = 104;
+
+// ---- Patterns ----------------------------------------------------------------
+
+inline constexpr int kPatternCount = 4;
+inline constexpr int kSteps = 16;
+// Lettered as on the panel.
+inline constexpr std::array<const char*, kPatternCount> kPatternNames{{"А", "Б", "В", "Г"}};
+inline constexpr float kSwingRest = 0.0f;
+
+// A measure plays sixteen sixteenths or twelve triplet eighths. Either way it
+// is four beats long.
+inline constexpr int kSizeRest = 16;
+constexpr bool validSize(int size) { return size == 16 || size == 12; }
+constexpr int stepsPerBeat(int size) { return size == 16 ? 4 : 3; }
+
+// The swing knob in the engine's units: fully right is the most there is.
+inline int engineSwing(float swing) { return static_cast<int>(std::lround(static_cast<double>(swing) * SNARE_SWING_MAX)); }
+
+// A plain hit's gain for where the accent knob stands; an accented hit is at 1.
+inline double plainGain(float accent) { return 1.0 - 0.6 * static_cast<double>(accent); }
 
 // The effect choices in the order the parameter lists them. A choice's index
 // is the engine's number for it.

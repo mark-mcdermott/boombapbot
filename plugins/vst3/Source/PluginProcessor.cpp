@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 
+#include "PluginEditor.h"
+
 #include <cmath>
 #include <cstdint>
 
@@ -37,6 +39,11 @@ constexpr std::array<KnobSpec, 4> kVoiceKnobs{{
 constexpr const char* kVolumeId = "master_volume";
 constexpr const char* kEffectKindId = "effect_kind";
 constexpr const char* kEffectMixId = "effect_mix";
+constexpr const char* kAccentId = "accent";
+constexpr const char* kSwingId = "swing";
+constexpr const char* kPatternId = "pattern";
+constexpr const char* kSequencerId = "sequencer";
+constexpr const char* kMuteKnob = "mute";
 constexpr int kParameterVersion = 1;
 
 juce::String voiceParameterId(const VoiceSpec& voice, const char* knob) {
@@ -54,17 +61,30 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout() {
           juce::ParameterID{voiceParameterId(voice, spec.id), kParameterVersion},
           juce::String(voice.name) + " " + spec.name, knob, spec.rest));
     }
+    group->addChild(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{voiceParameterId(voice, kMuteKnob), kParameterVersion}, juce::String(voice.name) + " Mute",
+        false));
     layout.add(std::move(group));
   }
 
   juce::StringArray effects;
   for (const char* name : kEffectNames) effects.add(name);
+  juce::StringArray patterns;
+  for (const char* name : kPatternNames) patterns.add(juce::String::fromUTF8(name));
   layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kVolumeId, kParameterVersion},
                                                          "Volume", knob, kVolumeRest));
   layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{kEffectKindId, kParameterVersion},
                                                           "Effect", effects, kEffectRest));
   layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kEffectMixId, kParameterVersion},
                                                          "Effect Mix", knob, kEffectMixRest));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kAccentId, kParameterVersion}, "Accent",
+                                                         knob, kAccentRest));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{kSwingId, kParameterVersion}, "Swing",
+                                                         knob, kSwingRest));
+  layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{kPatternId, kParameterVersion},
+                                                          "Pattern", patterns, 0));
+  layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{kSequencerId, kParameterVersion},
+                                                        "Sequencer", true));
   return layout;
 }
 
@@ -76,7 +96,19 @@ constexpr const char* kStateMachine = "machine";
 constexpr const char* kMachineId = "ritm12";
 // Version 1: one attribute for each parameter, named by its id, holding its
 // value as the host shows it.
-constexpr int kCurrentStateSchemaVersion = 1;
+// Version 2: more parameters, and a Beat element holding the patterns.
+constexpr int kCurrentStateSchemaVersion = 2;
+constexpr const char* kBeatTag = "Beat";
+constexpr const char* kBeatName = "name";
+constexpr const char* kBeatSize = "size";
+constexpr const char* kPatternTag = "Pattern";
+constexpr const char* kPatternAccents = "accents";
+constexpr std::size_t kAccentRow = kVoiceCount;
+
+// The host's tempo is held within the engine's range, as the engine holds it.
+double framesPerBeat(double tempo, double sampleRate) {
+  return sampleRate * 60.0 / juce::jlimit(SNARE_BPM_MIN, SNARE_BPM_MAX, tempo);
+}
 
 constexpr int kSoundPollMilliseconds = 15;
 constexpr int kSoundThreadStopMilliseconds = 5000;
@@ -122,11 +154,15 @@ BoombapbotAudioProcessor::BoombapbotAudioProcessor()
     const auto value = [&](const char* knob) {
       return parameters_.getRawParameterValue(voiceParameterId(kVoices[voice], knob));
     };
-    voiceParameters_[voice] = {value("pitch"), value("tone"), value("decay"), value("level")};
+    voiceParameters_[voice] = {value("pitch"), value("tone"), value("decay"), value("level"), value(kMuteKnob)};
   }
   volume_ = parameters_.getRawParameterValue(kVolumeId);
   effectKind_ = parameters_.getRawParameterValue(kEffectKindId);
   effectMix_ = parameters_.getRawParameterValue(kEffectMixId);
+  accent_ = parameters_.getRawParameterValue(kAccentId);
+  swing_ = parameters_.getRawParameterValue(kSwingId);
+  pattern_ = parameters_.getRawParameterValue(kPatternId);
+  sequencer_ = parameters_.getRawParameterValue(kSequencerId);
 }
 
 BoombapbotAudioProcessor::~BoombapbotAudioProcessor() { stopSoundThread(); }
@@ -144,6 +180,7 @@ void BoombapbotAudioProcessor::prepareToPlay(double sampleRate, int /*samplesPer
     engine_.reset(snare_engine_create(sampleRate));
     engineSampleRate_ = sampleRate;
     mixSent_ = false;
+    following_ = {};
     if (engine_ != nullptr) loadMachine(engine_.get());
   }
   if (engine_ == nullptr) return;
@@ -173,7 +210,6 @@ void BoombapbotAudioProcessor::loadMachine(SnareEngine* engine) {
     const SnareSoundParams longest{voice, kSoundKnobRest, kSoundKnobRest, 1.0f, kUnusedSnappy, 0};
     longestSound = juce::jmax(longestSound, snare_synth_frames(&longest, engineSampleRate_) / engineSampleRate_);
   }
-  snare_engine_set_accent(engine, kPlainGain, kAccentedGain);
   longestSoundSeconds_ = longestSound;
   tailSeconds_.store(tailSecondsAt(kTempoRest), std::memory_order_relaxed);
 }
@@ -188,15 +224,21 @@ double BoombapbotAudioProcessor::tailSecondsAt(double bpm) const {
   return longestSoundSeconds_ + longestEffect;
 }
 
-// The host's tempo for this block, or a new project's when the host has none
-// to give. The engine keeps it within its own range.
-double BoombapbotAudioProcessor::hostTempo() const {
-  if (const juce::AudioPlayHead* const playHead = getPlayHead()) {
-    if (const auto position = playHead->getPosition()) {
-      if (const auto bpm = position->getBpm(); bpm.hasValue() && std::isfinite(*bpm) && *bpm > 0.0) return *bpm;
-    }
+// What the host says about this block. A host with no tempo to give gets a new
+// project's, and one that does not say where it is in the song is not playing.
+BoombapbotAudioProcessor::HostTime BoombapbotAudioProcessor::readHost() const {
+  HostTime time{kTempoRest, false, 0.0};
+  const juce::AudioPlayHead* const playHead = getPlayHead();
+  if (playHead == nullptr) return time;
+  const auto position = playHead->getPosition();
+  if (!position.hasValue()) return time;
+
+  if (const auto bpm = position->getBpm(); bpm.hasValue() && std::isfinite(*bpm) && *bpm > 0.0) time.tempo = *bpm;
+  if (const auto beat = position->getPpqPosition(); beat.hasValue() && std::isfinite(*beat)) {
+    time.playing = position->getIsPlaying();
+    time.beat = *beat;
   }
-  return kTempoRest;
+  return time;
 }
 
 BoombapbotAudioProcessor::SoundKnobs BoombapbotAudioProcessor::soundKnobs(int voice) const {
@@ -234,13 +276,21 @@ bool BoombapbotAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts
 
 // A change that does not fit in the engine's queue is not recorded as sent, so
 // the next block tries again.
-void BoombapbotAudioProcessor::sendMix(SnareEngine* engine) {
+void BoombapbotAudioProcessor::sendMix(SnareEngine* engine, double tempo) {
   for (int voice = 0; voice < kVoiceCount; ++voice) {
     const auto index = static_cast<std::size_t>(voice);
-    const float level = voiceParameters_[index].level->load(std::memory_order_relaxed);
-    if (mixSent_ && juce::exactlyEqual(level, sentLevels_[index])) continue;
-    if (snare_engine_set_track_level(engine, voiceTrack(voice), levelGain(kVoices[index], level)) != SNARE_OK) return;
-    sentLevels_[index] = level;
+    const VoiceParameters& values = voiceParameters_[index];
+    const bool muted = values.mute->load(std::memory_order_relaxed) >= 0.5f;
+    const double gain = muted ? 0.0 : levelGain(kVoices[index], values.level->load(std::memory_order_relaxed));
+    if (mixSent_ && juce::exactlyEqual(gain, sentGains_[index])) continue;
+    if (snare_engine_set_track_level(engine, voiceTrack(voice), gain) != SNARE_OK) return;
+    sentGains_[index] = gain;
+  }
+
+  const float accent = accent_->load(std::memory_order_relaxed);
+  if (!mixSent_ || !juce::exactlyEqual(accent, sentAccent_)) {
+    if (snare_engine_set_accent(engine, plainGain(accent), kAccentedGain) != SNARE_OK) return;
+    sentAccent_ = accent;
   }
 
   const float volume = volume_->load(std::memory_order_relaxed);
@@ -263,13 +313,49 @@ void BoombapbotAudioProcessor::sendMix(SnareEngine* engine) {
   }
 
   // The delay keeps time with the engine's tempo, so the engine follows the host's.
-  const double tempo = hostTempo();
   if (!mixSent_ || !juce::exactlyEqual(tempo, sentTempo_)) {
     if (snare_engine_set_tempo(engine, tempo) != SNARE_OK) return;
     sentTempo_ = tempo;
     tailSeconds_.store(tailSecondsAt(tempo), std::memory_order_relaxed);
   }
   mixSent_ = true;
+}
+
+int BoombapbotAudioProcessor::chosenPattern() const {
+  return juce::jlimit(0, kPatternCount - 1, static_cast<int>(std::lround(pattern_->load(std::memory_order_relaxed))));
+}
+
+// The host's position is the truth, but one block's start and the last one's
+// end rarely agree to the last digit. While the host plays on, the step that
+// comes next is remembered, so no step is played twice or passed over. When
+// the host has jumped, by a loop or a seek, the place is found afresh.
+void BoombapbotAudioProcessor::followHost(double beat, double blockBeats, const StepGrid& grid) {
+  const double halfAStep = 0.5 / grid.stepsPerBeat;
+  const bool playedOn = following_.active && following_.stepsPerBeat == grid.stepsPerBeat &&
+                        std::abs(beat - following_.expectedBeat) <= halfAStep;
+  if (!playedOn) {
+    following_.nextStep = grid.firstStepFrom(beat);
+    following_.pattern = chosenPattern();
+  }
+  following_.active = true;
+  following_.stepsPerBeat = grid.stepsPerBeat;
+  following_.expectedBeat = beat + blockBeats;
+}
+
+// As on the machine, a pattern chosen while another plays takes over at the
+// next bar line.
+void BoombapbotAudioProcessor::playStep(SnareEngine* engine, std::int64_t step, const StepGrid& grid) {
+  const int place = grid.placeOf(step);
+  if (place == 0) following_.pattern = chosenPattern();
+
+  const PatternRows& rows = patterns_[static_cast<std::size_t>(following_.pattern)];
+  const auto on = [place](const std::atomic<StepRow>& row) {
+    return ((row.load(std::memory_order_relaxed) >> place) & 1) != 0;
+  };
+  const int accent = on(rows[kAccentRow]) ? 1 : 0;
+  for (int voice = 0; voice < kVoiceCount; ++voice) {
+    if (on(rows[static_cast<std::size_t>(voice)])) snare_engine_trigger(engine, voiceTrack(voice), accent);
+  }
 }
 
 void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) {
@@ -288,37 +374,68 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
   // An offline render has no deadline, so it makes its sounds here and a
   // bounce always plays the knobs as they stand at each block.
   if (isNonRealtime()) refreshSounds(Voices::changed);
-  sendMix(engine);
+  const HostTime host = readHost();
+  sendMix(engine, host.tempo);
 
   float* const left = buffer.getWritePointer(0);
   float* const right = buffer.getWritePointer(1);
-
-  // Every note-on plays one hit. The engine applies queued triggers at the
-  // start of the next render call, so the block is split at each note's
-  // sample offset: render up to the offset, queue the trigger, carry on.
-  //
-  // Events are read as raw bytes. Building a juce::MidiMessage could allocate
-  // for long messages such as SysEx.
   int rendered = 0;
-  for (const juce::MidiMessageMetadata event : midi) {
-    if (event.numBytes != 3 || (event.data[0] & 0xf0) != 0x90) continue;
-    const int velocity = event.data[2] & 0x7f;
-    if (velocity == 0) continue;  // note-on with velocity 0 is a note-off
-    const int track = kNoteToTrack[static_cast<std::size_t>(event.data[1] & 0x7f)];
-    if (track < 0) continue;
+  const auto renderTo = [&](int offset) {
+    if (offset > rendered) snare_engine_render(engine, left + rendered, right + rendered, offset - rendered);
+    rendered = juce::jmax(rendered, offset);
+  };
 
-    const int offset = juce::jlimit(rendered, frames, event.samplePosition);
-    if (offset > rendered) {
-      snare_engine_render(engine, left + rendered, right + rendered, offset - rendered);
-      rendered = offset;
+  // The sequencer runs while the host does, from the host's place in the song.
+  const StepGrid grid(beatSize_.load(std::memory_order_relaxed), swing_->load(std::memory_order_relaxed));
+  const double beatFrames = framesPerBeat(host.tempo, engineSampleRate_);
+  const bool sequencing = host.playing && sequencer_->load(std::memory_order_relaxed) >= 0.5f;
+  if (sequencing) {
+    followHost(host.beat, frames / beatFrames, grid);
+  } else {
+    following_.active = false;
+  }
+  // The frame the next step falls on, or `frames` when it is not in this block.
+  const auto nextStepFrame = [&] {
+    if (!sequencing) return frames;
+    const double frame = std::floor((grid.beatOf(following_.nextStep) - host.beat) * beatFrames + 0.5);
+    return static_cast<int>(juce::jlimit(static_cast<double>(rendered), static_cast<double>(frames), frame));
+  };
+
+  // Every hit, a note-on from the host or a step of the pattern, plays at its
+  // own frame. The engine applies queued triggers at the start of the next
+  // render call, so the block is split there: render up to the frame, queue
+  // the trigger, carry on. A full queue drops the hit; there is nothing
+  // useful to do about that here.
+  //
+  // MIDI events are read as raw bytes. Building a juce::MidiMessage could
+  // allocate for long messages such as SysEx.
+  auto note = midi.begin();
+  const auto noteTrack = [&]() -> int {
+    const juce::MidiMessageMetadata event = *note;
+    if (event.numBytes != 3 || (event.data[0] & 0xf0) != 0x90) return -1;
+    if ((event.data[2] & 0x7f) == 0) return -1;  // note-on with velocity 0 is a note-off
+    return kNoteToTrack[static_cast<std::size_t>(event.data[1] & 0x7f)];
+  };
+  for (;;) {
+    while (note != midi.end() && noteTrack() < 0) ++note;
+    const int stepFrame = nextStepFrame();
+    const bool noteLeft = note != midi.end();
+    const int noteFrame = noteLeft ? juce::jlimit(rendered, frames, (*note).samplePosition) : frames;
+
+    if (stepFrame < frames && stepFrame <= noteFrame) {
+      renderTo(stepFrame);
+      playStep(engine, following_.nextStep, grid);
+      ++following_.nextStep;
+    } else if (noteLeft) {
+      renderTo(noteFrame);
+      const int velocity = (*note).data[2] & 0x7f;
+      snare_engine_trigger(engine, noteTrack(), velocity >= kAccentVelocity ? 1 : 0);
+      ++note;
+    } else {
+      break;
     }
-    // A full queue drops the hit; there is nothing useful to do about it here.
-    snare_engine_trigger(engine, track, velocity >= kAccentVelocity ? 1 : 0);
   }
-
-  if (frames > rendered) {
-    snare_engine_render(engine, left + rendered, right + rendered, frames - rendered);
-  }
+  renderTo(frames);
 
   for (int channel = 2; channel < channels; ++channel) buffer.clear(channel, 0, frames);
   midi.clear();  // the plugin produces no MIDI
@@ -328,7 +445,7 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
 bool BoombapbotAudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* BoombapbotAudioProcessor::createEditor() {
-  return new juce::GenericAudioProcessorEditor(*this);
+  return new BoombapbotEditor(*this);
 }
 
 // ---- Description ------------------------------------------------------------
@@ -358,12 +475,24 @@ void BoombapbotAudioProcessor::getStateInformation(juce::MemoryBlock& destData) 
       state.setAttribute(ranged->paramID, static_cast<double>(ranged->convertFrom0to1(ranged->getValue())));
     }
   }
+
+  juce::XmlElement* const beat = state.createNewChildElement(kBeatTag);
+  beat->setAttribute(kBeatName, beatName());
+  beat->setAttribute(kBeatSize, beatSize_.load(std::memory_order_relaxed));
+  for (const PatternRows& rows : patterns_) {
+    juce::XmlElement* const pattern = beat->createNewChildElement(kPatternTag);
+    pattern->setAttribute(kPatternAccents, rowText(rows[kAccentRow].load(std::memory_order_relaxed)));
+    for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+      pattern->setAttribute(kVoices[voice].id, rowText(rows[voice].load(std::memory_order_relaxed)));
+    }
+  }
   copyXmlToBinary(state, destData);
 }
 
 // A state that is cut short, is not this plugin's, is for another machine, or
-// was written by a newer version is left unread. In one that is read, a value out of range is
-// brought into it, and a parameter it does not name goes to its resting value.
+// was written by a newer version is left unread. In one that is read, a value
+// out of range is brought into it, a parameter it does not name goes to its
+// resting value, and patterns it does not hold are empty.
 void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInBytes) {
   if (!holdsWholeState(data, sizeInBytes)) return;
   const std::unique_ptr<juce::XmlElement> state = getXmlFromBinary(data, sizeInBytes);
@@ -382,6 +511,78 @@ void BoombapbotAudioProcessor::setStateInformation(const void* data, int sizeInB
                             : ranged->getDefaultValue();
     ranged->setValueNotifyingHost(value);
   }
+
+  Beat beat;
+  if (const juce::XmlElement* const saved = state->getChildByName(kBeatTag)) {
+    beat.name = saved->getStringAttribute(kBeatName);
+    const int size = saved->getIntAttribute(kBeatSize, kSizeRest);
+    beat.size = validSize(size) ? size : kSizeRest;
+    std::size_t index = 0;
+    for (const juce::XmlElement* pattern : saved->getChildWithTagNameIterator(kPatternTag)) {
+      if (index == beat.patterns.size()) break;
+      BeatPattern& rows = beat.patterns[index++];
+      rows.accents = rowFromText(pattern->getStringAttribute(kPatternAccents));
+      for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+        rows.hits[voice] = rowFromText(pattern->getStringAttribute(kVoices[voice].id));
+      }
+    }
+  }
+  holdPatterns(beat);
+}
+
+// ---- Beats --------------------------------------------------------------------
+
+void BoombapbotAudioProcessor::holdPatterns(const Beat& beat) {
+  for (std::size_t index = 0; index < patterns_.size(); ++index) {
+    const BeatPattern& pattern = beat.patterns[index];
+    for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+      patterns_[index][voice].store(pattern.hits[voice], std::memory_order_relaxed);
+    }
+    patterns_[index][kAccentRow].store(pattern.accents, std::memory_order_relaxed);
+  }
+  beatSize_.store(beat.size, std::memory_order_relaxed);
+  {
+    const std::lock_guard<std::mutex> lock(beatNameLock_);
+    beatName_ = beat.name;
+  }
+  sendChangeMessage();
+}
+
+juce::String BoombapbotAudioProcessor::beatName() const {
+  const std::lock_guard<std::mutex> lock(beatNameLock_);
+  return beatName_;
+}
+
+void BoombapbotAudioProcessor::setParameterTo(const juce::String& id, float value) {
+  juce::RangedAudioParameter* const parameter = parameters_.getParameter(id);
+  jassert(parameter != nullptr);
+  if (parameter != nullptr) parameter->setValueNotifyingHost(parameter->convertTo0to1(value));
+}
+
+// The beat's tempo is not taken: in a host, the host keeps time.
+juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
+  Beat beat;
+  if (const juce::Result read = readBeat(json, beat); read.failed()) return read;
+
+  for (std::size_t index = 0; index < kVoices.size(); ++index) {
+    const VoiceSpec& voice = kVoices[index];
+    const BeatVoice& knobs = beat.voices[index];
+    setParameterTo(voiceParameterId(voice, "pitch"), knobs.pitch);
+    setParameterTo(voiceParameterId(voice, "tone"), knobs.tone);
+    setParameterTo(voiceParameterId(voice, "decay"), knobs.decay);
+    setParameterTo(voiceParameterId(voice, "level"), knobs.level);
+    setParameterTo(voiceParameterId(voice, kMuteKnob), knobs.muted ? 1.0f : 0.0f);
+  }
+  setParameterTo(kVolumeId, beat.volume);
+  setParameterTo(kAccentId, beat.accent);
+  setParameterTo(kSwingId, beat.swing);
+  setParameterTo(kEffectKindId, static_cast<float>(beat.effect));
+  setParameterTo(kEffectMixId, beat.effectMix);
+  setParameterTo(kPatternId, static_cast<float>(beat.pattern));
+
+  holdPatterns(beat);
+  updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+  return juce::Result::ok();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new BoombapbotAudioProcessor(); }
