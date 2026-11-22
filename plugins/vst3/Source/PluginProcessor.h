@@ -16,6 +16,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce::ChangeBroadcaster {
  public:
@@ -67,6 +68,15 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   bool stepOn(int pattern, int row, int step) const;
   void setStep(int pattern, int row, int step, bool on);
   void clearPattern(int pattern);
+  // Throws the dice: a new row for one voice in one pattern, likelier on the beat.
+  void rollDice(int pattern, int voice, juce::Random& random);
+  // The host's undo does not reach the patterns, so the panel has one of its
+  // own. Clearing, the dice, a new measure size and loading a beat are each a
+  // step back. Steps written by hand are one step back from where
+  // rememberPatterns was last called, which the step keys do at each press.
+  void rememberPatterns();
+  bool canUndoPatterns() const;
+  bool undoPatterns();
   int measureSize() const;
   void setMeasureSize(int size);
   void audition(int voice);
@@ -106,6 +116,15 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
     double beat;
   };
 
+  // The patterns and the measure as they stood at one moment.
+  struct PatternsThen {
+    std::array<std::array<boombapbot::plugin::StepRow, boombapbot::plugin::kVoiceCount + 1>,
+               boombapbot::plugin::kPatternCount>
+        rows{};
+    int size = boombapbot::plugin::kSizeRest;
+    bool operator==(const PatternsThen&) const = default;
+  };
+
   // A pattern's rows: one for each voice, then the accents.
   using PatternRows = std::array<std::atomic<boombapbot::plugin::StepRow>, boombapbot::plugin::kVoiceCount + 1>;
 
@@ -132,6 +151,8 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   void playAuditions(SnareEngine* engine);
   void setParameterTo(const juce::String& id, float value);
   void holdPatterns(const boombapbot::plugin::Beat& beat);
+  PatternsThen patternsNow() const;
+  void patternsChanged();
   double tailSecondsAt(double bpm) const;
   void stopSoundThread();
 
@@ -154,6 +175,8 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   std::atomic<double> hostTempo_{boombapbot::plugin::kTempoRest};
   std::atomic<int> shownStep_{-1};
   std::atomic<int> shownPattern_{0};
+  mutable std::mutex historyLock_;
+  std::vector<PatternsThen> history_;
   mutable std::mutex beatNameLock_;
   juce::String beatName_;
 
