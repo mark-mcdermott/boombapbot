@@ -25,6 +25,8 @@ void note() {
   }
 }
 
+#if !defined(BOOMBAPBOT_NO_HEAP_TRAP)
+
 void* take(std::size_t size) {
   note();
   return std::malloc(size == 0 ? 1 : size);
@@ -62,7 +64,11 @@ void* orThrow(void* block) {
   return block;
 }
 
+#endif
+
 }  // namespace
+
+#if !defined(BOOMBAPBOT_NO_HEAP_TRAP)
 
 // Every new and delete in this program, the plugin's code and JUCE's included.
 void* operator new(std::size_t size) { return orThrow(take(size)); }
@@ -116,7 +122,17 @@ void free(void* block) {
 
 #endif
 
+#endif  // !BOOMBAPBOT_NO_HEAP_TRAP
+
 namespace heaptrap {
+
+bool available() {
+#if defined(BOOMBAPBOT_NO_HEAP_TRAP)
+  return false;
+#else
+  return true;
+#endif
+}
 
 Watch::Watch() { watchedThread.store(std::this_thread::get_id(), std::memory_order_relaxed); }
 Watch::~Watch() { watchedThread.store(std::thread::id(), std::memory_order_relaxed); }

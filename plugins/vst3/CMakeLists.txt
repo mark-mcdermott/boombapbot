@@ -19,6 +19,16 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# For hunting bugs, not for a build anyone plays: everything here, JUCE and the
+# engine included, built under sanitizers. "address,undefined" finds memory
+# errors and undefined behaviour; "thread" finds data races between the audio
+# thread, the sound thread and the panel.
+set(BOOMBAPBOT_VST3_SANITIZE "" CACHE STRING "Sanitizers to build with, such as address,undefined or thread")
+if(BOOMBAPBOT_VST3_SANITIZE)
+  add_compile_options(-fsanitize=${BOOMBAPBOT_VST3_SANITIZE} -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=${BOOMBAPBOT_VST3_SANITIZE})
+endif()
+
 get_filename_component(BOOMBAPBOT_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 set(MACHINE_RITM12_DIR "${BOOMBAPBOT_REPO_ROOT}/packages/machine-ritm12")
 
@@ -135,7 +145,12 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
   endfunction()
 
   boombapbot_plugin_program(boombapbot_plugin_selftest Tests/ProcessorSelfTest.cpp)
+  # The heap trap stands in for the allocator, and so do the sanitizers. Under
+  # them the trap is left out and the check that needs it says it was skipped.
   target_sources(boombapbot_plugin_selftest PRIVATE Tests/HeapTrap.cpp Tests/HeapTrap.h)
+  if(BOOMBAPBOT_VST3_SANITIZE)
+    target_compile_definitions(boombapbot_plugin_selftest PRIVATE BOOMBAPBOT_NO_HEAP_TRAP=1)
+  endif()
   boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
   add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
   add_test(NAME vst3.window_snapshot

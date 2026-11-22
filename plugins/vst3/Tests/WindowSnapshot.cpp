@@ -45,12 +45,17 @@ int main(int argc, char** argv) {
     }
   }
 
-  const std::unique_ptr<juce::AudioProcessorEditor> editor(processor->createEditorIfNeeded());
+  juce::AudioProcessorEditor* const editor = processor->createEditorIfNeeded();
   if (editor == nullptr || editor->getWidth() <= 0 || editor->getHeight() <= 0) {
     std::fprintf(stderr, "FAIL the plugin has no window\n");
     return 1;
   }
   const juce::Image image = editor->createComponentSnapshot(editor->getLocalBounds(), true, kScale);
+  const int width = editor->getWidth();
+  const int height = editor->getHeight();
+  // Closed as a host closes it: the processor is told before the window goes.
+  processor->editorBeingDeleted(editor);
+  delete editor;
 
   const juce::File out = juce::File::getCurrentWorkingDirectory().getChildFile(juce::String::fromUTF8(argv[1]));
   out.deleteFile();
@@ -62,6 +67,6 @@ int main(int argc, char** argv) {
 
   const int colours = coloursIn(image);
   std::printf("%s the window is %d x %d and its picture holds %d colours\n", colours >= kColoursLeast ? "ok  " : "FAIL",
-              editor->getWidth(), editor->getHeight(), colours);
+              width, height, colours);
   return colours >= kColoursLeast ? 0 : 1;
 }

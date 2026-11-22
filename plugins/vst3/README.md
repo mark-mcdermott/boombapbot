@@ -259,14 +259,16 @@ block size matters, it checks:
   nonsense one is the same as none; a tempo outside 40 to 300 is held at the
   nearer end; the tempo changes nothing while no effect is mixed in; and the
   tempo jumping about while the delay rings keeps the output in range;
-- the audio thread keeps off the heap: the test program replaces `new` and
-  `delete`, and on macOS `malloc`, `calloc`, `realloc` and `free` as its own
-  code calls them, and counts every call the thread inside `processBlock`
-  makes. The trap first has to count a block it takes itself, and an offline
-  block that re-synthesises a sound, which is allowed the heap. Then 3000
-  realtime blocks with notes on every voice, a SysEx message, the sequencer, a
-  host that starts, stops, loops and changes tempo, and knobs turning between
-  blocks must make none;
+- the audio thread at work: 3000 realtime blocks with notes on every voice, a
+  SysEx message, the sequencer, a host that starts, stops, loops and changes
+  tempo, and knobs turning between blocks, while a second thread works the
+  panel (steps, dice, undo, measure size, voice keys, the name) and saves and
+  recalls the plugin's state. The test program replaces `new` and `delete`,
+  and on macOS `malloc`, `calloc`, `realloc` and `free` as its own code calls
+  them, and counts every call the thread inside `processBlock` makes. The trap
+  first has to count a block it takes itself, and an offline block that
+  re-synthesises a sound, which is allowed the heap. The realtime blocks must
+  make none;
 - on a realtime clock the plugin's own thread makes the new sound, and it is
   heard without the audio thread synthesising anything;
 - the accent knob and the mutes do what the machine's do;
@@ -329,6 +331,28 @@ It is how the panel can be looked at without a host:
 build/vst3/boombapbot_window_snapshot panel.png path/to/a.boombapbot.json
 ```
 
+### Sanitizers
+
+`-DBOOMBAPBOT_VST3_SANITIZE=` builds everything, JUCE and the engine included,
+under clang's sanitizers. The heap trap is left out of such a build, since a
+sanitizer has the allocator to itself, and the busy realtime blocks above run
+without it: they are what the thread sanitizer is there to watch.
+
+```sh
+cmake -S plugins/vst3 -B build/vst3-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 -DBOOMBAPBOT_VST3_SANITIZE=address,undefined
+cmake --build build/vst3-asan --target boombapbot_plugin_selftest
+build/vst3-asan/boombapbot_plugin_selftest
+
+cmake -S plugins/vst3 -B build/vst3-tsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 -DBOOMBAPBOT_VST3_SANITIZE=thread
+cmake --build build/vst3-tsan --target boombapbot_plugin_selftest
+build/vst3-tsan/boombapbot_plugin_selftest
+```
+
+A Debug build also switches on JUCE's own assertions, which print
+`JUCE Assertion failure` and carry on. CI does not run these builds.
+
 On macOS the rest check the built bundle:
 
 - its signature (`codesign --verify --deep --strict`) and that it holds both
@@ -363,6 +387,11 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
   from `GetPluginFactory`, as arm64 and as x86_64.
 
+- The self-test under sanitizers, arm64 only: a Debug build under the address
+  and undefined-behaviour sanitizers and a build under the thread sanitizer
+  each pass every check with nothing reported, and the Debug build prints no
+  JUCE assertion.
+
 The same build and tests also pass on GitHub's macOS 26 runner, which fetches
 JUCE itself (the `vst3` job in `.github/workflows/native.yml`).
 
@@ -380,9 +409,11 @@ signed the same way, but see below.
   run either. The hosted check uses JUCE's host against JUCE's wrapper, which
   cannot catch a mistake both share.
 - **Locks on the audio thread.** The self-test traps heap use there and finds
-  none, but nothing traps a lock, a system call or a page fault. What a system
-  library allocates inside itself is not seen either. That the audio thread
-  takes no lock is by design and by reading.
+  none, and the thread sanitizer finds no race, but nothing traps a lock, a
+  system call or a page fault. What a system library allocates inside itself
+  is not seen either. That the audio thread takes no lock is by design and by
+  reading. The sanitizers have run the self-test only, never the plugin in a
+  host, and never the x86_64 half.
 - **Dragging MIDI into a host.** The file is tested; the drag is not. Whether
   FL Studio or any other host takes a file dragged out of a plugin's window
   is unknown.
