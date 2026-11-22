@@ -53,6 +53,9 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   juce::Result loadBeat(const juce::String& json);
   // The name of the beat whose patterns are held, or nothing.
   juce::String beatName() const;
+  // The plugin as a beat: its patterns, and its parameters as the beat's knobs,
+  // at the tempo the host last gave. Not for the audio thread.
+  boombapbot::plugin::Beat currentBeat() const;
 
   // What the panel works: the parameters, the steps of the patterns, how many
   // steps a measure has, a voice key pressed, and where the sequencer is.
@@ -66,6 +69,9 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   int measureSize() const;
   void setMeasureSize(int size);
   void audition(int voice);
+  // The voice whose key was pressed last on the panel. It is saved with a beat.
+  void selectVoice(int voice);
+  int selectedVoice() const;
   // The step the sequencer last played in its measure, or -1 when it is not playing.
   int playingStep() const;
   int playingPattern() const;
@@ -143,6 +149,8 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   std::array<PatternRows, boombapbot::plugin::kPatternCount> patterns_{};
   std::atomic<int> beatSize_{boombapbot::plugin::kSizeRest};
   std::atomic<std::uint32_t> auditions_{0};
+  std::atomic<int> selectedVoice_{0};
+  std::atomic<double> hostTempo_{boombapbot::plugin::kTempoRest};
   std::atomic<int> shownStep_{-1};
   std::atomic<int> shownPattern_{0};
   mutable std::mutex beatNameLock_;

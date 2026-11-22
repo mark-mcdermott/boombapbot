@@ -366,6 +366,7 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
   // bounce always plays the knobs as they stand at each block.
   if (isNonRealtime()) refreshSounds(Voices::changed);
   const HostTime host = readHost();
+  hostTempo_.store(host.tempo, std::memory_order_relaxed);
   sendMix(engine, host.tempo);
 
   float* const left = buffer.getWritePointer(0);
@@ -563,6 +564,12 @@ void BoombapbotAudioProcessor::clearPattern(int pattern) {
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
 }
 
+void BoombapbotAudioProcessor::selectVoice(int voice) {
+  if (voice >= 0 && voice < kVoiceCount) selectedVoice_.store(voice, std::memory_order_relaxed);
+}
+
+int BoombapbotAudioProcessor::selectedVoice() const { return selectedVoice_.load(std::memory_order_relaxed); }
+
 int BoombapbotAudioProcessor::measureSize() const { return beatSize_.load(std::memory_order_relaxed); }
 
 void BoombapbotAudioProcessor::setMeasureSize(int size) {
@@ -604,6 +611,33 @@ void BoombapbotAudioProcessor::setParameterTo(const juce::String& id, float valu
   if (parameter != nullptr) parameter->setValueNotifyingHost(parameter->convertTo0to1(value));
 }
 
+Beat BoombapbotAudioProcessor::currentBeat() const {
+  Beat beat;
+  beat.name = beatName();
+  beat.tempo = juce::roundToInt(juce::jlimit(SNARE_BPM_MIN, SNARE_BPM_MAX, hostTempo_.load(std::memory_order_relaxed)));
+  beat.swing = swing_->load(std::memory_order_relaxed);
+  beat.size = measureSize();
+  for (std::size_t index = 0; index < patterns_.size(); ++index) {
+    for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+      beat.patterns[index].hits[voice] = patterns_[index][voice].load(std::memory_order_relaxed);
+    }
+    beat.patterns[index].accents = patterns_[index][kAccentRow].load(std::memory_order_relaxed);
+  }
+  beat.pattern = chosenPattern();
+  beat.selectedVoice = selectedVoice();
+  beat.volume = volume_->load(std::memory_order_relaxed);
+  beat.accent = accent_->load(std::memory_order_relaxed);
+  for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+    const VoiceParameters& values = voiceParameters_[voice];
+    beat.voices[voice] = {values.pitch->load(std::memory_order_relaxed), values.tone->load(std::memory_order_relaxed),
+                          values.decay->load(std::memory_order_relaxed), values.level->load(std::memory_order_relaxed),
+                          values.mute->load(std::memory_order_relaxed) >= 0.5f};
+  }
+  beat.effect = juce::roundToInt(effectKind_->load(std::memory_order_relaxed));
+  beat.effectMix = effectMix_->load(std::memory_order_relaxed);
+  return beat;
+}
+
 // The beat's tempo is not taken: in a host, the host keeps time.
 juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
   Beat beat;
@@ -625,6 +659,7 @@ juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
   setParameterTo(ids::kEffectMix, beat.effectMix);
   setParameterTo(ids::kPattern, static_cast<float>(beat.pattern));
 
+  selectVoice(beat.selectedVoice);
   holdPatterns(beat);
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
   return juce::Result::ok();
