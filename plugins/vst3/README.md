@@ -65,8 +65,12 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   brought into it and a parameter it does not name goes to its resting value.
 - The plugin window is JUCE's `GenericAudioProcessorEditor`: one slider for
   each parameter. A designed panel is a later slice.
-- The delay keeps time with the engine's tempo, which is fixed at 104, the
-  tempo of a new project, until the plugin follows the host's.
+- The delay keeps time with the host: its echo is a dotted eighth note at the
+  host's tempo, read from the playhead at every block and held within the
+  engine's 40 to 300. A host that reports no tempo gets 104, the tempo of a new
+  project. The delay glides to a new time rather than jumping, and the tail the
+  plugin reports grows as the tempo slows. Nothing else follows the host yet:
+  the plugin does not read its transport or position.
 
 ### Threads
 
@@ -80,9 +84,9 @@ that could wait: no allocation, no locks. The plugin keeps to it this way.
   the next buffer boundary. Hits already ringing finish on the old samples.
   It polls rather than being woken because a parameter listener can be called
   on the audio thread, where waking a thread is not allowed.
-- **Level, volume and the effect** are engine commands. The audio thread reads
-  the parameters' atomics at the start of each block and queues what has
-  changed, along with the note triggers. The engine's command queue has one
+- **Level, volume, the effect and the tempo** are engine commands. The audio
+  thread reads the parameters' atomics and the host's playhead at the start of
+  each block and queues what has changed, along with the note triggers. The engine's command queue has one
   producer, and once the plugin is playing that is the audio thread alone.
 - **An offline render** (`isNonRealtime()`) has no deadline, so `processBlock`
   brings the sounds up to date itself before it renders a block. A bounce
@@ -165,6 +169,11 @@ block size matters, it checks:
 - volume scales the output as the machine's knob does and 0 is silence;
 - each effect alters the output, no two effects sound the same, and an effect
   with no mix, or Off with some, leaves the output as it was;
+- the delay's first echo lands a dotted eighth after the hit at host tempos of
+  60, 120 and 174 and at 104 with no host clock; a clock with no tempo or a
+  nonsense one is the same as none; a tempo outside 40 to 300 is held at the
+  nearer end; the tempo changes nothing while no effect is mixed in; and the
+  tempo jumping about while the delay rings keeps the output in range;
 - on a realtime clock the plugin's own thread makes the new sound, and it is
   heard without the audio thread synthesising anything;
 - a sample rate change, an unsupported rate, the parameter count, the tail and
@@ -185,8 +194,8 @@ On macOS the rest check the built bundle:
   (`Tests/BundleHostCheck.cpp`): the bundle scans as one instrument called
   boombapbot with no input and a stereo output, the host sees the 35
   parameters by name, it is silent without MIDI, note 36 plays the kick, a
-  parameter the host sets reaches the sound, and a second instance recalls
-  the first one's state.
+  parameter the host sets reaches the sound, a second instance recalls the
+  first one's state, and the delay follows the tempo the host reports.
 
 On Apple silicon with Rosetta installed, the self-test, the load check and the
 hosted check each run a second time as x86_64, which is how FL Studio runs the
@@ -203,11 +212,14 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All eight CTest tests pass: the self-test's 328 checks as arm64 and again as
+- All eight CTest tests pass: the self-test's 355 checks as arm64 and again as
   x86_64 under Rosetta, the signature, the architectures, the load check on
   both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
   from `GetPluginFactory`, as arm64 and as x86_64.
+
+The same build and tests also pass on GitHub's macOS 26 runner, which fetches
+JUCE itself (the `vst3` job in `.github/workflows/native.yml`).
 
 The earlier spike, on the old machine, loaded and played in FL Studio 2026 on
 this Mac once it was universal and signed again. This plugin is built and
@@ -237,14 +249,14 @@ signed the same way, but see below.
 
 ## Next slices
 
-- **Host tempo and transport.** The plugin does not read the host's playhead.
-  The delay's time is the only thing that would follow it today.
-- **The internal sequencer.** The engine has РИТМ-12's four patterns, swing and
-  accents; the plugin does not use them. Playing a pattern in time with the
-  host needs the transport first.
+- **The internal sequencer, in time with the host.** The engine has РИТМ-12's
+  four patterns, swing and accents; the plugin does not use them. Playing one
+  means following the host's transport and position, which the plugin does not
+  read yet, and deciding where a pattern comes from while there is no panel to
+  write one on: a beat saved from the site is the likely answer.
 - **A designed panel** in place of the generic sliders.
-- **What the machine has and the plugin does not yet:** the accent knob, mutes,
-  swing, and loading a beat saved from the site.
+- **What the machine has and the plugin does not yet:** the accent knob, mutes
+  and swing.
 - **Other formats and platforms:** AU, CLAP, Windows and Linux builds.
 
 ## Licensing

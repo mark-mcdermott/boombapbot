@@ -1,6 +1,6 @@
 // boombapbot as a VST3 instrument: РИТМ-12's eight voices played from MIDI
 // notes on top of the shared render engine, with its knobs as host parameters.
-// No sequencer and no host sync yet.
+// It follows the host's tempo. No sequencer yet.
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -75,8 +75,10 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor {
   // allocates, so it runs on the sound thread, in prepareToPlay, or in
   // processBlock only while the host renders offline.
   void refreshSounds(Voices which);
-  // Queues level, volume and effect changes. Audio thread only.
+  // Queues level, volume, effect and tempo changes. Audio thread only.
   void sendMix(SnareEngine* engine);
+  double hostTempo() const;
+  double tailSecondsAt(double bpm) const;
   void stopSoundThread();
 
   juce::AudioProcessorValueTreeState parameters_;
@@ -87,13 +89,15 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor {
 
   std::unique_ptr<SnareEngine, EngineDeleter> engine_;
   double engineSampleRate_ = 0.0;
-  double tailSeconds_ = 0.0;
+  double longestSoundSeconds_ = 0.0;
+  std::atomic<double> tailSeconds_{0.0};
 
   // What the engine was last sent. Audio thread only once it is rendering.
   std::array<float, boombapbot::plugin::kVoiceCount> sentLevels_{};
   float sentVolume_ = 0.0f;
   int sentEffect_ = 0;
   float sentEffectMix_ = 0.0f;
+  double sentTempo_ = 0.0;
   bool mixSent_ = false;
 
   // The knobs each voice's current samples were made from.
