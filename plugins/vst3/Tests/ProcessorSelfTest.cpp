@@ -759,9 +759,18 @@ void testSequencerMatchesTheEngine(const std::string& context, double rate, int 
     const std::unique_ptr<juce::AudioProcessor> noted = makeBeatProcessor(rate, blockSize, entry.played, false);
     const Stereo bySequencer = renderPlaying(*sequenced, transport, 0.0, {}, total, blockSize, rate);
     const Stereo byNotes = renderPlaying(*noted, transport, 0.0, hits, total, blockSize, rate);
+    // Where the two part, if they do, and by how much: this check has failed
+    // once on a CI runner, as x86_64, and never on the Mac it was written on.
+    const int parted = firstDifference(bySequencer.left, byNotes.left);
+    const auto at = [&](const Stereo& audio) {
+      return parted >= 0 && parted < static_cast<int>(audio.left.size())
+                 ? static_cast<double>(audio.left[static_cast<std::size_t>(parted)])
+                 : 0.0;
+    };
     check(!hits.empty() && peak(bySequencer) > kAudible && identical(bySequencer, byNotes), context,
-          text("%s: two measures on a playing host land every one of %d hits on the engine's own frame", entry.name,
-               static_cast<int>(hits.size())));
+          text("%s: two measures on a playing host land every one of %d hits on the engine's own frame "
+               "(first difference at frame %d: %.9g against %.9g)",
+               entry.name, static_cast<int>(hits.size()), parted, at(bySequencer), at(byNotes)));
   }
 }
 
