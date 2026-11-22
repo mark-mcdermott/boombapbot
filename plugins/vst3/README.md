@@ -364,7 +364,13 @@ On macOS the rest check the built bundle:
   boombapbot with no input and a stereo output, the host sees the 47
   parameters by name, it is silent without MIDI, note 36 plays the kick, a
   parameter the host sets reaches the sound, a second instance recalls the
-  first one's state, and the delay follows the tempo the host reports.
+  first one's state, and the delay follows the tempo the host reports. It is
+  also handed a state with the fixture beat in it, which a program made of
+  the plugin's own code writes first (`Tests/StateWriter.cpp`), wrapped as
+  JUCE's host keeps a VST3 state: the beat's knobs are recalled, and with the
+  host playing and no notes the pattern sounds, its first hit on the frame of
+  its third step, and stays silent with the host stopped. So the host's
+  position reaches the sequencer through the wrapper.
 
 On Apple silicon with Rosetta installed, the self-test, the load check and the
 hosted check each run a second time as x86_64, which is how FL Studio runs the
@@ -381,7 +387,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 513 checks as arm64 and again as
+- All ten CTest tests pass: the self-test's 513 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -427,8 +433,9 @@ signed the same way, but see below.
   or out of one: how the knobs feel, whether the lamp keeps up, how it looks
   on a screen that is not Retina or at another size, whether a host lets its
   window be dragged larger, and the file chooser are all untried.
-- **The sequencer against a real host's transport.** The tests play a host that
-  reports an exact position. Whether FL Studio and others report one the
+- **The sequencer against a real host's transport.** The tests play hosts of
+  their own that report an exact position, one of them JUCE's VST3 host
+  through the wrapper. Whether FL Studio and others report one the
   plugin follows cleanly, through loops, tempo changes and odd signatures, is
   unknown. Where a step falls exactly halfway between two frames, the plugin
   and the engine's own sequencer can land it one frame apart.

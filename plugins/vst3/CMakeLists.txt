@@ -152,6 +152,7 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     target_compile_definitions(boombapbot_plugin_selftest PRIVATE BOOMBAPBOT_NO_HEAP_TRAP=1)
   endif()
   boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
+  boombapbot_plugin_program(boombapbot_state_writer Tests/StateWriter.cpp)
   add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
   add_test(NAME vst3.window_snapshot
     COMMAND boombapbot_window_snapshot "${CMAKE_CURRENT_BINARY_DIR}/window.png"
@@ -179,7 +180,14 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     add_test(NAME vst3.bundle_signature
       COMMAND "${BOOMBAPBOT_CODESIGN}" --verify --deep --strict --verbose=2 "${plugin_bundle}")
     add_test(NAME vst3.bundle_loads COMMAND boombapbot_bundle_load_check "${plugin_binary}")
-    add_test(NAME vst3.bundle_hosted COMMAND boombapbot_bundle_host_check "${plugin_bundle}")
+    # The hosted check is handed a state with a beat in it, which the plugin's
+    # own code writes first.
+    set(beat_state "${CMAKE_CURRENT_BINARY_DIR}/beat.state")
+    add_test(NAME vst3.beat_state
+      COMMAND boombapbot_state_writer "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json" "${beat_state}")
+    set_tests_properties(vst3.beat_state PROPERTIES FIXTURES_SETUP beat_state)
+    add_test(NAME vst3.bundle_hosted COMMAND boombapbot_bundle_host_check "${plugin_bundle}" "${beat_state}")
+    set_tests_properties(vst3.bundle_hosted PROPERTIES FIXTURES_REQUIRED beat_state)
 
     # The Intel half is run under Rosetta where there is one, which is how a
     # host that has not moved to Apple silicon runs it.
@@ -192,7 +200,8 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
         add_test(NAME vst3.bundle_loads_x86_64
           COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_bundle_load_check>" "${plugin_binary}")
         add_test(NAME vst3.bundle_hosted_x86_64
-          COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_bundle_host_check>" "${plugin_bundle}")
+          COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_bundle_host_check>" "${plugin_bundle}" "${beat_state}")
+        set_tests_properties(vst3.bundle_hosted_x86_64 PROPERTIES FIXTURES_REQUIRED beat_state)
       endif()
     endif()
   endif()
