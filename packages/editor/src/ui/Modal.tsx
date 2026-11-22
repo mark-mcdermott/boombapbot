@@ -8,6 +8,8 @@ export interface ModalProps {
   label: string;
   /** What its tip says, when the name carries more than a tip should. */
   tip?: string;
+  /** Its name under the icon on a phone, when the tip is too long for that. */
+  word?: string;
   title: string;
   /** The button's test id. The modal is `<testId>-modal` and its close button `<testId>-close`. */
   testId: string;
@@ -35,7 +37,7 @@ export function Modal(props: ModalProps) {
           aria-label={props.label}
         >
           {props.icon}
-          <span className="sb-footer-word">{props.tip ?? props.label}</span>
+          <span className="sb-footer-word">{props.word ?? props.tip ?? props.label}</span>
           {props.badge && (
             <span className="sb-footer-badge" aria-hidden="true">
               {props.badge}
