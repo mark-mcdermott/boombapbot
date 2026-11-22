@@ -9,7 +9,9 @@
 #include <cmath>
 #include <cstdio>
 #include <memory>
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -56,11 +58,54 @@ float play(juce::AudioPluginInstance& plugin, bool kick, int blocks = 8) {
   return loudest;
 }
 
+// A host that reports one tempo.
+class HostClock final : public juce::AudioPlayHead {
+ public:
+  explicit HostClock(double bpm) : bpm_(bpm) {}
+
+  juce::Optional<PositionInfo> getPosition() const override {
+    PositionInfo position;
+    position.setBpm(bpm_);
+    position.setTimeSignature(TimeSignature{4, 4});
+    position.setIsPlaying(true);
+    return position;
+  }
+
+ private:
+  double bpm_;
+};
+
 juce::AudioProcessorParameter* named(juce::AudioPluginInstance& plugin, const char* name) {
   for (juce::AudioProcessorParameter* parameter : plugin.getParameters()) {
     if (parameter->getName(64) == name) return parameter;
   }
   return nullptr;
+}
+
+// A kick into the delay on a host at `bpm`, once the delay has settled there.
+std::vector<float> playEcho(juce::VST3PluginFormat& format, const juce::PluginDescription& description, double bpm,
+                            int blocks) {
+  const std::unique_ptr<juce::AudioPluginInstance> plugin = host(format, description);
+  juce::AudioProcessorParameter* const mix = plugin != nullptr ? named(*plugin, "Effect Mix") : nullptr;
+  if (mix == nullptr) return {};
+  HostClock clock(bpm);
+  plugin->setPlayHead(&clock);
+  mix->setValue(0.6f);
+  play(*plugin, false, 600);
+
+  std::vector<float> heard;
+  juce::AudioBuffer<float> buffer(2, kBlock);
+  juce::MidiBuffer midi;
+  for (int block = 0; block < blocks; ++block) {
+    buffer.clear();
+    midi.clear();
+    if (block == 0) midi.addEvent(juce::MidiMessage::noteOn(10, kKickNote, juce::uint8{127}), 0);
+    plugin->processBlock(buffer, midi);
+    heard.insert(heard.end(), buffer.getReadPointer(0), buffer.getReadPointer(0) + kBlock);
+  }
+  plugin->setPlayHead(nullptr);
+  plugin->releaseResources();
+  return heard;
 }
 
 int ownParameters(juce::AudioPluginInstance& plugin) {
@@ -140,6 +185,17 @@ int main(int argc, char** argv) {
             juce::exactlyEqual(recalledPitch->getValue(), 0.875f),
         "a second instance recalls that state: Kick Level 0 and Kick Pitch 0.875");
   check(juce::exactlyEqual(play(*second, true), 0.0f), "and its kick is silent too");
+
+  // The delay's echo is a dotted eighth note behind the hit, so two hosts at
+  // different tempos part ways where the faster one's first echo arrives.
+  const std::vector<float> fast = playEcho(format, description, 120.0, 80);
+  const std::vector<float> slow = playEcho(format, description, 60.0, 80);
+  const auto parted = std::mismatch(fast.begin(), fast.end(), slow.begin(), slow.end(),
+                                    [](float a, float b) { return juce::exactlyEqual(a, b); });
+  const double partedSeconds = static_cast<double>(parted.first - fast.begin()) / kRate;
+  check(!fast.empty() && fast.size() == slow.size() && std::abs(partedSeconds - 0.375) < 0.01,
+        "the delay follows the host's tempo: hosts at 120 and at 60 part ways 0.375 s after the hit (" +
+            std::to_string(partedSeconds) + " s)");
 
   plugin->releaseResources();
   second->releaseResources();

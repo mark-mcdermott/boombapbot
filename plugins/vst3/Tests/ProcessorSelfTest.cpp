@@ -459,6 +459,113 @@ void testEffects(const std::string& context, double rate, int blockSize) {
         context, "Off with the mix at 0.6 leaves the output as it was");
 }
 
+// ---- Host tempo, run for every sample rate ----------------------------------
+
+// A host that reports one tempo, or none.
+class HostClock final : public juce::AudioPlayHead {
+ public:
+  explicit HostClock(juce::Optional<double> bpm) : bpm_(bpm) {}
+
+  juce::Optional<PositionInfo> getPosition() const override {
+    PositionInfo position;
+    position.setBpm(bpm_);
+    position.setIsPlaying(true);
+    return position;
+  }
+
+ private:
+  juce::Optional<double> bpm_;
+};
+
+// A snare into the delay, on a host at `bpm` (or with no host clock at all).
+// The delay glides to a new time, so it is given a while to get there first.
+Stereo renderEcho(double rate, int blockSize, const HostClock* clock, float mix, int total) {
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize);
+  set(*processor, {"effect_kind", 1.0f});
+  set(*processor, {"effect_mix", mix});
+  // The processor only reads the clock.
+  processor->setPlayHead(const_cast<HostClock*>(clock));
+  render(*processor, {}, framesFor(6.0, rate), blockSize);
+  Stereo audio = render(*processor, {noteOn(0, kSnare, 127)}, total, blockSize);
+  processor->setPlayHead(nullptr);
+  return audio;
+}
+
+void testDelayFollowsHostTempo(const std::string& context, double rate, int blockSize) {
+  const int total = framesFor(1.2, rate);
+  const auto echoFrame = [&](const HostClock* clock) {
+    return firstDifference(renderEcho(rate, blockSize, clock, 0.0f, total).left,
+                           renderEcho(rate, blockSize, clock, 0.6f, total).left);
+  };
+  // The echo is a dotted eighth note behind the hit.
+  const auto expected = [&](double bpm) { return framesFor(0.75 * 60.0 / bpm, rate); };
+  const auto near = [](int frame, int wanted) { return frame >= 0 && std::abs(frame - wanted) <= wanted / 100 + 2; };
+
+  for (const double bpm : {60.0, 120.0, 174.0}) {
+    const HostClock clock(bpm);
+    const int frame = echoFrame(&clock);
+    check(near(frame, expected(bpm)), context,
+          text("host at %.0f: the first echo is a dotted eighth after the hit (frame %d, expected %d)", bpm, frame,
+               expected(bpm)));
+  }
+
+  const int rest = echoFrame(nullptr);
+  check(near(rest, expected(boombapbot::plugin::kTempoRest)), context,
+        text("no host clock: the echo keeps a new project's tempo of %.0f (frame %d, expected %d)",
+             boombapbot::plugin::kTempoRest, rest, expected(boombapbot::plugin::kTempoRest)));
+
+  const Stereo atRest = renderEcho(rate, blockSize, nullptr, 0.6f, total);
+  const auto sameAs = [&](const Stereo& reference, juce::Optional<double> bpm) {
+    const HostClock clock(bpm);
+    return identical(reference, renderEcho(rate, blockSize, &clock, 0.6f, total));
+  };
+  check(sameAs(atRest, {}) && sameAs(atRest, std::nan("")) && sameAs(atRest, 0.0) && sameAs(atRest, -120.0), context,
+        "a host clock with no tempo, or one that is not a tempo, renders the same samples as no clock");
+
+  const HostClock slowest(SNARE_BPM_MIN);
+  const HostClock fastest(SNARE_BPM_MAX);
+  check(sameAs(renderEcho(rate, blockSize, &slowest, 0.6f, total), 5.0) &&
+            sameAs(renderEcho(rate, blockSize, &fastest, 0.6f, total), 5000.0),
+        context, text("a tempo outside %.0f to %.0f is held at the nearer end", SNARE_BPM_MIN, SNARE_BPM_MAX));
+
+  const HostClock slow(60.0);
+  const HostClock fast(200.0);
+  check(identical(renderEcho(rate, blockSize, &slow, 0.0f, total), renderEcho(rate, blockSize, &fast, 0.0f, total)),
+        context, "with no effect mixed in, the host's tempo changes nothing");
+}
+
+void testTempoChangeWhilePlaying(const std::string& context, double rate, int blockSize) {
+  class MovingClock final : public juce::AudioPlayHead {
+   public:
+    juce::Optional<PositionInfo> getPosition() const override {
+      PositionInfo position;
+      position.setBpm(bpm);
+      return position;
+    }
+    double bpm = 90.0;
+  };
+  MovingClock clock;
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize);
+  set(*processor, {"effect_kind", 1.0f});
+  set(*processor, {"effect_mix", 0.8f});
+  processor->setPlayHead(&clock);
+
+  bool sound = true;
+  double slowTail = 0.0;
+  for (const double bpm : {90.0, 40.0, 300.0, 123.456, 60.0}) {
+    clock.bpm = bpm;
+    const Stereo audio = render(*processor, {noteOn(0, kSnare, 127), noteOn(3000, kKick, 127)}, framesFor(0.5, rate),
+                                blockSize);
+    sound = sound && finite(audio) && peak(audio) > kAudible && peak(audio) <= 1.0f;
+    if (juce::exactlyEqual(bpm, 40.0)) slowTail = processor->getTailLengthSeconds();
+  }
+  check(sound, context, "the tempo jumping between 40 and 300 while the delay rings keeps the output in range");
+  check(slowTail > processor->getTailLengthSeconds() + 1.0, context,
+        text("the reported tail follows the tempo (%.1f s at 40, %.1f s at 60)", slowTail,
+             processor->getTailLengthSeconds()));
+  processor->setPlayHead(nullptr);
+}
+
 // ---- The sound thread, run once ---------------------------------------------
 
 // With a realtime clock the audio thread makes no sounds: a thread of the
@@ -718,6 +825,8 @@ int main() {
     testKnobTurnedBetweenHits(context, rate, 512);
     testVolume(context, rate, 512);
     testEffects(context, rate, 512);
+    testDelayFollowsHostTempo(context, rate, 512);
+    testTempoChangeWhilePlaying(context, rate, 512);
   }
   testSoundThreadFollowsKnobs();
   testSampleRateChange();

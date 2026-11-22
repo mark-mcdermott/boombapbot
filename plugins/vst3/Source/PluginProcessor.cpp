@@ -174,15 +174,29 @@ void BoombapbotAudioProcessor::loadMachine(SnareEngine* engine) {
     longestSound = juce::jmax(longestSound, snare_synth_frames(&longest, engineSampleRate_) / engineSampleRate_);
   }
   snare_engine_set_accent(engine, kPlainGain, kAccentedGain);
-  // The delay keeps time with the engine's tempo. Until the plugin follows the
-  // host's, that is the tempo of a new project.
-  snare_engine_set_tempo(engine, kTempoRest);
+  longestSoundSeconds_ = longestSound;
+  tailSeconds_.store(tailSecondsAt(kTempoRest), std::memory_order_relaxed);
+}
 
+// The longest sound, then the longest any effect rings on after it. The delay
+// rings for longer the slower the tempo.
+double BoombapbotAudioProcessor::tailSecondsAt(double bpm) const {
   double longestEffect = 0.0;
   for (int effect = SNARE_EFFECT_DELAY; effect <= SNARE_EFFECT_CHORUS; ++effect) {
-    longestEffect = juce::jmax(longestEffect, snare_effect_tail_seconds(effect, kTempoRest));
+    longestEffect = juce::jmax(longestEffect, snare_effect_tail_seconds(effect, bpm));
   }
-  tailSeconds_ = longestSound + longestEffect;
+  return longestSoundSeconds_ + longestEffect;
+}
+
+// The host's tempo for this block, or a new project's when the host has none
+// to give. The engine keeps it within its own range.
+double BoombapbotAudioProcessor::hostTempo() const {
+  if (const juce::AudioPlayHead* const playHead = getPlayHead()) {
+    if (const auto position = playHead->getPosition()) {
+      if (const auto bpm = position->getBpm(); bpm.hasValue() && std::isfinite(*bpm) && *bpm > 0.0) return *bpm;
+    }
+  }
+  return kTempoRest;
 }
 
 BoombapbotAudioProcessor::SoundKnobs BoombapbotAudioProcessor::soundKnobs(int voice) const {
@@ -246,6 +260,14 @@ void BoombapbotAudioProcessor::sendMix(SnareEngine* engine) {
     if (snare_engine_set_effect(engine, effect, static_cast<double>(mix)) != SNARE_OK) return;
     sentEffect_ = effect;
     sentEffectMix_ = mix;
+  }
+
+  // The delay keeps time with the engine's tempo, so the engine follows the host's.
+  const double tempo = hostTempo();
+  if (!mixSent_ || !juce::exactlyEqual(tempo, sentTempo_)) {
+    if (snare_engine_set_tempo(engine, tempo) != SNARE_OK) return;
+    sentTempo_ = tempo;
+    tailSeconds_.store(tailSecondsAt(tempo), std::memory_order_relaxed);
   }
   mixSent_ = true;
 }
@@ -315,7 +337,9 @@ const juce::String BoombapbotAudioProcessor::getName() const { return JucePlugin
 bool BoombapbotAudioProcessor::acceptsMidi() const { return true; }
 bool BoombapbotAudioProcessor::producesMidi() const { return false; }
 bool BoombapbotAudioProcessor::isMidiEffect() const { return false; }
-double BoombapbotAudioProcessor::getTailLengthSeconds() const { return tailSeconds_; }
+double BoombapbotAudioProcessor::getTailLengthSeconds() const {
+  return tailSeconds_.load(std::memory_order_relaxed);
+}
 
 int BoombapbotAudioProcessor::getNumPrograms() { return 1; }
 int BoombapbotAudioProcessor::getCurrentProgram() { return 0; }
