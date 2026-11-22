@@ -423,18 +423,32 @@ The same build and tests also pass on GitHub's macOS 26 runner, which fetches
 JUCE itself (the `vst3` job in `.github/workflows/native.yml`).
 
 **In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
-the build of the hang fix: the plugin scans and loads, the panel shows at its
-right shape, notes from the piano roll and from a keyboard play the eight
-voices, and a parameter linked to a hardware controller (Kick Level) follows
-it. That is the first three of the nine steps in `docs/follow-ups.md`. The
-rest of that list is still to do.
+the build of the hang fix:
+
+- the plugin scans and loads, and the panel shows at its right shape;
+- notes from the piano roll and from a keyboard play the eight voices;
+- a parameter linked to a hardware controller (Kick Level) follows it;
+- a beat exported from the site loads, and its pattern plays in time with
+  FL's transport in pattern mode, at 99 and at 100;
+- the step keys, the dice and the undo work while it plays;
+- a project saved and reopened brings the plugin back as it was;
+- a beat saved from the plugin opens on the site;
+- the window resizes.
+
+Dragging the MIDI key onto FL's playlist dropped nothing, and neither did the
+saved `.mid` dragged there from the Finder; see below.
 
 ## Not verified
 
-- **Most of what a person does with it in a host.** FL Studio has loaded it,
-  played it and linked a parameter (see above). Loading a beat there, the
-  sequencer on FL's transport, a project saved and reopened, saving a beat,
-  the MIDI drag and resizing are untried, and no other host has loaded it.
+- **Other hosts.** FL Studio has run it (see above). No other host has loaded
+  it.
+- **MIDI into FL Studio.** A drag from the MIDI key onto FL's playlist shows
+  FL's paintbrush and drops nothing, and the saved `.mid` dragged from the
+  Finder does the same, so the playlist may not be where FL takes a MIDI file.
+  Dropping it on the plugin's channel or into a piano roll is untried.
+- **A closed hat that may go missing.** In one session the owner sometimes did
+  not hear the hat on the fifteenth step of a looping pattern. It was not
+  pinned down.
 - **Steinberg's validator has not run.** JUCE bundles the parts of the VST3
   SDK a plugin needs, and the validator is not among them. `pluginval` has not
   run either. The hosted check uses JUCE's host against JUCE's wrapper, which
@@ -445,28 +459,20 @@ rest of that list is still to do.
   is not seen either. That the audio thread takes no lock is by design and by
   reading. The sanitizers have run the self-test only, never the plugin in a
   host, and never the x86_64 half.
-- **Dragging MIDI into a host.** The file is tested; the drag is not. Whether
-  FL Studio or any other host takes a file dragged out of a plugin's window
-  is unknown.
-- **The save and load keys.** Both open a file chooser, which no test can
-  press. The tests write and read beats through the same code the keys call.
-  Nobody has imported a plugin-saved beat on the live site; the site's reader
-  has opened one in its unit tests.
-- **The panel under a hand.** It has been looked at as a picture
-  (`panel.jpg` above is that picture) and its keys have been worked by the
-  tests, which make their own mouse events. Nobody has clicked it, in a host
-  or out of one: how the knobs feel, whether the lamp keeps up, how it looks
-  on a screen that is not Retina or at another size, whether a host lets its
-  window be dragged larger, and the file chooser are all untried.
-- **The sequencer against a real host's transport.** The tests play hosts of
-  their own that report an exact position, one of them JUCE's VST3 host
-  through the wrapper. Whether FL Studio and others report one the
-  plugin follows cleanly, through loops, tempo changes and odd signatures, is
-  unknown. Where a step falls exactly halfway between two frames, the plugin
-  and the engine's own sequencer can land it one frame apart.
-- **How it sounds.** The tests compare samples; nobody has listened. A knob
-  turned while its voice rings changes the next hit, not the ringing one, and
-  nobody has judged how that feels under automation.
+- **The tests and the keys with a chooser.** The load, save and MIDI keys open
+  a file chooser, which no test can press; the tests go through the code the
+  keys call. In FL Studio the owner has used the load and save keys.
+- **The panel on other screens.** It has been used in FL Studio on the owner's
+  Mac. How it looks on a screen that is not Retina is untried.
+- **The sequencer in song mode and odd signatures.** In FL Studio it has
+  followed the transport in pattern mode at two tempos. Song mode, tempo
+  automation and a signature other than 4/4 are untried there. Where a step
+  falls exactly halfway between two frames, the plugin and the engine's own
+  sequencer can land it one frame apart.
+- **How it sounds.** The tests compare samples. The owner has played it in FL
+  Studio and raised nothing but the hat above. A knob turned while its voice
+  rings changes the next hit, not the ringing one, and nobody has judged how
+  that feels under automation.
 - **Windows and Linux.** The CMake project has nothing against them, but it
   has only ever been built on macOS, and CI builds it there alone. The bundle
   checks are macOS only.
