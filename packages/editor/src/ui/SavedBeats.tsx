@@ -244,7 +244,7 @@ function MachineBeats({ baseUrl, account, close, runtime }: SavedBeatsProps & { 
   return (
     <section className="sb-beats" data-testid="beats" aria-labelledby={`${questionId}-title`}>
       <div className="sb-beats-head">
-        <h3 className="sb-label" id={`${questionId}-title`}>
+        <h3 className="sb-account-heading" id={`${questionId}-title`}>
           Saved beats
         </h3>
         {ready && (

@@ -109,6 +109,33 @@ test('a beat is saved to the account, listed there, and loaded back onto the mac
   await expect(page.getByTestId('beat')).toHaveCount(1);
 });
 
+test('logged in, the account modal is a page of one size, with the account beside its beats', async ({ page }) => {
+  await signedUp(page);
+  const modal = page.getByTestId('account-modal');
+  // As laid out, whatever the opening animation is doing to it.
+  const size = () => modal.evaluate((popup: HTMLElement) => [popup.offsetWidth, popup.offsetHeight]);
+
+  await expect(page.getByTestId('beats-empty')).toBeVisible();
+  expect(await size()).toEqual([920, 640]);
+
+  // Who it is, and the way out, are down one side; the beats are on the other.
+  const side = modal.getByRole('complementary', { name: 'Your profile' });
+  await expect(side.getByTestId('account-address')).toBeVisible();
+  await expect(side.getByTestId('account-log-out')).toBeVisible();
+  await expect(side.getByTestId('beats')).toHaveCount(0);
+  const sideBox = (await side.boundingBox())!;
+  const beatsBox = (await page.getByTestId('beats').boundingBox())!;
+  expect(beatsBox.x).toBeGreaterThanOrEqual(sideBox.x + sideBox.width);
+
+  // What it holds changes; its size does not.
+  await saveFromMachine(page);
+  await expect(page.getByTestId('beat')).toHaveCount(1);
+  expect(await size()).toEqual([920, 640]);
+  await page.getByTestId('account-to-delete').click();
+  await expect(page.getByTestId('account-delete')).toBeVisible();
+  expect(await size()).toEqual([920, 640]);
+});
+
 test('saving again replaces the same beat, and asks first when the copy in the account is newer', async ({ page }) => {
   await signedUp(page);
   await saveFromMachine(page);

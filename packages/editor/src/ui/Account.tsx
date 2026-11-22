@@ -329,6 +329,7 @@ interface DeleteAccountProps {
 function DeleteAccount({ account, cancel, deleted }: DeleteAccountProps) {
   return (
     <div data-testid="account-delete">
+      <h3 className="sb-account-heading">Delete your account</h3>
       <p className="sb-modal-text">
         This deletes your account and every beat saved in it, for good. I cannot bring them back. The beat on the
         machine stays {draftKeptWhere()}, and orders you placed stay on record without your
@@ -384,31 +385,29 @@ function Profile({ account, baseUrl, changed }: ProfileProps) {
   };
   return (
     <div className="sb-profile">
-      <Avatar account={account} baseUrl={baseUrl} size={64} />
-      <div className="sb-profile-who">
-        <p className="sb-profile-label">Logged in as</p>
-        <p className="sb-profile-address">
-          <strong data-testid="account-address">{account.email}</strong>
-        </p>
-        <div className="sb-profile-actions">
-          <input ref={file} type="file" accept="image/*" hidden data-testid="avatar-file" onChange={onPick} />
-          <button
-            className="sb-button"
-            type="button"
-            data-testid="avatar-upload"
-            disabled={waiting}
-            onClick={() => file.current?.click()}
-          >
-            {waiting ? 'Saving…' : account.image ? 'Change picture' : 'Upload a picture'}
-          </button>
-          {account.image && !waiting && (
-            <LinkButton testId="avatar-remove" onClick={() => void change(() => removeAvatar(baseUrl))}>
-              Remove picture
-            </LinkButton>
-          )}
-        </div>
-        <SharedProblem text={problem} testId="avatar-problem" />
+      <Avatar account={account} baseUrl={baseUrl} size={96} />
+      <p className="sb-profile-label">Logged in as</p>
+      <p className="sb-profile-address">
+        <strong data-testid="account-address">{account.email}</strong>
+      </p>
+      <div className="sb-profile-actions">
+        <input ref={file} type="file" accept="image/*" hidden data-testid="avatar-file" onChange={onPick} />
+        <button
+          className="sb-button"
+          type="button"
+          data-testid="avatar-upload"
+          disabled={waiting}
+          onClick={() => file.current?.click()}
+        >
+          {waiting ? 'Saving…' : account.image ? 'Change picture' : 'Upload a picture'}
+        </button>
+        {account.image && !waiting && (
+          <LinkButton testId="avatar-remove" onClick={() => void change(() => removeAvatar(baseUrl))}>
+            Remove picture
+          </LinkButton>
+        )}
       </div>
+      <SharedProblem text={problem} testId="avatar-problem" />
     </div>
   );
 }
@@ -424,32 +423,35 @@ interface SignedInProps {
 function SignedIn({ account, baseUrl, close, deleted, changed }: SignedInProps) {
   const { waiting, problem, run } = useAttempt();
   const [deleting, setDeleting] = useState(false);
-  if (deleting) return <DeleteAccount account={account.id} cancel={() => setDeleting(false)} deleted={deleted} />;
   return (
-    <div data-testid="account-signed-in">
-      <Profile account={account} baseUrl={baseUrl} changed={changed} />
-      <p className="sb-modal-text">
-        Saving puts a copy of the beat on the machine in your account, so you can pick it up on another device.
-        Nothing goes there until you save.
-      </p>
-      <SavedBeats baseUrl={baseUrl} account={account.id} close={close} />
-      <div className="sb-form sb-account-leave">
-        <Problem text={problem} />
-        <button
-          className="sb-button"
-          type="button"
-          data-testid="account-log-out"
-          disabled={waiting}
-          onClick={() => run(() => attempt(() => authClient().signOut()))}
-        >
-          {waiting ? 'Logging out…' : 'Log out'}
-        </button>
+    <div className="sb-account-page" data-testid="account-signed-in">
+      <aside className="sb-account-side" aria-label="Your profile">
+        <Profile account={account} baseUrl={baseUrl} changed={changed} />
+        <div className="sb-account-leave">
+          <SharedProblem text={problem} testId="account-leave-problem" />
+          <button
+            className="sb-button"
+            type="button"
+            data-testid="account-log-out"
+            disabled={waiting}
+            onClick={() => run(() => attempt(() => authClient().signOut()))}
+          >
+            {waiting ? 'Logging out…' : 'Log out'}
+          </button>
+          {!deleting && (
+            <LinkButton testId="account-to-delete" onClick={() => setDeleting(true)}>
+              Delete my account
+            </LinkButton>
+          )}
+        </div>
+      </aside>
+      <div className="sb-account-main">
+        {deleting ? (
+          <DeleteAccount account={account.id} cancel={() => setDeleting(false)} deleted={deleted} />
+        ) : (
+          <SavedBeats baseUrl={baseUrl} account={account.id} close={close} />
+        )}
       </div>
-      <p className="sb-account-links">
-        <LinkButton testId="account-to-delete" onClick={() => setDeleting(true)}>
-          Delete my account
-        </LinkButton>
-      </p>
     </div>
   );
 }
@@ -500,6 +502,7 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
     setOpen(true);
   }, [setOpen]);
 
+  const profile = account !== null && view.name !== 'new-password';
   const body = () => {
     if (view.name === 'new-password') return <NewPassword token={view.token} go={go} />;
     if (account) {
@@ -545,6 +548,7 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
       icon={account ? <Avatar account={account} baseUrl={baseUrl} size={26} /> : <CircleUserRound />}
       container={container}
       className={account ? 'sb-signed-in' : 'sb-ico-account'}
+      wide={profile}
       open={open}
       onOpenChange={setOpen}
     >
