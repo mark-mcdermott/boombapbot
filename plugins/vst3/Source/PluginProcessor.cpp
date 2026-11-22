@@ -1,7 +1,11 @@
 #include "PluginProcessor.h"
 
 #include "ParameterIds.h"
+#if BOOMBAPBOT_WEB_PANEL
+#include "WebPanel/WebPanelEditor.h"
+#else
 #include "PluginEditor.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -445,7 +449,11 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
 
 bool BoombapbotAudioProcessor::hasEditor() const { return true; }
 juce::AudioProcessorEditor* BoombapbotAudioProcessor::createEditor() {
+#if BOOMBAPBOT_WEB_PANEL
+  return new BoombapbotWebEditor(*this);
+#else
   return new BoombapbotEditor(*this);
+#endif
 }
 
 // ---- Description ------------------------------------------------------------
@@ -708,7 +716,10 @@ juce::String BoombapbotAudioProcessor::beatName() const {
 void BoombapbotAudioProcessor::setParameterTo(const juce::String& id, float value) {
   juce::RangedAudioParameter* const parameter = parameters_.getParameter(id);
   jassert(parameter != nullptr);
-  if (parameter != nullptr) parameter->setValueNotifyingHost(parameter->convertTo0to1(value));
+  if (parameter == nullptr) return;
+  // A parameter already there is left alone, so the host is told only of what changed.
+  const float wanted = parameter->convertTo0to1(value);
+  if (!juce::exactlyEqual(wanted, parameter->getValue())) parameter->setValueNotifyingHost(wanted);
 }
 
 Beat BoombapbotAudioProcessor::currentBeat() const {
@@ -739,10 +750,7 @@ Beat BoombapbotAudioProcessor::currentBeat() const {
 }
 
 // The beat's tempo is not taken: in a host, the host keeps time.
-juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
-  Beat beat;
-  if (const juce::Result read = readBeat(json, beat); read.failed()) return read;
-
+void BoombapbotAudioProcessor::applyBeat(const Beat& beat) {
   for (std::size_t index = 0; index < kVoices.size(); ++index) {
     const VoiceSpec& voice = kVoices[index];
     const BeatVoice& knobs = beat.voices[index];
@@ -759,10 +767,16 @@ juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
   setParameterTo(ids::kEffectMix, beat.effectMix);
   setParameterTo(ids::kPattern, static_cast<float>(beat.pattern));
 
-  rememberPatterns();
   selectVoice(beat.selectedVoice);
   holdPatterns(beat);
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
+}
+
+juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
+  Beat beat;
+  if (const juce::Result read = readBeat(json, beat); read.failed()) return read;
+  rememberPatterns();
+  applyBeat(beat);
   return juce::Result::ok();
 }
 

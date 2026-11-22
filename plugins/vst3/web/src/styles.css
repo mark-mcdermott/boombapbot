@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+/* The face the panel is lettered in, carried in the plugin: it has no server to fetch it from. */
+@import '@fontsource-variable/sofia-sans-condensed/wght.css';
+@import '@boombapbot/editor/styles.css';
+
+/* The editor's classes live in the workspace package. */
+@source '../../../../packages/editor/src';
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  color-scheme: dark;
+  background: #0e0d0c;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The window is the picture and nothing else. It is three wide to two high,
+   as the picture is, so the picture fills it edge to edge; what the page puts
+   under the picture on the site falls outside the window. */
+#machine {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}

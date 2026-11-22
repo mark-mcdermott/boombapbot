@@ -242,6 +242,87 @@ of `VerifiedIDs.nfo` and the `[Generators/VST3/boombapbot]` section of
 `.Plugins.ini`, then scan again with "Verify plugins" on. This happened on
 2026-11-22 and that cleared it.
 
+## A trial: the painted panel in a web view
+
+`-DBOOMBAPBOT_VST3_WEB_PANEL=ON` builds the plugin with another window: the
+painted panel the site, the phone app and the desktop app show, as a page in
+JUCE's web view (WKWebView on macOS). It is a trial to see whether that
+works, beside the panel drawn here, which stays the default and is untouched.
+
+```sh
+pnpm prepare:assets                              # once, as for the site and the apps
+pnpm --filter @boombapbot/vst3-panel build       # the page, into plugins/vst3/web/dist
+cmake -S plugins/vst3 -B build/vst3-web -G Ninja -DCMAKE_BUILD_TYPE=Release -DBOOMBAPBOT_VST3_WEB_PANEL=ON
+cmake --build build/vst3-web
+ctest --test-dir build/vst3-web --output-on-failure
+```
+
+How it is put together:
+
+- **The page** (`plugins/vst3/web`) mounts the machine's own `Panel` from
+  `packages/machine-ritm12` in the shared editor's runtime, as the desktop
+  app does, with nothing around it: no header, no settings, no account. It is
+  asked for the picture at any width, since a plugin's window is never a
+  phone.
+- **It is served from inside the plugin.** The built page, without the
+  engine's WebAssembly, is packed into one zip and compiled into the binary;
+  the web view's resource provider reads files out of it. Nothing comes from
+  the network and there is no server.
+- **The beat crosses whole.** In an app the page owns the beat and tells the
+  engine everything. In a plugin the host owns it, as parameters and state. So
+  the page sends its project document when a control changes it, and the
+  plugin makes itself that beat, telling the host of each parameter that
+  moved. The plugin sends its own when a host's automation or a recalled
+  project changes it, and the page takes it without an undo step. Neither is
+  sent its own change back. This reuses the reader and writer the load and
+  save keys already had.
+- **Of the engine's commands only three cross:** a voice key's hit, and play
+  and stop, which in a host are the sequencer's switch. The host keeps the
+  tempo and the transport.
+
+What is wired: the picture and its art; the step keys, the voice keys (which
+play the voice), the pattern keys, hits and accents, mute, the dice, clear,
+the measure's size, the voice knobs, the levels, volume, accent, swing, the
+effect and its mix, each moving the plugin and each moved by it; play and
+stop as the sequencer's switch; the step the sequencer is on, sent to the
+page 30 times a second.
+
+What is not: the tempo knob (the host keeps time; the page shows the host's
+tempo when the plugin next sends a beat), the level meter (no level is sent),
+the power switch (the machine is on while its window is open; switching it
+off on the page does not silence the plugin), recording, the page's own undo
+and its keyboard keys, loading and saving a beat, the MIDI key, naming a
+beat, and remembering the window's size. A knob dragged on the page reaches
+the host as a row of plain parameter changes, with no start and end of a
+gesture, so a host that records automation by touch may not record it well.
+
+`Tests/WebPanelCheck.cpp` opens this window with no host, in a real window,
+and works the page through the web view: it loads and says so, the picture is
+drawn and fills the window at three to two, the page opens on the plugin's
+beat, a voice key, a step key and a knob on the page move the plugin and the
+tom's key is heard, a parameter and a step changed in the plugin show on the
+page, both sides then rest, and stop and play turn the sequencer off and on.
+The hosted check opens the same window through the VST3 wrapper.
+
+Measured on the owner's Mac on 2026-11-22:
+
+| | Panel drawn here | Painted panel in a web view |
+| --- | --- | --- |
+| Bundle | 17 MB | 20 MB |
+| Window to page ready, arm64 | not measured | about 0.5 s |
+| Window to page ready, x86_64 under Rosetta | not measured | 0.6 to 1.0 s |
+| CTest | 10 of 10 | 9 of 9 |
+
+Not known, and the reasons this is a trial: whether it loads and behaves in
+FL Studio; whether a click in the web view takes the keyboard from the host,
+so that its shortcuts stop until the host's own window is clicked again;
+how resizing feels (the window keeps three to two and the page scales its
+stage); how it looks on a screen that is not Retina; what several instances
+cost, each with a web view and its processes. On Windows it would need
+Microsoft's WebView2: its SDK at build time, `NEEDS_WEBVIEW2 TRUE` in
+`juce_add_plugin`, and the WebView2 runtime on the user's machine, which
+Windows 11 has and Windows 10 usually does. On Linux it would need WebKitGTK.
+
 ## Tests
 
 `ctest` runs these. The first is the processor self-test

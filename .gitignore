@@ -15,6 +15,7 @@ coverage/
 apps/site/public/engine/
 apps/site/public/machines/
 apps/site/public/boombapbot-assets.json
+plugins/vst3/web/public/
 
 # The owner's unedited pictures. They stay out of public source. See misc/assets/README.md.
 misc/assets/*

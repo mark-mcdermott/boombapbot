@@ -58,6 +58,10 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // The plugin as a beat: its patterns, and its parameters as the beat's knobs,
   // at the tempo the host last gave. Not for the audio thread.
   boombapbot::plugin::Beat currentBeat() const;
+  // Makes the plugin this beat: its knobs become the parameters, where they
+  // differ, and its patterns are held. Its tempo is not taken. Nothing is
+  // remembered for the panel's undo. Not for the audio thread.
+  void applyBeat(const boombapbot::plugin::Beat& beat);
 
   // What the panel works: the parameters, the steps of the patterns, how many
   // steps a measure has, a voice key pressed, and where the sequencer is.
