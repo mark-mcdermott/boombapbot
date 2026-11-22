@@ -23,7 +23,7 @@ night = here / 'night'
 (night / 'patch').mkdir(parents=True, exist_ok=True)
 
 # The machine keeps most of its own colour; the room behind it goes to the blue of a dark room.
-MACHINE = {'light': np.array([0.74, 0.86, 0.84]), 'colour_kept': 0.85, 'depth': 1.32}
+MACHINE = {'light': np.array([0.80, 0.97, 1.28]), 'colour_kept': 1.0, 'depth': 1.15}
 ROOM = {'light': np.array([0.55, 0.78, 1.15]), 'colour_kept': 0.3, 'depth': 0.9}
 # The machine's case on the plate. Every patch lies well inside it.
 CASE = (70, 150, 1950, 1235)

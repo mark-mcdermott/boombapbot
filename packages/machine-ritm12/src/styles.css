@@ -288,7 +288,7 @@
 
 .rt-frame[data-lamp='out'] .rt-knob img,
 .rt-frame[data-lamp='out'] .rt-labels {
-  filter: brightness(0.82) saturate(0.85);
+  filter: brightness(0.92) saturate(0.7);
 }
 
 @media (prefers-reduced-motion: reduce) {
