@@ -2,7 +2,7 @@
 
 The phone's panel is not one picture. It is laid out by the page from parts
 of the big one: its keys, its knobs, its lamps, the frame of its screen, and
-what is lettered on its instrument keys and its nameplate. This cuts those
+what is lettered on its nameplate. This cuts those
 parts from plate.webp and patch/, which cut-art.py made, so nothing here
 needs the owner's originals. What it writes, phone/, is committed.
 
@@ -66,18 +66,6 @@ def luminance(box):
     return pixels, 0.299 * pixels[..., 0] + 0.587 * pixels[..., 1] + 0.114 * pixels[..., 2]
 
 
-def dark_ink(name, box):
-    """What is printed on a cream key, without the key."""
-    pixels, light = luminance(box)
-    paper = np.percentile(light, 70) * 0.9
-    ink = np.percentile(light, 1)
-    alpha = np.clip((paper - light) / (paper - ink), 0, 1) ** 0.85
-    cut = np.zeros(pixels.shape[:2] + (4,), 'uint8')
-    cut[..., :3] = (38, 30, 18)
-    cut[..., 3] = (alpha * 255).astype('uint8')
-    Image.fromarray(cut, 'RGBA').save(out / f'{name}.png', optimize=True)
-
-
 def light_ink(name, box):
     """What is lettered in cream on the paint, without the paint."""
     pixels, light = luminance(box)
@@ -119,12 +107,6 @@ rect('dice', (1696, 1100, 1773, 1177))
 rect('clear', (1788, 1100, 1869, 1177))
 rect('power-off', (182, 1077, 266, 1166))
 rect('power-on', (182, 1077, 266, 1166), wearing('power-on'))
-
-# What is printed on each instrument key: its drawing and its name.
-VOICES = [('kick', 371, 429), ('snare', 450, 507), ('clap', 527, 584), ('closed_hat', 604, 662),
-          ('open_hat', 682, 739), ('tom', 759, 816), ('rim', 836, 894), ('perc', 918, 977)]
-for voice, top, bottom in VOICES:
-    dark_ink(f'ink-{voice}', (160, top + 8, 300, bottom - 8))
 
 light_ink('nameplate', (205, 165, 705, 268))
 light_ink('badge', (1490, 165, 1835, 250))
