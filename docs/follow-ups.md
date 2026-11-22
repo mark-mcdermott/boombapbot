@@ -519,6 +519,13 @@ What is left:
   8. The MIDI key dragged onto a track drops a clip there. Whether FL takes a
      file dragged out of a plugin's window at all is unknown.
   9. The window drags larger and smaller, and the panel stays sharp.
+- **A closed hat that may go missing.** On 2026-11-22, with a beat of eight
+  closed hats to the measure looping in FL's pattern mode at 99 and 100, the
+  owner sometimes did not hear the hat on the fifteenth step, in some passes
+  and not others. It was not pinned down: it may be how FL reports its
+  position near the loop point, how a voice cuts its own last hit, or
+  nothing. If it comes back, a build that writes what the host says at every
+  block to a file is the way in.
 - **Listen to it.** The tests compare samples. A knob turned while its voice
   rings changes the next hit and not the ringing one; nobody has judged how
   that feels under automation, or how the delay sounds when the tempo moves.
