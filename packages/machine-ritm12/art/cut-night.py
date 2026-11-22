@@ -23,19 +23,19 @@ night = here / 'night'
 (night / 'patch').mkdir(parents=True, exist_ok=True)
 
 # The machine keeps most of its own colour; the room behind it goes to the blue of a dark room.
-MACHINE = {'light': np.array([0.50, 0.58, 0.66]), 'colour_kept': 0.8}
-ROOM = {'light': np.array([0.38, 0.54, 0.88]), 'colour_kept': 0.3}
+MACHINE = {'light': np.array([0.74, 0.86, 0.84]), 'colour_kept': 0.85, 'depth': 1.32}
+ROOM = {'light': np.array([0.55, 0.78, 1.15]), 'colour_kept': 0.3, 'depth': 0.9}
 # The machine's case on the plate. Every patch lies well inside it.
 CASE = (70, 150, 1950, 1235)
 # The lamp and the light it throws on the wall behind it: the middle of that glow, and how far it reaches.
 LAMP_GLOW = {'centre': (150, 70), 'reach': (400, 250)}
-LAMP_DARK = 0.2
+LAMP_DARK = 0.3
 
 
-def graded(pixels, light, colour_kept):
-    """A picture's colours without the lamp. Each pixel alone decides its colour, so a patch matches the plate."""
+def graded(pixels, light, colour_kept, depth):
+    """A picture's colours without the lamp. Each pixel alone decides its colour, so a patch matches the plate. `depth` deepens the shadows and leaves the brightest paint where it was."""
     grey = (pixels @ [0.299, 0.587, 0.114])[..., None]
-    return (grey * (1 - colour_kept) + pixels * colour_kept) ** 1.12 * light
+    return (grey * (1 - colour_kept) + pixels * colour_kept) ** depth * light
 
 
 def in_room(pixels):
