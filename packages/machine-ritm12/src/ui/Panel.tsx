@@ -92,6 +92,9 @@ function PicturePanel() {
           <div ref={wiring.frame} className="rt-frame" data-testid="panel" data-power={power ? 'on' : 'off'}>
             <div className="rt-stage" style={{ transform: `scale(${scale})` } as CSSProperties}>
               {plate ? <img className="rt-plate" src={plate} alt="" draggable={false} data-testid="plate" /> : null}
+              {INSTRUMENTS.map(({ voice, ink }) => (
+                <Patch key={voice} rect={ink} name={`key-${voice}`} shown />
+              ))}
               <Patch rect={PATCHES.power} name="power-on" shown={power} />
               <Patch rect={PATCHES.write} name="write-accents" shown={wiring.write === 'accents'} />
               <Patch rect={PATCHES.size} name="size-16" shown={wiring.size === 16} />

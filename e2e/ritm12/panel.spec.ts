@@ -21,8 +21,12 @@ test('the machine is its picture, with every control inside it', async ({ page }
   const images = await page.locator('.rt-plate, .rt-patch').evaluateAll((nodes) =>
     nodes.map((node) => ({ src: (node as HTMLImageElement).src, loaded: (node as HTMLImageElement).naturalWidth > 0 })),
   );
-  expect(images.length).toBe(7);
+  expect(images.length).toBe(7 + 8);
   expect(images.every((image) => image.loaded && image.src.includes('/machines/ritm12/'))).toBe(true);
+  // Each instrument key wears its drawing, whatever the controls are set to.
+  const drawings = page.locator('.rt-patch[src*="/patch/key-"]');
+  await expect(drawings).toHaveCount(8);
+  for (const drawing of await drawings.all()) await expect(drawing).toBeVisible();
 });
 
 test('step keys put hits of the selected instrument on and take them off', async ({ page }) => {

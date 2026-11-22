@@ -32,6 +32,8 @@ export interface KnobPlace {
 export interface InstrumentPlace {
   voice: VoiceId;
   button: Rect;
+  /** The end of the key its drawing is printed on, where that drawing's picture is laid over the plate. */
+  ink: Rect;
   knob: KnobPlace;
 }
 
@@ -39,6 +41,7 @@ const LEVEL_X = 422;
 const instrument = (voice: VoiceId, button: Rect, knobY: number, pivot: Offset): InstrumentPlace => ({
   voice,
   button,
+  ink: [158, button[1] + 5, 216, button[3] - 5],
   knob: { x: LEVEL_X, y: knobY, r: 30, kind: 'level', pivot },
 });
 
