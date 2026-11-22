@@ -475,6 +475,72 @@ What is left:
 - **Accounts, saved beats and the shop** are left out, as in the phone app,
   and for the same reasons: they ask the page's own address for `/api/...`.
 
+### VST3 (a plugin for a host)
+
+The first slices are built in `plugins/vst3`: РИТМ-12 as a JUCE 8.0.9 VST3
+instrument on the engine built natively. Notes from the host play the
+voices, the knobs are host parameters, a beat saved from the site loads and
+its patterns play in time with the host's transport, the panel is drawn for
+the plugin with step keys to write a pattern on, and a beat goes back to the
+site as a file or into the host as MIDI. `plugins/vst3/README.md` has what it
+does, what was checked, how, and what was not.
+
+Everything known about it comes from tests: a self-test that drives the
+plugin without a host, JUCE's own VST3 host playing the built bundle, a trap
+for heap use on the audio thread, and the sanitizers. On 2026-11-22 all of
+them passed on the Mac it was built on, as arm64 and as x86_64 under
+Rosetta. No DAW has loaded it and nobody has heard it or touched its panel.
+
+What is left:
+
+- **Try it in FL Studio.** This is the whole of what is unknown, and it needs
+  a person. `plugins/vst3/README.md` has the commands that copy the bundle
+  into `~/Library/Audio/Plug-Ins/VST3` and sign the copy. In FL's numbering
+  the kick is C3. Then, in order, each of these is a thing no test has done:
+  1. The plugin scans and opens, and the panel shows. The earlier spike made
+     FL crash when it was built for one architecture only; this build is
+     universal, and it is signed after every file is in place.
+  2. Notes from the piano roll play the eight voices, and a velocity of 104
+     or more is the accented hit.
+  3. The knobs turn under a mouse, a voice's key plays it, and automating a
+     parameter from FL moves the knob and the sound.
+  4. The load key opens a file chooser, and a beat exported from the site
+     loads. With FL playing, its pattern plays in time; looping a region,
+     starting from the middle of the song and changing FL's tempo keep it
+     there. The red lamp runs with it.
+  5. Step keys pressed while FL plays are heard at once. The dice and the
+     undo do what they say.
+  6. The project saved and reopened brings back the knobs, the patterns, the
+     beat's name and the size the window was left at.
+  7. The save key writes a file the site's import opens.
+  8. The MIDI key dragged onto a track drops a clip there. Whether FL takes a
+     file dragged out of a plugin's window at all is unknown.
+  9. The window drags larger and smaller, and the panel stays sharp.
+- **Listen to it.** The tests compare samples. A knob turned while its voice
+  rings changes the next hit and not the ringing one; nobody has judged how
+  that feels under automation, or how the delay sounds when the tempo moves.
+- **Steinberg's validator and `pluginval`.** Neither has run. JUCE bundles the
+  parts of the VST3 SDK a plugin needs and the validator is not among them, so
+  running it means fetching the SDK or `pluginval`.
+- **JUCE's licence.** JUCE 8 is AGPLv3 or commercial, and one of the two has to
+  be chosen before a build is given to anyone. It has not been. CI builds the
+  plugin and keeps no artefact for that reason.
+- **Measures and the host's time signature.** A measure is four of the host's
+  beats counted from the start of its timeline, whatever its signature says.
+  In 3/4 the pattern runs across the bar lines. Whether it should restart at
+  each bar is a choice nobody has made.
+- **The picture.** The panel is drawn in code, in the picture's colours. The
+  machine's own picture and its parts are in `packages/machine-ritm12/art`.
+- **Other hosts, formats and platforms.** Only macOS has built it and CI
+  builds it there alone. Windows, Linux, an Intel Mac, AU and CLAP are
+  untried.
+- **Signing and notarising**, for anyone else to load it without a warning:
+  the bundle is signed ad hoc, which loads on the Mac that built it. The
+  plugin's codes (`Bmbp`, `Rt12`) and its bundle identifier are stand-ins
+  until a build is released, and cannot change after.
+- **Beats from an account.** Only a file on disk loads. Saved beats live
+  behind the site's `/api/...`, as they do for the phone and desktop apps.
+
 ## Web
 
 - **The rename.** The app was renamed on 2026-11-16 and the site moved to
