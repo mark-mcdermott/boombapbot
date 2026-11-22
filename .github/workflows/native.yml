@@ -1,7 +1,8 @@
 name: Native apps
 
-# The desktop app and the phone engine plug-in. macOS minutes cost about ten
-# times Linux ones, so this runs only when something these builds use changes.
+# The desktop app, the phone engine plug-in and the VST3 instrument. macOS
+# minutes cost about ten times Linux ones, so this runs only when something
+# these builds use changes.
 on:
   push:
     branches: [main]
@@ -10,6 +11,7 @@ on:
       - packages/machine-*/engine/**
       - apps/desktop/**
       - apps/mobile/native-engine/**
+      - plugins/vst3/**
       - scripts/build-engine-ios.sh
       - scripts/build-wasm.sh
       - scripts/setup-emsdk.sh
@@ -122,6 +124,33 @@ jobs:
           path: ${{ matrix.packages }}
           if-no-files-found: error
           retention-days: 7
+
+  vst3:
+    name: VST3 instrument on macOS
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CMake and Ninja
+        run: |
+          brew list ninja >/dev/null 2>&1 || brew install ninja
+          cmake --version
+
+      # JUCE is fetched here and never vendored. The build is universal, so
+      # each file compiles twice.
+      - name: Configure
+        run: cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build/vst3
+
+      # The processor self-test, then the bundle: its signature, its two
+      # architectures, and each of them loaded and played in JUCE's own VST3
+      # host. No DAW and no validator runs here, and the bundle is not kept:
+      # JUCE's licence has to be chosen before a build is given to anyone.
+      - name: Self-test and bundle checks
+        run: ctest --test-dir build/vst3 --output-on-failure
 
   ios:
     name: Phone engine plug-in on iOS
