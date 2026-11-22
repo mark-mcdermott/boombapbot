@@ -23,6 +23,15 @@ export const ANY_ANSWER: Reader<unknown> = { safeParse: (value) => ({ success: t
 const typeOf = (body: unknown): string => (body instanceof Blob ? body.type : 'application/json');
 
 /**
+ * Every request but a GET names a type, with a body or without. The site
+ * refuses one from another origin that changes something and names none,
+ * before it asks whether that origin is an app's, and an app's page is not
+ * shown the refusal: a delete from an app then looks like no answer at all.
+ */
+const typed = (method: string, body: unknown): Record<string, string> =>
+  method === 'GET' ? {} : { 'content-type': typeOf(body) };
+
+/**
  * Sends a request and reads what came back: the answer in the shape `reader`
  * knows, or why not. A refusal is read with `refusal`; no answer at all is
  * `UNREACHABLE`, and an answer nothing can read is its status alone.
@@ -38,7 +47,7 @@ export async function ask<Answer, Said extends object>(
   try {
     response = await fetch(url, {
       method,
-      headers: { ...sessionHeaders(), ...(body === undefined ? {} : { 'content-type': typeOf(body) }) },
+      headers: { ...sessionHeaders(), ...typed(method, body) },
       body: body === undefined || body instanceof Blob ? body : JSON.stringify(body),
     });
   } catch {
