@@ -9,6 +9,8 @@ on:
     paths: &native-paths
       - engine/**
       - packages/machine-*/engine/**
+      - packages/machine-*/data/**
+      - packages/machine-*/fixtures/**
       - apps/desktop/**
       - apps/mobile/native-engine/**
       - plugins/vst3/**

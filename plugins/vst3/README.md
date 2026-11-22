@@ -75,6 +75,14 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   parameter values. Its tempo is not taken: in a host, the host keeps time. A
   file that is not a РИТМ-12 beat changes nothing and the window says why; a
   beat of the earlier machine has to be opened on the site and saved again.
+- **A beat made in the host goes back to the site.** The save key (СОХРАНИТЬ)
+  writes the plugin as a `.boombapbot.json` the site's import opens: the four
+  patterns, every knob, the mutes, the measure, the pattern and voice the
+  panel is on, and the host's tempo as a whole number. Each save is a new beat
+  to the site, with an id and a date of its own, named for the beat that was
+  loaded or "Untitled beat". Knob positions are written to six places. The
+  document has no "no effect", so a beat whose effect is Off is written as the
+  delay with none of it mixed in.
 - **The sequencer follows the host's transport.** While the host plays and
   Sequencer is on, the chosen pattern loops in step with the host's position,
   so it starts in the right place from anywhere in the song and goes back when
@@ -111,8 +119,7 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
     back where it rests.
   - A pattern can be written with no beat loaded. Steps written or cleared
     here are saved with the host's project like the rest of the state. They
-    are not undone by the host's undo, and they cannot be saved back to a beat
-    file yet.
+    are not undone by the host's undo.
   - The panel is drawn in code. It does not use the picture of the machine in
     `packages/machine-ritm12/art`, which a later slice could.
 - The delay keeps time with the host: its echo is a dotted eighth note at the
@@ -248,6 +255,13 @@ block size matters, it checks:
   and clear keys do what they say; a voice's key plays it and hands it the
   knobs; the sequencer reports the step it is on; steps and voices the machine
   does not have are turned down;
+- saving a beat: the site's fixture written out and read back is the same
+  beat; a plugin worked by hand saves what was done to it, and that file
+  loaded into a new plugin plays the same samples; and the file the plugin
+  writes for the fixture is byte for byte
+  `packages/machine-ritm12/fixtures/saved-by-plugin.project.json`, which the
+  site's own unit tests (`plugin-beat.test.ts`) open with the site's reader
+  and compare with the fixture, so the two sides cannot drift apart unseen;
 - beat files: the fixture `four-patterns.project.json` loads and sets the
   parameters; twelve kinds of file that are not a beat are refused with a
   reason and change nothing; the beat survives save → load → save byte for
@@ -296,7 +310,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All nine CTest tests pass: the self-test's 475 checks as arm64 and again as
+- All nine CTest tests pass: the self-test's 483 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
@@ -321,6 +335,10 @@ signed the same way, but see below.
 - **Realtime safety is by design and by reading, not by instrument.** Nothing
   here traps an allocation or a lock on the audio thread, as the desktop app's
   Rust tests do.
+- **The save and load keys.** Both open a file chooser, which no test can
+  press. The tests write and read beats through the same code the keys call.
+  Nobody has imported a plugin-saved beat on the live site; the site's reader
+  has opened one in its unit tests.
 - **The panel under a hand.** It has been looked at as a picture
   (`panel.jpg` above is that picture) and its keys have been worked by the
   tests, which make their own mouse events. Nobody has clicked it, in a host
@@ -343,9 +361,8 @@ signed the same way, but see below.
 
 ## Next slices
 
-- **Saving a beat.** A pattern written on the panel lives in the host's
-  project only. Writing it out as a `.boombapbot.json` the site can open would
-  close the loop.
+- **Naming a beat.** A beat saved from the plugin keeps the name of the one
+  loaded, or is "Untitled beat". The panel has nowhere to type a name.
 - **The picture.** The panel is drawn in code; the machine's own picture and
   its parts are in `packages/machine-ritm12/art`.
 - **Beats from an account.** Only a file on disk can be loaded. Beats saved to

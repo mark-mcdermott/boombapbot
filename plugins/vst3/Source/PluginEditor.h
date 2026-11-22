@@ -1,7 +1,7 @@
 // The plugin's window: РИТМ-12's panel, drawn for the plugin. The step keys of
 // the pattern the panel is on, a key and a mute for each voice, the selected
-// voice's knobs, the mix, the effect, and a key to load a beat saved from the
-// site.
+// voice's knobs, the mix, the effect, and keys to load a beat saved from the
+// site and to save one the site opens.
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -37,6 +37,9 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   void selectVoice(int voice);
   void chooseBeat();
   void loadBeat(const juce::File& file);
+  void chooseWhereToSave();
+  void saveBeat(const juce::File& file);
+  void showNote(const juce::String& note);
   void showState();
   void showProblem(const juce::String& problem);
 
@@ -55,6 +58,7 @@ class BoombapbotEditor final : public juce::AudioProcessorEditor,
   Key sequencerKey_;
   Key clearKey_;
   Key loadKey_;
+  Key saveKey_;
   ButtonAttachment sequencerAttachment_;
 
   Knob pitch_;

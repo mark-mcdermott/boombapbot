@@ -14,7 +14,7 @@ constexpr int kWidth = 920;
 constexpr int kHeight = 624;
 constexpr int kMargin = 16;
 constexpr int kHeaderHeight = 62;
-constexpr int kNameplateWidth = 200;
+constexpr int kNameplateWidth = 184;
 constexpr int kVoiceKeyWidth = 104;
 constexpr int kMuteKeyWidth = 36;
 constexpr int kStepsLeft = kMargin + kVoiceKeyWidth + 6 + kMuteKeyWidth + 12;
@@ -84,6 +84,7 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
       sequencerKey_(words("СЕКВЕНСЕР"), "Sequencer"),
       clearKey_(words("СБРОС"), "Clear"),
       loadKey_(words("ЗАГРУЗКА"), "Load beat"),
+      saveKey_(words("СОХРАНИТЬ"), "Save beat"),
       sequencerAttachment_(owner.parameters(), ids::kSequencer, sequencerKey_),
       pitch_(words(kPitchWords.word), kPitchWords.english),
       tone_(words(kToneWords.word), kToneWords.english),
@@ -143,7 +144,10 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
     steps_.refresh();
   };
   loadKey_.onClick = [this] { chooseBeat(); };
-  for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_}) addAndMakeVisible(key);
+  saveKey_.onClick = [this] { chooseWhereToSave(); };
+  for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_, &saveKey_}) {
+    addAndMakeVisible(key);
+  }
 
   for (Knob* knob : {&pitch_, &tone_, &decay_, &level_, &volume_, &accent_, &swing_, &effectMix_}) {
     addAndMakeVisible(knob);
@@ -157,7 +161,7 @@ BoombapbotEditor::BoombapbotEditor(BoombapbotAudioProcessor& owner)
   status_.setMinimumHorizontalScale(1.0f);
   addAndMakeVisible(status_);
 
-  selectVoice(0);
+  selectVoice(processor_.selectedVoice());
   showState();
   processor_.addChangeListener(this);
   setSize(kWidth, kHeight);
@@ -172,6 +176,7 @@ BoombapbotEditor::~BoombapbotEditor() {
 // The four knobs of a voice work whichever voice's key was pressed last.
 void BoombapbotEditor::selectVoice(int voice) {
   selectedVoice_ = voice;
+  processor_.selectVoice(voice);
   for (int index = 0; index < voiceKeys_.size(); ++index) {
     voiceKeys_[index]->setToggleState(index == voice, juce::dontSendNotification);
   }
@@ -230,6 +235,8 @@ void BoombapbotEditor::resized() {
   sequencerKey_.setBounds(keys.removeFromLeft(100));
   keys.removeFromLeft(12);
   clearKey_.setBounds(keys.removeFromLeft(70));
+  saveKey_.setBounds(keys.removeFromRight(100));
+  keys.removeFromRight(6);
   loadKey_.setBounds(keys.removeFromRight(100));
 
   steps_.setTopLeftPosition(kStepsLeft, kStepsTop);
@@ -299,12 +306,40 @@ void BoombapbotEditor::loadBeat(const juce::File& file) {
   if (loaded.failed()) showProblem(loaded.getErrorMessage());
 }
 
+void BoombapbotEditor::chooseWhereToSave() {
+  const juce::File suggested = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                                   .getChildFile(beatFileName(processor_.beatName()));
+  chooser_ = std::make_unique<juce::FileChooser>("Save this beat for boombapbot", suggested, "*.json");
+  const juce::Component::SafePointer<BoombapbotEditor> self(this);
+  chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
+                            juce::FileBrowserComponent::warnAboutOverwriting,
+                        [self](const juce::FileChooser& chooser) {
+                          const juce::File file = chooser.getResult();
+                          if (self != nullptr && file != juce::File()) self->saveBeat(file);
+                        });
+}
+
+void BoombapbotEditor::saveBeat(const juce::File& file) {
+  const juce::File target = file.getFileName().endsWithIgnoreCase(".json") ? file : file.withFileExtension("json");
+  if (target.replaceWithText(writeBeat(processor_.currentBeat(), newBeatStamp()), false, false, "\n")) {
+    showNote("Saved " + target.getFileName() + ". Open it on the site with its import.");
+  } else {
+    showProblem("The beat could not be saved to " + target.getFullPathName() + ".");
+  }
+}
+
+void BoombapbotEditor::showNote(const juce::String& note) {
+  status_.setColour(juce::Label::textColourId, colours::cream.withAlpha(0.75f));
+  status_.setText(note, juce::dontSendNotification);
+}
+
 void BoombapbotEditor::showState() {
   const juce::String name = processor_.beatName();
   status_.setColour(juce::Label::textColourId, colours::cream.withAlpha(0.75f));
   status_.setText(name.isEmpty() ? "No beat loaded. Press the step keys to write a pattern, or load a beat saved from the site."
                                  : "Beat: " + name,
                   juce::dontSendNotification);
+  if (selectedVoice_ != processor_.selectedVoice()) selectVoice(processor_.selectedVoice());
   const int size = processor_.measureSize();
   sixteenKey_.setToggleState(size == 16, juce::dontSendNotification);
   twelveKey_.setToggleState(size == 12, juce::dontSendNotification);

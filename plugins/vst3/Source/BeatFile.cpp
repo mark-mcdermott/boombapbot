@@ -1,6 +1,8 @@
 #include "BeatFile.h"
 
 #include <cmath>
+#include <cstdio>
+#include <ctime>
 
 namespace boombapbot::plugin {
 namespace {
@@ -10,6 +12,7 @@ constexpr const char* kMachineId = "ritm12";
 // Named as the document names them, in the order of the engine's effects from 1.
 constexpr std::array<const char*, 4> kEffectKinds{{"delay", "reverb", "flanger", "chorus"}};
 constexpr int kNameLongest = 80;
+constexpr int kSlugLongest = 48;
 
 juce::Result wrong(const juce::String& what) { return juce::Result::fail(what); }
 
@@ -135,7 +138,35 @@ juce::Result readDocument(const juce::var& document, Beat& out) {
     if (const juce::Result read = readVoice(document, kVoices[voice].id, out.voices[voice]); read.failed()) return read;
   }
   if (const juce::Result effect = readEffect(document["effect"], out); effect.failed()) return effect;
+  const juce::String selected = document["panel"]["selected"].toString();
+  for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+    if (selected == kVoices[voice].id) out.selectedVoice = static_cast<int>(voice);
+  }
   return readWhole(document["panel"]["pattern"], "panel.pattern", 0, kPatternCount - 1, out.pattern);
+}
+
+double sixPlaces(float knob) { return std::round(static_cast<double>(knob) * 1e6) / 1e6; }
+
+juce::var object() { return juce::var(new juce::DynamicObject()); }
+
+void put(const juce::var& target, const char* key, const juce::var& value) {
+  target.getDynamicObject()->setProperty(key, value);
+}
+
+// The moment as the document writes one: UTC, to the millisecond, with a Z.
+juce::String isoMoment(juce::Time moment) {
+  const juce::int64 milliseconds = moment.toMilliseconds();
+  const auto seconds = static_cast<std::time_t>(milliseconds / 1000);
+  std::tm utc{};
+#if JUCE_WINDOWS
+  gmtime_s(&utc, &seconds);
+#else
+  gmtime_r(&seconds, &utc);
+#endif
+  char text[32];
+  std::snprintf(text, sizeof(text), "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", utc.tm_year + 1900, utc.tm_mon + 1,
+                utc.tm_mday, utc.tm_hour, utc.tm_min, utc.tm_sec, static_cast<int>(milliseconds % 1000));
+  return text;
 }
 
 }  // namespace
@@ -152,6 +183,84 @@ StepRow rowFromText(const juce::String& text) {
     if (text[step] == 'x') row = static_cast<StepRow>(row | (1u << step));
   }
   return row;
+}
+
+BeatStamp newBeatStamp() { return {juce::Uuid().toDashedString(), juce::Time::getCurrentTime()}; }
+
+juce::String writeBeat(const Beat& beat, const BeatStamp& stamp) {
+  const juce::var document = object();
+  put(document, "format", kProjectFormat);
+  put(document, "schemaVersion", kBeatSchemaVersion);
+  put(document, "machine", kMachineId);
+  put(document, "id", stamp.id);
+  put(document, "name", beat.name.isEmpty() ? juce::String(kUntitledBeat) : beat.name.substring(0, kNameLongest));
+  put(document, "createdAt", isoMoment(stamp.written));
+  put(document, "updatedAt", isoMoment(stamp.written));
+  put(document, "tempo", juce::jlimit(static_cast<int>(SNARE_BPM_MIN), static_cast<int>(SNARE_BPM_MAX), beat.tempo));
+  put(document, "swing", sixPlaces(beat.swing));
+  put(document, "size", validSize(beat.size) ? beat.size : kSizeRest);
+
+  juce::Array<juce::var> patterns;
+  for (const BeatPattern& pattern : beat.patterns) {
+    const juce::var steps = object();
+    for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+      put(steps, kVoices[voice].id, rowText(pattern.hits[voice]));
+    }
+    const juce::var written = object();
+    put(written, "steps", steps);
+    put(written, "accents", rowText(pattern.accents));
+    patterns.add(written);
+  }
+  put(document, "patterns", patterns);
+
+  const juce::var levels = object();
+  const juce::var mutes = object();
+  const juce::var voices = object();
+  for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
+    const BeatVoice& knobs = beat.voices[voice];
+    put(levels, kVoices[voice].id, sixPlaces(knobs.level));
+    put(mutes, kVoices[voice].id, knobs.muted);
+    const juce::var sound = object();
+    put(sound, "pitch", sixPlaces(knobs.pitch));
+    put(sound, "decay", sixPlaces(knobs.decay));
+    put(sound, "tone", sixPlaces(knobs.tone));
+    put(voices, kVoices[voice].id, sound);
+  }
+  const juce::var mix = object();
+  put(mix, "volume", sixPlaces(beat.volume));
+  put(mix, "accent", sixPlaces(beat.accent));
+  put(mix, "levels", levels);
+  put(mix, "mutes", mutes);
+  put(document, "mix", mix);
+  put(document, "voices", voices);
+
+  const bool effectOn = beat.effect >= SNARE_EFFECT_DELAY && beat.effect <= SNARE_EFFECT_CHORUS;
+  const juce::var effect = object();
+  put(effect, "kind", kEffectKinds[static_cast<std::size_t>(effectOn ? beat.effect - SNARE_EFFECT_DELAY : 0)]);
+  put(effect, "mix", effectOn ? sixPlaces(beat.effectMix) : 0.0);
+  put(document, "effect", effect);
+
+  const juce::var panel = object();
+  put(panel, "selected", kVoices[static_cast<std::size_t>(juce::jlimit(0, kVoiceCount - 1, beat.selectedVoice))].id);
+  put(panel, "pattern", juce::jlimit(0, kPatternCount - 1, beat.pattern));
+  put(panel, "write", "hits");
+  put(document, "panel", panel);
+
+  // One line ending on every platform, as the site writes.
+  return juce::JSON::toString(document).replace("\r\n", "\n") + "\n";
+}
+
+juce::String beatFileName(const juce::String& beatName) {
+  juce::String slug;
+  for (const juce::juce_wchar letter : beatName.toLowerCase()) {
+    if (juce::CharacterFunctions::isLetterOrDigit(letter) && letter < 128) {
+      slug << letter;
+    } else if (slug.isNotEmpty() && !slug.endsWithChar('-')) {
+      slug << '-';
+    }
+  }
+  slug = slug.substring(0, kSlugLongest).trimCharactersAtEnd("-");
+  return (slug.isEmpty() ? juce::String("boombapbot-beat") : slug) + kBeatFileSuffix;
 }
 
 juce::Result readBeat(const juce::String& json, Beat& beat) {

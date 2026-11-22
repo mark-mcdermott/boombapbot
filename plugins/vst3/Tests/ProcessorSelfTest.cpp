@@ -1130,6 +1130,122 @@ void testBeatFile() {
         context, "a version 1 state still loads: its knobs are kept, the new ones rest and no pattern plays");
 }
 
+// ---- Saving a beat, run once ------------------------------------------------
+
+// A beat the plugin saved, committed beside the site's own fixtures. The
+// site's tests open the same file, so the two agree on what a beat file is.
+constexpr const char* kSavedFixture = "saved-by-plugin.project.json";
+
+boombapbot::plugin::BeatStamp fixtureStamp() {
+  return {"fixture-saved-by-plugin", juce::Time(2026, 10, 22, 12, 0, 0, 0, false)};
+}
+
+bool sameBeat(const Beat& a, const Beat& b) {
+  const auto near = [](float x, float y) { return std::abs(x - y) < 1e-6f; };
+  bool same = a.name == b.name && a.tempo == b.tempo && near(a.swing, b.swing) && a.size == b.size &&
+              a.pattern == b.pattern && a.selectedVoice == b.selectedVoice && near(a.volume, b.volume) &&
+              near(a.accent, b.accent) && a.effect == b.effect && near(a.effectMix, b.effectMix);
+  for (std::size_t index = 0; index < a.patterns.size(); ++index) {
+    same = same && a.patterns[index].hits == b.patterns[index].hits && a.patterns[index].accents == b.patterns[index].accents;
+  }
+  for (std::size_t voice = 0; voice < a.voices.size(); ++voice) {
+    const boombapbot::plugin::BeatVoice& x = a.voices[voice];
+    const boombapbot::plugin::BeatVoice& y = b.voices[voice];
+    same = same && near(x.pitch, y.pitch) && near(x.tone, y.tone) && near(x.decay, y.decay) && near(x.level, y.level) &&
+           x.muted == y.muted;
+  }
+  return same;
+}
+
+void testSavingABeat() {
+  const std::string context = "saving a beat";
+  constexpr double rate = 48000.0;
+  constexpr int blockSize = 512;
+  using boombapbot::plugin::readBeat;
+  using boombapbot::plugin::writeBeat;
+
+  // The fixture read and written again is the same beat.
+  Beat original;
+  readBeat(fourPatterns(), original);
+  Beat rewritten;
+  const juce::Result reread = readBeat(writeBeat(original, fixtureStamp()), rewritten);
+  check(reread.wasOk() && sameBeat(original, rewritten), context,
+        "the site's fixture, written out by the plugin and read back, is the same beat");
+
+  // A plugin worked by hand: a beat loaded, knobs turned, steps written, a host at 97.4.
+  const auto worked = [&] {
+    std::unique_ptr<juce::AudioProcessor> made = makeProcessor(rate, blockSize);
+    BoombapbotAudioProcessor& hands = plugin(*made);
+    hands.loadBeat(fourPatterns());
+    for (const Setting& setting : std::vector<Setting>{{"tom_pitch", 1.0f / 3.0f}, {"perc_decay", 0.81f},
+                                                       {"snare_mute", 1.0f}, {"swing", 0.25f}, {"accent", 0.9f},
+                                                       {"effect_kind", 4.0f}, {"effect_mix", 0.45f}, {"pattern", 3.0f}}) {
+      set(*made, setting);
+    }
+    hands.setStep(3, 7, 0, true);
+    hands.setStep(3, BoombapbotAudioProcessor::kAccentsRow, 15, true);
+    hands.setMeasureSize(12);
+    hands.selectVoice(7);
+    return made;
+  };
+  const std::unique_ptr<juce::AudioProcessor> processor = worked();
+  BoombapbotAudioProcessor& machine = plugin(*processor);
+  Transport transport;
+  transport.bpm = 97.4;
+  renderPlaying(*processor, transport, 0.0, {}, blockSize, blockSize, rate);
+
+  const juce::String saved = writeBeat(machine.currentBeat(), fixtureStamp());
+  const juce::var document = juce::JSON::parse(saved);
+  check(document["tempo"] == juce::var(97) && document["size"] == juce::var(12) &&
+            document["panel"]["selected"].toString() == "perc" && document["panel"]["pattern"] == juce::var(3) &&
+            document["effect"]["kind"].toString() == "chorus" && document["mix"]["mutes"]["snare"] == juce::var(true) &&
+            document["patterns"][3]["steps"]["perc"].toString() == "x..............x" &&
+            document["createdAt"].toString() == "2026-11-22T12:00:00.000Z",
+        context, "a saved beat holds the host's tempo as a whole number, the panel's place and what was written");
+  check(saved.contains("0.333333") && !saved.contains("0.33333334"), context,
+        "knob positions are written to six places");
+
+  // The saved beat, loaded into a new plugin, is the plugin it was saved from.
+  // The pattern it plays uses no voice whose knob six places would move.
+  const std::unique_ptr<juce::AudioProcessor> reopened = makeProcessor(rate, blockSize);
+  const juce::Result loaded = plugin(*reopened).loadBeat(saved);
+  Beat held = plugin(*reopened).currentBeat();
+  held.tempo = machine.currentBeat().tempo;
+  const int total = 2 * measureFrames(rate);
+  transport.bpm = kSequencerBpm;
+  const Stereo fromSaved = renderPlaying(*reopened, transport, 0.0, {}, total, blockSize, rate);
+  check(loaded.wasOk() && sameBeat(machine.currentBeat(), held) && peak(fromSaved) > kAudible &&
+            identical(renderPlaying(*worked(), transport, 0.0, {}, total, blockSize, rate), fromSaved),
+        context, "a saved beat loaded into a new plugin has the same knobs and plays the same samples");
+
+  // With the effect off there is nothing in the document to say so but a mix of 0.
+  set(*processor, {"effect_kind", 0.0f});
+  const juce::var dry = juce::JSON::parse(writeBeat(machine.currentBeat(), fixtureStamp()));
+  check(dry["effect"]["kind"].toString() == "delay" && dry["effect"]["mix"] == juce::var(0.0), context,
+        "a beat whose effect is off is written as the delay with none of it mixed in");
+
+  const boombapbot::plugin::BeatStamp first = boombapbot::plugin::newBeatStamp();
+  const boombapbot::plugin::BeatStamp second = boombapbot::plugin::newBeatStamp();
+  check(first.id != second.id && first.id.length() >= 1 && first.id.length() <= 64, context,
+        "each save gets an id of its own, of a length the site takes");
+  using boombapbot::plugin::beatFileName;
+  check(beatFileName("Four patterns fixture") == "four-patterns-fixture.boombapbot.json" &&
+            beatFileName("") == "boombapbot-beat.boombapbot.json" &&
+            beatFileName(juce::String::fromUTF8("  Бит №1 / test!  ")) == "1-test.boombapbot.json",
+        context, "a beat's file is named for it, in letters a disk takes");
+
+  // The committed fixture is what the plugin writes today.
+  const juce::String fresh = writeBeat(original, fixtureStamp());
+  const juce::File committed = juce::File(BOOMBAPBOT_FIXTURES_DIR).getChildFile(kSavedFixture);
+  if (juce::SystemStats::getEnvironmentVariable("BOOMBAPBOT_WRITE_FIXTURES", {}).isNotEmpty()) {
+    committed.replaceWithText(fresh, false, false, "\n");
+  }
+  check(committed.loadFileAsString() == fresh, context,
+        text("%s is byte for byte what the plugin writes for the site's fixture "
+             "(run the self-test with BOOMBAPBOT_WRITE_FIXTURES=1 to write it again)",
+             kSavedFixture));
+}
+
 // ---- State, run once --------------------------------------------------------
 
 juce::MemoryBlock saveState(juce::AudioProcessor& processor) {
@@ -1332,6 +1448,7 @@ int main() {
   testDescription();
   testPanel();
   testBeatFile();
+  testSavingABeat();
   testState();
   testVoicesMatchTheMachine();
 
