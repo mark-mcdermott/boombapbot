@@ -269,6 +269,13 @@ block size matters, it checks:
   first has to count a block it takes itself, and an offline block that
   re-synthesises a sound, which is allowed the heap. The realtime blocks must
   make none;
+- a host that misbehaves: 1008 blocks of every size from 0 to 8192 frames, at
+  positions from minus infinity to 1e300 beats and tempos from nothing to
+  infinity, with notes dated before and long after the block, all give sound
+  in range and come back, and the plugin plays in time afterwards. A position
+  more than a thousand million beats from the start of the timeline is taken
+  as a host that is not playing. This test found a hang: such a position
+  overflowed on its way to a step number;
 - on a realtime clock the plugin's own thread makes the new sound, and it is
   heard without the audio thread synthesising anything;
 - the accent knob and the mutes do what the machine's do;
@@ -387,7 +394,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All ten CTest tests pass: the self-test's 513 checks as arm64 and again as
+- All ten CTest tests pass: the self-test's 516 checks as arm64 and again as
   x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
   load check on both and the hosted check on both.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory

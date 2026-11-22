@@ -19,6 +19,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <string>
 #include <thread>
@@ -886,6 +887,93 @@ void testSoundThreadFollowsKnobs() {
   const Stereo again = render(*processor, hit, span, blockSize);
   check(std::abs(signChanges(again.left, 0, window) - high) <= 2, context,
         "after releaseResources and prepareToPlay the plugin plays the same tom");
+}
+
+// ---- A host that misbehaves, run once -----------------------------------------
+
+// A host is someone else's program. Whatever it says about time, and whatever
+// size of block it asks for, the plugin has to answer with sound in range and
+// come back. Run under the undefined-behaviour sanitizer, this is also where a
+// number too large to turn into a step would be caught.
+void testHostileHost() {
+  const std::string context = "hostile host";
+  constexpr double rate = 48000.0;
+
+  class OddClock final : public juce::AudioPlayHead {
+   public:
+    juce::Optional<PositionInfo> getPosition() const override {
+      PositionInfo position;
+      position.setBpm(bpm);
+      position.setPpqPosition(beat);
+      position.setIsPlaying(true);
+      return position;
+    }
+    double bpm = 120.0;
+    double beat = 0.0;
+  };
+
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, 512, Clock::realtime);
+  plugin(*processor).loadBeat(fourPatterns());
+  set(*processor, {"pattern", 1.0f});
+  set(*processor, {"effect_mix", 0.6f});
+  OddClock clock;
+  processor->setPlayHead(&clock);
+
+  const double infinity = std::numeric_limits<double>::infinity();
+  const std::array<double, 16> beats{{0.0, -1.0e6, 1.0e9, -1.0e9, 1.0e9 + 1.0, 1.0e15, 9.0e18, 1.0e300, -1.0e300,
+                                      infinity, -infinity, std::nan(""), 4.0, 3.999999999, 1.0e-300, -0.0}};
+  const std::array<double, 9> tempos{{120.0, 0.0, -50.0, 1.0e-9, 1.0e9, infinity, std::nan(""), 39.999, 300.001}};
+  const std::array<int, 7> sizes{{0, 1, 2, 63, 512, 4096, 8192}};
+
+  juce::MidiBuffer notes;
+  for (const VoiceSpec& voice : kVoices) notes.addEvent(noteOn(0, voice.gmNote, 127).bytes.data(), 3, 0);
+  notes.addEvent(noteOn(0, kKick, 127).bytes.data(), 3, 100000);  // far past the end of any block
+  notes.addEvent(noteOn(0, kKick, 127).bytes.data(), 3, -5);
+
+  bool inRange = true;
+  int blocks = 0;
+  juce::AudioBuffer<float> buffer(2, 8192);
+  juce::MidiBuffer midi;
+  midi.ensureSize(1024);
+  const juce::int64 started = juce::Time::currentTimeMillis();
+  for (const double beat : beats) {
+    for (const double tempo : tempos) {
+      for (const int size : sizes) {
+        clock.beat = beat;
+        clock.bpm = tempo;
+        buffer.setSize(2, size, false, false, true);
+        buffer.clear();
+        midi.clear();
+        midi.addEvents(notes, -10, 200000, 0);
+        processor->processBlock(buffer, midi);
+        for (int channel = 0; channel < 2 && size > 0; ++channel) {
+          const juce::Range<float> range = juce::FloatVectorOperations::findMinAndMax(buffer.getReadPointer(channel), size);
+          inRange = inRange && std::isfinite(range.getStart()) && std::isfinite(range.getEnd()) &&
+                    range.getStart() >= -1.0f && range.getEnd() <= 1.0f;
+        }
+        ++blocks;
+      }
+    }
+  }
+  const juce::int64 took = juce::Time::currentTimeMillis() - started;
+  processor->setPlayHead(nullptr);
+  check(inRange, context,
+        text("%d blocks of every size from 0 to 8192 frames, at positions and tempos no song has, give sound in range",
+             blocks));
+  check(took < 20000, context, text("and none of them keeps the audio thread (%d ms for all)", static_cast<int>(took)));
+
+  // After all that the plugin still plays in time.
+  Transport transport;
+  const std::unique_ptr<juce::AudioProcessor> fresh = makeBeatProcessor(rate, 512, {fourPatterns(), 1, 0.0f}, true);
+  set(*processor, {"swing", 0.0f});
+  set(*processor, {"effect_mix", 0.0f});
+  set(*fresh, {"effect_mix", 0.0f});
+  processor->setNonRealtime(true);
+  render(*processor, {}, framesFor(30.0, rate), 512);
+  const int total = measureFrames(rate);
+  check(identical(renderPlaying(*processor, transport, 0.0, {}, total, 512, rate),
+                  renderPlaying(*fresh, transport, 0.0, {}, total, 512, rate)),
+        context, "and afterwards it plays a measure the same as a plugin that never met that host");
 }
 
 // ---- The audio thread at work, run once -------------------------------------
@@ -1893,6 +1981,7 @@ int main() {
   }
   testSoundThreadFollowsKnobs();
   testAudioThreadAtWork();
+  testHostileHost();
   testSampleRateChange();
   testUnsupportedSampleRate();
   testDescription();
