@@ -219,7 +219,9 @@ site its icon still opens a modal that says it is not open.
     was set by measurement and nobody has listened: the crusher's rate and
     levels, tape's drive and wobble, how deep the pump ducks (it halves the
     loudness of the test beat at full), the filter's range and ring,
-    vinyl's hiss and pops, the phaser's sweep. Still to do before they are
+    vinyl's hiss and pops, the phaser's sweep. To hear them, `pnpm audition`
+    renders a beat through each, half on and full on, into
+    `build/auditions`. Still to do before they are
     sold: the owner listens and they are tuned; РИТМ-12's document takes
     them (a schema change, with its step and fixture); they are gated; and
     they get a place on the machine. Still to settle:
@@ -230,9 +232,8 @@ site its icon still opens a modal that says it is not open.
     without one.
   - **One upgrade for everything.** Decided by the owner on 2026-11-22: the
     same five dollars unlocks the paid effects in the VST3 plugin too, and
-    in the apps on both stores. None of it is built. How it could work was
-    talked through the same day, and these parts are proposals the owner
-    has not yet agreed to:
+    in the apps on both stores. None of it is built. How it works was
+    agreed by the owner the same day:
     - The server hands out a signed license file when a key is entered or
       an account logs in, and each program checks the signature with a
       public key built into it. That answers both questions above: a key
