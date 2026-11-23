@@ -7,7 +7,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
-#include "../PatternMidi.h"
+#include "../BeatDesk.h"
 #include "../PluginProcessor.h"
 #include "PanelStyle.h"
 #include "StepKeys.h"
@@ -40,21 +40,13 @@ class BoombapbotPanel final : public juce::Component, private juce::ChangeListen
   void timerCallback() override;
   void selectVoice(int voice);
   int shownPattern() const;
-  void chooseBeat();
-  void loadBeat(const juce::File& file);
-  void chooseWhereToSave();
-  void saveBeat(const juce::File& file);
   void showNote(const juce::String& note);
-  // The pattern the panel is on, as a MIDI file.
-  juce::MemoryBlock shownPatternMidi() const;
-  juce::String shownPatternMidiName() const;
-  void chooseWhereToSaveMidi();
-  void dragMidiOut();
   void showState();
   void showProblem(const juce::String& problem);
 
   BoombapbotAudioProcessor& processor_;
   boombapbot::panel::StepKeys steps_;
+  boombapbot::plugin::BeatDesk desk_;
 
   juce::OwnedArray<Key> voiceKeys_;
   juce::OwnedArray<Key> muteKeys_;
@@ -93,7 +85,6 @@ class BoombapbotPanel final : public juce::Component, private juce::ChangeListen
   juce::Rectangle<int> voiceGroup_;
   juce::Rectangle<int> mixGroup_;
   juce::Rectangle<int> effectGroup_;
-  std::unique_ptr<juce::FileChooser> chooser_;
   juce::TooltipWindow tooltips_{this};
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BoombapbotPanel)

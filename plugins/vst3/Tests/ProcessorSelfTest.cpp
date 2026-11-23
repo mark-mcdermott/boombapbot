@@ -10,6 +10,7 @@
 #include "Panel/Panel.h"
 #include "Panel/StepKeys.h"
 #include "PatternMidi.h"
+#include "PluginEditor.h"
 #include "PluginProcessor.h"
 
 #include <algorithm>
@@ -96,7 +97,10 @@ struct WindowCloser {
 
 using Window = std::unique_ptr<juce::AudioProcessorEditor, WindowCloser>;
 
-Window open(juce::AudioProcessor& processor) { return Window(processor.createEditorIfNeeded()); }
+// The window with the panel drawn here in it, whichever window the build gives a host.
+Window open(juce::AudioProcessor& processor) {
+  return Window(new BoombapbotEditor(dynamic_cast<BoombapbotAudioProcessor&>(processor)));
+}
 
 // ---- Parameters ---------------------------------------------------------------
 

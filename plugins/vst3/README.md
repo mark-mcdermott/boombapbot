@@ -111,39 +111,40 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   is left unread. In one that is read, a value out of range is brought into
   it, a parameter it does not name goes to its resting value, and a version 1
   state, which has no patterns, loads with none.
-- **The window is a panel of the machine's own**, drawn for the plugin in the
-  olive, cream and amber of РИТМ-12's picture, lettered in the machine's
-  Russian with English under it. It is laid out at 920 by 624, and the window can be dragged from 0.7 to 2
-  times that, keeping its shape; the panel is drawn through a scale. The size
-  it was left at is saved with the plugin.
-  - *Step keys.* A row of sixteen for the accents and one for each voice,
-    showing the pattern the panel is on. A press turns a step on or off and a
-    drag along a row carries that on. A red lamp runs over the step the
-    sequencer is playing. With the measure at twelve steps the last four keys
-    go dark.
-  - *Voice keys.* A key for each voice plays it and puts its pitch, tone,
-    decay and level on the four voice knobs. Beside each is its mute.
-  - *The rest.* Pattern keys А Б В Г, 16 and 12 for the measure, the sequencer
-    switch, a key that clears the pattern the panel is on, the mix knobs
-    (volume, accent, swing), the effect keys and its mix, and the key that
-    loads a beat. Every parameter is on the panel; a double click puts a knob
-    back where it rests.
-  - *The name.* The field at the foot shows the beat's name. A click lets a
-    name be typed: it names the beat in the host's project, the file a save
-    suggests and the beat inside that file. With none it reads "Untitled
-    beat". The line beside it says what a load or a save did, or why not.
-  - *The dice* (СЛУЧАЙНО) throw a new row for the voice the panel is on in the
-    shown pattern, likelier on the beat: 55% on a beat, 30% between beats and
-    14% off them, as the site's dice do.
-  - *Undo* (ОТМЕНА). The host's undo does not reach the patterns, so the
-    panel has its own. A press and drag on the step keys, a clear, a throw of
-    the dice, a new measure size and loading a beat are each one step back,
-    64 at the most. It does not undo a knob; the host's undo does that. There
-    is no redo, and the history is not saved with the project.
+- **The window is the machine's painted panel**, the one the site, the phone
+  app and the desktop app show, as a page in a web view, with a bar under it.
+  "The window" below says how it is put together. It opens at 960 by 684 and
+  can be dragged from 0.7 to 2 times that, keeping its shape; the size it was
+  left at is saved with the plugin.
+  - *On the picture.* The step keys, the voice keys (which play the voice),
+    the pattern keys А Б В Г, hits and accents, mute, the dice, clear, the
+    measure's size, the voice knobs, the levels, volume, accent, swing, the
+    effect and its mix, each moving the plugin and each moved by it. A lamp
+    runs over the step the sequencer is playing, and the meter reads how loud
+    the plugin is. Play and stop are the sequencer's switch: the patterns
+    play while the host does.
+  - *What the host keeps.* The tempo knob shows the host's tempo and cannot be
+    turned. The record key and the power switch take no hand: a host does the
+    recording, and the machine is on for as long as its window is open.
+  - *The bar.* The beat's name, which can be typed over: it names the beat in
+    the host's project, the file a save suggests and the beat inside that
+    file. A line that says what a load or a save did, or why not. And four
+    keys: undo, load a beat, save a beat, and the shown pattern as MIDI, which
+    a click saves and a drag carries out of the window.
+  - *Undo.* The host's undo does not reach the patterns, so the plugin has its
+    own. A step key, a clear, a throw of the dice, a new measure size and
+    loading a beat are each one step back, 64 at the most. It does not undo a
+    knob; the host's undo does that. There is no redo, and the history is not
+    saved with the project.
+  - *A knob turned* reaches the host as one gesture from the hand taking hold
+    to its letting go, which is how a host records automation by touch.
   - A pattern can be written with no beat loaded. Steps written or cleared
     here are saved with the host's project like the rest of the state.
-  - The panel is drawn in code. It does not use the picture of the machine in
-    `packages/machine-ritm12/art`, which a later slice could.
+- **The panel drawn here** is the window the plugin had first, and a build
+  with `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` still has it: a panel drawn in code in
+  the picture's colours, laid out at 920 by 624, with the same keys and knobs
+  and the same bar. It needs no web view and no page. It stays until the
+  painted window has been lived with; then it can go.
 - The delay keeps time with the host: its echo is a dotted eighth note at the
   host's tempo, read from the playhead at every block and held within the
   engine's 40 to 300. A host that reports no tempo gets 104, the tempo of a new
@@ -183,13 +184,25 @@ that could wait: no allocation, no locks. The plugin keeps to it this way.
 
 ## Build
 
-From the repository root, with CMake 3.22 or later and Ninja:
+From the repository root, with CMake 3.22 or later, Ninja, and pnpm with the
+repository's packages installed:
 
 ```sh
+pnpm install
 cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/vst3
 ctest --test-dir build/vst3 --output-on-failure
 ```
+
+The window's page is built by the build itself, with pnpm, each time, and
+packed into the plugin; the plugin is only linked again when the page has
+changed. It needs no Emscripten: the plugin has the engine itself, so its page
+carries none. Two options change this:
+
+- `-DBOOMBAPBOT_VST3_BUILD_PAGE=OFF` packs `plugins/vst3/web/dist` as it was
+  last built, for a machine that has the page and not pnpm.
+- `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` builds the panel drawn here in place of
+  the painted one. That build needs neither pnpm nor a web view.
 
 JUCE is fetched at configure time (`FetchContent`, tag 8.0.9) and is not
 vendored. To build against a checkout you already have, add
@@ -242,86 +255,55 @@ of `VerifiedIDs.nfo` and the `[Generators/VST3/boombapbot]` section of
 `.Plugins.ini`, then scan again with "Verify plugins" on. This happened on
 2026-11-22 and that cleared it.
 
-## A trial: the painted panel in a web view
+## The window
 
-`-DBOOMBAPBOT_VST3_WEB_PANEL=ON` builds the plugin with another window: the
-painted panel the site, the phone app and the desktop app show, as a page in
-JUCE's web view (WKWebView on macOS). It is a trial to see whether that
-works, beside the panel drawn here, which stays the default and is untouched.
-
-```sh
-pnpm prepare:assets                              # once, as for the site and the apps
-pnpm --filter @boombapbot/vst3-panel build       # the page, into plugins/vst3/web/dist
-cmake -S plugins/vst3 -B build/vst3-web -G Ninja -DCMAKE_BUILD_TYPE=Release -DBOOMBAPBOT_VST3_WEB_PANEL=ON
-cmake --build build/vst3-web
-ctest --test-dir build/vst3-web --output-on-failure
-```
-
-How it is put together:
+The painted panel is a page in JUCE's web view (WKWebView on macOS).
 
 - **The page** (`plugins/vst3/web`) mounts the machine's own `Panel` from
   `packages/machine-ritm12` in the shared editor's runtime, as the desktop
-  app does, with nothing around it: no header, no settings, no account. It is
-  asked for the picture at any width, since a plugin's window is never a
-  phone.
-- **It is served from inside the plugin.** The built page, without the
-  engine's WebAssembly, is packed into one zip and compiled into the binary;
-  the web view's resource provider reads files out of it. Nothing comes from
-  the network and there is no server.
+  app does, with the plugin's bar under it and nothing else: no header, no
+  settings, no account. It is asked for the picture at any width, since a
+  plugin's window is never a phone. The picture and the bar are both sized
+  from the window's width, so the whole window scales as one.
+- **It is served from inside the plugin.** The built page is packed into one
+  zip and compiled into the binary; the web view's resource provider reads
+  files out of it. Nothing comes from the network and there is no server.
 - **The beat crosses whole.** In an app the page owns the beat and tells the
   engine everything. In a plugin the host owns it, as parameters and state. So
   the page sends its project document when a control changes it, and the
   plugin makes itself that beat, telling the host of each parameter that
   moved. The plugin sends its own when a host's automation or a recalled
   project changes it, and the page takes it without an undo step. Neither is
-  sent its own change back. This reuses the reader and writer the load and
-  save keys already had.
+  sent its own change back, and the page is sent back whatever the plugin did
+  not take, which is how the tempo knob returns to the host's tempo.
 - **Of the engine's commands only three cross:** a voice key's hit, and play
   and stop, which in a host are the sequencer's switch. The host keeps the
-  tempo and the transport.
-
-What is wired: the picture and its art; the step keys, the voice keys (which
-play the voice), the pattern keys, hits and accents, mute, the dice, clear,
-the measure's size, the voice knobs, the levels, volume, accent, swing, the
-effect and its mix, each moving the plugin and each moved by it; play and
-stop as the sequencer's switch; the step the sequencer is on, sent to the
-page 30 times a second.
-
-What is not: the tempo knob (the host keeps time; the page shows the host's
-tempo when the plugin next sends a beat), the level meter (no level is sent),
-the power switch (the machine is on while its window is open; switching it
-off on the page does not silence the plugin), recording, the page's own undo
-and its keyboard keys, loading and saving a beat, the MIDI key, naming a
-beat, and remembering the window's size. A knob dragged on the page reaches
-the host as a row of plain parameter changes, with no start and end of a
-gesture, so a host that records automation by touch may not record it well.
-
-`Tests/WebPanelCheck.cpp` opens this window with no host, in a real window,
-and works the page through the web view: it loads and says so, the picture is
-drawn and fills the window at three to two, the page opens on the plugin's
-beat, a voice key, a step key and a knob on the page move the plugin and the
-tom's key is heard, a parameter and a step changed in the plugin show on the
-page, both sides then rest, and stop and play turn the sequencer off and on.
-The hosted check opens the same window through the VST3 wrapper.
+  tempo and the transport. Back the other way come the step the sequencer is
+  on and how loud the output is, 30 times a second while they change.
+- **The bar's keys ask the plugin.** Loading, saving and the MIDI file are
+  done by the plugin (`Source/BeatDesk`), with the system's own dialogs, and
+  the bar is told in words how each went. The panel drawn here uses the same
+  code.
+- **A knob held** is told to the plugin when the hand takes hold and when it
+  lets go, and the plugin marks the gesture on each parameter that moved in
+  between.
+- **The three controls the host keeps** are made inert by the page after the
+  panel is drawn, by their names on the panel. The panel itself is not
+  changed for the plugin.
 
 Measured on the owner's Mac on 2026-11-22:
 
-| | Panel drawn here | Painted panel in a web view |
+| | Painted panel in a web view | Panel drawn here |
 | --- | --- | --- |
-| Bundle | 17 MB | 20 MB |
-| Window to page ready, arm64 | not measured | about 0.5 s |
-| Window to page ready, x86_64 under Rosetta | not measured | 0.6 to 1.0 s |
-| CTest | 10 of 10 | 9 of 9 |
+| Bundle | 23 MB | 17 MB |
+| Window to page ready, arm64 | about 0.5 s | not measured |
+| Window to page ready, x86_64 under Rosetta | 0.7 to 0.9 s | not measured |
+| CTest | 14 of 14 | 10 of 10 |
 
-Not known, and the reasons this is a trial: whether it loads and behaves in
-FL Studio; whether a click in the web view takes the keyboard from the host,
-so that its shortcuts stop until the host's own window is clicked again;
-how resizing feels (the window keeps three to two and the page scales its
-stage); how it looks on a screen that is not Retina; what several instances
-cost, each with a web view and its processes. On Windows it would need
-Microsoft's WebView2: its SDK at build time, `NEEDS_WEBVIEW2 TRUE` in
-`juce_add_plugin`, and the WebView2 runtime on the user's machine, which
-Windows 11 has and Windows 10 usually does. On Linux it would need WebKitGTK.
+On Windows the web view would need Microsoft's WebView2: its SDK at build
+time, `NEEDS_WEBVIEW2 TRUE` in `juce_add_plugin`, and the WebView2 runtime on
+the user's machine, which Windows 11 has and Windows 10 usually does. On Linux
+it would need WebKitGTK. Neither has been built.
 
 ## Tests
 
@@ -423,13 +405,45 @@ block size matters, it checks:
   nonsense is brought into range;
 - the plugin's voice table against `ritm12.machine.json`.
 
-A second program (`Tests/WindowSnapshot.cpp`) paints the window to
-`build/vst3/window.png` with a beat loaded and fails if the picture is blank.
-It is how the panel can be looked at without a host:
+The self-test's window is the panel drawn here, whichever window the build
+gives a host: that panel's code is in every build, and so are its tests.
+
+A second program (`Tests/WindowSnapshot.cpp`) paints the panel drawn here to
+`build/vst3/window.png` with a beat loaded and fails if the picture is blank:
 
 ```sh
 build/vst3/boombapbot_window_snapshot panel.png path/to/a.boombapbot.json
 ```
+
+A third (`Tests/WebPanelCheck.cpp`, in a build with the painted window, on
+macOS) opens that window with no host, in a real window on the desktop, and
+works the page through the web view, as arm64 and again under Rosetta:
+
+- the page loads from inside the plugin and says so, the picture is drawn and
+  fills the window's width at three to two, and the bar lies under it and ends
+  where the window does;
+- the page opens on the plugin's beat; a voice key, a step key and a knob on
+  the page move the plugin and the tom's key is heard; a parameter and a step
+  changed in the plugin show on the page; both sides then rest;
+- stop and play turn the sequencer off and on;
+- a name typed in the bar names the plugin's beat, and a name set in the
+  plugin shows in the bar;
+- a step written on the page is taken back by the bar's undo, in the plugin
+  and on the page;
+- the page's meter is given how loud the plugin is;
+- a hold on a knob reaches the host as one gesture around its changes, with
+  the last change sent before the hand lets go, and a change with no hold is
+  a gesture by itself;
+- the tempo knob, the record key and the power switch are inert, and a tempo
+  turned anyway goes back to the host's;
+- saving a beat writes a file the beat reader takes, loading one puts it on
+  the page, a file that is not a beat is refused in words, and the pattern is
+  written as a MIDI file, each by the code the bar's keys call;
+- the window opens at its own size and, left a quarter larger, opens a
+  quarter larger.
+
+To look at it, `BOOMBAPBOT_HOLD_WINDOW=5` keeps the window up that many
+seconds at the end.
 
 ### Steinberg's validator
 
@@ -511,9 +525,13 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
   designated requirement).
-- All ten CTest tests pass: the self-test's 516 checks as arm64 and again as
-  x86_64 under Rosetta, the window snapshot, the signature, the architectures, the
-  load check on both and the hosted check on both.
+- All fourteen CTest tests pass: the self-test's 516 checks as arm64 and again
+  as x86_64 under Rosetta, the snapshot of the panel drawn here, the painted
+  window opened and worked on both, the signature, the architectures, the
+  load check on both, the hosted check on both and Steinberg's validator on
+  both.
+- A build with `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF`, the panel drawn here as the
+  window, passes its ten.
 - `/usr/bin/python3` loads the binary with `ctypes.CDLL` and gets a factory
   from `GetPluginFactory`, as arm64 and as x86_64.
 
@@ -522,11 +540,13 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
   each pass every check with nothing reported, and the Debug build prints no
   JUCE assertion.
 
-The same build and tests also pass on GitHub's macOS 26 runner, which fetches
-JUCE itself (the `vst3` job in `.github/workflows/native.yml`).
+GitHub's macOS 26 runner does the same build and runs the same tests, fetching
+JUCE itself (the `vst3` job in `.github/workflows/native.yml`). It passed
+there with the panel drawn here as the window; whether the check that opens
+the painted window passes on a runner was not known when this was written.
 
 **In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
-the build of the hang fix:
+the build of the hang fix, whose window was the panel drawn here:
 
 - the plugin scans and loads, and the panel shows at its right shape;
 - notes from the piano roll and from a keyboard play the eight voices;
@@ -540,8 +560,24 @@ the build of the hang fix:
 - the MIDI key dragged onto the Channel Rack imports the shown pattern. FL's
   playlist does not take it; see below.
 
+The owner also tried the first cut of the painted window in FL Studio that
+day, the picture alone with no bar, and found it worked.
+
 ## Not verified
 
+- **The painted window as it is now, in a host.** The window with its bar has
+  only been opened by the tests. In FL Studio nobody has typed a name into
+  it, pressed its undo, load, save or MIDI keys, watched its meter or
+  recorded a knob as automation.
+- **Dragging the MIDI key out of the painted window.** The page tells the
+  plugin when the key is dragged and the plugin starts the system's drag,
+  which needs the mouse button still down. No test can hold one. A click on
+  the key, which saves the file, is tested.
+- **The keyboard in the painted window.** Whether typing works in a host, and
+  whether a click in the web view keeps the host's own shortcuts from it
+  until the host's window is clicked again.
+- **Several painted windows at once,** each with a web view and its
+  processes, and how the page looks on a screen that is not Retina.
 - **Other hosts.** FL Studio has run it (see above). No other host has loaded
   it.
 - **MIDI into FL Studio.** A drag from the MIDI key onto FL's playlist shows
@@ -563,9 +599,8 @@ the build of the hang fix:
   host, and never the x86_64 half.
 - **The tests and the keys with a chooser.** The load, save and MIDI keys open
   a file chooser, which no test can press; the tests go through the code the
-  keys call. In FL Studio the owner has used the load and save keys.
-- **The panel on other screens.** It has been used in FL Studio on the owner's
-  Mac. How it looks on a screen that is not Retina is untried.
+  keys call. In FL Studio the owner has used the load and save keys of the
+  panel drawn here.
 - **The sequencer in song mode and odd signatures.** In FL Studio it has
   followed the transport in pattern mode at two tempos. Song mode, tempo
   automation and a signature other than 4/4 are untried there. Where a step
@@ -575,17 +610,21 @@ the build of the hang fix:
   Studio and raised nothing but the hat above. A knob turned while its voice
   rings changes the next hit, not the ringing one, and nobody has judged how
   that feels under automation.
-- **Windows and Linux.** The CMake project has nothing against them, but it
-  has only ever been built on macOS, and CI builds it there alone. The bundle
-  checks are macOS only.
+- **Windows and Linux.** It has only ever been built on macOS, and CI builds
+  it there alone. The painted window needs WebView2 on Windows and WebKitGTK
+  on Linux, which the CMake project does not yet ask for. The bundle checks
+  and the check of the painted window are macOS only.
 - **An Intel Mac, and any macOS older than 26.** The x86_64 half has only run
   under Rosetta. The deployment target is 11.0 and untried.
 - **Distribution:** no Developer ID signature, no notarisation, no installer.
 
 ## Next slices
 
-- **The picture.** The panel is drawn in code; the machine's own picture and
-  its parts are in `packages/machine-ritm12/art`.
+- **Take the panel drawn here out,** once the painted window has been lived
+  with: `Source/Panel`, `Source/PluginEditor`, the snapshot test and the
+  option that chooses between the two.
+- **The paid effects.** The upgrade's six effects are in the engine, and
+  neither the page nor the plugin's Effect parameter names them yet.
 - **Beats from an account.** Only a file on disk can be loaded. Beats saved to
   a boombapbot account are out of reach.
 - **Time signatures and tempo changes inside a block.** A measure is four

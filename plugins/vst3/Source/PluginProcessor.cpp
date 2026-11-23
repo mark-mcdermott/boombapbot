@@ -440,6 +440,7 @@ void BoombapbotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, ju
     }
   }
   renderTo(frames);
+  outputLevel_.store(static_cast<float>(snare_engine_output_level(engine)), std::memory_order_relaxed);
 
   for (int channel = 2; channel < channels; ++channel) buffer.clear(channel, 0, frames);
   midi.clear();  // the plugin produces no MIDI
@@ -723,8 +724,29 @@ void BoombapbotAudioProcessor::setParameterTo(const juce::String& id, float valu
   if (parameter == nullptr) return;
   // A parameter already there is left alone, so the host is told only of what changed.
   const float wanted = parameter->convertTo0to1(value);
-  if (!juce::exactlyEqual(wanted, parameter->getValue())) parameter->setValueNotifyingHost(wanted);
+  if (juce::exactlyEqual(wanted, parameter->getValue())) return;
+  if (!knobHeld_) {
+    parameter->beginChangeGesture();
+    parameter->setValueNotifyingHost(wanted);
+    parameter->endChangeGesture();
+    return;
+  }
+  if (std::find(heldParameters_.begin(), heldParameters_.end(), parameter) == heldParameters_.end()) {
+    parameter->beginChangeGesture();
+    heldParameters_.push_back(parameter);
+  }
+  parameter->setValueNotifyingHost(wanted);
 }
+
+void BoombapbotAudioProcessor::holdKnob() { knobHeld_ = true; }
+
+void BoombapbotAudioProcessor::letGoOfKnob() {
+  for (juce::RangedAudioParameter* parameter : heldParameters_) parameter->endChangeGesture();
+  heldParameters_.clear();
+  knobHeld_ = false;
+}
+
+float BoombapbotAudioProcessor::outputLevel() const { return outputLevel_.load(std::memory_order_relaxed); }
 
 Beat BoombapbotAudioProcessor::currentBeat() const {
   Beat beat;

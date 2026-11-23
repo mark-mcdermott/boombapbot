@@ -3,6 +3,7 @@
 //
 //   window_snapshot <out.png> [beat file]
 
+#include "PluginEditor.h"
 #include "PluginProcessor.h"
 
 #include <cstdio>
@@ -45,7 +46,7 @@ int main(int argc, char** argv) {
     }
   }
 
-  juce::AudioProcessorEditor* const editor = processor->createEditorIfNeeded();
+  juce::AudioProcessorEditor* const editor = new BoombapbotEditor(dynamic_cast<BoombapbotAudioProcessor&>(*processor));
   if (editor == nullptr || editor->getWidth() <= 0 || editor->getHeight() <= 0) {
     std::fprintf(stderr, "FAIL the plugin has no window\n");
     return 1;

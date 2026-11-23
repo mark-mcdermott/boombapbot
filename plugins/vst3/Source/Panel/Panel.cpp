@@ -81,6 +81,14 @@ class BoombapbotPanel::ChoiceKeys final {
 BoombapbotPanel::BoombapbotPanel(BoombapbotAudioProcessor& owner)
     : processor_(owner),
       steps_(owner),
+      desk_(owner,
+            [this](const juce::String& words, boombapbot::plugin::BeatDesk::Said kind) {
+              if (kind == boombapbot::plugin::BeatDesk::Said::problem) {
+                showProblem(words);
+              } else {
+                showNote(words);
+              }
+            }),
       sixteenKey_("16", ""),
       twelveKey_("12", ""),
       sequencerKey_(words("СЕКВЕНСЕР"), "Sequencer"),
@@ -151,15 +159,15 @@ BoombapbotPanel::BoombapbotPanel(BoombapbotAudioProcessor& owner)
   undoKey_.setTitle("Undo");
   undoKey_.setTooltip("Take back the last change to the patterns");
   undoKey_.onClick = [this] { processor_.undoPatterns(); };
-  loadKey_.onClick = [this] { chooseBeat(); };
-  saveKey_.onClick = [this] { chooseWhereToSave(); };
+  loadKey_.onClick = [this] { desk_.chooseBeat(); };
+  saveKey_.onClick = [this] { desk_.chooseWhereToSave(); };
   // A click saves the shown pattern as a MIDI file; a drag carries the file
   // out of the window, into the host or onto the desktop.
   midiKey_.setTitle("Pattern as MIDI");
   midiKey_.setTooltip("Click to save the shown pattern as a MIDI file, or drag it into the host");
   midiKey_.addMouseListener(this, false);
   midiKey_.onClick = [this] {
-    if (!midiKeyDragged_) chooseWhereToSaveMidi();
+    if (!midiKeyDragged_) desk_.chooseWhereToSaveMidi();
     midiKeyDragged_ = false;
   };
   for (Key* key : {&sixteenKey_, &twelveKey_, &sequencerKey_, &clearKey_, &loadKey_, &saveKey_, &midiKey_,
@@ -342,97 +350,12 @@ void BoombapbotPanel::changeListenerCallback(juce::ChangeBroadcaster*) { showSta
 
 void BoombapbotPanel::timerCallback() { steps_.refresh(); }
 
-void BoombapbotPanel::chooseBeat() {
-  chooser_ = std::make_unique<juce::FileChooser>("Load a beat saved from boombapbot", juce::File(), "*.json");
-  const juce::Component::SafePointer<BoombapbotPanel> self(this);
-  chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                        [self](const juce::FileChooser& chooser) {
-                          const juce::File file = chooser.getResult();
-                          if (self != nullptr && file != juce::File()) self->loadBeat(file);
-                        });
-}
-
-void BoombapbotPanel::loadBeat(const juce::File& file) {
-  if (file.getSize() > kBeatFileBytesMost) {
-    showProblem("That file is too large to be a beat file.");
-    return;
-  }
-  const juce::Result loaded = processor_.loadBeat(file.loadFileAsString());
-  if (loaded.failed()) {
-    showProblem(loaded.getErrorMessage());
-  } else {
-    showNote("Loaded " + file.getFileName() + ".");
-  }
-}
-
-void BoombapbotPanel::chooseWhereToSave() {
-  const juce::File suggested = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-                                   .getChildFile(beatFileName(processor_.beatName()));
-  chooser_ = std::make_unique<juce::FileChooser>("Save this beat for boombapbot", suggested, "*.json");
-  const juce::Component::SafePointer<BoombapbotPanel> self(this);
-  chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
-                            juce::FileBrowserComponent::warnAboutOverwriting,
-                        [self](const juce::FileChooser& chooser) {
-                          const juce::File file = chooser.getResult();
-                          if (self != nullptr && file != juce::File()) self->saveBeat(file);
-                        });
-}
-
-void BoombapbotPanel::saveBeat(const juce::File& file) {
-  const juce::File target = file.getFileName().endsWithIgnoreCase(".json") ? file : file.withFileExtension("json");
-  if (target.replaceWithText(writeBeat(processor_.currentBeat(), newBeatStamp()), false, false, "\n")) {
-    showNote("Saved " + target.getFileName() + ". Open it on the site with its import.");
-  } else {
-    showProblem("The beat could not be saved to " + target.getFullPathName() + ".");
-  }
-}
-
-juce::MemoryBlock BoombapbotPanel::shownPatternMidi() const {
-  const Beat beat = processor_.currentBeat();
-  return writePatternMidi(beat, beat.pattern);
-}
-
-juce::String BoombapbotPanel::shownPatternMidiName() const {
-  return patternMidiFileName(processor_.beatName(), processor_.currentBeat().pattern);
-}
-
-void BoombapbotPanel::chooseWhereToSaveMidi() {
-  const juce::File suggested =
-      juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile(shownPatternMidiName());
-  chooser_ = std::make_unique<juce::FileChooser>("Save this pattern as MIDI", suggested, "*.mid");
-  const juce::Component::SafePointer<BoombapbotPanel> self(this);
-  chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
-                            juce::FileBrowserComponent::warnAboutOverwriting,
-                        [self](const juce::FileChooser& chooser) {
-                          const juce::File file = chooser.getResult();
-                          if (self == nullptr || file == juce::File()) return;
-                          const juce::File target = file.withFileExtension("mid");
-                          if (target.replaceWithData(self->shownPatternMidi().getData(),
-                                                     self->shownPatternMidi().getSize())) {
-                            self->showNote("Saved " + target.getFileName() + ".");
-                          } else {
-                            self->showProblem("The pattern could not be saved to " + target.getFullPathName() + ".");
-                          }
-                        });
-}
-
-// The file a drag carries has to be on disk before the drag starts.
-void BoombapbotPanel::dragMidiOut() {
-  const juce::MemoryBlock midi = shownPatternMidi();
-  const juce::File file = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile(shownPatternMidiName());
-  if (!file.replaceWithData(midi.getData(), midi.getSize())) {
-    showProblem("The pattern could not be written out to drag.");
-    return;
-  }
-  juce::DragAndDropContainer::performExternalDragDropOfFiles({file.getFullPathName()}, false, &midiKey_);
-}
-
 void BoombapbotPanel::mouseDrag(const juce::MouseEvent& event) {
   if (event.eventComponent != &midiKey_ || midiKeyDragged_ || event.getDistanceFromDragStart() < kDragStartsAfter) {
     return;
   }
   midiKeyDragged_ = true;
-  dragMidiOut();
+  desk_.dragMidiOut(midiKey_);
 }
 
 void BoombapbotPanel::showNote(const juce::String& note) {
