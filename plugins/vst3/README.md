@@ -542,9 +542,8 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
   JUCE assertion.
 
 GitHub's macOS 26 runner does the same build and runs the same tests, fetching
-JUCE itself (the `vst3` job in `.github/workflows/native.yml`). It passed
-there with the panel drawn here as the window; whether the check that opens
-the painted window passes on a runner was not known when this was written.
+JUCE itself (the `vst3` job in `.github/workflows/native.yml`). All fourteen
+pass there too, the check that opens the painted window among them.
 
 **In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
 the build of the hang fix, whose window was the panel drawn here:
