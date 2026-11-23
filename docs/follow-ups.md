@@ -240,13 +240,14 @@ site its icon still opens a modal that says it is not open.
     refuses any beat saved since, and the plugin reads both. The selector reaches only the four without the upgrade
     and all ten with it, so only an upgraded device writes such a beat. The plugin, where it holds the upgrade, plays
     such a beat and saves it with the effect's name; where it does not, it
-    loads one with its effect off and says which effect that was. The six names on the label are
-    stand-ins. Where they sit was decided by the
+    loads one with its effect off and says which effect that was. The six names on the label and the
+    drawing beside each are the owner's, since 2026-11-23
+    (`art/effect/`): БИТКРАШЕР, ЛЕНТА, ПАМПИНГ, ФИЛЬТР, ВИНИЛ and ФЕЙЗЕР.
+    Where they sit was decided by the
     owner on 2026-11-22 and the picture's unit is built for it: the effect
     selector now turns a whole circle shared evenly among the effects there
     are, four now and ten with the upgrade, beside a window that shows the
-    effect's drawing and name. What that leaves for the six: a drawing and
-    a Russian name each, which are the owner's. The phone's panel has the
+    effect's drawing and name. The phone's panel has the
     same selector and window behind its effect tab. Nobody has looked at
     either on a real screen, only in the tests' browser.
   - **One upgrade for everything.** Decided by the owner on 2026-11-22: the

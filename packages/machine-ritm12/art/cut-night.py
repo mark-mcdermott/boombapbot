@@ -14,6 +14,7 @@ It needs numpy, Pillow and scipy. Run it again when the plate or a patch
 changes. The lamp's box is DESK_LAMP in packages/machine-ritm12/src/ui/layout.ts.
 """
 import re
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -95,6 +96,11 @@ for patch in sorted((here / 'patch').glob('*.png')):
         colours = graded(pixels[..., :3], **MACHINE) * (KEY_LIFT if patch.name.startswith('key-') else 1)
     write(colours, pixels[..., 3], night / 'patch' / patch.name, optimize=True)
     print(patch.name)
+
+# The label's drawings are shapes the page fills with ink, with no colour of their own to regrade.
+(night / 'effect').mkdir(exist_ok=True)
+for drawing in sorted((here / 'effect').glob('*.svg')):
+    shutil.copyfile(drawing, night / 'effect' / drawing.name)
 
 for part in sorted((here / 'phone').iterdir()):
     if part.suffix == '.svg':

@@ -1,5 +1,5 @@
 import { useRef, type CSSProperties } from 'react';
-import type { EffectKind } from '../document';
+import { isPaidEffect, type EffectKind } from '../document';
 import { Patch, boxOf, circleOf } from './Controls';
 import { useReadout } from './context';
 import { EFFECT_UNIT } from './layout';
@@ -46,6 +46,15 @@ export function EffectUnitArt({ angle }: { angle: number }) {
 }
 
 /**
+ * Where an effect's drawing is among the machine's art. The first four are
+ * cut from the picture, which had them beside their names; the upgrade's six
+ * are the owner's drawings, made for the label.
+ */
+function effectIcon(kind: EffectKind): string {
+  return isPaidEffect(kind) ? `effect/${kind}.svg` : `phone/icon-${kind}.png`;
+}
+
+/**
  * What is printed on the label in the window: the effect's drawing and its
  * name. The picture says where on its plate the label is; the phone's panel
  * places it over its own cut of the window.
@@ -64,7 +73,7 @@ export function EffectLabel({
   className?: string;
   style?: CSSProperties;
 }) {
-  const icon = useReadout().art(`phone/icon-${kind}.png`);
+  const icon = useReadout().art(effectIcon(kind));
   return (
     <span className={className ? `rt-effect-label ${className}` : 'rt-effect-label'} style={style} aria-hidden="true" data-testid="effect-label" data-effect={kind} data-left-out={leftOut || undefined}>
       {icon ? <i className="rt-effect-icon" style={{ '--rt-effect-icon': `url("${icon}")` } as CSSProperties} /> : null}

@@ -53,6 +53,12 @@ does not have.
   page.
 - **`pointer/`** holds the pointer line of each kind of knob, on a clear
   background. A knob's painted body stays still; the page turns only its line.
+- **`effect/`** holds the drawing printed on the effect window's label for
+  each of the upgrade's six effects, one SVG each, named by the effect. They
+  are the owner's drawings, used as they came: the page fills their shape
+  with the label's ink, so their own colour is never seen. The first four
+  effects use the drawing the picture has beside their name
+  (`phone/icon-*.png`). `night/effect/` holds the same six, unchanged.
 - **`phone/`** holds the parts of the phone's panel, which the page lays out
   itself: the frame of the screen, a blank key, the pattern, transport, dice
   and clear keys, the power rocker off and on, each knob's body and each
