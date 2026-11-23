@@ -328,8 +328,10 @@ which features it will unlock is not decided.
   plugin's C++ too, is in [docs/license-file.md](docs/license-file.md).
   `pnpm license:keypair` makes the pair. A license with `withdrawn_at` set
   (`apps/site/drizzle/0007_license_withdrawn.sql`) gives out no more files,
-  and the files it gave out before keep working. Nothing sets that mark
-  yet. The owner made the real pair on 2026-11-22: its public half is
+  and the files it gave out before keep working. A payment
+  refunded in full sets that mark and takes the license off its account
+  (the Stripe webhook's `charge.refunded`, which the endpoint in Stripe's
+  dashboard has to be set to send). The owner made the real pair on 2026-11-22: its public half is
   `LICENSE_PUBLIC_KEY`.
 - The site, the desktop app and the phone apps keep a license file and
   check it themselves (`packages/editor/src/upgrade/device-license.ts`),
