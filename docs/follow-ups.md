@@ -561,8 +561,9 @@ What is left:
   be sold on that tier and asks for no source. What is left before a build is
   given to anyone, and why CI still keeps none: settle the bundled VST3
   SDK's terms (Steinberg's agreement, or a JUCE that bundles SDK 3.8). And
-  watch the tier's limit of 20,000 dollars a year, which counts differently
-  for a person and for a company.
+  watch the tier's limit of 20,000 dollars a year: the owner sells as a
+  person, so it counts what the use of JUCE brings in, and forming a company
+  would make it count everything the company receives.
   `plugins/vst3/README.md` has the detail under "Licensing".
 - **Measures and the host's time signature.** A measure is four of the host's
   beats counted from the start of its timeline, whatever its signature says.

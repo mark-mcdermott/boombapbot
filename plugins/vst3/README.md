@@ -544,5 +544,6 @@ throws its build away:
   Steinberg's own agreement. Without the GPL, that agreement has to be signed
   with Steinberg, or JUCE moved to a version that bundles the MIT-licensed
   SDK 3.8.
-- Whether the owner sells as a person or as a company is not written down
-  here, and it decides which of the two limits applies.
+- Nothing else. The owner sells as a person, with no company formed, so the
+  limit that applies is the first: what the use of JUCE brings in. Forming a
+  company would change that to everything the company receives.
