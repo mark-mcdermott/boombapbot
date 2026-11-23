@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - plugins/vst3/web
 onlyBuiltDependencies:
   - esbuild
   - sharp
