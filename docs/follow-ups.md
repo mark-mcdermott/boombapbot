@@ -295,9 +295,9 @@ site its icon still opens a modal that says it is not open.
         in Vercel as `LICENSE_SIGNING_KEY` and nowhere else; the public
         half is `LICENSE_PUBLIC_KEY` in
         `packages/contracts/src/license-file.ts`, and goes into the plugin
-        when its check is written. Nobody has checked the two halves
-        against each other: the first file the live server signs, checked
-        against the built-in key, is what will. Losing the signing key
+        when its check is written. The two halves go together: on
+        2026-11-23 the live site's page kept a file the live server signed
+        (see below). Losing the signing key
         means a new pair and new builds of every program; files signed
         with the old one stop verifying in them.
       - Nothing sets `withdrawn_at`. The Stripe webhook still has no case
@@ -314,9 +314,16 @@ site its icon still opens a modal that says it is not open.
         signed with another key, is fetched and not kept. The unlocked path
         was run once by hand in a browser with a page built for a
         throwaway pair: four effects before, ten after, and still ten
-        offline and logged out. Nobody has done it with a real license on
-        the live site, which is also what will first check the two halves
-        of the real pair against each other. What is left of it:
+        offline and logged out. **It works on the live site**: on 2026-11-23 the
+        owner gave their own account a license by adding a row to
+        `licenses` by hand on Neon (its `stripe_session_id` starts
+        `manual_`, since no payment made it), logged in on the site, and
+        the selector reached all ten effects, each of which played. Logged
+        out, it reached four again; logged in with the network off and the
+        page reloaded, it still reached ten. Not tried there: a key alone,
+        which the site's modal offers only while the upgrade is open; a
+        license made by a payment; and the desktop and phone apps. What is
+        left of it:
         - **A key alone unlocks the site and the desktop app**, since
           2026-11-23: typed with nobody logged in, it fetches its file
           (`POST /api/upgrade/license`) and goes onto no account. The
