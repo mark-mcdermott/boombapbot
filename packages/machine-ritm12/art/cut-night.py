@@ -4,7 +4,8 @@ The lamp in the picture can be switched off, and then the machine sits in
 the dark of the room: cooler, dimmer, and lit only by its own lamps and
 screen, which the page draws. This regrades plate.webp and everything in
 patch/ the same way, so a patch still lies on the plate without a seam, and
-puts the lamp itself out. Nothing is moved or redrawn. What it writes,
+puts the lamp itself out. It regrades the phone panel's parts, phone/, as it
+does the machine, so both panels are the same in the dark. Nothing is moved or redrawn. What it writes,
 night/, is committed.
 
     python3 packages/machine-ritm12/art/cut-night.py
@@ -12,6 +13,7 @@ night/, is committed.
 It needs numpy, Pillow and scipy. Run it again when the plate or a patch
 changes. The lamp's box is DESK_LAMP in packages/machine-ritm12/src/ui/layout.ts.
 """
+import re
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +23,7 @@ from scipy import ndimage
 here = Path(__file__).resolve().parent
 night = here / 'night'
 (night / 'patch').mkdir(parents=True, exist_ok=True)
+(night / 'phone').mkdir(parents=True, exist_ok=True)
 
 # The machine keeps most of its own colour; the room behind it goes to the blue of a dark room.
 MACHINE = {'light': np.array([0.83, 1.0, 1.32]), 'colour_kept': 1.0, 'depth': 1.0}
@@ -92,3 +95,16 @@ for patch in sorted((here / 'patch').glob('*.png')):
         colours = graded(pixels[..., :3], **MACHINE) * (KEY_LIFT if patch.name.startswith('key-') else 1)
     write(colours, pixels[..., 3], night / 'patch' / patch.name, optimize=True)
     print(patch.name)
+
+for part in sorted((here / 'phone').iterdir()):
+    if part.suffix == '.svg':
+        # A drawing in one flat ink: the ink is regraded where it is named.
+        inked = re.sub(r'#([0-9a-f]{6})', lambda found: '#' + bytes(
+            (np.clip(graded(np.array([[list(bytes.fromhex(found[1]))]], float) / 255, **MACHINE), 0, 1) * 255).round().astype('uint8').ravel()
+        ).hex(), part.read_text())
+        (night / 'phone' / part.name).write_text(inked)
+    else:
+        pixels = read(part)
+        write(graded(pixels[..., :3], **MACHINE), pixels[..., 3], night / 'phone' / part.name, **(
+            {'quality': 92, 'method': 6} if part.suffix == '.webp' else {'optimize': True}))
+print(len(list((night / 'phone').iterdir())), 'phone parts')

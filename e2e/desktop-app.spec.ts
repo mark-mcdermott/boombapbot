@@ -5,9 +5,10 @@ import { accountFromSignUpToDeletion, openApp } from './shell-account';
 // under the machine are its settings and the account, which lives on the
 // site's server as the phone app's does.
 
-test('the footer has the settings and the account, and nothing of the site', async ({ page }) => {
+test('the footer has the light switch, the settings and the account, and nothing of the site', async ({ page }) => {
   await openApp(page);
-  await expect(page.locator('.sb-footer .sb-footer-icon')).toHaveCount(2);
+  await expect(page.locator('.sb-footer .sb-footer-icon')).toHaveCount(3);
+  await expect(page.getByTestId('light-toggle')).toBeVisible();
   await expect(page.getByTestId('settings')).toBeVisible();
   await expect(page.getByTestId('account')).toBeVisible();
   await expect(page.getByTestId('nav-merch')).toHaveCount(0);

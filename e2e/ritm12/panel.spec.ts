@@ -301,3 +301,30 @@ test('the smoke holds still for whoever asks for less movement', async ({ page }
   await page.waitForTimeout(400);
   expect(await drawn()).toBe(first);
 });
+
+test('the footer has a switch between light and dark beside the settings, and it and the desk lamp are one switch', async ({ page }) => {
+  const toggle = page.getByTestId('light-toggle');
+  const lamp = page.getByRole('button', { name: 'Desk lamp' });
+  // Its icon is the light the machine is in now, and its name is what pressing it does.
+  await expect(toggle).toHaveAttribute('data-light', 'light');
+  await expect(toggle).toHaveAccessibleName('Light mode, switch to dark mode');
+  await expect(toggle.locator('svg.lucide-sun')).toBeVisible();
+  const [switchBox, settingsBox] = [(await toggle.boundingBox())!, (await page.getByTestId('settings').boundingBox())!];
+  expect(switchBox.x + switchBox.width).toBeLessThanOrEqual(settingsBox.x + 1);
+  expect(Math.abs(switchBox.y - settingsBox.y)).toBeLessThan(2);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('data-light', 'dark');
+  await expect(toggle).toHaveAccessibleName('Dark mode, switch to light mode');
+  await expect(toggle.locator('svg.lucide-moon')).toBeVisible();
+  await expect(lamp).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('night')).toHaveCSS('opacity', '1');
+
+  await lamp.click();
+  await expect(toggle).toHaveAttribute('data-light', 'light');
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(lamp).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Enter');
+  await expect(lamp).toHaveAttribute('aria-pressed', 'true');
+});
