@@ -12,7 +12,7 @@ import {
   type VoiceId,
 } from '../document';
 import { shownRow } from '../session';
-import { holdsUpgrade } from '../upgrade';
+import { useHoldsUpgrade } from '../upgrade';
 import type { KeyWiring, KnobWiring, LampWiring } from './Controls';
 import { useEditorState, useRuntime, type Readout } from './context';
 import { LETTERING, useScript } from './lettering';
@@ -116,7 +116,7 @@ export function useWiring(): Wiring {
   );
 
   const { panel, mix, effect, size } = project;
-  const effects = reachableEffects(holdsUpgrade());
+  const effects = reachableEffects(useHoldsUpgrade());
   const effectLeftOut = !effects.includes(effect.kind);
   const selected = getVoice(panel.selected);
   const knobs = project.voices[panel.selected];

@@ -465,6 +465,38 @@ test('a key bought without an account is entered in the modal, once somebody is 
   await expect(page.getByTestId('upgrade-key')).toHaveText(key);
 });
 
+test('an upgraded account brings its license file to the browser, which trusts only the key built into it', async ({ page, request }) => {
+  const key = await boughtWithoutAccount(request);
+  const fetched = () =>
+    page.waitForResponse((answer) => new URL(answer.url()).pathname === '/api/upgrade/license' && answer.request().method() === 'GET');
+  const kept = () => page.evaluate(() => localStorage.getItem('boombapbot.license.v1'));
+
+  // Logged in and not upgraded, the browser asks and is told there is none.
+  await openEditor(page);
+  const [none] = await Promise.all([fetched(), signedUp(page)]);
+  expect(none.status()).toBe(404);
+  await page.getByTestId('account-close').click();
+
+  // The key goes onto the account, and the file is fetched without being asked for.
+  await openUpgrade(page);
+  await page.getByTestId('upgrade-to-key').click();
+  await page.getByTestId('upgrade-key-input').fill(key);
+  const [afterKey] = await Promise.all([fetched(), page.getByTestId('upgrade-submit').click()]);
+  expect(afterKey.status()).toBe(200);
+  expect((await afterKey.json()).file).toMatch(/^boombapbot-license\./);
+  await expect(page.getByTestId('upgrade-key')).toHaveText(key);
+
+  // This server signs with a key made for the run, not the one the page was
+  // built with, so its file is a forgery to the page: not kept, and nothing unlocked.
+  expect(await kept()).toBeNull();
+  await expect(page.getByTestId('upgrade-on-device')).toHaveCount(0);
+
+  // The page asks again when it next finds the account logged in.
+  const [onLoad] = await Promise.all([fetched(), page.reload()]);
+  expect(onLoad.status()).toBe(200);
+  expect(await kept()).toBeNull();
+});
+
 test('a lost key is asked for in the modal and emailed to the address that bought it', async ({ page, request }) => {
   const address = newAddress();
   const key = await boughtWithoutAccount(request, address);

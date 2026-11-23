@@ -8,6 +8,7 @@ import { SnareWasm, type SynthSound } from './engine/wasm-engine';
 import type { WavBitDepth } from './engine/wav';
 import type { Machine, MachineHost, MachineSession, StartPlan } from './machine';
 import type { KeyValueStorage } from './state/draft-storage';
+import { deviceLicense } from './upgrade/device-license';
 import { keyValueDrafts, noDrafts, pageDrafts, type Drafts } from './state/drafts';
 import { downloadFile, exportBaseName, projectFileName, readProjectFile, type SaveFile } from './state/project-io';
 import { EditorStore, newProjectId, wavExportUnderWay } from './state/store';
@@ -200,8 +201,11 @@ export class EditorRuntime<
       this.persist(next.project);
       this.syncAudio();
     });
+    // A machine may ask for more of the engine once the device holds the upgrade.
+    const stopLicense = deviceLicense().subscribe(() => this.syncAudio());
     this.unsubscribe = () => {
       stopStore();
+      stopLicense();
       stopWrites();
       stopTab?.();
     };

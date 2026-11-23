@@ -1,8 +1,9 @@
 import { LICENSE_KEY_PREFIX, formatPrice, type License, type UpgradeAnswer } from '@boombapbot/contracts';
 import { Copy, Sparkles } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
-import { authClient, explain, type Failure } from '../account/client';
+import { authClient, draftKeeper, explain, type Failure } from '../account/client';
 import { signedInAccount } from '../account/session';
+import { fetchDeviceLicense, useDeviceUpgraded } from '../upgrade/device-license';
 import { askUpgrade, fetchLicense, redeemKey, remindKey, startCheckout } from '../upgrade/client';
 import { takeParams } from './arrival';
 import { LinkButton, Problem as SharedProblem, useAttempt } from './attempt';
@@ -302,6 +303,12 @@ type Held = { state: 'loading' } | { state: 'failed'; problem: string } | { stat
 function Upgraded({ baseUrl }: { baseUrl: string }) {
   const [held, setHeld] = useState<Held>({ state: 'loading' });
   const [copied, setCopied] = useState<string | null>(null);
+  const onDevice = useDeviceUpgraded();
+
+  // An account upgraded a moment ago, by paying or by a key, logged in before it was.
+  useEffect(() => {
+    void fetchDeviceLicense(baseUrl);
+  }, [baseUrl]);
 
   useEffect(() => {
     let current = true;
@@ -327,6 +334,11 @@ function Upgraded({ baseUrl }: { baseUrl: string }) {
   return (
     <div data-testid="upgrade-upgraded">
       <p className="sb-modal-text">This account is upgraded. This is its license key.</p>
+      {onDevice && (
+        <p className="sb-modal-text" data-testid="upgrade-on-device">
+          The upgrade is unlocked on {draftKeeper()}, and stays unlocked offline.
+        </p>
+      )}
       {held.state === 'loading' && (
         <p className="sb-modal-text" role="status">
           Fetching the key…

@@ -232,12 +232,13 @@ site its icon still opens a modal that says it is not open.
     2026-11-23: a beat can name any of the six, and a program that does not
     hold the upgrade opens it, plays it without that effect, and says so
     (`engineSetup`, `holdsUpgrade` in the machine's `src/upgrade.ts`, which
-    answers no everywhere until a program is given its license file). The
+    since 2026-11-23 answers yes where the device keeps a license file
+    that checks out, and no in the plugin, which reads none). The
     schema is version 4 for it, by the owner's decision. A beat of
     version 3 is brought up to date as it is read, with nothing lost
     (`fixtures/version-3.project.json`); a program from before version 4
-    refuses any beat saved since, and the plugin reads both. The selector still reaches only the four, so nothing
-    writes such a beat yet. The plugin loads one with its effect off and
+    refuses any beat saved since, and the plugin reads both. The selector reaches only the four without the upgrade
+    and all ten with it, so only an upgraded device writes such a beat. The plugin loads one with its effect off and
     says which effect that was, but does not keep the name: saved from the
     plugin, the beat has no effect. The six names on the label are
     stand-ins. Where they sit was decided by the
@@ -302,10 +303,35 @@ site its icon still opens a modal that says it is not open.
       - Nothing sets `withdrawn_at`. The Stripe webhook still has no case
         for a refund, and a withdrawn license still counts as upgraded on
         the site (`isUpgraded`) and still shows its key.
-      - Nothing fetches, keeps or reads a file: not the site, the desktop
-        app, the phone apps or the plugin, whose C++ check is not written.
-        Where the desktop app and the plugin keep the one file they share
-        is not chosen.
+      - **The site, the desktop app and the phone apps fetch, keep and
+        check a file**, since 2026-11-23
+        (`packages/editor/src/upgrade/device-license.ts`). A page that
+        finds an upgraded account logged in, or has just put a key on one,
+        asks `GET /api/upgrade/license`, checks the file against the
+        built-in key and keeps it in the browser's storage; РИТМ-12 then
+        reaches and plays the six. Checked in the unit tests, and in a
+        browser against the built server, where the test server's file,
+        signed with another key, is fetched and not kept. The unlocked path
+        was run once by hand in a browser with a page built for a
+        throwaway pair: four effects before, ten after, and still ten
+        offline and logged out. Nobody has done it with a real license on
+        the live site, which is also what will first check the two halves
+        of the real pair against each other. What is left of it:
+        - A key alone unlocks nothing yet. No program takes a key without
+          an account: the site's modal sends such a person to log in, and
+          the desktop app has no upgrade modal at all.
+        - The plugin reads no file and its C++ check is not written. The
+          desktop app keeps its file in its web view's storage, where the
+          plugin cannot read it; the one place they share is not chosen.
+        - The phone apps keep the file in the web view's storage, which
+          the system may clear. Logging in fetches it again.
+        - A device stays unlocked after a log-out, on a shared computer
+          too. That follows from files that do not run out and no limit on
+          devices; it is the owner's to change.
+        - A logged-in account that has not upgraded is asked about once
+          for each page it opens, and answered 404.
+        - Nothing gates the six effects on the server: a beat that names
+          one is saved and loaded for anybody, and plays without it.
       - The key route's limit, ten tries in ten minutes from one address,
         has run on the test server and not on Vercel. Its refusal borrows
         the words of the key-by-email limit, which say "an hour".

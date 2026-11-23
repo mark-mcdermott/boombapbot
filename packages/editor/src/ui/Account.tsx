@@ -15,6 +15,7 @@ import {
 import { removeAvatar, uploadAvatar } from '../account/avatar';
 import { deviceBeatLinks } from '../account/beat-links';
 import { signedInAccount, type SignedInAccount } from '../account/session';
+import { fetchDeviceLicense } from '../upgrade/device-license';
 import { takeParams } from './arrival';
 import { LinkButton, Problem as SharedProblem, useAttempt } from './attempt';
 import { Avatar } from './Avatar';
@@ -492,6 +493,12 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
     setView(next);
     setNotice(said ?? null);
   };
+
+  // Logging in is what brings an upgraded account's license file to a device.
+  const accountId = account?.id ?? null;
+  useEffect(() => {
+    if (accountId) void fetchDeviceLicense(baseUrl);
+  }, [accountId, baseUrl]);
 
   useEffect(() => {
     const arrival = takeArrival();
