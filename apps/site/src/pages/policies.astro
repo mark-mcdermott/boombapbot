@@ -1,20 +1,21 @@
 ---
+import { UPGRADE_PRICE_CENTS } from '@boombapbot/contracts';
 import { SitePage } from '@boombapbot/editor';
 import Section from '../components/Section.astro';
 import Base from '../layouts/Base.astro';
 
 const base = import.meta.env.BASE_URL;
+const UPGRADE_PRICE = `${UPGRADE_PRICE_CENTS / 100} dollars`;
 ---
 
 <Base
   title="Policies · boombapbot"
-  description="What boombapbot keeps, how the shop works, the terms it is offered on, and what it is and is not."
+  description="What boombapbot keeps, how the upgrade and the shop work, the terms it is offered on, and what it is and is not."
 >
   <SitePage client:load baseUrl={base} current="policies">
     <h1>Policies</h1>
     <p class="sb-lede">
-      This page is short because the site does very little with you. I'll update it again before the upgrade is
-      for sale.
+      This page is short because the site does very little with you.
     </p>
 
     <Section title="Privacy">
@@ -37,8 +38,8 @@ const base = import.meta.env.BASE_URL;
           it.
         </li>
         <li>
-          <strong>I email you twice at most, and only when you ask.</strong> Once to confirm the address, and again
-          if you ask to reset your password. Nothing else.
+          <strong>I email you only when you ask.</strong> Once to confirm the address, and again if you ask to
+          reset your password. Buying the upgrade sends its key, as set out below. Nothing else.
         </li>
         <li>
           <strong>One cookie.</strong> Logging in sets a cookie that keeps you logged in. Logging out removes it.
@@ -63,12 +64,61 @@ const base = import.meta.env.BASE_URL;
         <li>
           <strong>No analytics, no ads, no third-party scripts.</strong> Three companies do the plumbing: Vercel
           hosts the site and keeps ordinary request logs, Neon runs the database the accounts and saved beats live in, and Resend
-          delivers the emails. Buying from the shop brings in two more, set out below.
+          delivers the emails. Buying the upgrade or from the shop brings in Stripe, and the shop brings in
+          Printful, both set out below.
         </li>
         <li>
           <strong>Deleting an account.</strong> The account window has a delete button. It asks for your password,
           then removes the account, its log-ins, its picture and every beat saved in it straight away. Orders you placed are
-          kept as records, no longer tied to an account.
+          kept as records, no longer tied to an account. A license you bought is kept too, and its key still
+          works.
+        </li>
+      </ul>
+    </Section>
+
+    <Section title="The upgrade">
+      <ul>
+        <li>
+          <strong>What it is.</strong> One payment of {UPGRADE_PRICE}, once. It adds six effects to the machine: a
+          crusher, tape, a pump, a filter, vinyl and a phaser. There is no subscription and nothing renews. The
+          machine, its eight sounds and its first four effects stay free. It is not for sale yet.
+        </li>
+        <li>
+          <strong>What you get.</strong> A license key, sent to the email address you give when you pay. You don't
+          need an account to buy it. The key is yours to use on as many of your own devices as you like, and I
+          don't count them.
+        </li>
+        <li>
+          <strong>Refunds.</strong> Ask within 30 days and I'll give you the {UPGRADE_PRICE} back, whatever the
+          reason. After a refund the key stops unlocking anything new.
+        </li>
+        <li>
+          <strong>What you pay.</strong> The price is in US dollars. I don't collect sales tax or VAT on it.
+        </li>
+        <li>
+          <strong>Who takes the money.</strong> Stripe does, on its own page. Your card details go to Stripe and
+          never reach this site.
+        </li>
+        <li>
+          <strong>What a license keeps.</strong> The email address the key was sent to, the key, when you bought
+          it and the reference Stripe gives the payment. If you were logged in, or you enter the key in an
+          account, the license is tied to that account. Deleting the account unties it and keeps the license, so
+          the key still works.
+        </li>
+        <li>
+          <strong>If you lose the key.</strong> Ask in the upgrade window and I'll send it again to the address
+          that bought it. To stop that being used to pester anyone, I count how often an address is asked about
+          and how often a visitor asks.
+        </li>
+        <li>
+          <strong>What stays on your device.</strong> Entering a key, or logging in to an upgraded account, puts a
+          small license file on the device. The machine checks that file itself, without asking the site, so
+          the upgrade works with no connection. The file holds the license's number, when it was issued and what it
+          unlocks. It does not hold your name or your email address.
+        </li>
+        <li>
+          <strong>A beat made with the upgrade opens for anyone.</strong> Without the upgrade it plays with that
+          effect off, and says so.
         </li>
       </ul>
     </Section>
@@ -123,10 +173,6 @@ const base = import.meta.env.BASE_URL;
         </li>
         <li>The sounds are synthesised here. They are not samples or recordings of any hardware.</li>
         <li>The picture of the machine is original artwork.</li>
-        <li>
-          The one-time upgrade is not for sale yet. What it costs, how refunds for it work and what is collected
-          to take payment will be set out here before it opens.
-        </li>
       </ul>
     </Section>
 
