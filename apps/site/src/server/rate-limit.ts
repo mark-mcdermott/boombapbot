@@ -21,6 +21,7 @@ export interface RateRule {
 export const SITE_RATE_RULES = {
   '/site/key-by-email/address': { window: 60 * 60, max: 3 },
   '/site/key-by-email/ip': { window: 10 * 60, max: 5 },
+  '/site/license-by-key/ip': { window: 10 * 60, max: 10 },
 } as const satisfies Record<string, RateRule>;
 
 export type SiteRateRule = keyof typeof SITE_RATE_RULES;

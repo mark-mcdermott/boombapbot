@@ -261,6 +261,42 @@ site its icon still opens a modal that says it is not open.
       licenses that expire and need the server.
     - The stores' cut and their rules on linking out to another checkout
       were not checked and change by country; check them when this is built.
+    - **The license file and the server's side of it are built**, on
+      2026-11-22, and nothing uses them yet. The format is in
+      `docs/license-file.md`: one line, a JSON payload (version, license
+      id, when it was issued, what it unlocks) and an Ed25519 signature
+      over the bytes as they are in the file, with no expiry.
+      `POST /api/upgrade/license` gives a file for a key alone and
+      `GET /api/upgrade/license` gives one to an upgraded account;
+      `verifyLicenseFile` in `packages/contracts` checks one. Checked in
+      the unit tests (changed, cut short, wrong key, wrong version, and
+      against Node's own Ed25519) and against the built server with its
+      database in memory. What is left, in order:
+      - **Run the migration before the code is deployed.**
+        `apps/site/drizzle/0007_license_withdrawn.sql` adds `withdrawn_at`
+        to `licenses`. It has not been run on Neon. The Stripe webhook
+        reads whole license rows, so the deployed code needs the column to
+        be there first.
+      - **Make the real key pair** with `pnpm license:keypair`. The signing
+        half goes into Vercel as `LICENSE_SIGNING_KEY` and nowhere else;
+        the public half goes into `LICENSE_PUBLIC_KEY` in
+        `packages/contracts/src/license-file.ts`, and into the plugin when
+        its check is written. Until the first is set the routes answer 503
+        `no_signing_key`; until the second is, no program accepts a file.
+        Losing the signing key means a new pair and new builds of every
+        program; files signed with the old one stop verifying in them.
+      - Nothing sets `withdrawn_at`. The Stripe webhook still has no case
+        for a refund, and a withdrawn license still counts as upgraded on
+        the site (`isUpgraded`) and still shows its key.
+      - Nothing fetches, keeps or reads a file: not the site, the desktop
+        app, the phone apps or the plugin, whose C++ check is not written.
+        Where the desktop app and the plugin keep the one file they share
+        is not chosen.
+      - The key route's limit, ten tries in ten minutes from one address,
+        has run on the test server and not on Vercel. Its refusal borrows
+        the words of the key-by-email limit, which say "an hour".
+      - Both routes answer whether or not the upgrade is open, like the
+        routes that enter and recover a key.
   - **The modal is built**, on 2026-11-18, and shows only while the server
     says the upgrade is open: the price from `GET /api/upgrade`, a button
     that goes to Stripe, the way back (`/?upgrade=paid` and

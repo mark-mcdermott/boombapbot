@@ -28,7 +28,8 @@
     "db:generate": "pnpm --filter @boombapbot/site db:generate",
     "db:migrate": "pnpm --filter @boombapbot/site db:migrate",
     "shop:sync": "node scripts/sync-shop.mjs",
-    "shop:webhook": "node scripts/register-printful-webhook.mjs"
+    "shop:webhook": "node scripts/register-printful-webhook.mjs",
+    "license:keypair": "node scripts/make-license-keypair.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

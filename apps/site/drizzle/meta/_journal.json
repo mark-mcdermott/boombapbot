@@ -50,6 +50,13 @@
       "when": 1795292187342,
       "tag": "0006_avatars",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795411105432,
+      "tag": "0007_license_withdrawn",
+      "breakpoints": true
     }
   ]
 }

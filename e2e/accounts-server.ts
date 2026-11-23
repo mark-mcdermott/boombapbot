@@ -20,6 +20,13 @@ export const STRIPE_WEBHOOK_SECRET = 'browser-tests-only-stripe-webhook';
 export const PRINTFUL_WEBHOOK_SECRET = 'browser-tests-only-printful-webhook';
 
 /**
+ * The key the test server signs license files with: 32 random bytes, made
+ * by whichever process starts the run and handed to its workers through the
+ * environment, so the tests can check a signature and no key is in the repo.
+ */
+export const LICENSE_SIGNING_KEY = (process.env.BOOMBAPBOT_E2E_LICENSE_SIGNING_KEY ??= randomBytes(32).toString('base64url'));
+
+/**
  * What the built server is started with: a database in memory, the outbox in
  * place of real email, and the fake in place of Stripe and Printful. The
  * secrets are made up on the spot and open nothing.
@@ -36,6 +43,7 @@ export function serverEnv(port: number): Record<string, string> {
     STRIPE_SECRET_KEY: randomBytes(16).toString('hex'),
     STRIPE_WEBHOOK_SECRET,
     STRIPE_API_URL: FAKE_SERVICES_URL,
+    LICENSE_SIGNING_KEY,
     PRINTFUL_API_KEY: randomBytes(16).toString('hex'),
     PRINTFUL_WEBHOOK_SECRET,
     PRINTFUL_API_URL: FAKE_SERVICES_URL,

@@ -1,0 +1,1 @@
+ALTER TABLE "licenses" ADD COLUMN "withdrawn_at" timestamp with time zone;

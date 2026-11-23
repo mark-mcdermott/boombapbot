@@ -26,6 +26,8 @@ const STATUS: Record<UpgradeRefusal, number> = {
   key_taken: 409,
   invalid: 400,
   too_many: 429,
+  withdrawn: 403,
+  no_signing_key: 503,
 };
 
 const MESSAGES: Record<UpgradeRefusal, string> = {
@@ -37,6 +39,8 @@ const MESSAGES: Record<UpgradeRefusal, string> = {
   key_taken: 'That license key is already on another account.',
   invalid: 'That request could not be read.',
   too_many: 'I have had that request a lot just now. Try again in an hour.',
+  withdrawn: 'That license was withdrawn, so it gives out no more license files.',
+  no_signing_key: 'License files cannot be made just now.',
 };
 
 /** The answer when a request is turned down: why, in a word and in a sentence. */
