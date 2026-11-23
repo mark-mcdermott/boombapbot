@@ -12,6 +12,7 @@ import { Footer } from './Footer';
 import { Header } from './Header';
 import { NoticeBanner } from './StatusBar';
 import { PlayButton } from './PlayButton';
+import { LightToggle } from './LightToggle';
 import { Settings } from './Settings';
 import type { BelowMachine } from './ShellFooter';
 
@@ -129,7 +130,13 @@ function EditorBody({ runtime, baseUrl, below, accounts = !below }: EditorBodyPr
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [runtime]);
 
-  const settings = <Settings container={modals} accounts={accounts} device={device} />;
+  const { light } = runtime.machine;
+  const settings = (
+    <>
+      {light ? <LightToggle light={light} container={modals} /> : null}
+      <Settings container={modals} accounts={accounts} device={device} />
+    </>
+  );
   return (
     <div
       className="sb-app"

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState, type RefObject } from 'react';
+import { useReducedMotion } from './motion';
 import { ALL_SEGMENTS, CELL, POINT, cellsOf, litPath, readable, windowOf, type Cell } from './segments';
 
 /** How long a line a control put up stays, in milliseconds. */
@@ -25,17 +26,6 @@ function cutShort(cells: readonly Cell[], count: number): Cell[] {
   const kept = cells.slice(0, count - 2).map((cell) => ({ ...cell }));
   kept[kept.length - 1]!.point = true;
   return [...kept, { lit: [], point: true }, { lit: [], point: true }];
-}
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const follow = () => setReduced(query.matches);
-    query.addEventListener('change', follow);
-    return () => query.removeEventListener('change', follow);
-  }, []);
-  return reduced;
 }
 
 /**
@@ -80,20 +70,22 @@ interface ReadoutProps {
   /** What it shows while nothing has been said: where the machine stands. */
   idle: string;
   power: boolean;
+  /** What the readout is called, lettered beside it. */
+  name: string;
   /** How many characters it has. A longer line runs across it. */
   cells: number;
   className: string;
 }
 
 /**
- * A strip of sixteen-segment characters under the screen that says in
+ * A strip of sixteen-segment characters in a box of its own that says in
  * English what a control is or just did, for whoever can see the Russian
  * lettering and not read it. Its unlit segments show faintly, as a real
  * readout's do. It is also the panel's live line for a screen reader, which
  * hears what controls say but not the names of those it moves to, since it
  * announces those itself.
  */
-export function Readout({ spoken, said, scope, idle, power, cells: count, className }: ReadoutProps) {
+export function Readout({ spoken, said, scope, idle, power, name, cells: count, className }: ReadoutProps) {
   const [message, clear] = useMessage(spoken, said, scope);
   const reduced = useReducedMotion();
   const [offset, setOffset] = useState(0);
@@ -121,7 +113,12 @@ export function Readout({ spoken, said, scope, idle, power, cells: count, classN
 
   return (
     <div className={`rt-readout ${className}`} data-testid="readout" data-power={power ? 'on' : 'off'} data-text={message?.text ?? ''} data-shown={text}>
-      <i className="rt-readout-screw" />
+      <span className="rt-readout-name" aria-hidden="true" data-testid="readout-name">
+        <svg viewBox="0 0 14 12">
+          <path d="M0 0.5h2v2H0zM4 0.5h10v2H4zM0 5h2v2H0zM4 5h10v2H4zM0 9.5h2v2H0zM4 9.5h10v2H4z" />
+        </svg>
+        {name}
+      </span>
       <div className="rt-readout-glass">
         <svg viewBox={`-6 -5 ${width + 12} ${CELL.height + 10}`} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
           <defs>
@@ -138,7 +135,6 @@ export function Readout({ spoken, said, scope, idle, power, cells: count, classN
           </g>
         </svg>
       </div>
-      <i className="rt-readout-screw" />
       <span className="sb-visually-hidden" aria-live="polite" data-testid="spoken">
         {spoken}
       </span>

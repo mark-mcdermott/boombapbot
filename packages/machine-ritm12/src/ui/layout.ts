@@ -32,6 +32,8 @@ export interface KnobPlace {
 export interface InstrumentPlace {
   voice: VoiceId;
   button: Rect;
+  /** The end of the key its drawing is printed on, where that drawing's picture is laid over the plate. */
+  ink: Rect;
   knob: KnobPlace;
 }
 
@@ -39,6 +41,7 @@ const LEVEL_X = 422;
 const instrument = (voice: VoiceId, button: Rect, knobY: number, pivot: Offset): InstrumentPlace => ({
   voice,
   button,
+  ink: [158, button[1] + 5, 216, button[3] - 5],
   knob: { x: LEVEL_X, y: knobY, r: 30, kind: 'level', pivot },
 });
 
@@ -75,6 +78,24 @@ export const BUTTONS = {
   dice: [1696, 1100, 1773, 1177],
   clear: [1788, 1100, 1869, 1177],
 } as const satisfies Record<string, Rect>;
+
+/**
+ * The ashtray on the bench in front of the machine's corner, running off the
+ * picture's foot: the box of what shows of it, the lit end of its cigarette,
+ * and the box its smoke rises in, with the lit end at the middle of that
+ * box's foot.
+ */
+const LIT_END = { x: 1879, y: 1242 } as const;
+export const ASHTRAY = {
+  rect: [1611, 1186, 2000, 1333] as Rect,
+  ember: { ...LIT_END, r: 38 },
+  smoke: [LIT_END.x - 300, LIT_END.y - 760, LIT_END.x + 300, LIT_END.y] as Rect,
+} as const;
+
+/** The lamp over the machine, which is pressed to switch the room's light off and on. */
+export const DESK_LAMP: Rect = [0, 0, 360, 154];
+/** The lamp made larger than the plate has it, laid over the plate's corner. */
+export const DESK_LAMP_PATCH: Rect = [0, 0, 380, 162];
 
 export const POWER_LAMP = { x: 324, y: 1127, r: 15 } as const;
 
@@ -145,13 +166,17 @@ export const KNOB_SWEEP = 270;
 
 export const SCREEN = { rect: [931, 263, 1398, 536] as Rect, width: 467, height: 273 } as const;
 
-/** The readout let into the screen frame's lower lip, between its screws: as wide as the screen. */
-export const READOUT: Rect = [886, 545, 1438, 598];
+/**
+ * The status readout's own box, under the level meter's. The picture was
+ * painted without it: `patch` is where the picture of both boxes is laid
+ * over the plate, and `box` the readout's, inside its painted line.
+ */
+export const STATUS = { patch: [505, 278, 870, 580] as Rect, box: [516, 494, 859, 574] as Rect } as const;
 
 export const METER = {
-  rect: [566, 384, 810, 510] as Rect,
+  rect: [602.7, 361, 773.8, 449.4] as Rect,
   /** Where the needle turns, from the meter's left and bottom edges, and how long it is. */
-  needle: { left: 122.5, bottom: -25, width: 3, length: 141 },
+  needle: { left: 85.9, bottom: -17.5, width: 2.2, length: 98.8 },
   /** The painted scale: decibels, and the needle's angle at each. */
   scale: [
     [-20, -45.3],

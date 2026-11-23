@@ -205,7 +205,8 @@ test('a control touched on the phone’s panel says in English what it is on the
   await expect(readout).toHaveAttribute('data-text', `Tempo: ${before} beats a minute`);
   expect((await beat(page)).tempo).toBe(before);
 
-  // It is a row of its own under the screen's frame, as wide as the frame, one line tall, and goes quiet again.
+  // It is a box of its own under the screen's frame, as wide as the frame, one line tall, with its name, and goes quiet again.
+  await expect(page.getByTestId('readout-name')).toHaveText('СТАТУС');
   const frame = (await page.locator('.rt-ph-crt').boundingBox())!;
   const strip = (await readout.boundingBox())!;
   expect(strip.y).toBeGreaterThanOrEqual(frame.y + frame.height);
@@ -276,4 +277,41 @@ test('on a phone the WAV export chip sits centred at the foot of the screen, ove
   await download;
   await expect(chip).toHaveText('WAV exported, open settings');
   await expect(chip).toHaveCount(0, { timeout: 10_000 });
+});
+
+test('the switch in the footer puts the phone’s panel in the dark, with every part the dark room’s, and back', async ({ page }) => {
+  await openPhonePanel(page);
+  const panel = page.getByTestId('panel');
+  const toggle = page.getByTestId('light-toggle');
+  const parts = () =>
+    panel.locator('img').evaluateAll((nodes) =>
+      nodes.map((node) => ({
+        loaded: (node as HTMLImageElement).naturalWidth > 0,
+        dark: (node as HTMLImageElement).src.includes('/machines/ritm12/night/phone/'),
+      })),
+    );
+  const lettering = () => panel.locator('.rt-ph-let').first().evaluate((node) => getComputedStyle(node).color);
+  await expect(panel).toHaveAttribute('data-lamp', 'lit');
+  await expect(toggle.locator('svg.lucide-sun')).toBeVisible();
+  expect((await parts()).some((part) => part.dark)).toBe(false);
+  const lit = await lettering();
+
+  await toggle.tap();
+  await expect(panel).toHaveAttribute('data-lamp', 'out');
+  await expect(toggle.locator('svg.lucide-moon')).toBeVisible();
+  await expect.poll(async () => (await parts()).every((part) => part.loaded && part.dark)).toBe(true);
+  expect((await parts()).length).toBeGreaterThan(20);
+  expect(await lettering()).not.toBe(lit);
+  // The keys cut from the art, which the page lays out through its own styles, are the dark room's too.
+  expect(await panel.evaluate((node) => getComputedStyle(node).getPropertyValue('--rt-cap'))).toContain('/night/phone/key.webp');
+
+  // It is kept, and the panel still works in the dark.
+  await page.reload();
+  await expect(page.getByTestId('panel')).toHaveAttribute('data-lamp', 'out');
+  await step(page, 2).tap();
+  await expect(step(page, 2)).toHaveAttribute('aria-pressed', /true|false/);
+
+  await page.getByTestId('light-toggle').tap();
+  await expect(page.getByTestId('panel')).toHaveAttribute('data-lamp', 'lit');
+  expect((await parts()).some((part) => part.dark)).toBe(false);
 });

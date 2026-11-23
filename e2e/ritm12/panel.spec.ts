@@ -18,11 +18,15 @@ test('the machine is its picture, with every control inside it', async ({ page }
     expect(box.bottom).toBeLessThanOrEqual(frame.y + frame.height + 1);
   }
   // The picture and every piece laid over it came from this build.
-  const images = await page.locator('.rt-plate, .rt-patch').evaluateAll((nodes) =>
+  const images = await page.locator('.rt-stage > .rt-plate, .rt-stage > .rt-patch').evaluateAll((nodes) =>
     nodes.map((node) => ({ src: (node as HTMLImageElement).src, loaded: (node as HTMLImageElement).naturalWidth > 0 })),
   );
-  expect(images.length).toBe(7);
+  expect(images.length).toBe(7 + 8 + 1 + 1);
   expect(images.every((image) => image.loaded && image.src.includes('/machines/ritm12/'))).toBe(true);
+  // Each instrument key wears its drawing, whatever the controls are set to.
+  const drawings = page.locator('.rt-stage > .rt-patch[src*="/patch/key-"]');
+  await expect(drawings).toHaveCount(8);
+  for (const drawing of await drawings.all()) await expect(drawing).toBeVisible();
 });
 
 test('step keys put hits of the selected instrument on and take them off', async ({ page }) => {
@@ -45,7 +49,7 @@ test('step keys put hits of the selected instrument on and take them off', async
 
 test('the write switch turns the step keys to accents, and shows its other picture', async ({ page }) => {
   await emptyPattern(page);
-  const patch = page.locator('.rt-patch[src*="write-accents"]');
+  const patch = page.locator('.rt-stage > .rt-patch[src*="write-accents"]');
   await expect(patch).toBeHidden();
   await page.getByTestId('write').click();
   await expect(patch).toBeVisible();
@@ -75,7 +79,7 @@ test('the effect selector steps through its four positions and the mix knob adds
     seen.push((await beat(page)).effect.kind);
   }
   expect(seen).toEqual(['reverb', 'flanger', 'chorus', 'delay']);
-  await expect(page.locator('.rt-patch[src*="effect-delay"]')).toBeVisible();
+  await expect(page.locator('.rt-stage > .rt-patch[src*="effect-delay"]')).toBeVisible();
   const mix = page.getByTestId('mix');
   await mix.focus();
   await page.keyboard.press('PageUp');
@@ -113,16 +117,17 @@ test('knobs turn by keyboard and by dragging, and say where they stand', async (
   await expect(page.getByTestId('pitch')).toHaveAccessibleName('Perc pitch');
 });
 
-test('the readout under the screen says in English what a control is or did', async ({ page }) => {
+test('the status readout has a box of its own, and says in English what a control is or did', async ({ page }) => {
   const readout = page.getByTestId('readout');
   const screen = (await page.getByTestId('screen').boundingBox())!;
+  const needle = (await page.locator('.rt-meter').boundingBox())!;
   const strip = (await readout.boundingBox())!;
-  // A module of its own on the frame's lower lip: centred under the screen, wider than the glass, one line tall.
-  expect(Math.abs(strip.x + strip.width / 2 - (screen.x + screen.width / 2))).toBeLessThanOrEqual(3);
-  expect(strip.width).toBeGreaterThan(screen.width);
-  expect(strip.y).toBeGreaterThanOrEqual(screen.y + screen.height);
-  expect(strip.y - (screen.y + screen.height)).toBeLessThan(screen.height / 4);
-  expect(strip.height).toBeLessThan(screen.height / 4);
+  // Its box is under the level meter's, clear of the screen and its frame, and is lettered with its name.
+  expect(strip.x + strip.width).toBeLessThan(screen.x);
+  expect(strip.y).toBeGreaterThan(needle.y + needle.height);
+  expect(Math.abs(strip.x + strip.width / 2 - (needle.x + needle.width / 2))).toBeLessThanOrEqual(3);
+  await expect(page.getByTestId('readout-name')).toHaveText('СТАТУС');
+  await expect(page.locator('.rt-stage > .rt-patch[src*="/patch/status"]')).toBeVisible();
 
   // Left alone, it says where the machine stands rather than going blank.
   await expect(readout).toHaveAttribute('data-shown', /^PATTERN A {2}KICK {2}\d+ BPM$/);
@@ -192,11 +197,134 @@ test('mute, dice and clear work on what is selected', async ({ page }) => {
 test('switched off, the machine is dark and its controls are out of reach', async ({ page }) => {
   await page.getByTestId('power').click();
   await expect(page.getByTestId('panel')).toHaveAttribute('data-power', 'off');
-  await expect(page.locator('.rt-patch[src*="power-on"]')).toBeHidden();
+  await expect(page.locator('.rt-stage > .rt-patch[src*="power-on"]')).toBeHidden();
   await expect(page.locator('.rt-controls')).toHaveAttribute('inert', '');
   const before = await beat(page);
   await step(page, 2).click({ force: true });
   expect(await beat(page)).toEqual(before);
   await page.getByTestId('power').click();
-  await expect(page.locator('.rt-patch[src*="power-on"]')).toBeVisible();
+  await expect(page.locator('.rt-stage > .rt-patch[src*="power-on"]')).toBeVisible();
+});
+
+test('the desk lamp switches the room dark and lit again, and stays as it was left', async ({ page }) => {
+  const lamp = page.getByRole('button', { name: 'Desk lamp' });
+  const night = page.getByTestId('night');
+  await expect(lamp).toHaveAttribute('aria-pressed', 'true');
+  await expect(night).toHaveCSS('opacity', '0');
+
+  await lamp.click();
+  await expect(lamp).toHaveAttribute('aria-pressed', 'false');
+  await expect(night).toHaveCSS('opacity', '1');
+  // The dark room is the same picture and the same pieces, each over its lit one.
+  const pictures = (within: string) =>
+    page.locator(`${within} > .rt-plate, ${within} > .rt-patch`).evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const { x, y, width, height } = node.getBoundingClientRect();
+        return {
+          file: (node as HTMLImageElement).src.split('/machines/ritm12/')[1]!.replace(/^night\//, ''),
+          loaded: (node as HTMLImageElement).naturalWidth > 0,
+          shown: getComputedStyle(node).visibility === 'visible',
+          box: [x, y, width, height].map(Math.round),
+        };
+      }),
+    );
+  const dark = await pictures('[data-testid="night"]');
+  expect(dark).toEqual(await pictures('.rt-stage'));
+  expect(dark.every((picture) => picture.loaded)).toBe(true);
+  // What the machine lights itself is not dimmed with the room.
+  await expect(page.getByTestId('power')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(page.getByTestId('plate')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Desk lamp' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('night')).toHaveCSS('opacity', '1');
+
+  await page.getByRole('button', { name: 'Desk lamp' }).click();
+  await expect(page.getByTestId('night')).toHaveCSS('opacity', '0');
+  expect(await page.evaluate(() => localStorage.getItem('boombapbot.ritm12.desk-lamp'))).toBeNull();
+});
+
+test('an ashtray stands by the machine in either light, its cigarette smoking, and is in nobody’s way', async ({ page }) => {
+  const bench = page.getByTestId('bench');
+  await expect(bench).toHaveAttribute('aria-hidden', 'true');
+  await expect(bench).toHaveCSS('pointer-events', 'none');
+  const ashtrays = () =>
+    bench.locator('.rt-ashtray').evaluateAll((nodes) =>
+      nodes.map((node) => ({ loaded: (node as HTMLImageElement).naturalWidth > 0, shown: getComputedStyle(node).opacity === '1' })),
+    );
+  await expect.poll(ashtrays).toEqual([
+    { loaded: true, shown: true },
+    { loaded: true, shown: false },
+  ]);
+  // It stands in the corner of the picture, inside it, beside the last keys and not on them.
+  const frame = (await page.getByTestId('panel').boundingBox())!;
+  const ashtray = (await page.getByTestId('ashtray').boundingBox())!;
+  const clear = (await page.getByTestId('clear-pattern').boundingBox())!;
+  expect(ashtray.x + ashtray.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+  expect(ashtray.y + ashtray.height).toBeLessThanOrEqual(frame.y + frame.height + 1);
+  expect(ashtray.y).toBeGreaterThan(clear.y + clear.height);
+
+  const drawn = () =>
+    page.getByTestId('smoke').evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      let sum = 0;
+      for (let index = 3; index < data.length; index += 4) sum += data[index]! * (index % 97);
+      return sum;
+    });
+  await expect.poll(drawn).toBeGreaterThan(0);
+  const before = await drawn();
+  await expect.poll(drawn).not.toBe(before);
+
+  // With the lamp out the ashtray is the dark room's, and the keys behind the smoke still take a press.
+  await page.getByRole('button', { name: 'Desk lamp' }).click();
+  await expect.poll(async () => (await ashtrays())[1]).toEqual({ loaded: true, shown: true });
+  await emptyPattern(page);
+  await page.getByTestId('dice').click();
+  expect((await beat(page)).patterns.some((pattern) => Object.values(pattern.steps).some((steps) => stepsOn(steps).length > 0))).toBe(true);
+});
+
+test('the smoke holds still for whoever asks for less movement', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const smoke = page.getByTestId('smoke');
+  await expect(smoke).toHaveAttribute('data-still', 'true');
+  const drawn = () =>
+    smoke.evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      let sum = 0;
+      for (let index = 3; index < data.length; index += 4) sum += data[index]! * (index % 97);
+      return sum;
+    });
+  await expect.poll(drawn).toBeGreaterThan(0);
+  const first = await drawn();
+  await page.waitForTimeout(400);
+  expect(await drawn()).toBe(first);
+});
+
+test('the footer has a switch between light and dark beside the settings, and it and the desk lamp are one switch', async ({ page }) => {
+  const toggle = page.getByTestId('light-toggle');
+  const lamp = page.getByRole('button', { name: 'Desk lamp' });
+  // Its icon is the light the machine is in now, and its name is what pressing it does.
+  await expect(toggle).toHaveAttribute('data-light', 'light');
+  await expect(toggle).toHaveAccessibleName('Light mode, switch to dark mode');
+  await expect(toggle.locator('svg.lucide-sun')).toBeVisible();
+  const [switchBox, settingsBox] = [(await toggle.boundingBox())!, (await page.getByTestId('settings').boundingBox())!];
+  expect(switchBox.x + switchBox.width).toBeLessThanOrEqual(settingsBox.x + 1);
+  expect(Math.abs(switchBox.y - settingsBox.y)).toBeLessThan(2);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('data-light', 'dark');
+  await expect(toggle).toHaveAccessibleName('Dark mode, switch to light mode');
+  await expect(toggle.locator('svg.lucide-moon')).toBeVisible();
+  await expect(lamp).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('night')).toHaveCSS('opacity', '1');
+
+  await lamp.click();
+  await expect(toggle).toHaveAttribute('data-light', 'light');
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(lamp).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Enter');
+  await expect(lamp).toHaveAttribute('aria-pressed', 'true');
 });

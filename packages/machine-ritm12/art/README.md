@@ -12,17 +12,45 @@ does not have.
 - **`patch/`** holds a small picture for each other position of a stepped
   control: the write switch on accents, the size switch on 16, the power
   rocker on, and the effect selector on delay, reverb and flanger. The page
-  lays one over the plate.
+  lays one over the plate. It also holds the end of each instrument key
+  (`key-*.png`) with the instrument drawn as `instrument-icons.svg` has it,
+  which the page always lays over the plate.
+- **`patch/status.png`** is the level meter's box done again with room
+  under it for the status readout: the meter smaller, and a second box
+  below, both from the plate's own paint. [`cut-status.py`](cut-status.py)
+  makes it, and the page always lays it over the plate.
+- **`patch/lamp.png`** is the desk lamp made larger than the plate has it,
+  which the page always lays over the plate's top left corner.
+  [`cut-lamp.py`](cut-lamp.py) makes it from `plate.webp`.
+- **`instrument-icons.svg`** is the owner's drawing of the eight instruments
+  in one picture. [`cut-icons.py`](cut-icons.py) cuts each from it, as the
+  phone's `phone/ink-*.svg` and printed onto its key for `patch/key-*.png`.
+  Run it again when the sheet or the plate changes.
+- **`night/`** holds the plate, every patch and every part of the phone's
+  panel again as the room has them with its light out: cooler and dimmer,
+  the lamp itself out, and nothing moved. The page shows them when the lamp
+  in the picture is pressed, or the light switch in the footer.
+  [`cut-night.py`](cut-night.py) makes all of it from `plate.webp`, `patch/`
+  and `phone/`, with one grade for both panels. Run it again when any of
+  them changes; the colours the phone's panel paints itself follow the same
+  grade in `src/styles.css`.
+- **`props/ashtray.png`** and **`night/props/ashtray.png`** are the ashtray
+  and its cigarette that stand on the bench in the corner of the picture, as
+  they are with the desk lamp lit and with it out, running off the picture's
+  foot. [`cut-ashtray.py`](cut-ashtray.py)
+  lifts them from the owner's two pictures of the whole bench, which are not
+  in the repository. The smoke and the glow of the lit end are drawn by the
+  page.
 - **`pointer/`** holds the pointer line of each kind of knob, on a clear
   background. A knob's painted body stays still; the page turns only its line.
 - **`phone/`** holds the parts of the phone's panel, which the page lays out
   itself: the frame of the screen, a blank key, the pattern, transport, dice
   and clear keys, the power rocker off and on, each knob's body and each
-  stepped control in every position cut round, a lamp, what is lettered
-  on the instrument keys, the nameplate and the maker's badge with the paint
-  or the key taken away, and (`icon-*.png`) the small drawing the picture has
-  beside each label, in the lettering's cream. [`cut-phone-parts.py`](cut-phone-parts.py) cuts all
-  of it from `plate.webp` and `patch/`, so it is this artwork and nothing
+  stepped control in every position cut round, a lamp, the nameplate and
+  the maker's badge with the paint taken away, the drawing on each
+  instrument key (`ink-*.svg`, from `cut-icons.py`), and (`icon-*.png`) the small drawing the picture has
+  beside each label, in the lettering's cream. [`cut-phone-parts.py`](cut-phone-parts.py) cuts the
+  rest from `plate.webp` and `patch/`, so it is this artwork and nothing
   else. Run it again when either changes.
 
 ## Where it comes from
