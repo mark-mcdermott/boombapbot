@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState, type RefObject } from 'react';
+import { useReducedMotion } from './motion';
 import { ALL_SEGMENTS, CELL, POINT, cellsOf, litPath, readable, windowOf, type Cell } from './segments';
 
 /** How long a line a control put up stays, in milliseconds. */
@@ -25,17 +26,6 @@ function cutShort(cells: readonly Cell[], count: number): Cell[] {
   const kept = cells.slice(0, count - 2).map((cell) => ({ ...cell }));
   kept[kept.length - 1]!.point = true;
   return [...kept, { lit: [], point: true }, { lit: [], point: true }];
-}
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const follow = () => setReduced(query.matches);
-    query.addEventListener('change', follow);
-    return () => query.removeEventListener('change', follow);
-  }, []);
-  return reduced;
 }
 
 /**
