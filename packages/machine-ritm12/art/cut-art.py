@@ -48,12 +48,11 @@ def changed(window, others, threshold=8, pad=6):
 
 boxes = {
     'write': changed((574, 635, 690, 724), [accents], pad=0),
-    'effect': changed((1395, 675, 1545, 815), [delay, flanger, reverb], threshold=24, pad=8),
     'size': changed((665, 795, 730, 855), [straight]),
     'power': changed((175, 1065, 275, 1180), [accents]),
 }
-patches = {'write-accents': ('write', accents), 'size-16': ('size', straight), 'power-on': ('power', accents),
-           'effect-delay': ('effect', delay), 'effect-reverb': ('effect', reverb), 'effect-flanger': ('effect', flanger)}
+# The plate's own effect selector has no patches: cut-effect.py covers it with the unit as it was painted again.
+patches = {'write-accents': ('write', accents), 'size-16': ('size', straight), 'power-on': ('power', accents)}
 (here / 'patch').mkdir(exist_ok=True)
 for name, (box, source) in patches.items():
     source.crop(boxes[box]).save(here / 'patch' / f'{name}.png')

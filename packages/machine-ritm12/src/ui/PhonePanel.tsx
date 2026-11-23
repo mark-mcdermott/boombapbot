@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ke
 import { EFFECT_KINDS } from '../document';
 import { Hand, Key, Lamp, useTurning, type KnobWiring, type LampWiring } from './Controls';
 import { ReadoutContext, useReadout } from './context';
+import { EffectLabel, selectorAngle, useSelectorTurns } from './EffectUnit';
 import { INSTRUMENTS, PHONE_KNOBS } from './layout';
 import { Readout } from './Readout';
 import { PhoneScreen } from './Screen';
@@ -85,9 +86,9 @@ function Lettered({ text, dim, icon }: { text: string; dim?: boolean; icon?: Ico
 }
 
 /** A picture cut from the panel's art. */
-function Part({ file, className }: { file: string; className?: string }) {
+function Part({ file, className, style }: { file: string; className?: string; style?: CSSProperties }) {
   const src = useReadout().art(`phone/${file}`);
-  return src ? <img className={className} src={src} alt="" draggable={false} /> : null;
+  return src ? <img className={className} style={style} src={src} alt="" draggable={false} /> : null;
 }
 
 /** A lamp the page lays out: the painted lamp, with its light laid over it. */
@@ -159,6 +160,7 @@ export function PhonePanel() {
   const growth = useGrowth(room);
   const selected = wiring.voices.find((voice) => voice.voice === wiring.selected)!;
   const words = useLettering();
+  const effectAngle = selectorAngle(useSelectorTurns(EFFECT_KINDS.indexOf(wiring.effect), EFFECT_KINDS.length), EFFECT_KINDS.length);
   const english = useScript() === 'english';
 
   const art = (file: string) => {
@@ -323,14 +325,10 @@ export function PhonePanel() {
                   <>
                     <div className="rt-ph-ctl rt-ph-ctl-wide">
                       <Key className="rt-ph-key rt-ph-pick" {...keys.effect}>
-                        <Part file={`effect-${wiring.effect}.png`} />
-                        <span className="rt-ph-names">
-                          {EFFECT_KINDS.map((kind) => (
-                            <span key={kind} className="rt-ph-name" data-on={kind === wiring.effect || undefined}>
-                              <i />
-                              <Lettered text={words.effects[kind]} icon={kind} dim={kind !== wiring.effect} />
-                            </span>
-                          ))}
+                        <Part className="rt-ph-effect-knob" file="effect-knob.png" style={{ transform: `rotate(${effectAngle}deg)` }} />
+                        <span className="rt-ph-window">
+                          <Part file="effect-window.png" />
+                          <EffectLabel className="rt-ph-effect-label" kind={wiring.effect} name={words.effects[wiring.effect]} />
                         </span>
                       </Key>
                     </div>

@@ -155,7 +155,14 @@ test('the knobs of the phone’s panel are behind three tabs', async ({ page }) 
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('tab-effect')).toBeFocused();
   await expect(page.getByTestId('tab-effect')).toHaveAttribute('aria-selected', 'true');
-  await page.getByTestId('effect').click();
+  const selector = page.getByTestId('effect');
+  const label = selector.getByTestId('effect-label');
+  await expect(label).toHaveAttribute('data-effect', before.effect.kind);
+  await selector.click();
+  // The selector turns a quarter for the next of four effects, and the window names it.
+  await expect(selector.locator('.rt-ph-effect-knob')).toHaveAttribute('style', /rotate\(90deg\)/);
+  await expect(label).not.toHaveAttribute('data-effect', before.effect.kind);
+  await expect(selector.locator('.rt-ph-window > img')).toBeVisible();
   await turnUp('mix');
   const wet = await beat(page);
   expect(wet.effect.kind).not.toBe(before.effect.kind);
@@ -178,8 +185,10 @@ test('what is lettered on the phone’s panel has the picture’s drawing for it
   await expect(drawn('.rt-ph-deck')).toHaveCount(4);
   await page.getByTestId('tab-tempo').click();
   await expect(drawn('.rt-ph-deck')).toHaveCount(4);
+  // The effect's own drawing is printed on the label in its window, with its name.
   await page.getByTestId('tab-effect').click();
-  await expect(drawn('.rt-ph-deck')).toHaveCount(5);
+  await expect(drawn('.rt-ph-deck')).toHaveCount(1);
+  await expect(page.getByTestId('effect').locator('.rt-effect-icon')).toBeVisible();
   await expect(page.getByTestId('mix').locator('.rt-ph-ends i')).toHaveCount(2);
   await expect.poll(() => loaded('')).toBe(true);
 });

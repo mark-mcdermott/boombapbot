@@ -135,7 +135,7 @@ function PicturePanel() {
                 </div>
               ) : null}
 
-              <EffectLabel kind={wiring.effect} name={words.effects[wiring.effect]} />
+              <EffectLabel kind={wiring.effect} name={words.effects[wiring.effect]} style={boxOf(EFFECT_UNIT.label)} />
               <ScreenAndMeter line={wiring.line} />
               <div className="rt-readout-slot" style={boxOf(STATUS.box)}>
                 <Readout className="rt-readout-plate" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />

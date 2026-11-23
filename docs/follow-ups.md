@@ -234,10 +234,9 @@ site its icon still opens a modal that says it is not open.
     selector now turns a whole circle shared evenly among the effects there
     are, four now and ten with the upgrade, beside a window that shows the
     effect's drawing and name. What that leaves for the six: a drawing and
-    a Russian name each, which are the owner's; and the phone's panel,
-    which still has the four-position selector and four names in a row.
-    Nobody has looked at the new unit on a real screen but in the tests'
-    browser.
+    a Russian name each, which are the owner's. The phone's panel has the
+    same selector and window behind its effect tab. Nobody has looked at
+    either on a real screen, only in the tests' browser.
   - **One upgrade for everything.** Decided by the owner on 2026-11-22: the
     same five dollars unlocks the paid effects in the VST3 plugin too, and
     in the apps on both stores. None of it is built. How it works was

@@ -36,13 +36,17 @@ export function EffectUnitArt({ angle }: { angle: number }) {
   );
 }
 
-/** What is printed on the label in the window: the effect's drawing and its name. */
-export function EffectLabel({ kind, name }: { kind: EffectKind; name: string }) {
+/**
+ * What is printed on the label in the window: the effect's drawing and its
+ * name. The picture says where on its plate the label is; the phone's panel
+ * places it over its own cut of the window.
+ */
+export function EffectLabel({ kind, name, className, style }: { kind: EffectKind; name: string; className?: string; style?: CSSProperties }) {
   const icon = useReadout().art(`phone/icon-${kind}.png`);
   return (
-    <div className="rt-effect-label" style={boxOf(EFFECT_UNIT.label)} aria-hidden="true" data-testid="effect-label" data-effect={kind}>
+    <span className={className ? `rt-effect-label ${className}` : 'rt-effect-label'} style={style} aria-hidden="true" data-testid="effect-label" data-effect={kind}>
       {icon ? <i className="rt-effect-icon" style={{ '--rt-effect-icon': `url("${icon}")` } as CSSProperties} /> : null}
       <span data-let={name} />
-    </div>
+    </span>
   );
 }
