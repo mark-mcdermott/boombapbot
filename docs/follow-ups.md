@@ -238,9 +238,9 @@ site its icon still opens a modal that says it is not open.
     version 3 is brought up to date as it is read, with nothing lost
     (`fixtures/version-3.project.json`); a program from before version 4
     refuses any beat saved since, and the plugin reads both. The selector reaches only the four without the upgrade
-    and all ten with it, so only an upgraded device writes such a beat. The plugin loads one with its effect off and
-    says which effect that was, but does not keep the name: saved from the
-    plugin, the beat has no effect. The six names on the label are
+    and all ten with it, so only an upgraded device writes such a beat. The plugin, where it holds the upgrade, plays
+    such a beat and saves it with the effect's name; where it does not, it
+    loads one with its effect off and says which effect that was. The six names on the label are
     stand-ins. Where they sit was decided by the
     owner on 2026-11-22 and the picture's unit is built for it: the effect
     selector now turns a whole circle shared evenly among the effects there
@@ -341,9 +341,32 @@ site its icon still opens a modal that says it is not open.
           desktop app has the upgrade's modal for it, which sells nothing
           and takes a key whether or not the upgrade is open. The phone
           apps have no modal and unlock by logging in only.
-        - The plugin reads no file and its C++ check is not written. The
-          desktop app keeps its file in its web view's storage, where the
-          plugin cannot read it; the one place they share is not chosen.
+        - **The desktop app and the plugin share one file**, since
+          2026-11-23, at the place `docs/license-file.md` names. The app
+          writes it when the device is unlocked and removes it when it is
+          locked; the plugin reads it as it is loaded, checks it in C++
+          (Monocypher's Ed25519, with the strict checks of the key added)
+          and plays and offers the six only when it holds. Its Effect
+          parameter lists all eleven choices on every machine, and without
+          the upgrade the six sound as no effect. Checked in the app's
+          Rust and page tests and in the plugin's CTest suites, on both
+          architectures. What is left:
+          - Nobody has seen it work: every test license is signed with a
+            key made for the test, so the plugin's built-in key has only
+            been seen to refuse, and the app has not been unlocked in its
+            own window. To try it, unlock the desktop app with a real key
+            and open the plugin in a host.
+          - The plugin reads the file only as it is loaded, so one already
+            open in a host stays as it was until it is loaded again, and it
+            never says whether it holds the upgrade or why a file was
+            refused.
+          - The plugin cannot be unlocked by itself: it has no key to
+            enter, so it needs the desktop app, or the file put in place
+            by hand.
+          - If the app's web view storage is cleared it forgets that a key
+            unlocked it and takes the file for an account's, which the
+            next log-out removes.
+          - The Windows and Linux places are written and have never run.
         - The phone apps keep the file in the web view's storage, which
           the system may clear. Logging in fetches it again.
         - **A device is locked the way it was unlocked**, decided by the

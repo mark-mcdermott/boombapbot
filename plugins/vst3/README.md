@@ -2,7 +2,8 @@
 
 The first slices of boombapbot as a plugin: РИТМ-12's eight voices, played
 from MIDI notes or from the patterns of a beat saved from the site, in time
-with the host, with the machine's knobs as host parameters. It is a JUCE 8.0.17
+with the host, with the machine's knobs as host parameters, and with the
+upgrade's six effects on a machine that holds the upgrade. It is a JUCE 8.0.17
 VST3 instrument on the same engine the site, the phone apps and the desktop
 app play through (`engine/`, built natively for
 `packages/machine-ritm12`).
@@ -55,7 +56,7 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   | Pitch, Tone, Decay for each voice | `kick_pitch`, `kick_tone`, `kick_decay`, … | 0.5 |
   | Level for each voice | `kick_level`, … | 0.75 |
   | Volume | `master_volume` | 0.8 |
-  | Effect: Off, Delay, Reverb, Flanger, Chorus | `effect_kind` | Delay |
+  | Effect: Off, Delay, Reverb, Flanger, Chorus, then the upgrade's Crusher, Tape, Pump, Filter, Vinyl, Phaser | `effect_kind` | Delay |
   | Effect Mix | `effect_mix` | 0 |
   | Mute for each voice, on or off | `kick_mute`, … | off |
   | Accent | `accent` | 0.6 |
@@ -68,6 +69,36 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   effect, so a new instance is dry. Level and volume follow the machine's
   arithmetic (`src/document/machine.ts`): a level of 0 is silence, and volume
   is the knob to the power 1.5.
+- **The upgrade's six effects play on a machine that holds the upgrade.** The
+  plugin reads the license file the desktop app keeps, once, as it is loaded:
+  `~/Library/Application Support/boombapbot/boombapbot.license` on macOS, and
+  the other places in "The file on a machine" of `docs/license-file.md`. It
+  checks the file itself (`Source/LicenseFile`), by the eight steps of that
+  page, against the public key built into the plugin, and asks no server. A
+  file that is missing, cannot be read or does not check out is no license,
+  and the plugin says nothing about it.
+  - *The parameter is the same on every machine.* Effect lists its eleven
+    choices whether the file is there or not, so a host never sees a
+    parameter change with a file on disk. With the upgrade the six are
+    played. Without it one of the six sounds as no effect, however it was
+    chosen: by the host's automation, by a project recalled, by the page. The
+    choice itself stays, in the parameter and in the host's project, so a
+    project made with the upgrade plays its effect again on a machine that
+    holds it.
+  - *Beats.* With the upgrade a beat file that names one of the six loads
+    with it. Without, it loads with its effect off and the window says which
+    effect was left out. A beat saved while Effect stands on one of the six
+    names it, on either kind of machine, as the site does.
+  - *When it is read.* In the plugin's constructor and not again. A machine
+    unlocked or locked in the desktop app while a host is open shows in the
+    plugin the next time the plugin is loaded.
+  - *The list grew, and that moved the parameter's normalised values.* A host
+    keeps a choice as a number from 0 to 1, and with eleven choices in place
+    of five Delay is 0.1 where it was 0.25. Automation of Effect drawn
+    against a build from before 2026-11-23, and a host project that stored
+    the parameter's own number, come back as another effect. The plugin's
+    saved state is not touched by this: it holds the choice's index. No build
+    had been given to anyone when the list grew.
 - **A beat saved from the site plays in the host.** The load key
   (ЗАГРУЗКА) on the panel takes the `.boombapbot.json` file the site's project export
   writes. Its four patterns are held by the plugin, and its knobs, levels,
@@ -145,7 +176,9 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
   with `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` still has it: a panel drawn in code in
   the picture's colours, laid out at 920 by 624, with the same keys and knobs
   and the same bar. It needs no web view and no page. It stays until the
-  painted window has been lived with; then it can go.
+  painted window has been lived with; then it can go. Its effect keys are the
+  five it always had. It has none for the upgrade's six, and none of its keys
+  is lit while Effect stands on one of them.
 - The delay keeps time with the host: its echo is a dotted eighth note at the
   host's tempo, read from the playhead at every block and held within the
   engine's 40 to 300. A host that reports no tempo gets 104, the tempo of a new
@@ -182,6 +215,10 @@ that could wait: no allocation, no locks. The plugin keeps to it this way.
 - The engine is created in `prepareToPlay` at the host's sample rate, with
   every sound synthesised at that rate, and replaced if the rate changes.
   Outside the engine's 8 kHz to 192 kHz the plugin stays silent.
+- **The license file** is read and checked in the plugin's constructor, on
+  the thread the host makes the plugin on. What came of it never changes
+  afterwards, so the audio thread reads it with no lock and never goes near
+  the disk.
 
 ## Build
 
@@ -208,6 +245,11 @@ carries none. Two options change this:
 JUCE is fetched at configure time (`FetchContent`, tag `8.0.17-security`) and is not
 vendored. To build against a checkout you already have, add
 `-DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE`.
+
+Monocypher 4.0.2 is fetched the same way, by the commit its tag names, for the
+Ed25519 signature on the license file, which JUCE has nothing for. Two of its
+files are compiled into the plugin: `monocypher.c` and the optional
+`monocypher-ed25519.c`, which holds Ed25519 itself and SHA-512.
 
 The bundle is written to
 `build/vst3/boombapbot_plugin_artefacts/Release/VST3/boombapbot.vst3`. The
@@ -291,6 +333,19 @@ The painted panel is a page in JUCE's web view (WKWebView on macOS).
 - **The three controls the host keeps** are made inert by the page after the
   panel is drawn, by their names on the panel. The panel itself is not
   changed for the plugin.
+- **The upgrade is the plugin's to say.** The panel's selector reaches the
+  six effects where `holdsUpgrade()` of `packages/machine-ritm12` says so,
+  and that asks the license file the page holds. In an app the page keeps
+  one in its own storage. Here it keeps none (`keepDeviceLicenseIn(null)`):
+  before anything is drawn it asks the plugin for the file's text, which the
+  plugin gives only when its own check of it held, and takes it with
+  `deviceLicense().keep`, which checks it once more with the site's code and
+  the site's copy of the key. The page is not the gate. Whatever a page asks
+  for, the plugin plays one of the six only with the upgrade.
+- **The effect crosses by name** like the rest of the beat, all ten of them
+  both ways, whether or not the selector on the page reaches it. A page
+  without the upgrade shows one of the six as an effect that is not playing,
+  as the site does, and sends it back untouched with its next change.
 
 Measured on the owner's Mac on 2026-11-22:
 
@@ -328,8 +383,17 @@ block size matters, it checks:
 - a knob turned before `prepareToPlay` and one turned after come to the same
   samples, and a knob turned between two hits changes the second;
 - volume scales the output as the machine's knob does and 0 is silence;
-- each effect alters the output, no two effects sound the same, and an effect
-  with no mix, or Off with some, leaves the output as it was;
+- each of the four effects alters the output, and an effect with no mix, or
+  Off with some, leaves the output as it was;
+- the upgrade's six effects: without the upgrade each renders the same
+  samples as Off; with it each alters the output and none of the ten sounds
+  like another; one chosen while the plugin plays is heard only with the
+  upgrade; and a state saved without the upgrade keeps the choice, silent of
+  the effect when recalled without and playing it when recalled with. The
+  upgrade here is a license file the test signs as it runs with the key pair
+  of RFC 8032's first test, which the plugin is told to check it against.
+  The plugin's own key signs nothing in the tests, and no check reads the
+  license file of the machine it runs on;
 - the delay's first echo lands a dotted eighth after the hit at host tempos of
   60, 120 and 174 and at 104 with no host clock; a clock with no tempo or a
   nonsense one is the same as none; a tempo outside 40 to 300 is held at the
@@ -337,7 +401,8 @@ block size matters, it checks:
   tempo jumping about while the delay rings keeps the output in range;
 - the audio thread at work: 3000 realtime blocks with notes on every voice, a
   SysEx message, the sequencer, a host that starts, stops, loops and changes
-  tempo, and knobs turning between blocks, while a second thread works the
+  tempo, and knobs turning between blocks, each of the ten effects switched
+  in among them, while a second thread works the
   panel (steps, dice, undo, measure size, voice keys, the name) and saves and
   recalls the plugin's state. The test program replaces `new` and `delete`,
   and on macOS `malloc`, `calloc`, `realloc` and `free` as its own code calls
@@ -398,8 +463,14 @@ block size matters, it checks:
   parameters; twelve kinds of file that are not a beat are refused with a
   reason and change nothing; the beat survives save → load → save byte for
   byte and plays the same; a version 1 state still loads;
-- a sample rate change, an unsupported rate, the parameter count, the tail and
-  that the window opens;
+- beats and the upgrade: the fixture `paid-effect.project.json`, which names
+  the crusher, loads with its effect off without the upgrade, and says so,
+  and with the crusher with it; a beat saved on each of the six names it as
+  the site does, loads with it under the upgrade and with it off without;
+  and a beat saved without the upgrade names the one Effect stands on;
+- a sample rate change, an unsupported rate, the parameter count, that the
+  parameters and the eleven choices of Effect are the same with the upgrade
+  and without, the tail and that the window opens;
 - state: it is versioned, save → load → save is byte for byte the same with
   every knob somewhere awkward, the recalled plugin renders the same samples,
   eight kinds of bad state leave it untouched, and a state of ours that holds
@@ -409,14 +480,52 @@ block size matters, it checks:
 The self-test's window is the panel drawn here, whichever window the build
 gives a host: that panel's code is in every build, and so are its tests.
 
-A second program (`Tests/WindowSnapshot.cpp`) paints the panel drawn here to
+The check of the license file (`Tests/LicenseFileTest.cpp`) is a program of
+its own. It reads the worked example out of `docs/license-file.md` and the
+public key out of `packages/contracts/src/license-file.ts`, so neither can
+drift from the plugin unseen. It checks:
+
+- the key built into the plugin is `LICENSE_PUBLIC_KEY`, byte for byte;
+- the page's example verifies against the page's key and unlocks the
+  upgrade; the page's seed makes that key, and signing the page's payload
+  with it writes the page's file letter for letter; against the plugin's own
+  key, or one made that minute, it is `bad_signature`;
+- every letter of the example turned into every other letter of base64url,
+  and into `.`, `=`, `+`, `/` and a space, is refused; so is the file cut
+  short at every length, and with a letter put in or taken out anywhere;
+- payloads signed properly: the fields in another order and one the plugin
+  does not know are taken; `unlocks` without `upgrade` is a license that does
+  not unlock; a `version` other than 1 is `unsupported_version`, even with
+  nothing else in it; and thirty that are wrong some other way are
+  `malformed`, among them no JSON, a list, bytes that are not UTF-8, a
+  `licenseId` that is no UUID, the thirtieth of February and an empty
+  `unlocks`;
+- the line: fewer or more than three parts, an empty part, another first
+  word, padding, `+` and `/`, bits left over that no encoder writes and a
+  signature that is not 64 bytes are each `malformed` even when signed; 2048
+  characters are read and 2049 are not;
+- a strict signature: `S` with the group's order added to it is refused. For
+  each of the curve's eight points of small order as the key, and five ways
+  of writing one of them that are not canonical, the test makes a signature
+  that Monocypher alone takes, which anybody can, and the plugin refuses it;
+- the file on a machine, in a place the test is given (`BOOMBAPBOT_LICENSE_FILE`,
+  never the file a person keeps): no folder, no file, an empty file, a file
+  of something else, one too long, a folder in its place and a file nobody
+  may read are each no license and no error; the example with a line ending
+  after it is the upgrade.
+
+The same cases were put to the site's `verifyLicenseFile` once, by hand, on
+2026-11-23, and it gave the same answer for each. Nothing runs the two side
+by side.
+
+Another program (`Tests/WindowSnapshot.cpp`) paints the panel drawn here to
 `build/vst3/window.png` with a beat loaded and fails if the picture is blank:
 
 ```sh
 build/vst3/boombapbot_window_snapshot panel.png path/to/a.boombapbot.json
 ```
 
-A third (`Tests/WebPanelCheck.cpp`, in a build with the painted window, on
+Another (`Tests/WebPanelCheck.cpp`, in a build with the painted window, on
 macOS) opens that window with no host, in a real window on the desktop, and
 works the page through the web view, as arm64 and again under Rosetta:
 
@@ -437,6 +546,12 @@ works the page through the web view, as arm64 and again under Rosetta:
   a gesture by itself;
 - the tempo knob, the record key and the power switch are inert, and a tempo
   turned anyway goes back to the host's;
+- the effect, with a plugin that holds the upgrade by a file the test signed:
+  the plugin hands the page that file; the page, whose own key did not sign
+  it, stays without the upgrade; each of the ten effects chosen in the plugin
+  is the effect on the page; a knob turned on the page leaves one of the six
+  as the plugin chose it; and the page's selector moves the Effect parameter,
+  going round the four;
 - saving a beat writes a file the beat reader takes, loading one puts it on
   the page, a file that is not a beat is refused in words, and the pattern is
   written as a MIDI file, each by the code the bar's keys call;
@@ -509,9 +624,9 @@ On macOS the rest check the built bundle:
   its third step, and stays silent with the host stopped. So the host's
   position reaches the sequencer through the wrapper.
 
-On Apple silicon with Rosetta installed, the self-test, the load check and the
-hosted check each run a second time as x86_64, which is how FL Studio runs the
-plugin.
+On Apple silicon with Rosetta installed, the self-test, the check of the
+license file, the load check and the hosted check each run a second time as
+x86_64, which is how FL Studio runs the plugin.
 
 ## Verified
 
@@ -545,6 +660,35 @@ GitHub's macOS 26 runner does the same build and runs the same tests, fetching
 JUCE itself (the `vst3` job in `.github/workflows/native.yml`). All fourteen
 pass there too, the check that opens the painted window among them.
 
+**With the license file and the upgrade's effects in, on the same Mac on
+2026-11-23.** A Release build from an empty build directory, against a
+checkout of JUCE `8.0.17-security` already on the machine, with Monocypher
+4.0.2 fetched by the build:
+
+- All sixteen CTest tests pass, the two new ones being the check of the
+  license file as arm64 and as x86_64 under Rosetta: 88 checks each. The
+  self-test now makes 594 checks on each.
+- Steinberg's validator, extensive tests, against the parameter with its
+  eleven choices: 537 of 537 on arm64 and on x86_64 under Rosetta.
+- The bundle holds both architectures, its signature verifies, and it is
+  24 MB.
+- The check of the license file and the self-test under the address and
+  undefined-behaviour sanitizers, arm64 only, a Debug build: 88 and 592 checks
+  pass (the two that need the heap trap are left out), nothing is reported
+  and no JUCE assertion is printed.
+- `pnpm typecheck` passes, and `pnpm test:unit` passes its 332 tests with 4
+  skipped. The site's unit tests include the one that opens the file the
+  plugin saves.
+
+The check of the painted window failed once in some twenty runs that day,
+under Rosetta, at a check this change did not touch: the step written on the
+page and taken back by the bar's undo. It passed in every run after, and the
+cause was not looked for. That check waits fixed lengths of time for the page.
+
+The runner has not built this change. A build with
+`-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` was not made again, and the thread sanitizer
+was not run again.
+
 **In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
 the build of the hang fix, whose window was the panel drawn here:
 
@@ -573,6 +717,34 @@ Dragging the MIDI key out of the window did not work; see below.
 
 ## Not verified
 
+- **The upgrade with a real license file.** Every license in the tests is
+  signed by a test's key, and the plugin is told to check it against that
+  key. No file the server signed has ever been where the plugin looks, so
+  the key built into the plugin has only ever been seen to refuse. That the
+  bytes are the site's key is checked; that a file bought on the site unlocks
+  the plugin is not.
+- **The page with the upgrade.** The page checks the file it is handed
+  against the site's copy of the key, which no test can sign for. So the
+  page has been seen to ask for the file, to be handed it, and to refuse one
+  signed by another key, and has never been seen unlocked: its selector
+  reaching the six, and one of the six chosen there moving the plugin, are
+  untried. An effect of the upgrade chosen in the plugin does show on the
+  page by name.
+- **The desktop app and the plugin together.** The plugin looks where
+  `docs/license-file.md` says the desktop app keeps the file. Nobody has
+  unlocked the app and then loaded the plugin.
+- **The upgrade in a host.** No host has loaded a build with the eleven
+  choices. How FL Studio shows them, and what it does with a project saved
+  with five, is not known.
+- **The plugin's check beside the site's.** The two are written from one
+  page and tested on the same example, and gave the same answers to the same
+  cases once by hand. Nothing runs them side by side. They differ in one
+  place that is known: the plugin reads the payload with JUCE's JSON reader,
+  which takes some text that `JSON.parse` does not. It is read only after
+  the signature has held, so only a payload the server itself signed gets
+  that far.
+- **Where the file is on Windows and Linux.** The paths are written from the
+  page and have never been compiled, like the rest of the plugin there.
 - **Dragging the MIDI key out of the painted window does not work.** The
   owner tried it in FL Studio on 2026-11-22 and nothing was carried out. The
   page tells the plugin when the key is dragged and the plugin asks the
@@ -632,8 +804,11 @@ Dragging the MIDI key out of the window did not work; see below.
 - **Take the panel drawn here out,** once the painted window has been lived
   with: `Source/Panel`, `Source/PluginEditor`, the snapshot test and the
   option that chooses between the two.
-- **The paid effects.** The upgrade's six effects are in the engine, and
-  neither the page nor the plugin's Effect parameter names them yet.
+- **Saying what became of a license file.** A file that does not check out
+  is no license and the plugin says nothing, as `docs/license-file.md` asks.
+  The plugin knows which of the three reasons it was and shows it nowhere,
+  and nothing in the window says whether the upgrade is held or how to come
+  by it. The file is read as the plugin is loaded and not again.
 - **Beats from an account.** Only a file on disk can be loaded. Beats saved to
   a boombapbot account are out of reach.
 - **Time signatures and tempo changes inside a block.** A measure is four
@@ -675,11 +850,31 @@ The owner sells as a person, with no company formed, so the limit that
 applies is the first: what the use of JUCE brings in. Forming a company would
 change that to everything the company receives.
 
+Monocypher 4.0.2 (https://monocypher.org) checks the license file's
+signature. Its makers offer it under either of two licences, the 2-clause BSD
+licence or the CC0 1.0 dedication to the public domain, at the user's choice
+(`LICENCE.md` in its source, and `SPDX-License-Identifier: BSD-2-Clause OR
+CC0-1.0` in each file). It is taken here under the 2-clause BSD licence. That
+is an ordinary software licence, good wherever the plugin is sold, where a
+dedication to the public domain is not the same thing in every country, and
+all it asks is that its notice goes with a build, in a notices file the build
+needs anyway. Neither licence asks for the plugin's source or limits selling
+it, and neither touches JUCE's terms. Monocypher was chosen because it is
+small, two C files with nothing under them, has Ed25519 as RFC 8032 writes it
+with SHA-512, and refuses a signature whose `S` is not below the group's
+order. It takes any point as a public key, so `Source/LicenseFile.cpp` asks
+the rest of a strict check itself, before Monocypher is called: that the key
+is written canonically and is not of small order. Monocypher checks the
+equation without the cofactor, which is stricter than the site's check for a
+signature its own signer has bent, and the same for every file the server
+signs.
+
 Left before a build is given to anyone:
 
 - The MIT licence asks that its notice goes with every copy. A build that is
   handed on needs a notices file with the VST3 SDK's licence in it, and the
-  licences of whatever else it carries. There is none yet.
+  licences of whatever else it carries. There is none yet. Monocypher's
+  2-clause BSD notice belongs in it too.
 - Steinberg's `VST3_Usage_Guidelines.pdf`, beside the SDK in JUCE, says how
   the VST name and logo may be used. It has not been read against how the
   plugin will be described.

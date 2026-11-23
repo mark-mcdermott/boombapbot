@@ -9,7 +9,12 @@ export {
 } from './ui/ShellFooter';
 export { SITE_PAGES, type SitePageId } from './ui/pages';
 export { linkServer, type ServerLink, type TokenStore } from './account/client';
-export { deviceLicense, useDeviceUpgraded } from './upgrade/device-license';
+export {
+  LICENSE_FILE_KEY,
+  deviceLicense,
+  keepDeviceLicenseIn,
+  useDeviceUpgraded,
+} from './upgrade/device-license';
 export { SitePage, type SitePageLayout, type SitePageProps } from './ui/SitePage';
 export { RuntimeContext, useAssetManifest, useEditorState, useRuntime } from './ui/context';
 export { useKnob, type KnobOptions } from './ui/knob';

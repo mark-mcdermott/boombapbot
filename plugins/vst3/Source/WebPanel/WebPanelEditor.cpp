@@ -92,6 +92,10 @@ juce::WebBrowserComponent::Options BoombapbotWebEditor::options() {
       .withNativeIntegrationEnabled()
       .withKeepPageLoadedWhenBrowserIsHidden()
       .withResourceProvider([this](const juce::String& path) { return resource(path); })
+      .withNativeFunction("licenseFile",
+                          [this](const juce::Array<juce::var>&, Completion done) {
+                            done(juce::String(processor_.licenseFile()));
+                          })
       .withNativeFunction("getBeat",
                           [this](const juce::Array<juce::var>&, Completion done) {
                             pageBeat_ = beatText();

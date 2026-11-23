@@ -8,6 +8,7 @@
 #include "BeatFile.h"
 #include "ParameterIds.h"
 #include "PluginProcessor.h"
+#include "TestLicense.h"
 #include "WebPanel/WebPanelEditor.h"
 
 #include <CoreFoundation/CoreFoundation.h>
@@ -103,6 +104,84 @@ void play(BoombapbotAudioProcessor& plugin, int blocks) {
     block.clear();
     plugin.processBlock(block, noNotes);
   }
+}
+
+// The effect, which the plugin's parameter and the page's selector both choose.
+// The plugin here holds the upgrade by a file a test key signed. The page is
+// handed that file and checks it against its own key, which did not sign it,
+// so the page's selector stays at the four effects: what a page that holds
+// the upgrade does with the six needs a file the server signed.
+void checkTheEffect(BoombapbotAudioProcessor& plugin, juce::WebBrowserComponent& page) {
+  juce::RangedAudioParameter& effect = *plugin.parameters().getParameter(ids::kEffectKind);
+  const auto choose = [&effect](int choice) { effect.setValueNotifyingHost(effect.convertTo0to1(static_cast<float>(choice))); };
+  const auto chosen = [&plugin] { return juce::roundToInt(parameter(plugin, ids::kEffectKind)); };
+  const auto onThePage = [&page] { return ask(page, "window.__panel.project().effect.kind").toString(); };
+  // The page hears of the plugin's change, and the plugin of the page's, a moment later.
+  const auto pageComesTo = [&onThePage](const juce::String& kind) {
+    for (int waited = 0; waited < 5000 && onThePage() != kind; waited += 100) wait(100);
+    return onThePage();
+  };
+  const auto pluginComesTo = [&chosen](int choice) {
+    waitFor([&] { return chosen() == choice; }, 5000);
+    return chosen();
+  };
+  // The selector is drawn a moment after the page's beat changes, and a press goes on from what is drawn.
+  const auto selectorStandsOn = [&page](const juce::String& kind) {
+    const char* const drawn = "document.querySelector('[data-testid=effect]').getAttribute('data-position')";
+    for (int waited = 0; waited < 5000 && ask(page, drawn).toString() != kind; waited += 100) wait(100);
+  };
+  const float mix = parameter(plugin, ids::kEffectMix);
+  const int before = chosen();
+
+  ask(page, "(() => { const b = window.__JUCE__.backend; b.addEventListener('__juce__complete', (done) => { "
+            "if (done.promiseId === 4096) window.__handed = done.result; }); "
+            "b.emitEvent('__juce__invoke', {name: 'licenseFile', params: [], resultId: 4096}); })()");
+  wait(300);
+  const juce::String handed = ask(page, "window.__handed").toString();
+  check(plugin.holdsUpgrade() && handed.isNotEmpty() && handed == juce::String(plugin.licenseFile()),
+        "the plugin hands the page the license file it holds the upgrade by");
+  check(!static_cast<bool>(ask(page, "window.__panel.upgraded()")),
+        "the page checks the file itself: one its own key did not sign does not unlock the page");
+
+  const juce::StringArray kinds{"delay", "reverb", "flanger", "chorus", "crusher", "tape", "pump", "filter", "vinyl", "phaser"};
+  juce::StringArray shown;
+  for (int choice = 1; choice <= kinds.size(); ++choice) {
+    choose(choice);
+    shown.add(pageComesTo(kinds[choice - 1]));
+  }
+  check(shown == kinds, "each of the ten effects chosen in the plugin is the effect on the page (" +
+                            shown.joinIntoString(" ").toStdString() + ")");
+
+  // The page's own change crosses with the effect in it, and the effect stays.
+  const float volume = parameter(plugin, ids::kVolume);
+  ask(page, keysOn("volume", "ArrowUp", 1));
+  wait(400);
+  check(parameter(plugin, ids::kVolume) > volume && chosen() == kinds.size() && onThePage() == "phaser" &&
+            std::abs(parameter(plugin, ids::kEffectMix) - mix) < 1e-6f,
+        "a knob turned on the page leaves an effect of the upgrade as the plugin chose it");
+  ask(page, keysOn("volume", "ArrowDown", 1));
+  // The page's beat, with the phaser in it, is still on its way: a choice made now would be overtaken by it.
+  wait(400);
+
+  // The selector on the page moves the plugin's parameter.
+  choose(SNARE_EFFECT_DELAY);
+  struct Press {
+    const char* from;
+    int to;
+  };
+  juce::String round;
+  for (const Press press : {Press{"delay", SNARE_EFFECT_REVERB}, Press{"reverb", SNARE_EFFECT_FLANGER},
+                            Press{"flanger", SNARE_EFFECT_CHORUS}, Press{"chorus", SNARE_EFFECT_DELAY}}) {
+    selectorStandsOn(press.from);
+    ask(page, "document.querySelector('[data-testid=effect]').click()");
+    round << pluginComesTo(press.to) << " ";
+  }
+  check(round == "2 3 4 1 " && onThePage() == "delay",
+        "the page's selector moves the Effect parameter, and without the upgrade on the page goes round the four (" +
+            round.trim().toStdString() + ")");
+
+  choose(before);
+  wait(400);
 }
 
 // What the bar under the picture does, and what the host keeps for itself.
@@ -235,7 +314,7 @@ int main(int argc, char** argv) {
   }
   const juce::ScopedJuceInitialiser_GUI juceInitialiser;
 
-  BoombapbotAudioProcessor plugin;
+  BoombapbotAudioProcessor plugin(boombapbot::plugin::testing::heldUpgrade());
   plugin.setPlayConfigDetails(0, 2, 48000.0, 512);
   plugin.prepareToPlay(48000.0, 512);
   const juce::Result loaded = plugin.loadBeat(
@@ -353,6 +432,7 @@ int main(int argc, char** argv) {
     check(stopped && parameter(plugin, ids::kSequencer) >= 0.5f,
           "the page's stop and play keys turn the plugin's sequencer off and on");
 
+    checkTheEffect(plugin, page);
     checkTheBar(plugin, *window, fixture);
   }
 

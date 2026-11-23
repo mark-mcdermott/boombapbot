@@ -6,12 +6,14 @@
 
 #include "BeatFile.h"
 #include "HeapTrap.h"
+#include "LicenseFile.h"
 #include "MachineRitm12.h"
 #include "Panel/Panel.h"
 #include "Panel/StepKeys.h"
 #include "PatternMidi.h"
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
+#include "TestLicense.h"
 
 #include <algorithm>
 #include <array>
@@ -30,10 +32,14 @@ namespace {
 
 using boombapbot::plugin::Beat;
 using boombapbot::plugin::kAccentVelocity;
+using boombapbot::plugin::kEffectLast;
 using boombapbot::plugin::kEffectNames;
+using boombapbot::plugin::kFreeEffectLast;
 using boombapbot::plugin::kVoiceCount;
 using boombapbot::plugin::kVoices;
+using boombapbot::plugin::Upgrade;
 using boombapbot::plugin::VoiceSpec;
+using boombapbot::plugin::testing::heldUpgrade;
 
 int failures = 0;
 int checks = 0;
@@ -144,9 +150,11 @@ enum class Clock { offline, realtime };
 
 // An offline processor makes its sounds inside processBlock, so what it
 // renders does not depend on when another thread got to run. Every check but
-// the ones about the sound thread uses one.
-std::unique_ptr<juce::AudioProcessor> makeProcessor(double rate, int blockSize, Clock clock = Clock::offline) {
-  std::unique_ptr<juce::AudioProcessor> processor(createPluginFilter());
+// the ones about the sound thread uses one. A processor here is handed its
+// upgrade, or none: no check reads the license file of the machine it runs on.
+std::unique_ptr<juce::AudioProcessor> makeProcessor(double rate, int blockSize, Clock clock = Clock::offline,
+                                                    Upgrade upgrade = {}) {
+  std::unique_ptr<juce::AudioProcessor> processor(new BoombapbotAudioProcessor(std::move(upgrade)));
   processor->setNonRealtime(clock == Clock::offline);
   processor->setPlayConfigDetails(0, 2, rate, blockSize);
   processor->prepareToPlay(rate, blockSize);
@@ -185,8 +193,8 @@ Stereo render(juce::AudioProcessor& processor, const std::vector<Event>& events,
 
 // A new processor with `settings` made after prepareToPlay, as a host makes them.
 Stereo renderFresh(double rate, int blockSize, const std::vector<Event>& events, int totalFrames,
-                   const std::vector<Setting>& settings = {}) {
-  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize);
+                   const std::vector<Setting>& settings = {}, const Upgrade& upgrade = {}) {
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize, Clock::offline, upgrade);
   for (const Setting& setting : settings) set(*processor, setting);
   return render(*processor, events, totalFrames, blockSize);
 }
@@ -422,7 +430,7 @@ void testKnobsReachTheEngineWheneverTheyAreTurned(const std::string& context, do
   const std::vector<Event> hit{noteOn(50, kTom, 127)};
   const int total = framesFor(0.3, rate);
 
-  std::unique_ptr<juce::AudioProcessor> early(createPluginFilter());
+  std::unique_ptr<juce::AudioProcessor> early(new BoombapbotAudioProcessor(Upgrade{}));
   for (const Setting& setting : settings) set(*early, setting);
   early->setNonRealtime(true);
   early->setPlayConfigDetails(0, 2, rate, blockSize);
@@ -471,21 +479,66 @@ void testEffects(const std::string& context, double rate, int blockSize) {
   const Stereo dry = renderFresh(rate, blockSize, hit, total);
 
   std::vector<Stereo> wet;
-  for (std::size_t kind = 1; kind < kEffectNames.size(); ++kind) {
+  for (int kind = 1; kind <= kFreeEffectLast; ++kind) {
+    const char* const name = kEffectNames[static_cast<std::size_t>(kind)];
     const float choice = static_cast<float>(kind);
     wet.push_back(renderFresh(rate, blockSize, hit, total, {{"effect_kind", choice}, {"effect_mix", 0.6f}}));
     check(!identical(dry, wet.back()) && finite(wet.back()) && peak(wet.back()) <= 1.0f, context,
-          text("the %s at 0.6 alters the output", kEffectNames[kind]));
+          text("the %s at 0.6 alters the output", name));
     check(identical(dry, renderFresh(rate, blockSize, hit, total, {{"effect_kind", choice}, {"effect_mix", 0.0f}})),
-          context, text("the %s with none of it mixed in leaves the output as it was", kEffectNames[kind]));
+          context, text("the %s with none of it mixed in leaves the output as it was", name));
+  }
+  check(identical(dry, renderFresh(rate, blockSize, hit, total, {{"effect_kind", 0.0f}, {"effect_mix", 0.6f}})),
+        context, "Off with the mix at 0.6 leaves the output as it was");
+
+  // The upgrade's six. Without the upgrade each is a choice that sounds as none.
+  const Upgrade upgrade = heldUpgrade();
+  check(upgrade.held(), context, "a license file signed for the test is the upgrade");
+  const Stereo upgradedDry = renderFresh(rate, blockSize, hit, total, {}, upgrade);
+  check(identical(dry, upgradedDry), context, "the upgrade alone changes nothing that is heard");
+  for (int kind = kFreeEffectLast + 1; kind <= kEffectLast; ++kind) {
+    const char* const name = kEffectNames[static_cast<std::size_t>(kind)];
+    const std::vector<Setting> chosen{{"effect_kind", static_cast<float>(kind)}, {"effect_mix", 0.6f}};
+    check(identical(dry, renderFresh(rate, blockSize, hit, total, chosen)), context,
+          text("without the upgrade, the %s at 0.6 renders the same samples as Off", name));
+    wet.push_back(renderFresh(rate, blockSize, hit, total, chosen, upgrade));
+    check(!identical(dry, wet.back()) && finite(wet.back()) && peak(wet.back()) <= 1.0f, context,
+          text("with the upgrade, the %s at 0.6 alters the output", name));
+    check(identical(dry, renderFresh(rate, blockSize, hit, total,
+                                     {{"effect_kind", static_cast<float>(kind)}, {"effect_mix", 0.0f}}, upgrade)),
+          context, text("with the upgrade, the %s with none of it mixed in leaves the output as it was", name));
   }
   bool distinct = true;
   for (std::size_t a = 0; a < wet.size(); ++a) {
     for (std::size_t b = a + 1; b < wet.size(); ++b) distinct = distinct && !identical(wet[a], wet[b]);
   }
-  check(distinct, context, "no two effects render the same samples");
-  check(identical(dry, renderFresh(rate, blockSize, hit, total, {{"effect_kind", 0.0f}, {"effect_mix", 0.6f}})),
-        context, "Off with the mix at 0.6 leaves the output as it was");
+  check(wet.size() == static_cast<std::size_t>(kEffectLast) && distinct, context,
+        "no two of the ten effects render the same samples");
+
+  // A host that automates the choice while the plugin plays, and a state recalled.
+  const std::vector<Setting> pump{{"effect_kind", static_cast<float>(SNARE_EFFECT_PUMP)}, {"effect_mix", 0.6f}};
+  const std::unique_ptr<juce::AudioProcessor> without = makeProcessor(rate, blockSize);
+  const std::unique_ptr<juce::AudioProcessor> with = makeProcessor(rate, blockSize, Clock::offline, upgrade);
+  for (const auto* processor : {&without, &with}) {
+    render(**processor, hit, total, blockSize);
+    for (const Setting& setting : pump) set(**processor, setting);
+  }
+  const Stereo automatedWithout = render(*without, hit, total, blockSize);
+  const std::unique_ptr<juce::AudioProcessor> plain = makeProcessor(rate, blockSize);
+  render(*plain, hit, total, blockSize);
+  check(identical(automatedWithout, render(*plain, hit, total, blockSize)) && !identical(automatedWithout, render(*with, hit, total, blockSize)),
+        context, "an effect of the upgrade chosen while the plugin plays is heard only with the upgrade");
+
+  juce::MemoryBlock state;
+  without->getStateInformation(state);
+  const std::unique_ptr<juce::AudioProcessor> recalledWithout = makeProcessor(rate, blockSize);
+  const std::unique_ptr<juce::AudioProcessor> recalledWith = makeProcessor(rate, blockSize, Clock::offline, upgrade);
+  recalledWithout->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+  recalledWith->setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+  check(juce::exactlyEqual(valueOf(*recalledWithout, "effect_kind"), static_cast<float>(SNARE_EFFECT_PUMP)) &&
+            identical(dry, render(*recalledWithout, hit, total, blockSize)) &&
+            identical(wet[SNARE_EFFECT_PUMP - 1], render(*recalledWith, hit, total, blockSize)),
+        context, "a state saved without the upgrade keeps the choice: recalled it is silent of the effect without, and plays it with");
 }
 
 // ---- Host tempo, run for every sample rate ----------------------------------
@@ -1011,7 +1064,8 @@ BusyRun runBusyRealtimeBlocks() {
   constexpr int blockSize = 256;
   constexpr int blocks = 3000;
 
-  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize, Clock::realtime);
+  // With the upgrade, so that every effect the engine has is switched in on the audio thread.
+  const std::unique_ptr<juce::AudioProcessor> processor = makeProcessor(rate, blockSize, Clock::realtime, heldUpgrade());
   BoombapbotAudioProcessor& machine = plugin(*processor);
   machine.loadBeat(fourPatterns());
   set(*processor, {"pattern", 1.0f});
@@ -1052,9 +1106,11 @@ BusyRun runBusyRealtimeBlocks() {
     }
   });
 
-  const std::array<Setting, 10> turns{{{"kick_level", 0.3f}, {"tom_pitch", 0.9f}, {"effect_kind", 2.0f},
+  const std::array<Setting, 16> turns{{{"kick_level", 0.3f}, {"tom_pitch", 0.9f}, {"effect_kind", 2.0f},
                                        {"effect_mix", 0.5f}, {"master_volume", 0.6f}, {"snare_mute", 1.0f},
-                                       {"accent", 0.2f}, {"swing", 0.7f}, {"pattern", 0.0f}, {"effect_kind", 4.0f}}};
+                                       {"accent", 0.2f}, {"swing", 0.7f}, {"pattern", 0.0f}, {"effect_kind", 4.0f},
+                                       {"effect_kind", 5.0f}, {"effect_kind", 6.0f}, {"effect_kind", 7.0f},
+                                       {"effect_kind", 8.0f}, {"effect_kind", 9.0f}, {"effect_kind", 10.0f}}};
   BusyRun run;
   heaptrap::reset();
   for (int block = 0; block < blocks; ++block) {
@@ -1153,6 +1209,26 @@ void testDescription() {
   check(processor->getParameters().size() == expected, context,
         text("the plugin has %d parameters: four knobs and a mute for each of %d voices, and seven more (%d found)",
              expected, kVoiceCount, processor->getParameters().size()));
+
+  // A host sees the same parameters whether or not the machine holds the upgrade.
+  const std::unique_ptr<juce::AudioProcessor> upgraded = makeProcessor(48000.0, 512, Clock::offline, heldUpgrade());
+  const auto listed = [](juce::AudioProcessor& plugin) {
+    juce::StringArray lines;
+    for (juce::AudioProcessorParameter* parameter : plugin.getParameters()) {
+      lines.add(parameter->getName(64) + " " + juce::String(parameter->getNumSteps()) + " " +
+                juce::String(parameter->getDefaultValue()) + " " + parameter->getAllValueStrings().joinIntoString(","));
+    }
+    return lines;
+  };
+  const juce::StringArray effects = findParameter(*processor, "effect_kind")->getAllValueStrings();
+  check(listed(*processor) == listed(*upgraded) && effects.size() == static_cast<int>(kEffectNames.size()) &&
+            effects[kFreeEffectLast] == "Chorus" && effects[kEffectLast] == "Phaser",
+        context,
+        text("with and without the upgrade the parameters are the same, and Effect lists its %d choices: %s",
+             effects.size(), effects.joinIntoString(", ").toRawUTF8()));
+  check(plugin(*upgraded).holdsUpgrade() && !plugin(*processor).holdsUpgrade() &&
+            upgraded->getTailLengthSeconds() >= processor->getTailLengthSeconds(),
+        context, "the tail with the upgrade is no shorter than without");
   check(processor->getTailLengthSeconds() > 1.0, context,
         text("the tail covers the longest sound and effect (%.2f s)", processor->getTailLengthSeconds()));
 
@@ -1516,6 +1592,39 @@ void testBeatFile() {
   check(paid.wasOk() && leftOut == "crusher" && plugin(*processor).beatName() == "Paid effect fixture" &&
             std::abs(valueOf(*processor, "effect_kind")) < 1e-6f && std::abs(valueOf(*processor, "kick_pitch") - 0.35f) < 1e-6f,
         context, text("a beat naming an effect of the upgrade loads with its effect off, and says which: %s", leftOut.toRawUTF8()));
+
+  // With the upgrade the same beat keeps its effect, and a beat saved names it.
+  using boombapbot::plugin::effectKind;
+  using boombapbot::plugin::readBeat;
+  using boombapbot::plugin::writeBeat;
+  const std::unique_ptr<juce::AudioProcessor> upgraded = makeProcessor(48000.0, 512, Clock::offline, heldUpgrade());
+  const juce::Result kept = plugin(*upgraded).loadBeat(fixture("paid-effect.project.json"), &leftOut);
+  check(kept.wasOk() && leftOut.isEmpty() && juce::exactlyEqual(valueOf(*upgraded, "effect_kind"), static_cast<float>(SNARE_EFFECT_CRUSHER)) &&
+            std::abs(valueOf(*upgraded, "effect_mix") - 0.6f) < 1e-6f,
+        context, "with the upgrade, a beat naming the crusher loads with the crusher, and nothing is left out");
+  const std::array<const char*, 6> names{{"crusher", "tape", "pump", "filter", "vinyl", "phaser"}};
+  for (std::size_t index = 0; index < names.size(); ++index) {
+    const int effect = kFreeEffectLast + 1 + static_cast<int>(index);
+    set(*upgraded, {"effect_kind", static_cast<float>(effect)});
+    const juce::String saved = writeBeat(plugin(*upgraded).currentBeat(), boombapbot::plugin::newBeatStamp());
+    const juce::var document = juce::JSON::parse(saved);
+    Beat reread;
+    const std::unique_ptr<juce::AudioProcessor> again = makeProcessor(48000.0, 512, Clock::offline, heldUpgrade());
+    const std::unique_ptr<juce::AudioProcessor> locked = makeProcessor(48000.0, 512);
+    juce::String lockedOut;
+    check(document["effect"]["kind"].toString() == names[index] && effectKind(effect) == names[index] &&
+              readBeat(saved, reread).wasOk() && reread.effect == effect &&
+              plugin(*again).loadBeat(saved).wasOk() && juce::exactlyEqual(valueOf(*again, "effect_kind"), static_cast<float>(effect)) &&
+              plugin(*locked).loadBeat(saved, &lockedOut).wasOk() && lockedOut == names[index] &&
+              juce::exactlyEqual(valueOf(*locked, "effect_kind"), 0.0f),
+          context,
+          text("a beat saved on the %s names it, loads with it under the upgrade, and loads with it off without", names[index]));
+  }
+  // Without the upgrade a choice of the upgrade's is still the choice, and a beat saved says so.
+  set(*processor, {"effect_kind", static_cast<float>(SNARE_EFFECT_PUMP)});
+  const juce::var unplayed = juce::JSON::parse(writeBeat(plugin(*processor).currentBeat(), boombapbot::plugin::newBeatStamp()));
+  check(unplayed["effect"]["kind"].toString() == "pump", context,
+        "without the upgrade, a beat saved while Effect stands on the pump names the pump");
 
   // A beat of the version before this one is the same beat.
   const juce::Result versionThree = plugin(*processor).loadBeat(fixture("version-3.project.json"));
@@ -1935,7 +2044,7 @@ void testState() {
   loadState(*target, blobOf(nonsense));
   const bool tamed = juce::exactlyEqual(valueOf(*target, "kick_pitch"), 1.0f) &&
                      juce::exactlyEqual(valueOf(*target, "snare_level"), 0.0f) &&
-                     juce::exactlyEqual(valueOf(*target, "effect_kind"), 4.0f) &&
+                     juce::exactlyEqual(valueOf(*target, "effect_kind"), static_cast<float>(kEffectLast)) &&
                      valueOf(*target, "effect_mix") >= 0.0f && valueOf(*target, "effect_mix") <= 1.0f &&
                      valueOf(*target, "master_volume") >= 0.0f && valueOf(*target, "master_volume") <= 1.0f &&
                      juce::exactlyEqual(valueOf(*target, "tom_decay"), boombapbot::plugin::kSoundKnobRest);

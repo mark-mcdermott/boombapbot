@@ -9,6 +9,7 @@
 #include <boombapbot/engine.h>
 
 #include "BeatFile.h"
+#include "LicenseFile.h"
 #include "MachineRitm12.h"
 #include "Sequencer.h"
 
@@ -20,8 +21,18 @@
 
 class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce::ChangeBroadcaster {
  public:
-  BoombapbotAudioProcessor();
+  // The upgrade is learnt once, here, from the machine's license file unless
+  // one is handed in, and holds for as long as the plugin is loaded.
+  explicit BoombapbotAudioProcessor(
+      boombapbot::plugin::Upgrade upgrade = boombapbot::plugin::upgradeOnThisMachine());
   ~BoombapbotAudioProcessor() override;
+
+  // Whether this machine holds the upgrade, which is what plays its six
+  // effects. Without it they are still choices of the Effect parameter, and
+  // sound as no effect.
+  bool holdsUpgrade() const { return upgrade_.held(); }
+  // The license file that pays for the upgrade, as text, or nothing.
+  const std::string& licenseFile() const { return upgrade_.licenseFile; }
 
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
@@ -51,8 +62,9 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // Takes the text of a beat file saved from the site: its patterns, and its
   // knobs as parameter values. A file that is not a beat changes nothing and
   // the result says why. Not for the audio thread.
-  // When the beat names an effect of the upgrade it is loaded with its effect
-  // off, and `leftOut`, if given, is told which effect that was.
+  // When the beat names an effect of the upgrade and the upgrade is not held,
+  // it is loaded with its effect off, and `leftOut`, if given, is told which
+  // effect that was.
   juce::Result loadBeat(const juce::String& json, juce::String* leftOut = nullptr);
   // The name of the beat whose patterns are held, or nothing.
   juce::String beatName() const;
@@ -165,6 +177,9 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // Plays the hits one step of the playing pattern holds. Audio thread only.
   void playStep(SnareEngine* engine, std::int64_t step, const boombapbot::plugin::StepGrid& grid);
   int chosenPattern() const;
+  int chosenEffect() const;
+  // Whether an effect is one this machine plays: all but the upgrade's, unless it is held.
+  bool plays(int effect) const;
   // Plays the voice keys pressed on the panel since the last block. Audio thread only.
   void playAuditions(SnareEngine* engine);
   void setParameterTo(const juce::String& id, float value);
@@ -174,6 +189,7 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   double tailSecondsAt(double bpm) const;
   void stopSoundThread();
 
+  const boombapbot::plugin::Upgrade upgrade_;
   juce::AudioProcessorValueTreeState parameters_;
   std::array<VoiceParameters, boombapbot::plugin::kVoiceCount> voiceParameters_{};
   std::atomic<float>* volume_ = nullptr;

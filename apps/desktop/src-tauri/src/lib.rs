@@ -5,6 +5,7 @@ mod bridge;
 mod check;
 pub mod engine;
 mod ffi;
+mod license;
 pub mod messages;
 mod output;
 mod outside;
@@ -62,6 +63,9 @@ pub fn run() {
             engine_close,
             save::export_ask,
             save::export_write,
+            license::license_read,
+            license::license_write,
+            license::license_remove,
             check::check_mode,
             check::check_lose,
             check::check_engine,

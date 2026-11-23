@@ -18,9 +18,18 @@ The page, in `src/`:
   phone app do, and hands it two things of its own: `audio`, a
   `NativeAudioController` over the bridge below, and `save`. Served to a
   browser (`pnpm dev`) it hands in neither. Either way it links the site's
-  server (`linkServer`) and puts the account button beside the settings.
+  server (`linkServer`) and puts a license key to enter and the account
+  button beside the settings.
 - `session-token.ts` keeps the token that says who is logged in, in the web
   view's `localStorage`. Its tests are `test/`.
+- `license-store.ts` is where the app keeps the upgrade's license file: on
+  the disk, in the one place the plugin reads too
+  (`docs/license-file.md`, "The file on a machine"), through the three
+  `license_` commands of `src-tauri/src/license.rs`. The page sends the
+  file's text and never names a place on the disk, and the app writes
+  only text shaped like a license file. The file is read before the
+  machine is drawn. How the device came by it, a key or an account, stays
+  in the web view's storage.
 - `tauri-engine.ts` is the bridge the editor asks a native shell for
   (`NativeEngineBridge`): `open`, `send`, `listen` and `close`, as three
   Tauri commands and one event.
@@ -228,6 +237,12 @@ and the buffers held a beat. The reports come as the worklet's do.
 - **The draft is in the web view's storage**, kept by macOS under the app's
   identifier. I do not know whether macOS ever clears it. The phone app
   keeps its draft in the device's own store for that reason.
+- **The license file on the disk has run only in the tests**: the Rust
+  that reads, writes and removes it against a folder of the test's own, and
+  the page's side against a stand-in for the app. Nobody has unlocked the
+  app in its own window and looked for the file. If the web view's storage
+  is cleared, the app forgets that a key unlocked it and takes the file for
+  an account's, which the next log-out removes.
 - **The window opens at one size**, 1100 by 980, which is the machine and
   the settings button with nothing to scroll on this Mac. It does not
   remember where it was or how large.

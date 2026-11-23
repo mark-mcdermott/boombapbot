@@ -350,7 +350,12 @@ which features it will unlock is not decided.
     The device stays unlocked, logged in or not, until "Remove the key" is
     pressed in the same modal. The phone apps have no such modal: a store's
     app may not be unlocked by a typed key.
-  The plugin reads no file yet.
+  The desktop app keeps its file on the disk, in one place the VST3 plugin
+  reads too (`docs/license-file.md`, "The file on a machine"), so unlocking
+  the app unlocks the plugin on that machine and locking it locks the
+  plugin. The plugin checks the file itself in C++ as it is loaded
+  (`plugins/vst3/Source/LicenseFile.cpp`) and plays the six only when it
+  holds.
 - The upgrade icon's modal (`packages/editor/src/ui/Upgrade.tsx`) asks
   `GET /api/upgrade` when it is opened, never before. Closed, it says what it
   has always said and offers nothing to press. Open, it shows the price and a

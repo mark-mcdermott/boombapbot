@@ -7,8 +7,8 @@ the phone apps check one with `verifyLicenseFile` in
 same check in C++, and this page is what it follows. Change the code and
 this page together.
 
-Where a program keeps the file, and how the desktop app and the plugin share
-one, is not decided here.
+Where the desktop app and the plugin keep the one file they share is under
+"The file on a machine" below.
 
 ## The file
 
@@ -109,6 +109,27 @@ boombapbot-license.eyJ2ZXJzaW9uIjoxLCJsaWNlbnNlSWQiOiIzZjJiOGMxZS05YTQ3LTRkMGItY
 It verifies against that public key, and changing any one character of it
 makes it fail. `packages/contracts/test/license-file.test.ts` holds the same
 example, so the page and the code cannot drift apart unnoticed.
+
+## The file on a machine
+
+The desktop app and the plugin share one file, so unlocking the app unlocks
+the plugin on that machine:
+
+| System | Path |
+| --- | --- |
+| macOS | `~/Library/Application Support/boombapbot/boombapbot.license` |
+| Windows | `%APPDATA%\\boombapbot\\boombapbot.license` |
+| Linux | `$XDG_CONFIG_HOME/boombapbot/boombapbot.license`, or `~/.config/boombapbot/boombapbot.license` |
+
+- It holds the file's text as the server gave it, and nothing else.
+- The desktop app writes it when the device is unlocked, by a key or by an
+  account, and removes it when the device is locked again. The app also reads
+  it as it opens, so the file is where its own license is kept.
+- The plugin only reads it, each time it is loaded, and checks it as above.
+  A file that is missing, cannot be read or does not check out is no
+  license: the plugin has the four effects and says nothing.
+- The site and the phone apps do not use it. They keep their file in their
+  own storage.
 
 ## Getting one from the server
 
