@@ -366,10 +366,13 @@ which features it will unlock is not decided.
 What has been checked: all of the above against the built server with its
 database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`), the
 modal included, and the modal by hand on that same server at a computer's
-width and a phone's. What
-has not: anything against real Stripe or a real email, and nothing has
-written to the live database, which has had the empty `licenses` table
-since 2026-11-17, when the migration was run there.
+width and a phone's. On the live site, on 2026-11-23, the owner gave their own account a license
+by adding a row to `licenses` by hand, and logging in unlocked all ten
+effects, which played; logging out locked them again, and logged in with
+the network off they stayed unlocked. What has not: anything against real
+Stripe or a real email, a key alone on the live site, and the desktop and
+phone apps with a license. The live `licenses` table, there since
+2026-11-17, has held only that hand-made row.
 
 ## Tests
 
