@@ -329,8 +329,8 @@ which features it will unlock is not decided.
   `pnpm license:keypair` makes the pair. A license with `withdrawn_at` set
   (`apps/site/drizzle/0007_license_withdrawn.sql`) gives out no more files,
   and the files it gave out before keep working. Nothing sets that mark
-  yet, nothing reads or keeps a file yet, and `LICENSE_PUBLIC_KEY` is empty
-  until the owner makes the real pair.
+  yet, and nothing reads or keeps a file yet. The owner made the real pair
+  on 2026-11-22: its public half is `LICENSE_PUBLIC_KEY`.
 - The upgrade icon's modal (`packages/editor/src/ui/Upgrade.tsx`) asks
   `GET /api/upgrade` when it is opened, never before. Closed, it says what it
   has always said and offers nothing to press. Open, it shows the price and a
