@@ -23,10 +23,14 @@ night = here / 'night'
 (night / 'patch').mkdir(parents=True, exist_ok=True)
 
 # The machine keeps most of its own colour; the room behind it goes to the blue of a dark room.
-MACHINE = {'light': np.array([0.80, 0.97, 1.28]), 'colour_kept': 1.0, 'depth': 1.15}
+MACHINE = {'light': np.array([0.83, 1.0, 1.32]), 'colour_kept': 1.0, 'depth': 1.0}
 ROOM = {'light': np.array([0.55, 0.78, 1.15]), 'colour_kept': 0.3, 'depth': 0.9}
 # The machine's case on the plate. Every patch lies well inside it.
 CASE = (70, 150, 1950, 1235)
+# The instrument keys, as layout.ts has them, are the ones read most, so they are kept a little brighter than the rest.
+INSTRUMENT_KEYS = [(150, 371, 309, 429), (150, 450, 309, 507), (150, 527, 309, 584), (150, 604, 309, 662),
+                   (150, 682, 309, 739), (150, 759, 309, 816), (150, 836, 309, 894), (150, 918, 310, 977)]
+KEY_LIFT = 1.1
 # The lamp and the light it throws on the wall behind it: the middle of that glow, and how far it reaches.
 LAMP_GLOW = {'centre': (150, 70), 'reach': (400, 250)}
 LAMP_DARK = 0.3
@@ -45,7 +49,10 @@ def in_room(pixels):
     case = np.zeros((height, width))
     case[top:bottom, left:right] = 1
     case = ndimage.gaussian_filter(case, 22)[..., None]
-    return graded(pixels, **MACHINE) * case + graded(pixels, **ROOM) * (1 - case)
+    machine = graded(pixels, **MACHINE)
+    for left, top, right, bottom in INSTRUMENT_KEYS:
+        machine[top:bottom, left:right] *= KEY_LIFT
+    return machine * case + graded(pixels, **ROOM) * (1 - case)
 
 
 def lamp_out(pixels):
@@ -74,5 +81,6 @@ plate = read(here / 'plate.webp')
 write(lamp_out(in_room(plate[..., :3])), plate[..., 3], night / 'plate.webp', quality=92, method=6)
 for patch in sorted((here / 'patch').glob('*.png')):
     pixels = read(patch)
-    write(graded(pixels[..., :3], **MACHINE), pixels[..., 3], night / 'patch' / patch.name, optimize=True)
+    lift = KEY_LIFT if patch.name.startswith('key-') else 1
+    write(graded(pixels[..., :3], **MACHINE) * lift, pixels[..., 3], night / 'patch' / patch.name, optimize=True)
     print(patch.name)
