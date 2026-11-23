@@ -23,7 +23,7 @@ export {
   saveDraft,
   type KeyValueStorage,
 } from './state/draft-storage';
-export type { Machine, MachineHost, MachineSession, StartPlan } from './machine';
+export type { Machine, MachineHost, MachineLight, MachineSession, StartPlan } from './machine';
 export type { EngineMeasure } from './engine/wasm-engine';
 export type {
   AudioControllerEvents,

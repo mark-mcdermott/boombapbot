@@ -6,9 +6,10 @@ import { accountFromSignUpToDeletion, openApp } from './shell-account';
 // server, which it reaches from another origin with a token and no cookie,
 // as the app does from inside a phone.
 
-test('the footer has the pages, the shop, the settings and the account', async ({ page }) => {
+test('the footer has the pages, the shop, the light switch, the settings and the account', async ({ page }) => {
   await openApp(page);
   await expect(page.locator('.sb-footer-word:visible')).toHaveText(['About', 'Docs', 'Manifesto', 'Policies', 'Merch', 'Settings', 'Account']);
+  await expect(page.getByTestId('light-toggle')).toBeVisible();
   await expect(page.getByTestId('nav-merch')).toHaveAttribute('href', `${ACCOUNTS_URL}/?cart=open`);
   await expect(page.getByTestId('upgrade')).toHaveCount(0);
   await expect(page.getByTestId('cart')).toHaveCount(0);

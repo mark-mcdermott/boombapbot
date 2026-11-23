@@ -1,10 +1,11 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
 import { EFFECT_KINDS } from '../document';
 import { Hand, Key, Lamp, useTurning, type KnobWiring, type LampWiring } from './Controls';
 import { ReadoutContext, useReadout } from './context';
 import { INSTRUMENTS, PHONE_KNOBS } from './layout';
 import { Readout } from './Readout';
 import { PhoneScreen } from './Screen';
+import { useDeskLamp } from './desk-lamp';
 import { useLettering, useScript } from './lettering';
 import { useWiring } from './wiring';
 
@@ -146,7 +147,13 @@ function PhoneKnob({ name, lettered, icon, ends, wiring }: PhoneKnobProps) {
  */
 export function PhonePanel() {
   const wiring = useWiring();
-  const { keys, knobs, power, readout } = wiring;
+  const { keys, knobs, power } = wiring;
+  const lampLit = useDeskLamp() === 'lit';
+  // With the room's light out the panel's parts are the dark room's, which are cut for every part the phone has.
+  const readout = useMemo(
+    () => (lampLit ? wiring.readout : { ...wiring.readout, art: (file: string) => wiring.readout.art(file.startsWith('phone/') ? `night/${file}` : file) }),
+    [lampLit, wiring.readout],
+  );
   const [tab, setTab] = useState<TabId>('voice');
   const room = useRef<HTMLElement>(null);
   const growth = useGrowth(room);
@@ -180,6 +187,7 @@ export function PhonePanel() {
           data-testid="panel"
           data-view="phone"
           data-power={power ? 'on' : 'off'}
+          data-lamp={lampLit ? 'lit' : 'out'}
           style={{ zoom: growth, '--rt-bezel': art('bezel.webp'), '--rt-cap': art('key.webp'), '--rt-lamp': art('lamp.png') } as CSSProperties}
         >
           <div className="rt-ph-top">
@@ -197,7 +205,7 @@ export function PhonePanel() {
             </div>
           </div>
 
-          <Readout className="rt-readout-phone" spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={26} />
+          <Readout className="rt-readout-phone" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
 
           {/* Everything but the power switch: dark and out of reach while the machine is off. */}
           <div className="rt-ph-controls" inert={!power}>
@@ -230,6 +238,7 @@ export function PhonePanel() {
               <div className="rt-ph-steps">
                 {wiring.steps.map((step, index) => (
                   <Key key={index} className="rt-ph-key rt-ph-cap rt-ph-step" {...step}>
+                    <i className="rt-pip" />
                     <b>{index + 1}</b>
                   </Key>
                 ))}

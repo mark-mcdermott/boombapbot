@@ -466,10 +466,14 @@ double BoombapbotAudioProcessor::getTailLengthSeconds() const {
   return tailSeconds_.load(std::memory_order_relaxed);
 }
 
+// The plugin has no presets, but a host is told of one program, as JUCE
+// advises, and Steinberg's validator fails a program with no name.
+static constexpr const char* kProgramName = "Default";
+
 int BoombapbotAudioProcessor::getNumPrograms() { return 1; }
 int BoombapbotAudioProcessor::getCurrentProgram() { return 0; }
 void BoombapbotAudioProcessor::setCurrentProgram(int /*index*/) {}
-const juce::String BoombapbotAudioProcessor::getProgramName(int /*index*/) { return {}; }
+const juce::String BoombapbotAudioProcessor::getProgramName(int /*index*/) { return kProgramName; }
 void BoombapbotAudioProcessor::changeProgramName(int /*index*/, const juce::String& /*newName*/) {}
 
 // ---- State ------------------------------------------------------------------

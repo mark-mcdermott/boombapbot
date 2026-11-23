@@ -431,6 +431,26 @@ It is how the panel can be looked at without a host:
 build/vst3/boombapbot_window_snapshot panel.png path/to/a.boombapbot.json
 ```
 
+### Steinberg's validator
+
+Steinberg's own VST3 validator runs against the built bundle, with its
+extensive tests, natively and under Rosetta. It is not built unless asked for,
+because it means fetching Steinberg's VST3 SDK (3.8.1, MIT licensed, used only
+to build the validator and no part of the plugin):
+
+```sh
+cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DBOOMBAPBOT_VST3_STEINBERG_VALIDATOR=ON
+cmake --build build/vst3
+ctest --test-dir build/vst3 -R steinberg --output-on-failure
+```
+
+All 537 of its tests pass on each architecture. The first run found one
+failure: the plugin's one program had no name. It is now called "Default".
+The validator checks that the plugin keeps to the VST3 interfaces (buses,
+parameters, state, processing at many rates and block sizes, threading of its
+calls). It does not listen, and it does not open the window.
+
 ### Sanitizers
 
 `-DBOOMBAPBOT_VST3_SANITIZE=` builds everything, JUCE and the engine included,
@@ -485,6 +505,8 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 
 - A configure and a Release build from an empty build directory, with JUCE
   8.0.9 from a local checkout.
+- Steinberg's validator from VST3 SDK 3.8.1, extensive tests: 537 of 537 pass
+  on arm64 and on x86_64 under Rosetta.
 - The binary holds both architectures (`lipo -archs`: `x86_64 arm64`).
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
@@ -530,10 +552,9 @@ the build of the hang fix:
 - **A closed hat that may go missing.** In one session the owner sometimes did
   not hear the hat on the fifteenth step of a looping pattern. It was not
   pinned down.
-- **Steinberg's validator has not run.** JUCE bundles the parts of the VST3
-  SDK a plugin needs, and the validator is not among them. `pluginval` has not
-  run either. The hosted check uses JUCE's host against JUCE's wrapper, which
-  cannot catch a mistake both share.
+- **`pluginval` has not run.** Steinberg's validator has, and passes (see
+  "Steinberg's validator" under the tests), but it is one host's view.
+  `pluginval` drives a plugin harder and in other orders.
 - **Locks on the audio thread.** The self-test traps heap use there and finds
   none, and the thread sanitizer finds no race, but nothing traps a lock, a
   system call or a page fault. What a system library allocates inside itself
@@ -574,10 +595,36 @@ the build of the hang fix:
 
 ## Licensing
 
-JUCE 8 is offered under the AGPLv3 or a commercial licence from its makers. A
-plugin built with it can only be given to anyone else under one of the two:
-either boombapbot's plugin source is published under the AGPLv3, or a JUCE
-licence is bought. That choice has not been made. Until it is, builds are for
-the machine that made them, and CI builds the plugin and throws it away. The
-VST3 SDK that JUCE bundles has its own terms, which JUCE's
-`modules/juce_audio_processors/format_types/VST3_SDK` spells out.
+JUCE 8 is offered under the AGPLv3 or a commercial licence from its makers,
+and a plugin built with it can only be given to anyone else under one of the
+two. The owner chose on 2026-11-22: the commercial licence, on its free
+Starter tier. The reason is the upgrade: its paid effects are to be gated in
+the plugin too, and under the AGPLv3 anyone may rebuild the plugin without the
+gate.
+
+What the licence says, in JUCE 8's (https://juce.com/legal/juce-8-licence/)
+and, clause for clause, in JUCE 9's:
+
+- Clause 1.9 lets the owner of a product distribute and sell it, on any tier.
+  Nothing asks for the product's source.
+- Clause 1.2.1 sets the Starter tier's limit at 20,000 dollars over the last
+  twelve months. For a person it counts what their use of JUCE brings in,
+  from every source; for a company it counts everything the company and its
+  affiliates receive, JUCE or not. Above it a paid tier is needed, or
+  distributing stops (1.14). The upgrade unlocks the plugin along with the
+  rest, so its sales are best counted whole.
+- Clause 2.3 forbids putting JUCE under an open source licence, so the plugin
+  cannot be given one that reaches JUCE. The repository can stay public: it
+  has no licence, and it does not hold JUCE, which the build fetches (1.17
+  forbids handing JUCE on by itself).
+
+Not done yet, so builds are still for the machine that made them and CI still
+throws its build away:
+
+- The VST3 SDK that JUCE 8.0.9 bundles is 3.7.12, offered under the GPLv3 or
+  Steinberg's own agreement. Without the GPL, that agreement has to be signed
+  with Steinberg, or JUCE moved to a version that bundles the MIT-licensed
+  SDK 3.8.
+- Nothing else. The owner sells as a person, with no company formed, so the
+  limit that applies is the first: what the use of JUCE brings in. Forming a
+  company would change that to everything the company receives.

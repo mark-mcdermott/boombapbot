@@ -124,11 +124,13 @@ test.describe('the page around the machine', () => {
     expect(mascot.height - mark.height).toBeLessThan(5);
     await expect(page.getByTestId('tagline')).toBeHidden();
 
-    // One row of names across the page, the pages and then the buttons, with no icon among them.
+    // One row of names across the page, the pages and then the buttons.
+    // The light switch alone is a drawing, the sun or the moon, between the cart and the settings.
     const names = ['About', 'Docs', 'Manifesto', 'Policies', 'Upgrade', 'Cart', 'Settings', 'Account'];
-    const words = page.locator('.sb-footer-word');
+    const words = page.locator('.sb-footer-word:visible');
     await expect(words).toHaveText(names);
-    await expect(page.locator('.sb-footer-icon svg:visible')).toHaveCount(0);
+    await expect(page.locator('.sb-footer-icon svg:visible')).toHaveCount(1);
+    await expect(page.getByTestId('light-toggle').locator('svg')).toBeVisible();
     const boxes = await page.locator('.sb-footer-icon').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON() as DOMRect));
     for (const [index, box] of boxes.entries()) {
       expect(box.top).toBeCloseTo(boxes[0]!.top, 0);

@@ -1,0 +1,9 @@
+{
+  "machine": "ritm12",
+  "engine": {
+    "worklet": "engine/boombapbot-worklet.3ffa218d18.js",
+    "wasm": "engine/boombapbot-engine-ritm12.c9163f7dd0.wasm"
+  },
+  "faceplate": null,
+  "art": "machines/ritm12/"
+}

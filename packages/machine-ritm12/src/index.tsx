@@ -2,6 +2,7 @@ import type { Machine } from '@boombapbot/editor';
 import { documentRitm12, type Project } from './document';
 import { engineSetup, exportPlan } from './engine';
 import { RESTING, SessionRitm12, memoryOf, type TransientRitm12 } from './session';
+import { setDeskLamp, useDeskLamp } from './ui/desk-lamp';
 import { Panel } from './ui/Panel';
 import { KeysHelp, Notes, Options, SettingsActions, StatusLines } from './ui/SettingsParts';
 import './styles.css';
@@ -23,6 +24,10 @@ export const machineRitm12: Machine<Project, TransientRitm12, SessionRitm12> = {
   StatusLines,
   Notes,
   Options,
+  light: {
+    use: () => (useDeskLamp() === 'lit' ? 'light' : 'dark'),
+    set: (next) => setDeskLamp(next === 'light' ? 'lit' : 'out'),
+  },
   keysHelp: <KeysHelp />,
   messages: {
     earlierVersion: 'What changed on the way is listed here.',

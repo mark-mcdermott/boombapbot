@@ -42,6 +42,15 @@ export interface MachineSession<Document extends ProjectBase, Transient extends 
   keyDown?(event: KeyboardEvent): boolean;
 }
 
+/**
+ * The light a machine is seen in, where its panel has one for the light and
+ * one for the dark. `use` is a hook: it follows the choice as it changes.
+ */
+export interface MachineLight {
+  use(): 'light' | 'dark';
+  set(next: 'light' | 'dark'): void;
+}
+
 /** One drum machine: its documents, how they sound, and its panel. */
 export interface Machine<
   Document extends ProjectBase,
@@ -74,6 +83,8 @@ export interface Machine<
   Notes: ComponentType;
   /** The machine's own options in settings, each with its label, kept on this device. */
   Options?: ComponentType;
+  /** Given by a machine that can be seen in the light or in the dark: the footer then has the switch between them. */
+  light?: MachineLight;
   /** How the keyboard works on this machine, for the settings footnote. */
   keysHelp: ReactNode;
   messages: {

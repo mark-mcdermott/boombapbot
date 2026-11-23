@@ -16,6 +16,11 @@ test('play starts the engine, the running step moves, and stop stops it', async 
   const first = (await playing(page)).step;
   await expect.poll(async () => (await playing(page)).step).not.toBe(first);
   await expect(page.locator('.rt-key[data-now]')).toHaveCount(1);
+  // Every step key has a small light of its own, and only the running step's is lit: the key itself is not.
+  await expect(page.locator('.rt-key > .rt-pip')).toHaveCount(16);
+  const glow = (selector: string) => page.locator(selector).first().evaluate((node) => getComputedStyle(node).boxShadow);
+  expect(await glow('.rt-key[data-now] > .rt-pip')).not.toBe(await glow('.rt-key:not([data-now]) > .rt-pip'));
+  expect(await page.locator('.rt-key[data-now]').evaluate((node) => getComputedStyle(node).filter)).toBe('none');
   await page.getByTestId('stop').click();
   await expect(editor).toHaveAttribute('data-playing', 'false');
   expect(await playing(page)).toEqual({ step: -1, pattern: -1 });

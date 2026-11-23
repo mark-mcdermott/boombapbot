@@ -752,6 +752,15 @@
   transform: rotate(60deg);
 }
 
+/* Light: the sun turns a little, and the moon tips back. */
+.sb-ico-light[data-light='light']:is(:hover, :focus-visible) svg {
+  transform: rotate(45deg);
+}
+
+.sb-ico-light[data-light='dark']:is(:hover, :focus-visible) svg {
+  transform: rotate(-18deg);
+}
+
 /* Cart: it rolls off on its back wheel. */
 .sb-ico-cart svg {
   transform-origin: 33% 83%;
@@ -2412,7 +2421,7 @@ select.sb-input {
      more where there is room, and on a screen too narrow for one row the
      buttons go under the pages. */
   .sb-footer-links {
-    --word-gap: clamp(3px, 1.7vw, 12px);
+    --word-gap: clamp(3px, 1.2vw, 12px);
     order: -1;
     width: 100%;
     flex-wrap: wrap;
@@ -2447,6 +2456,18 @@ select.sb-input {
 
   .sb-footer-word {
     display: inline;
+  }
+
+  /* The light switch alone stays a drawing: a sun or a moon says which light
+     this is with no word, and a word more would not fit the row. */
+  .sb-ico-light svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+
+  .sb-ico-light .sb-footer-word {
+    display: none;
   }
 
   .sb-footer-icon:hover,

@@ -228,6 +228,33 @@ site its icon still opens a modal that says it is not open.
     on); whether a key alone unlocks a device with nobody logged in; and how
     a paid effect behaves with no server, since the machine has to work
     without one.
+  - **One upgrade for everything.** Decided by the owner on 2026-11-22: the
+    same five dollars unlocks the paid effects in the VST3 plugin too, and
+    in the apps on both stores. None of it is built. How it could work was
+    talked through the same day, and these parts are proposals the owner
+    has not yet agreed to:
+    - The server hands out a signed license file when a key is entered or
+      an account logs in, and each program checks the signature with a
+      public key built into it. That answers both questions above: a key
+      alone unlocks the desktop app and the plugin, and nothing needs the
+      server afterwards. The desktop app and the plugin read the file from
+      one place, so unlocking one unlocks the other on that machine.
+    - In the store apps the upgrade is the store's own in-app purchase, one
+      product bought once, with "Restore purchases" on iOS. The app sends
+      the store's receipt to the server, which checks it with Apple or
+      Google itself and makes the same license a Stripe payment does. The
+      store apps unlock by logging in, never by a typed key: Apple's review
+      guideline 3.1.1 names license keys as something an app may not unlock
+      with. A purchase made in a store app reaches the site, the desktop
+      app and the plugin once its buyer logs in.
+    - A beat that uses a paid effect, opened without the upgrade, plays
+      with that effect off and says so. It is never refused.
+    - No limit on devices.
+    - A refund marks the license so that it cannot be fetched again; files
+      already on a machine keep working, since withdrawing them would mean
+      licenses that expire and need the server.
+    - The stores' cut and their rules on linking out to another checkout
+      were not checked and change by country; check them when this is built.
   - **The modal is built**, on 2026-11-18, and shows only while the server
     says the upgrade is open: the price from `GET /api/upgrade`, a button
     that goes to Stripe, the way back (`/?upgrade=paid` and
@@ -525,12 +552,19 @@ What is left:
 - **Listen to it.** The tests compare samples. A knob turned while its voice
   rings changes the next hit and not the ringing one; nobody has judged how
   that feels under automation, or how the delay sounds when the tempo moves.
-- **Steinberg's validator and `pluginval`.** Neither has run. JUCE bundles the
-  parts of the VST3 SDK a plugin needs and the validator is not among them, so
-  running it means fetching the SDK or `pluginval`.
-- **JUCE's licence.** JUCE 8 is AGPLv3 or commercial, and one of the two has to
-  be chosen before a build is given to anyone. It has not been. CI builds the
-  plugin and keeps no artefact for that reason.
+- **`pluginval`.** Steinberg's validator runs in CI and passes; `pluginval`
+  has not run. It is a download, and it drives a plugin in ways the validator
+  does not.
+- **JUCE's licence.** Chosen by the owner on 2026-11-22: JUCE's commercial
+  licence on its free Starter tier, not the AGPLv3, because the upgrade's
+  paid effects are to be gated in the plugin. JUCE's licence lets a product
+  be sold on that tier and asks for no source. What is left before a build is
+  given to anyone, and why CI still keeps none: settle the bundled VST3
+  SDK's terms (Steinberg's agreement, or a JUCE that bundles SDK 3.8). And
+  watch the tier's limit of 20,000 dollars a year: the owner sells as a
+  person, so it counts what the use of JUCE brings in, and forming a company
+  would make it count everything the company receives.
+  `plugins/vst3/README.md` has the detail under "Licensing".
 - **Measures and the host's time signature.** A measure is four of the host's
   beats counted from the start of its timeline, whatever its signature says.
   In 3/4 the pattern runs across the bar lines. Whether it should restart at
