@@ -1,6 +1,14 @@
+import { createPrivateKey, createPublicKey, verify } from 'node:crypto';
 import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
 import { PASSWORD, ROW_ID, UUID, signedUp, signedUpRequest } from './account';
-import { ACCOUNTS_URL, BROKEN_MAIL_PORT, CLOSED_PORT, CLOSED_URL, FAKE_SERVICES_URL } from './accounts-server';
+import {
+  ACCOUNTS_URL,
+  BROKEN_MAIL_PORT,
+  CLOSED_PORT,
+  CLOSED_URL,
+  FAKE_SERVICES_URL,
+  LICENSE_SIGNING_KEY,
+} from './accounts-server';
 import { openEditor, scanner } from './helpers';
 import { mailTo, newAddress } from './mail';
 import { startServer, type SecondServer } from './second-server';
@@ -70,6 +78,37 @@ const redeem = (request: APIRequestContext, key: unknown) =>
   request.post('/api/upgrade/redeem', { data: { key }, headers: json });
 const remind = (request: APIRequestContext, email: unknown) =>
   request.post('/api/upgrade/key', { data: { email }, headers: json });
+
+const licenseFile = (request: APIRequestContext, key: unknown, headers: Record<string, string> = json) =>
+  request.post('/api/upgrade/license', { data: { key }, headers });
+
+/** The public half of the test server's signing key, worked out by Node from the 32 bytes the server was given. */
+const LICENSE_VERIFYING_KEY = createPublicKey(
+  createPrivateKey({
+    key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(LICENSE_SIGNING_KEY, 'base64url')]),
+    format: 'der',
+    type: 'pkcs8',
+  }),
+);
+
+/**
+ * What a license file says, once Node's own Ed25519 has checked it the way
+ * docs/license-file.md describes: the signature is over everything before
+ * the last dot.
+ */
+async function licenseFileIn(answer: APIResponse): Promise<{ version: number; licenseId: string; issuedAt: string; unlocks: string[] }> {
+  expect(answer.status(), await answer.text()).toBe(200);
+  const text = await answer.text();
+  expect(text).not.toMatch(ROW_ID);
+  const body = JSON.parse(text);
+  expect(Object.keys(body)).toEqual(['file']);
+  const [prefix, payload, signature, ...more] = (body.file as string).split('.');
+  expect(more).toEqual([]);
+  expect(prefix).toBe('boombapbot-license');
+  const signed = Buffer.from(`${prefix}.${payload}`);
+  expect(verify(null, signed, LICENSE_VERIFYING_KEY, Buffer.from(signature!, 'base64url'))).toBe(true);
+  return JSON.parse(Buffer.from(payload!, 'base64url').toString('utf8'));
+}
 
 async function refused(answer: APIResponse, status: number, code: string): Promise<void> {
   expect(answer.status(), await answer.text()).toBe(status);
@@ -444,6 +483,40 @@ test('a lost key is asked for in the modal and emailed to the address that bough
   await expect(page.getByTestId('upgrade-buy')).toBeVisible();
 });
 
+test('a key alone gets a signed license file, with nobody logged in', async ({ request }) => {
+  const key = await boughtWithoutAccount(request);
+  const before = Date.now();
+  const file = await licenseFileIn(await licenseFile(request, key));
+  expect(Object.keys(file).sort()).toEqual(['issuedAt', 'licenseId', 'unlocks', 'version']);
+  expect(file).toMatchObject({ version: 1, unlocks: ['upgrade'] });
+  expect(file.licenseId).toMatch(UUID);
+  expect(Date.parse(file.issuedAt)).toBeGreaterThanOrEqual(before);
+
+  // Typed any way a key is read, and as often as there are devices.
+  const again = await licenseFileIn(await licenseFile(request, key.toLowerCase().replace(/-/g, ' ')));
+  expect(again.licenseId).toBe(file.licenseId);
+
+  await refused(await licenseFile(request, 'BOOM-00000-00000-00000-00000'), 404, 'unknown_key');
+  await refused(await licenseFile(request, 'not a key'), 404, 'unknown_key');
+  await refused(await licenseFile(request, 7), 400, 'invalid');
+  await refused(await request.post('/api/upgrade/license', { data: 'key', headers: json }), 400, 'invalid');
+  await refused(await request.get('/api/upgrade/license'), 401, 'signed_out');
+});
+
+test('an upgraded account gets its license file by logging in, and no other account does', async ({ request }) => {
+  const key = await boughtWithoutAccount(request);
+  await signedUpRequest(request);
+  await refused(await request.get('/api/upgrade/license'), 404, 'no_license');
+
+  expect((await redeem(request, key)).status()).toBe(200);
+  const { license } = await (await request.get('/api/upgrade/key')).json();
+  const file = await licenseFileIn(await request.get('/api/upgrade/license'));
+  expect(file).toMatchObject({ version: 1, licenseId: license.id, unlocks: ['upgrade'] });
+
+  // The key still gets the same license's file with nobody logged in.
+  expect((await licenseFileIn(await licenseFile(request, key))).licenseId).toBe(license.id);
+});
+
 test.describe('until the upgrade is switched on', () => {
   // The server as the live site runs until UPGRADE_OPEN is set, with its
   // limits on. It has a database of its own and shares the outbox.
@@ -510,6 +583,16 @@ test.describe('until the upgrade is switched on', () => {
       message: 'I have had that request a lot just now. Try again in an hour.',
     });
     expect((await remindFrom('198.51.100.5', newAddress())).status()).toBe(202);
+  });
+
+  test('one place can try ten keys for a license file in ten minutes, and then no more', async () => {
+    const tryFrom = (place: string, key: string) => licenseFile(closed, key, { ...closedJson, 'x-forwarded-for': place });
+    const guess = (last: number) => `BOOM-00000-00000-00000-0000${last}`;
+    const statuses = [];
+    for (let tried = 0; tried < 11; tried += 1) statuses.push((await tryFrom('198.51.100.40', guess(tried % 10))).status());
+    expect(statuses).toEqual([...Array<number>(10).fill(404), 429]);
+    await refused(await tryFrom('198.51.100.40', guess(0)), 429, 'too_many');
+    await refused(await tryFrom('198.51.100.41', guess(0)), 404, 'unknown_key');
   });
 
   test('one place can ask for five addresses in ten minutes, and then no more', async () => {

@@ -220,6 +220,8 @@ export const license = pgTable(
     stripePaymentIntentId: text('stripe_payment_intent_id'),
     /** When the key last went out by email. Empty until the first one has. */
     emailedAt: moment('emailed_at'),
+    /** When it was refunded or taken back. From then it gives out no license file; files already out keep working. */
+    withdrawnAt: moment('withdrawn_at'),
     createdAt: moment('created_at').notNull().defaultNow(),
     updatedAt: moment('updated_at').notNull().defaultNow(),
   },
