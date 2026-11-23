@@ -29,9 +29,6 @@ plate = Image.open(here / 'plate.webp').convert('RGB')
 PATCHES = {
     'power-on': (178, 1070),
     'size-16': (674, 804),
-    'effect-delay': (1415, 696),
-    'effect-reverb': (1415, 696),
-    'effect-flanger': (1415, 696),
 }
 
 
@@ -47,6 +44,18 @@ def wearing(*names):
 def rect(name, box, picture=plate):
     """A key or a frame, cut square."""
     picture.crop(box).save(out / f'{name}.webp', quality=92, method=6)
+
+
+def rounded(name, box, corner, picture):
+    """A frame with round corners, cut without the paint in them."""
+    cut = picture.crop(box).convert('RGBA')
+    width, height = cut.size
+    down, across = np.mgrid[0:height, 0:width]
+    in_x = np.maximum(np.maximum(corner - across, across - (width - 1 - corner)), 0)
+    in_y = np.maximum(np.maximum(corner - down, down - (height - 1 - corner)), 0)
+    alpha = np.clip(corner - np.hypot(in_x, in_y) + 0.5, 0, 1) * 255
+    cut.putalpha(Image.fromarray(alpha.astype('uint8')))
+    cut.save(out / f'{name}.png', optimize=True)
 
 
 def disc(name, x, y, radius, picture=plate, feather=3):
@@ -155,9 +164,13 @@ for name, (x, y, radius) in KNOBS.items():
 disc('write-hits', 604, 693, 42)
 disc('size-12', 697, 827, 26)
 disc('size-16', 697, 827, 26, wearing('size-16'))
-disc('effect-chorus', 1470, 756, 54)
-for kind in ('delay', 'reverb', 'flanger'):
-    disc(f'effect-{kind}', 1470, 756, 54, wearing(f'effect-{kind}'))
+
+# The effect unit's selector, which the page turns, and its window (EFFECT_UNIT
+# in layout.ts), as cut-effect.py made them.
+shutil.copyfile(here / 'patch' / 'effect-knob.png', out / 'effect-knob.png')
+UNIT, WINDOW = (1398, 660), (1503, 712, 1721, 800)
+rounded('effect-window', (WINDOW[0] - UNIT[0], WINDOW[1] - UNIT[1], WINDOW[2] - UNIT[0], WINDOW[3] - UNIT[1]), 8,
+        Image.open(here / 'patch' / 'effect-unit.png').convert('RGB'))
 
 files = sorted(out.iterdir())
 print(f'{len(files)} parts, {sum(file.stat().st_size for file in files) // 1024} KB, in {out.relative_to(here.parents[2])}')

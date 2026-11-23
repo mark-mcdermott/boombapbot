@@ -10,9 +10,8 @@ does not have.
 - **`plate.webp`** is the panel: the whole machine, with every stepped
   control in one position and every knob without its pointer line.
 - **`patch/`** holds a small picture for each other position of a stepped
-  control: the write switch on accents, the size switch on 16, the power
-  rocker on, and the old effect selector on delay, reverb and flanger. The page
-  lays one over the plate (the effect's are for the phone's panel alone). It also holds the end of each instrument key
+  control: the write switch on accents, the size switch on 16 and the
+  power rocker on. The page lays one over the plate. It also holds the end of each instrument key
   (`key-*.png`) with the instrument drawn as `instrument-icons.svg` has it,
   which the page always lays over the plate.
 - **`patch/effect-unit.png`** and **`patch/effect-knob.png`** are the effect
@@ -25,9 +24,7 @@ does not have.
   second is the selector cut round, at twice its size on the plate, as it
   stands for the first effect; the page turns it. The painting itself is in
   `misc/assets/ritm12/effect-unit.webp`. The plate's four-position selector
-  is still under the patch, and `patch/effect-delay.png`, `-reverb` and
-  `-flanger` are still its other positions: the phone's panel is cut from
-  them.
+  is still under the patch, and its other positions are no longer cut.
 - **`patch/status.png`** is the level meter's box done again with room
   under it for the status readout: the meter smaller, and a second box
   below, both from the plate's own paint. [`cut-status.py`](cut-status.py)
@@ -59,7 +56,8 @@ does not have.
 - **`phone/`** holds the parts of the phone's panel, which the page lays out
   itself: the frame of the screen, a blank key, the pattern, transport, dice
   and clear keys, the power rocker off and on, each knob's body and each
-  stepped control in every position cut round, a lamp, the nameplate and
+  stepped control in every position cut round, the effect unit's selector and
+  its window (`effect-knob.png`, `effect-window.png`, from `patch/`), a lamp, the nameplate and
   the maker's badge with the paint taken away, the drawing on each
   instrument key (`ink-*.svg`, from `cut-icons.py`), and (`icon-*.png`) the small drawing the picture has
   beside each label, in the lettering's cream. [`cut-phone-parts.py`](cut-phone-parts.py) cuts the
