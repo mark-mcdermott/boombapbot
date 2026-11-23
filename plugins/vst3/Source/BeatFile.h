@@ -40,13 +40,10 @@ struct Beat {
   float volume = kVolumeRest;
   float accent = kAccentRest;
   std::array<BeatVoice, kVoiceCount> voices{};
+  // The effect the beat names, which can be one of the upgrade's whoever
+  // holds the beat. Whether it is played is the plugin's to say.
   int effect = kEffectRest;
   float effectMix = kEffectMixRest;
-  // The effect a read beat named, as the document names it, when it is one
-  // of the upgrade's. The plugin does not have those yet: such a beat is read
-  // with its effect off, and what it named is here to be said. It is not
-  // written back.
-  juce::String upgradeEffect;
 };
 
 inline constexpr int kBeatSchemaVersion = 4;
@@ -55,6 +52,9 @@ inline constexpr int kBeatSchemaVersion = 4;
 inline constexpr int kBeatSchemaVersionOldest = 3;
 // Far more than a beat file ever is. Anything larger is not one.
 inline constexpr int kBeatFileBytesMost = 1 << 20;
+
+// An effect as the document names it: "delay", "crusher". Off has no name there.
+juce::String effectKind(int effect);
 
 // A row as the document writes it: 'x' on, '.' off.
 juce::String rowText(StepRow row);
@@ -79,7 +79,8 @@ BeatStamp newBeatStamp();
 // The text of a beat file the site opens. Knob positions are written to six
 // places, which is finer than a hand or a host sets them. The document has no
 // "no effect": that is an effect with none of it mixed in, so a beat whose
-// effect is off is written as the delay at 0.
+// effect is off is written as the delay at 0. An effect of the upgrade is
+// written by its name like any other.
 juce::String writeBeat(const Beat& beat, const BeatStamp& stamp);
 // A file name for a beat: its name in lower case with dashes, as the site makes one.
 juce::String beatFileName(const juce::String& beatName);

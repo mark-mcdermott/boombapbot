@@ -1,6 +1,5 @@
 #include "BeatFile.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -11,10 +10,11 @@ namespace {
 constexpr const char* kProjectFormat = "boombapbot.project";
 constexpr const char* kMachineId = "ritm12";
 // Named as the document names them, in the order of the engine's effects from 1.
-constexpr std::array<const char*, 4> kEffectKinds{{"delay", "reverb", "flanger", "chorus"}};
-// The effects that come with the upgrade, which a beat can name and this plugin does not play.
-constexpr std::array<const char*, 6> kUpgradeEffectKinds{{"crusher", "tape", "pump", "filter", "vinyl", "phaser"}};
+constexpr std::array<const char*, kEffectLast> kEffectKinds{
+    {"delay", "reverb", "flanger", "chorus", "crusher", "tape", "pump", "filter", "vinyl", "phaser"}};
 constexpr int kSlugLongest = 48;
+
+bool isAnEffect(int effect) { return effect >= SNARE_EFFECT_DELAY && effect <= kEffectLast; }
 
 juce::Result wrong(const juce::String& what) { return juce::Result::fail(what); }
 
@@ -82,10 +82,8 @@ juce::Result readEffect(const juce::var& effect, Beat& out) {
   for (std::size_t index = 0; index < kEffectKinds.size(); ++index) {
     if (kind == kEffectKinds[index]) found = SNARE_EFFECT_DELAY + static_cast<int>(index);
   }
-  const bool ofTheUpgrade = std::any_of(kUpgradeEffectKinds.begin(), kUpgradeEffectKinds.end(), [&kind](const char* paid) { return kind == juce::String(paid); });
-  if (found == SNARE_EFFECT_NONE && !ofTheUpgrade) return wrong("effect.kind is not an effect this machine has.");
+  if (found == SNARE_EFFECT_NONE) return wrong("effect.kind is not an effect this machine has.");
   out.effect = found;
-  out.upgradeEffect = ofTheUpgrade ? kind : juce::String();
   return readKnob(effect["mix"], "effect.mix", out.effectMix);
 }
 
@@ -175,6 +173,10 @@ juce::String isoMoment(juce::Time moment) {
 
 }  // namespace
 
+juce::String effectKind(int effect) {
+  return isAnEffect(effect) ? kEffectKinds[static_cast<std::size_t>(effect - SNARE_EFFECT_DELAY)] : "";
+}
+
 juce::String rowText(StepRow row) {
   juce::String text;
   for (int step = 0; step < kSteps; ++step) text << ((row >> step) & 1 ? 'x' : '.');
@@ -241,9 +243,9 @@ juce::String writeBeat(const Beat& beat, const BeatStamp& stamp) {
   put(document, "mix", mix);
   put(document, "voices", voices);
 
-  const bool effectOn = beat.effect >= SNARE_EFFECT_DELAY && beat.effect <= SNARE_EFFECT_CHORUS;
+  const bool effectOn = isAnEffect(beat.effect);
   const juce::var effect = object();
-  put(effect, "kind", kEffectKinds[static_cast<std::size_t>(effectOn ? beat.effect - SNARE_EFFECT_DELAY : 0)]);
+  put(effect, "kind", effectKind(effectOn ? beat.effect : SNARE_EFFECT_DELAY));
   put(effect, "mix", effectOn ? sixPlaces(beat.effectMix) : 0.0);
   put(document, "effect", effect);
 
