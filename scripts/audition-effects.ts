@@ -7,7 +7,8 @@
 // With no beat it plays the committed fixture. It needs the native render
 // tool, which "pnpm build:engine" builds.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createProjectCodec } from '../packages/contracts/src/index';
 import type { EffectKind, EngineSetup } from '../packages/editor/src/engine/index';
@@ -46,14 +47,16 @@ if (!Number.isInteger(measures) || measures < 1 || measures > 64) fail('--measur
 const beat = beatPath();
 if (!existsSync(beat)) fail(`${beat} is not there`);
 const parsed = createProjectCodec([documentRitm12]).parseText(readFileSync(beat, 'utf8'));
-if (!parsed.ok) fail(`${beat} is not a beat: ${parsed.errors.join('; ')}`);
+if (!parsed.ok) fail(`${beat} is not a beat saved from the site or the plugin (a .boombapbot.json file): ${parsed.errors.join('; ')}`);
 const project = parsed.project;
 
 const outDir = resolve(option('--out', join(repoRoot, 'build/auditions')));
 mkdirSync(outDir, { recursive: true });
+// What the render tool is handed. It is no beat, and is not left beside the audio.
+const runDir = mkdtempSync(join(tmpdir(), 'boombapbot-audition-'));
 
 function render(name: string, setup: EngineSetup): void {
-  const run = join(outDir, `${name}.run.json`);
+  const run = join(runDir, `${name}.json`);
   const wav = join(outDir, `${name}.wav`);
   writeFileSync(run, JSON.stringify({ rate: RATE, setup, pattern: project.panel.pattern, measures }));
   execFileSync(renderTool, ['--setup', run, '--out', wav]);
@@ -65,3 +68,4 @@ render('dry', dry);
 for (const kind of PAID_EFFECTS) {
   for (const wet of AMOUNTS) render(`${kind}-${Math.round(wet * 100)}`, { ...dry, effect: { kind, wet } });
 }
+rmSync(runDir, { recursive: true });

@@ -254,14 +254,16 @@ SNARE_TEST(tape_dulls_the_top_and_rounds_off_what_is_loud) {
   CHECK(peak < 0.75f && peak > 0.2f);
 }
 
-SNARE_TEST(the_pump_lets_a_low_hit_through_and_then_ducks_under_it) {
+SNARE_TEST(the_pump_lets_a_low_hit_through_ducks_under_it_and_swells_back) {
   const auto low = tone(60.0, 1.0, 0.6f);
   const auto plain = through(low, SNARE_EFFECT_NONE, 0.0, 48000);
   const auto pumped = through(low, SNARE_EFFECT_PUMP, 1.0, 48000);
-  // The first two milliseconds come through; a quarter of a second in, it is well down.
+  // The first two milliseconds come through. A twentieth of a second in it is
+  // well down, and by the end, with the hit still sounding, it is back and more.
   CHECK(energy(pumped.left, 0, 96) > 0.8 * energy(plain.left, 0, 96));
-  CHECK(energy(pumped.left, 12000, 24000) < 0.4 * energy(plain.left, 12000, 24000));
-  CHECK(energy(pumped.left, 12000, 24000) > 0.02 * energy(plain.left, 12000, 24000));
+  CHECK(energy(pumped.left, 1600, 3200) < 0.25 * energy(plain.left, 1600, 3200));
+  CHECK(energy(pumped.left, 1600, 3200) > 0.01 * energy(plain.left, 1600, 3200));
+  CHECK(energy(pumped.left, 40000, 48000) > 1.5 * energy(plain.left, 40000, 48000));
 }
 
 SNARE_TEST(the_filter_closes_as_its_knob_is_turned_up) {
