@@ -1496,7 +1496,7 @@ void testBeatFile() {
       {"JSON that is not a beat", "{\"format\": \"something.else\", \"schemaVersion\": 3}"},
       {"a list", "[1, 2, 3]"},
       {"a beat of the earlier machine", fixture("earlier-v2.project.json")},
-      {"a beat from a newer version", with([](const juce::var& beat) { put(beat, "schemaVersion", 4); })},
+      {"a beat from a newer version", with([](const juce::var& beat) { put(beat, "schemaVersion", 5); })},
       {"a beat for another machine", with([](const juce::var& beat) { put(beat, "machine", "808"); })},
       {"a row of fifteen steps", with([](const juce::var& beat) { put(beat["patterns"][0]["steps"], "kick", "x.............."); })},
       {"a row with a letter that is no step", with([](const juce::var& beat) { put(beat["patterns"][3], "accents", "x......X........"); })},
@@ -1510,8 +1510,20 @@ void testBeatFile() {
           text("%s is refused and changes nothing: \"%s\"", file.name, result.getErrorMessage().toRawUTF8()));
   }
 
-  const juce::Result loaded = plugin(*processor).loadBeat(fourPatterns());
-  check(loaded.wasOk() && plugin(*processor).beatName() == "Four patterns fixture", context,
+  // A beat that names an effect of the upgrade is not refused: it loads with its effect off.
+  juce::String leftOut;
+  const juce::Result paid = plugin(*processor).loadBeat(fixture("paid-effect.project.json"), &leftOut);
+  check(paid.wasOk() && leftOut == "crusher" && plugin(*processor).beatName() == "Paid effect fixture" &&
+            std::abs(valueOf(*processor, "effect_kind")) < 1e-6f && std::abs(valueOf(*processor, "kick_pitch") - 0.35f) < 1e-6f,
+        context, text("a beat naming an effect of the upgrade loads with its effect off, and says which: %s", leftOut.toRawUTF8()));
+
+  // A beat of the version before this one is the same beat.
+  const juce::Result versionThree = plugin(*processor).loadBeat(fixture("version-3.project.json"));
+  check(versionThree.wasOk() && plugin(*processor).beatName() == "Version 3 fixture" && std::abs(valueOf(*processor, "effect_kind") - 2.0f) < 1e-6f,
+        context, "a beat of version 3 loads as it is");
+
+  const juce::Result loaded = plugin(*processor).loadBeat(fourPatterns(), &leftOut);
+  check(loaded.wasOk() && leftOut.isEmpty() && plugin(*processor).beatName() == "Four patterns fixture", context,
         text("the fixture loads and the plugin holds its name: %s", plugin(*processor).beatName().toRawUTF8()));
   const auto is = [&](const char* id, float value) { return std::abs(valueOf(*processor, id) - value) < 1e-6f; };
   check(is("kick_pitch", 0.35f) && is("clap_level", 0.5f) && is("rim_mute", 1.0f) && is("kick_mute", 0.0f) &&

@@ -213,8 +213,8 @@ site its icon still opens a modal that says it is not open.
     someone who has not upgraded cannot hear them. They are six, chosen by
     the owner the same day: a crusher, tape, a pump, a filter, vinyl and a
     phaser. Nothing reads `isUpgraded` yet. The six are built in the engine
-    (2026-11-18) and nowhere else: no control reaches them and РИТМ-12's
-    document cannot name them, so nothing a visitor has changes. They pass
+    (2026-11-18): no control reaches them, so nothing a visitor has
+    changes. They pass
     the engine's tests, natively and in WebAssembly alike. How each sounds
     was set by measurement: the crusher's rate and levels, tape's drive and
     wobble, how the pump ducks, the filter's range and ring, vinyl's hiss
@@ -227,9 +227,20 @@ site its icon still opens a modal that says it is not open.
     and is back, and a little over, while the hit still rings. To hear them, `pnpm audition`
     renders a beat through each, half on and full on, into
     `build/auditions`. Still to do before they are
-    sold: the owner listens and they are tuned; РИТМ-12's document takes
-    them (a schema change, with its step and fixture); they are gated; and
-    they get a place on the machine. Where they sit was decided by the
+    sold: the owner listens and they are tuned; they are gated; and
+    they get a place on the machine. РИТМ-12's document takes them since
+    2026-11-23: a beat can name any of the six, and a program that does not
+    hold the upgrade opens it, plays it without that effect, and says so
+    (`engineSetup`, `holdsUpgrade` in the machine's `src/upgrade.ts`, which
+    answers no everywhere until a program is given its license file). The
+    schema is version 4 for it, by the owner's decision. A beat of
+    version 3 is brought up to date as it is read, with nothing lost
+    (`fixtures/version-3.project.json`); a program from before version 4
+    refuses any beat saved since, and the plugin reads both. The selector still reaches only the four, so nothing
+    writes such a beat yet. The plugin loads one with its effect off and
+    says which effect that was, but does not keep the name: saved from the
+    plugin, the beat has no effect. The six names on the label are
+    stand-ins. Where they sit was decided by the
     owner on 2026-11-22 and the picture's unit is built for it: the effect
     selector now turns a whole circle shared evenly among the effects there
     are, four now and ten with the upgrade, beside a window that shows the
@@ -767,7 +778,8 @@ Started, and open to nobody yet (both under "Upgrade" above):
 
 - **Paid effects.** Six effects for the upgrade are built in the engine
   (2026-11-18): a crusher, tape, a pump, a filter, vinyl and a phaser. No
-  control reaches them, a project cannot name them, and nothing gates them.
+  control reaches them. A project can name one, and it plays only where the
+  upgrade is held, which is nowhere yet.
 - **Paying.** The build spec's billing is, by the owner's decision, a flat
   one-time upgrade with no subscription: a Stripe checkout, a license key
   and `isUpgraded` on the server, and the modal. It is built and switched

@@ -42,9 +42,17 @@ struct Beat {
   std::array<BeatVoice, kVoiceCount> voices{};
   int effect = kEffectRest;
   float effectMix = kEffectMixRest;
+  // The effect a read beat named, as the document names it, when it is one
+  // of the upgrade's. The plugin does not have those yet: such a beat is read
+  // with its effect off, and what it named is here to be said. It is not
+  // written back.
+  juce::String upgradeEffect;
 };
 
-inline constexpr int kBeatSchemaVersion = 3;
+inline constexpr int kBeatSchemaVersion = 4;
+// The oldest version read: the one before a beat could name an effect of the
+// upgrade, which differs in nothing else.
+inline constexpr int kBeatSchemaVersionOldest = 3;
 // Far more than a beat file ever is. Anything larger is not one.
 inline constexpr int kBeatFileBytesMost = 1 << 20;
 

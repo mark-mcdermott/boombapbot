@@ -17,10 +17,28 @@ import { createStarterPatterns } from './starter';
  * knob and switch stands.
  */
 export const MACHINE_ID = 'ritm12';
-export const PROJECT_SCHEMA_VERSION = 3;
+export const PROJECT_SCHEMA_VERSION = 4;
+/**
+ * The version before a beat could name an effect of the upgrade. Nothing
+ * else differs: everything such a beat holds means what it means now.
+ */
+const SCHEMA_VERSION_BEFORE_UPGRADE_EFFECTS = 3;
 
-export const EFFECT_KINDS = ['delay', 'reverb', 'flanger', 'chorus'] as const;
+/** The effects the machine has for anyone. */
+export const FREE_EFFECT_KINDS = ['delay', 'reverb', 'flanger', 'chorus'] as const;
+/** The effects that come with the upgrade. A beat can name one whoever opens it; only the upgrade plays it. */
+export const PAID_EFFECT_KINDS = ['crusher', 'tape', 'pump', 'filter', 'vinyl', 'phaser'] as const;
+export const EFFECT_KINDS = [...FREE_EFFECT_KINDS, ...PAID_EFFECT_KINDS] as const;
 export type EffectKind = (typeof EFFECT_KINDS)[number];
+
+export function isPaidEffect(kind: EffectKind): boolean {
+  return (PAID_EFFECT_KINDS as readonly EffectKind[]).includes(kind);
+}
+
+/** The effects the selector reaches, in its order: the six of the upgrade follow the four only for whoever holds it. */
+export function reachableEffects(upgraded: boolean): readonly EffectKind[] {
+  return upgraded ? EFFECT_KINDS : FREE_EFFECT_KINDS;
+}
 
 /** What the step keys write: hits of the selected voice, or the pattern's accents. */
 export const WRITE_MODES = ['hits', 'accents'] as const;
@@ -77,9 +95,16 @@ function describeIssues(error: z.ZodError): string[] {
   });
 }
 
-/** Validates a РИТМ-12 project. Never throws. */
+/** A project of the version before this one as this version has it. Nothing is lost on the way. */
+function broughtUpToDate(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null) return input;
+  const { schemaVersion } = input as { schemaVersion?: unknown };
+  return schemaVersion === SCHEMA_VERSION_BEFORE_UPGRADE_EFFECTS ? { ...input, schemaVersion: PROJECT_SCHEMA_VERSION } : input;
+}
+
+/** Validates a РИТМ-12 project, bringing one of the version before up to date. Never throws. */
 export function parseProject(input: unknown): ParseResult {
-  const result = projectSchema.safeParse(input);
+  const result = projectSchema.safeParse(broughtUpToDate(input));
   if (!result.success) return { ok: false, errors: describeIssues(result.error) };
   return { ok: true, project: result.data, changes: [] };
 }

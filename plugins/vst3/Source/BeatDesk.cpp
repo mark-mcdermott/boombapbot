@@ -47,9 +47,12 @@ void BeatDesk::loadBeat(const juce::File& file) {
     say_("That file is too large to be a beat file.", Said::problem);
     return;
   }
-  const juce::Result loaded = processor_.loadBeat(file.loadFileAsString());
+  juce::String leftOut;
+  const juce::Result loaded = processor_.loadBeat(file.loadFileAsString(), &leftOut);
   if (loaded.failed()) {
     say_(loaded.getErrorMessage(), Said::problem);
+  } else if (leftOut.isNotEmpty()) {
+    say_("Loaded " + file.getFileName() + " without its effect, " + leftOut + ", which comes with the upgrade.", Said::note);
   } else {
     say_("Loaded " + file.getFileName() + ".", Said::note);
   }

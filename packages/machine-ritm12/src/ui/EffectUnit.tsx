@@ -22,6 +22,15 @@ export function selectorAngle(turns: number, count: number): number {
   return (turns * 360) / count;
 }
 
+/**
+ * The angle the selector stands at for an effect, among those it reaches. On
+ * an effect it does not reach, which a beat made with the upgrade can name,
+ * it stands on its first.
+ */
+export function useSelectorAngle(effect: EffectKind, effects: readonly EffectKind[]): number {
+  return selectorAngle(useSelectorTurns(Math.max(0, effects.indexOf(effect)), effects.length), effects.length);
+}
+
 /** The unit's paint with the window in it, and the selector turned to its effect, from whichever set of pictures is being read. */
 export function EffectUnitArt({ angle }: { angle: number }) {
   const knob = useReadout().art('patch/effect-knob.png');
@@ -41,10 +50,23 @@ export function EffectUnitArt({ angle }: { angle: number }) {
  * name. The picture says where on its plate the label is; the phone's panel
  * places it over its own cut of the window.
  */
-export function EffectLabel({ kind, name, className, style }: { kind: EffectKind; name: string; className?: string; style?: CSSProperties }) {
+export function EffectLabel({
+  kind,
+  name,
+  leftOut,
+  className,
+  style,
+}: {
+  kind: EffectKind;
+  name: string;
+  /** The effect is named but not playing: it is printed faint and struck through. */
+  leftOut?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
   const icon = useReadout().art(`phone/icon-${kind}.png`);
   return (
-    <span className={className ? `rt-effect-label ${className}` : 'rt-effect-label'} style={style} aria-hidden="true" data-testid="effect-label" data-effect={kind}>
+    <span className={className ? `rt-effect-label ${className}` : 'rt-effect-label'} style={style} aria-hidden="true" data-testid="effect-label" data-effect={kind} data-left-out={leftOut || undefined}>
       {icon ? <i className="rt-effect-icon" style={{ '--rt-effect-icon': `url("${icon}")` } as CSSProperties} /> : null}
       <span data-let={name} />
     </span>

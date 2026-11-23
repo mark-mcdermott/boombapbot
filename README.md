@@ -559,7 +559,7 @@ are docked at the bottom of the screen.
 ## File formats
 
 - **Project JSON** (`.boombapbot.json`, `format: "boombapbot.project"`,
-  `schemaVersion: 3`, `machine: "ritm12"`): everything the machine
+  `schemaVersion: 4`, `machine: "ritm12"`): everything the machine
   remembers. The tempo in beats a minute, swing, the size of a measure, four
   patterns of eight sixteen-step rows and an accent row, the volume, accent
   strength, levels and mutes, each instrument's pitch, decay and tone, the

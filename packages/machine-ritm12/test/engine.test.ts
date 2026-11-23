@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { exportSongMidi, renderSong } from '@boombapbot/editor/engine';
 import { loadWasm, parseMidi, rms } from '../../editor/test/helpers';
-import { VOICES, countHits, levelGain } from '../src/document';
+import { PAID_EFFECT_KINDS, VOICES, countHits, levelGain } from '../src/document';
 import { engineSetup, exportPlan } from '../src/engine';
 import { newProject } from './helpers';
 
@@ -91,6 +91,22 @@ describe('РИТМ-12 through the engine', () => {
       expect(wet.left, kind).not.toEqual(straight.left);
       expect(wet.left.every(Number.isFinite), kind).toBe(true);
     }
+  });
+
+  it('asks for an effect of the upgrade only where the upgrade is held, and plays the beat without it anywhere else', () => {
+    const project = newProject();
+    const plan = exportPlan(project);
+    const dry = renderSong(wasm, engineSetup({ ...project, effect: { kind: 'delay', mix: 0 } }), plan, 44100);
+    for (const kind of PAID_EFFECT_KINDS) {
+      const named = { ...project, effect: { kind, mix: 0.6 } };
+      expect(engineSetup(named).effect, kind).toBeUndefined();
+      expect(renderSong(wasm, engineSetup(named), plan, 44100).left, kind).toEqual(dry.left);
+      expect(engineSetup(named, { upgraded: true }).effect, kind).toEqual({ kind, wet: 0.6 });
+      expect(renderSong(wasm, engineSetup(named, { upgraded: true }), plan, 44100).left, kind).not.toEqual(dry.left);
+    }
+    // The upgrade changes nothing about the four everyone has.
+    const free = { ...project, effect: { kind: 'reverb' as const, mix: 0.6 } };
+    expect(engineSetup(free, { upgraded: true })).toEqual(engineSetup(free));
   });
 
   it('exports the pattern as MIDI, a note for each voice and louder where accented', () => {
