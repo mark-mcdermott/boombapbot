@@ -171,7 +171,7 @@ void openTheWindow(juce::VST3PluginFormat& format, const juce::PluginDescription
   const std::unique_ptr<juce::AudioPluginInstance> plugin = host(format, description);
   if (plugin == nullptr) return;
   check(plugin->hasEditor(), "the hosted plugin says it has a window");
-  juce::AudioProcessorEditor* const view = plugin->createEditorIfNeeded();
+  juce::AudioProcessorEditor* const view = plugin->createEditorAndMakeActive();
   check(view != nullptr, "the host is given the plugin's view");
   if (view == nullptr) return;
 

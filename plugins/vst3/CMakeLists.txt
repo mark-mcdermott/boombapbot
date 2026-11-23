@@ -42,7 +42,7 @@ set(MACHINE_RITM12_DIR "${BOOMBAPBOT_REPO_ROOT}/packages/machine-ritm12")
 include(FetchContent)
 FetchContent_Declare(JUCE
   GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
-  GIT_TAG 8.0.9
+  GIT_TAG 8.0.17-security
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 

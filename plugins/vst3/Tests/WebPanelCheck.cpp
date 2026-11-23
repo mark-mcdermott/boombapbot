@@ -74,7 +74,7 @@ struct Told final : juce::AudioProcessorParameter::Listener {
 // The plugin's window on the desktop. A host puts the view inside a window of
 // its own, so the view has no title bar to share its size with; nor has this.
 BoombapbotWebEditor* openWindow(BoombapbotAudioProcessor& plugin) {
-  auto* const window = dynamic_cast<BoombapbotWebEditor*>(plugin.createEditorIfNeeded());
+  auto* const window = dynamic_cast<BoombapbotWebEditor*>(plugin.createEditorAndMakeActive());
   if (window == nullptr) return nullptr;
   window->setOpaque(true);
   window->addToDesktop(0);
