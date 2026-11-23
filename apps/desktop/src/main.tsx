@@ -6,12 +6,14 @@ import {
   BoombapbotEditor,
   NativeAudioController,
   browserStorage,
+  keepDeviceLicenseIn,
   linkServer,
   shellAccountFooter,
   type AudioFactory,
 } from '@boombapbot/editor';
 import { machine } from '@boombapbot/machine-ritm12';
 import { checkIfAsked } from './check';
+import { openLicenseStore } from './license-store';
 import { saveThroughApp } from './save-export';
 import { openTokenStore } from './session-token';
 import { tauriEngine } from './tauri-engine';
@@ -41,17 +43,28 @@ const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'https://boombapbot.co
  */
 linkServer({ url: SITE_URL, token: openTokenStore(browserStorage()) });
 
-createRoot(root).render(
-  <StrictMode>
-    <BoombapbotEditor
-      machine={machine}
-      baseUrl={import.meta.env.BASE_URL}
-      audio={audio}
-      save={save}
-      below={shellAccountFooter(SITE_URL)}
-      accounts
-    />
-  </StrictMode>,
-);
+/**
+ * In the app the license file is kept on the disk, where the plugin reads
+ * it. It is read before the machine is drawn, so the machine opens with the
+ * effects it holds.
+ */
+async function start(machineRoot: HTMLElement): Promise<void> {
+  if (inApp) keepDeviceLicenseIn(await openLicenseStore(invoke, browserStorage()));
 
-if (inApp) void checkIfAsked(invoke).catch((error: unknown) => console.error('The check could not start.', error));
+  createRoot(machineRoot).render(
+    <StrictMode>
+      <BoombapbotEditor
+        machine={machine}
+        baseUrl={import.meta.env.BASE_URL}
+        audio={audio}
+        save={save}
+        below={shellAccountFooter(SITE_URL)}
+        accounts
+      />
+    </StrictMode>,
+  );
+
+  if (inApp) void checkIfAsked(invoke).catch((error: unknown) => console.error('The check could not start.', error));
+}
+
+void start(root);
