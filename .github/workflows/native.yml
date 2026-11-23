@@ -14,6 +14,8 @@ on:
       - apps/desktop/**
       - apps/mobile/native-engine/**
       - plugins/vst3/**
+      - packages/contracts/src/license-file.ts
+      - docs/license-file.md
       - scripts/build-engine-ios.sh
       - scripts/build-wasm.sh
       - scripts/setup-emsdk.sh
@@ -151,9 +153,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      # JUCE is fetched here and never vendored, and so is Steinberg's VST3
-      # SDK, for its validator. The build is universal, so each file compiles
-      # twice.
+      # JUCE is fetched here and never vendored, and so are Monocypher, which
+      # checks the license file's signature, and Steinberg's VST3 SDK, for
+      # its validator. The build is universal, so each file compiles twice.
       - name: Configure
         run: >
           cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release

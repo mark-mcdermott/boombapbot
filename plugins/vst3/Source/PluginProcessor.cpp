@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 namespace {
 
@@ -143,8 +144,9 @@ class BoombapbotAudioProcessor::SoundThread final : public juce::Thread {
   BoombapbotAudioProcessor& owner_;
 };
 
-BoombapbotAudioProcessor::BoombapbotAudioProcessor()
+BoombapbotAudioProcessor::BoombapbotAudioProcessor(Upgrade upgrade)
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      upgrade_(std::move(upgrade)),
       parameters_(*this, nullptr, kParameterTreeType, createParameterLayout()),
       soundThread_(std::make_unique<SoundThread>(*this)) {
   for (std::size_t voice = 0; voice < kVoices.size(); ++voice) {
@@ -212,12 +214,12 @@ void BoombapbotAudioProcessor::loadMachine(SnareEngine* engine) {
   tailSeconds_.store(tailSecondsAt(kTempoRest), std::memory_order_relaxed);
 }
 
-// The longest sound, then the longest any effect rings on after it. The delay
-// rings for longer the slower the tempo.
+// The longest sound, then the longest any effect this machine plays rings on
+// after it. The delay rings for longer the slower the tempo.
 double BoombapbotAudioProcessor::tailSecondsAt(double bpm) const {
   double longestEffect = 0.0;
-  for (int effect = SNARE_EFFECT_DELAY; effect <= SNARE_EFFECT_CHORUS; ++effect) {
-    longestEffect = juce::jmax(longestEffect, snare_effect_tail_seconds(effect, bpm));
+  for (int effect = SNARE_EFFECT_DELAY; effect <= kEffectLast; ++effect) {
+    if (plays(effect)) longestEffect = juce::jmax(longestEffect, snare_effect_tail_seconds(effect, bpm));
   }
   return longestSoundSeconds_ + longestEffect;
 }
@@ -298,10 +300,11 @@ void BoombapbotAudioProcessor::sendMix(SnareEngine* engine, double tempo) {
     sentVolume_ = volume;
   }
 
-  // As in the editor, an effect with nothing of it mixed in is no effect.
-  int effect = static_cast<int>(std::lround(effectKind_->load(std::memory_order_relaxed)));
+  // As in the editor, an effect with nothing of it mixed in is no effect, and
+  // neither is one of the upgrade's where the upgrade is not held.
+  int effect = chosenEffect();
   float mix = effectMix_->load(std::memory_order_relaxed);
-  if (effect == SNARE_EFFECT_NONE || mix <= 0.0f) {
+  if (effect == SNARE_EFFECT_NONE || mix <= 0.0f || !plays(effect)) {
     effect = SNARE_EFFECT_NONE;
     mix = 0.0f;
   }
@@ -323,6 +326,13 @@ void BoombapbotAudioProcessor::sendMix(SnareEngine* engine, double tempo) {
 int BoombapbotAudioProcessor::chosenPattern() const {
   return juce::jlimit(0, kPatternCount - 1, static_cast<int>(std::lround(pattern_->load(std::memory_order_relaxed))));
 }
+
+int BoombapbotAudioProcessor::chosenEffect() const {
+  return juce::jlimit(SNARE_EFFECT_NONE, kEffectLast,
+                      static_cast<int>(std::lround(effectKind_->load(std::memory_order_relaxed))));
+}
+
+bool BoombapbotAudioProcessor::plays(int effect) const { return holdsUpgrade() || !comesWithTheUpgrade(effect); }
 
 // The host's position is the truth, but one block's start and the last one's
 // end rarely agree to the last digit. While the host plays on, the step that
@@ -770,7 +780,7 @@ Beat BoombapbotAudioProcessor::currentBeat() const {
                           values.decay->load(std::memory_order_relaxed), values.level->load(std::memory_order_relaxed),
                           values.mute->load(std::memory_order_relaxed) >= 0.5f};
   }
-  beat.effect = juce::roundToInt(effectKind_->load(std::memory_order_relaxed));
+  beat.effect = chosenEffect();
   beat.effectMix = effectMix_->load(std::memory_order_relaxed);
   return beat;
 }
@@ -801,9 +811,11 @@ void BoombapbotAudioProcessor::applyBeat(const Beat& beat) {
 juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json, juce::String* leftOut) {
   Beat beat;
   if (const juce::Result read = readBeat(json, beat); read.failed()) return read;
+  const juce::String named = plays(beat.effect) ? juce::String() : effectKind(beat.effect);
+  if (named.isNotEmpty()) beat.effect = SNARE_EFFECT_NONE;
   rememberPatterns();
   applyBeat(beat);
-  if (leftOut != nullptr) *leftOut = beat.upgradeEffect;
+  if (leftOut != nullptr) *leftOut = named;
   return juce::Result::ok();
 }
 

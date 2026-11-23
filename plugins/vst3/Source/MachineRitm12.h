@@ -102,12 +102,23 @@ inline constexpr float kWindowScaleRest = 1.0f;
 inline constexpr float kWindowScaleLeast = 0.7f;
 inline constexpr float kWindowScaleMost = 2.0f;
 
-// The effect choices in the order the parameter lists them. A choice's index
-// is the engine's number for it.
-inline constexpr std::array<const char*, 5> kEffectNames{{"Off", "Delay", "Reverb", "Flanger", "Chorus"}};
+// The effect choices in the order the parameter lists them: off, the four
+// the machine has for anyone, then the six that come with the upgrade. A
+// choice's index is the engine's number for it. All of them are listed
+// whether or not the upgrade is held, so a host sees one parameter on every
+// machine; without the upgrade its six sound as no effect.
+inline constexpr std::array<const char*, 11> kEffectNames{
+    {"Off", "Delay", "Reverb", "Flanger", "Chorus", "Crusher", "Tape", "Pump", "Filter", "Vinyl", "Phaser"}};
 inline constexpr int kEffectRest = SNARE_EFFECT_DELAY;
+inline constexpr int kEffectLast = SNARE_EFFECT_LAST;
+// The last of the effects the machine has for anyone.
+inline constexpr int kFreeEffectLast = SNARE_EFFECT_CHORUS;
+constexpr bool comesWithTheUpgrade(int effect) { return effect > kFreeEffectLast && effect <= kEffectLast; }
 
 static_assert(SNARE_EFFECT_NONE == 0 && SNARE_EFFECT_DELAY == 1 && SNARE_EFFECT_REVERB == 2 &&
-              SNARE_EFFECT_FLANGER == 3 && SNARE_EFFECT_CHORUS == 4);
+              SNARE_EFFECT_FLANGER == 3 && SNARE_EFFECT_CHORUS == 4 && SNARE_EFFECT_CRUSHER == 5 &&
+              SNARE_EFFECT_TAPE == 6 && SNARE_EFFECT_PUMP == 7 && SNARE_EFFECT_FILTER == 8 &&
+              SNARE_EFFECT_VINYL == 9 && SNARE_EFFECT_PHASER == 10 &&
+              SNARE_EFFECT_LAST == static_cast<int>(kEffectNames.size()) - 1);
 
 }  // namespace boombapbot::plugin

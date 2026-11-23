@@ -1,7 +1,14 @@
 import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createProjectCodec } from '@boombapbot/contracts';
-import { EditorRuntime, NativeAudioController, RuntimeContext, type AudioFactory } from '@boombapbot/editor';
+import {
+  EditorRuntime,
+  NativeAudioController,
+  RuntimeContext,
+  deviceLicense,
+  keepDeviceLicenseIn,
+  type AudioFactory,
+} from '@boombapbot/editor';
 import { machine } from '@boombapbot/machine-ritm12';
 import type { Project } from '@boombapbot/machine-ritm12/document';
 import { Bar } from './Bar';
@@ -12,7 +19,7 @@ import './styles.css';
 declare global {
   interface Window {
     /** For the check that opens the plugin's window. Not a stable API. */
-    __panel?: { project(): Project; level(): number };
+    __panel?: { project(): Project; level(): number; upgraded(): boolean };
   }
 }
 
@@ -24,6 +31,10 @@ const SEND_AFTER_MS = 16;
 
 const root = document.getElementById('machine');
 if (!root) throw new Error('the page has no place for the machine');
+
+// The license file is the plugin's to read, from the machine's disk, each
+// time it is loaded. The page keeps none: it is handed the file as it opens.
+keepDeviceLicenseIn(null);
 
 const plugin = connectPlugin();
 const codec = createProjectCodec([machine.document]);
@@ -135,6 +146,9 @@ function Window() {
 
 async function open(): Promise<void> {
   if (plugin) {
+    // Before anything is drawn, so the selector reaches the upgrade's effects from the first.
+    const license = await plugin.call<string>('licenseFile');
+    if (license) deviceLicense().keep(license, 'key');
     const held = fromPlugin(await plugin.call<string>('getBeat'));
     if (held) runtime.store.replaceProject(held);
     markKnobHolds(plugin, keepInStep(plugin));
@@ -153,7 +167,11 @@ async function open(): Promise<void> {
       </RuntimeContext.Provider>
     </StrictMode>,
   );
-  window.__panel = { project: () => runtime.store.getState().project, level: () => runtime.outputLevel() };
+  window.__panel = {
+    project: () => runtime.store.getState().project,
+    level: () => runtime.outputLevel(),
+    upgraded: () => deviceLicense().upgraded,
+  };
   void plugin?.call('pageReady');
 }
 
