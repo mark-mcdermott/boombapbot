@@ -79,6 +79,9 @@ export const BUTTONS = {
   clear: [1788, 1100, 1869, 1177],
 } as const satisfies Record<string, Rect>;
 
+/** The lamp over the machine, which is pressed to switch the room's light off and on. */
+export const DESK_LAMP: Rect = [40, 16, 300, 150];
+
 export const POWER_LAMP = { x: 324, y: 1127, r: 15 } as const;
 
 /** The stepped controls, each a round area that is pressed to move it on. */

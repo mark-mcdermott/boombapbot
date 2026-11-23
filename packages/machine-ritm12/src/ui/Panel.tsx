@@ -1,10 +1,12 @@
-import { useEffect, useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type RefObject } from 'react';
 import { Segmented } from '@boombapbot/editor';
 import { EFFECT_KINDS, getVoice } from '../document';
 import { Key, Lamp, Patch, PointerKnob, boxOf } from './Controls';
-import { ReadoutContext } from './context';
+import { ReadoutContext, useReadout } from './context';
+import { setDeskLamp, useDeskLamp } from './desk-lamp';
 import {
   BUTTONS,
+  DESK_LAMP,
   EFFECT_PATCH,
   INSTRUMENTS,
   INSTRUMENT_LAMP,
@@ -23,7 +25,7 @@ import { useLettering, useScript } from './lettering';
 import { PLATE_LABELS } from './plate-labels';
 import { Readout } from './Readout';
 import { ScreenAndMeter } from './Screen';
-import { useWiring, type KnobName } from './wiring';
+import { useWiring, type KnobName, type Wiring } from './wiring';
 
 const around = ({ x, y, r }: { x: number; y: number; r: number }): Rect => [x - r, y - r, x + r, y + r];
 
@@ -75,13 +77,35 @@ export function Panel() {
   return usePanelView() === 'phone' ? <PhonePanel /> : <PicturePanel />;
 }
 
+/** The picture and every piece laid over it for where the stepped controls stand, from whichever set of pictures is being read. */
+function Pictures({ wiring, plateTestId }: { wiring: Pick<Wiring, 'power' | 'write' | 'size' | 'effect'>; plateTestId: string }) {
+  const plate = useReadout().art('plate.webp');
+  return (
+    <>
+      {plate ? <img className="rt-plate" src={plate} alt="" draggable={false} data-testid={plateTestId} /> : null}
+      {INSTRUMENTS.map(({ voice, ink }) => (
+        <Patch key={voice} rect={ink} name={`key-${voice}`} shown />
+      ))}
+      <Patch rect={STATUS.patch} name="status" shown />
+      <Patch rect={PATCHES.power} name="power-on" shown={wiring.power} />
+      <Patch rect={PATCHES.write} name="write-accents" shown={wiring.write === 'accents'} />
+      <Patch rect={PATCHES.size} name="size-16" shown={wiring.size === 16} />
+      {EFFECT_KINDS.map((kind) => {
+        const name = EFFECT_PATCH[kind];
+        return name ? <Patch key={kind} rect={PATCHES.effect} name={name} shown={wiring.effect === kind} /> : null;
+      })}
+    </>
+  );
+}
+
 /** The picture of the machine, with every control on it live. */
 function PicturePanel() {
   const wiring = useWiring();
   const { keys, knobs, power, readout } = wiring;
   const [fit, setFit] = useState(false);
   const scale = useStageScale(wiring.frame);
-  const plate = readout.art('plate.webp');
+  const lampLit = useDeskLamp() === 'lit';
+  const nightReadout = useMemo(() => ({ ...readout, art: (file: string) => readout.art(`night/${file}`) }), [readout]);
   const words = useLettering();
   const english = useScript() === 'english';
 
@@ -89,20 +113,14 @@ function PicturePanel() {
     <ReadoutContext.Provider value={readout}>
       <section className="rt-machine" aria-label="РИТМ-12 drum machine" data-testid="machine">
         <div className="rt-scroll" data-fit={fit}>
-          <div ref={wiring.frame} className="rt-frame" data-testid="panel" data-power={power ? 'on' : 'off'}>
+          <div ref={wiring.frame} className="rt-frame" data-testid="panel" data-power={power ? 'on' : 'off'} data-lamp={lampLit ? 'lit' : 'out'}>
             <div className="rt-stage" style={{ transform: `scale(${scale})` } as CSSProperties}>
-              {plate ? <img className="rt-plate" src={plate} alt="" draggable={false} data-testid="plate" /> : null}
-              {INSTRUMENTS.map(({ voice, ink }) => (
-                <Patch key={voice} rect={ink} name={`key-${voice}`} shown />
-              ))}
-              <Patch rect={STATUS.patch} name="status" shown />
-              <Patch rect={PATCHES.power} name="power-on" shown={power} />
-              <Patch rect={PATCHES.write} name="write-accents" shown={wiring.write === 'accents'} />
-              <Patch rect={PATCHES.size} name="size-16" shown={wiring.size === 16} />
-              {EFFECT_KINDS.map((kind) => {
-                const name = EFFECT_PATCH[kind];
-                return name ? <Patch key={kind} rect={PATCHES.effect} name={name} shown={wiring.effect === kind} /> : null;
-              })}
+              <Pictures wiring={wiring} plateTestId="plate" />
+              <div className="rt-night" data-shown={lampLit ? undefined : ''} data-testid="night">
+                <ReadoutContext.Provider value={nightReadout}>
+                  <Pictures wiring={wiring} plateTestId="night-plate" />
+                </ReadoutContext.Provider>
+              </div>
 
               {english ? (
                 <div className="rt-labels" aria-hidden="true" data-testid="plate-labels">
@@ -120,6 +138,14 @@ function PicturePanel() {
                 <Readout className="rt-readout-plate" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
               </div>
 
+              <Key
+                className="rt-desk-lamp"
+                rect={DESK_LAMP}
+                label="Desk lamp"
+                testId="desk-lamp"
+                pressed={lampLit}
+                onPress={() => setDeskLamp(lampLit ? 'out' : 'lit')}
+              />
               <Key rect={BUTTONS.power} {...keys.power} />
               <Lamp place={POWER_LAMP} {...wiring.powerLamp} />
 

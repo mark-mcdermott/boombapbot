@@ -23,6 +23,11 @@ does not have.
   in one picture. [`cut-icons.py`](cut-icons.py) cuts each from it, as the
   phone's `phone/ink-*.svg` and printed onto its key for `patch/key-*.png`.
   Run it again when the sheet or the plate changes.
+- **`night/`** holds the plate and every patch again as the room has them
+  with its desk lamp switched off: cooler and dimmer, the lamp itself out,
+  and nothing moved. The page lays them over the lit ones when the lamp in
+  the picture is pressed. [`cut-night.py`](cut-night.py) makes all of it from
+  `plate.webp` and `patch/`. Run it again when either changes.
 - **`pointer/`** holds the pointer line of each kind of knob, on a clear
   background. A knob's painted body stays still; the page turns only its line.
 - **`phone/`** holds the parts of the phone's panel, which the page lays out
