@@ -23,7 +23,7 @@ const SMOKE_IN = {
 /** The smoke is drawn in bands up each strand, each a little wider and fainter than the one under it. */
 const BANDS = 11;
 /** The picture ends partway across the smoke's box. The smoke thins out before that edge, where it would otherwise stop dead. */
-const EDGE = { thins: 0.52, gone: 0.69 } as const;
+const EDGE = { thins: 0.54, gone: 0.7 } as const;
 /** How fast the smoke moves, against how fast its strands are written to: slow, as smoke is in still air. */
 const PACE = 0.0625;
 const FRAME_MS = 1000 / 30;

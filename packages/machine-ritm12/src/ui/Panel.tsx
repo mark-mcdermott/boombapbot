@@ -8,6 +8,7 @@ import { setDeskLamp, useDeskLamp } from './desk-lamp';
 import {
   BUTTONS,
   DESK_LAMP,
+  DESK_LAMP_PATCH,
   EFFECT_PATCH,
   INSTRUMENTS,
   INSTRUMENT_LAMP,
@@ -87,6 +88,7 @@ function Pictures({ wiring, plateTestId }: { wiring: Pick<Wiring, 'power' | 'wri
       {INSTRUMENTS.map(({ voice, ink }) => (
         <Patch key={voice} rect={ink} name={`key-${voice}`} shown />
       ))}
+      <Patch rect={DESK_LAMP_PATCH} name="lamp" shown />
       <Patch rect={STATUS.patch} name="status" shown />
       <Patch rect={PATCHES.power} name="power-on" shown={wiring.power} />
       <Patch rect={PATCHES.write} name="write-accents" shown={wiring.write === 'accents'} />

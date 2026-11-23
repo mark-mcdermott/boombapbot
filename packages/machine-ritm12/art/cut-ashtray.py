@@ -31,8 +31,13 @@ BOX = (1352, 738, 1642, 902)
 GLASS = [(1367, 787), (1375, 775), (1410, 766), (1503, 763), (1583, 768), (1622, 782), (1627, 795), (1623, 847),
          (1610, 860), (1577, 871), (1517, 876), (1463, 873), (1413, 865), (1383, 853), (1372, 840), (1367, 810)]
 CIGARETTE = ((1459, 776), (1612, 753), 10.5)
-# How wide the ashtray is on the plate, which is 2000 wide.
-WIDTH = 250
+# On the plate, which is 2000 by 1333: how wide the ashtray is, and where its box's top left corner goes. It is too
+# big for the strip of bench the plate has, so it runs off the plate's foot and side, as the lamp runs off its top.
+PLATE = (2000, 1333)
+WIDTH = 425
+AT = (1611, 1186)
+# How far from the plate's edge the ashtray starts to go into the dark the picture's edge goes into.
+EDGE = 60
 OVERSAMPLE = 4
 
 
@@ -65,11 +70,18 @@ solid = outline()
 under = shadow(solid) * (1 - solid)
 alpha = solid + under
 height = round(WIDTH * solid.shape[0] / solid.shape[1])
+seen = (min(WIDTH, PLATE[0] - AT[0]), min(height, PLATE[1] - AT[1]))
+across = np.clip((PLATE[0] - AT[0] - np.arange(seen[0])) / EDGE, 0, 1)
+down = np.clip((PLATE[1] - AT[1] - np.arange(seen[1])) / EDGE, 0, 1)
 for source, target in (('scene-lamp-lit.webp', here / 'props'), ('scene-lamp-out.webp', here / 'night' / 'props')):
     pixels = np.asarray(Image.open(sources / source).convert('RGB').crop(BOX), float) / 255
     colour = pixels * (solid / np.maximum(alpha, 1e-6))[..., None]
     cut = Image.fromarray((np.dstack([colour, alpha]) * 255).round().astype('uint8'), 'RGBA')
+    turned = cut.transpose(Image.FLIP_LEFT_RIGHT).resize((WIDTH, height), Image.LANCZOS).crop((0, 0, *seen))
+    faded = np.asarray(turned, float)
+    faded[..., 3] *= down[:, None] * across[None, :]
     target.mkdir(parents=True, exist_ok=True)
-    cut.transpose(Image.FLIP_LEFT_RIGHT).resize((WIDTH, height), Image.LANCZOS).save(target / 'ashtray.png', optimize=True)
+    Image.fromarray(faded.round().astype('uint8'), 'RGBA').save(target / 'ashtray.png', optimize=True)
 scale = WIDTH / solid.shape[1]
-print('size', [WIDTH, height], 'lit end', [WIDTH - round((CIGARETTE[0][0] - BOX[0]) * scale), round((CIGARETTE[0][1] - BOX[1]) * scale)])
+lit_end = (AT[0] + WIDTH - round((CIGARETTE[0][0] - BOX[0]) * scale), AT[1] + round((CIGARETTE[0][1] - BOX[1]) * scale))
+print('box', [*AT, AT[0] + seen[0], AT[1] + seen[1]], 'lit end', list(lit_end))
