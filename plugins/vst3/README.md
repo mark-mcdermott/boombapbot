@@ -517,27 +517,32 @@ the build of the hang fix:
 JUCE 8 is offered under the AGPLv3 or a commercial licence from its makers,
 and a plugin built with it can only be given to anyone else under one of the
 two. The owner chose on 2026-11-22: the commercial licence, on its free
-Starter tier, pending JUCE's confirmation that the tier covers this. The
-reason is the upgrade: its paid effects are to be gated in the plugin too, and
-under the AGPLv3 anyone may rebuild the plugin without the gate.
+Starter tier. The reason is the upgrade: its paid effects are to be gated in
+the plugin too, and under the AGPLv3 anyone may rebuild the plugin without the
+gate.
 
-What that tier asks, as the JUCE 8 licence reads (https://juce.com/legal/juce-8-licence/):
+What the licence says, in JUCE 8's (https://juce.com/legal/juce-8-licence/)
+and, clause for clause, in JUCE 9's:
 
-- Revenue and funding from every source stay under 20,000 dollars over the
-  last twelve months. Above that a paid tier is needed, or distributing stops.
-- The plugin is not put under an open source licence. The repository can stay
-  public; a public repository is not a licence to use what is in it.
-- JUCE itself is not handed on apart from the plugin.
+- Clause 1.9 lets the owner of a product distribute and sell it, on any tier.
+  Nothing asks for the product's source.
+- Clause 1.2.1 sets the Starter tier's limit at 20,000 dollars over the last
+  twelve months. For a person it counts what their use of JUCE brings in,
+  from every source; for a company it counts everything the company and its
+  affiliates receive, JUCE or not. Above it a paid tier is needed, or
+  distributing stops (1.14). The upgrade unlocks the plugin along with the
+  rest, so its sales are best counted whole.
+- Clause 2.3 forbids putting JUCE under an open source licence, so the plugin
+  cannot be given one that reaches JUCE. The repository can stay public: it
+  has no licence, and it does not hold JUCE, which the build fetches (1.17
+  forbids handing JUCE on by itself).
 
 Not done yet, so builds are still for the machine that made them and CI still
 throws its build away:
 
-- JUCE has not been asked. The licence does not say in so many words that a
-  closed plugin may be sold on the Starter tier; sales@juce.com is where it
-  names for questions.
 - The VST3 SDK that JUCE 8.0.9 bundles is 3.7.12, offered under the GPLv3 or
   Steinberg's own agreement. Without the GPL, that agreement has to be signed
   with Steinberg, or JUCE moved to a version that bundles the MIT-licensed
   SDK 3.8.
-- JUCE's site now sells JUCE 9, whose terms have not been read. The plugin is
-  pinned to 8.0.9.
+- Whether the owner sells as a person or as a company is not written down
+  here, and it decides which of the two limits applies.

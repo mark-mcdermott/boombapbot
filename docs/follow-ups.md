@@ -557,11 +557,12 @@ What is left:
   does not.
 - **JUCE's licence.** Chosen by the owner on 2026-11-22: JUCE's commercial
   licence on its free Starter tier, not the AGPLv3, because the upgrade's
-  paid effects are to be gated in the plugin. Not confirmed with JUCE yet, so
-  CI still keeps no artefact. What is left: ask sales@juce.com whether the
-  Starter tier covers a closed plugin that is sold; settle the bundled VST3
-  SDK's terms (Steinberg's agreement, or a JUCE that bundles SDK 3.8); and
-  watch the tier's limit of 20,000 dollars a year from every source.
+  paid effects are to be gated in the plugin. JUCE's licence lets a product
+  be sold on that tier and asks for no source. What is left before a build is
+  given to anyone, and why CI still keeps none: settle the bundled VST3
+  SDK's terms (Steinberg's agreement, or a JUCE that bundles SDK 3.8). And
+  watch the tier's limit of 20,000 dollars a year, which counts differently
+  for a person and for a company.
   `plugins/vst3/README.md` has the detail under "Licensing".
 - **Measures and the host's time signature.** A measure is four of the host's
   beats counted from the start of its timeline, whatever its signature says.
