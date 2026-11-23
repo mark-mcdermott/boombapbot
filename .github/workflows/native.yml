@@ -166,8 +166,8 @@ jobs:
       # the bundle: its signature, its two architectures, and each of them
       # loaded and played in JUCE's own VST3 host and put through Steinberg's
       # validator. No DAW runs here, and the
-      # bundle is not kept: the terms of the VST3 SDK inside JUCE are not
-      # settled, and no build is given to anyone before they are.
+      # bundle is not kept: a build that is handed on needs a notices file
+      # with the licences of what it carries, and there is none yet.
       - name: Self-test and bundle checks
         run: ctest --test-dir build/vst3 --output-on-failure
 

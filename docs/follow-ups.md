@@ -514,7 +514,7 @@ What is left:
 
 ### VST3 (a plugin for a host)
 
-The first slices are built in `plugins/vst3`: РИТМ-12 as a JUCE 8.0.9 VST3
+The first slices are built in `plugins/vst3`: РИТМ-12 as a JUCE 8.0.17 VST3
 instrument on the engine built natively. Notes from the host play the
 voices, the knobs are host parameters, a beat saved from the site loads and
 its patterns play in time with the host's transport, its window is the
@@ -564,10 +564,12 @@ What is left:
 - **JUCE's licence.** Chosen by the owner on 2026-11-22: JUCE's commercial
   licence on its free Starter tier, not the AGPLv3, because the upgrade's
   paid effects are to be gated in the plugin. JUCE's licence lets a product
-  be sold on that tier and asks for no source. What is left before a build is
-  given to anyone, and why CI still keeps none: settle the bundled VST3
-  SDK's terms (Steinberg's agreement, or a JUCE that bundles SDK 3.8). And
-  watch the tier's limit of 20,000 dollars a year: the owner sells as a
+  be sold on that tier and asks for no source. The plugin is on JUCE 8.0.17,
+  whose VST3 SDK is 3.8 under the MIT licence, so nothing has to be signed
+  with Steinberg. What is left before a build is given to anyone: a notices
+  file with the SDK's licence in it, which the MIT licence asks for, and a
+  read of Steinberg's guidelines on the VST name and logo. And watch the
+  tier's limit of 20,000 dollars a year: the owner sells as a
   person, so it counts what the use of JUCE brings in, and forming a company
   would make it count everything the company receives.
   `plugins/vst3/README.md` has the detail under "Licensing".

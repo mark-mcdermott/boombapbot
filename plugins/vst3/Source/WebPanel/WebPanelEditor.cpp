@@ -62,9 +62,8 @@ int scaled(int length, float scale) { return juce::roundToInt(static_cast<float>
 BoombapbotWebEditor::BoombapbotWebEditor(BoombapbotAudioProcessor& owner)
     : AudioProcessorEditor(owner),
       processor_(owner),
-      page_(std::make_unique<juce::ZipFile>(
-          new juce::MemoryInputStream(BinaryData::panel_zip, static_cast<std::size_t>(BinaryData::panel_zipSize), false),
-          true)),
+      page_(std::make_unique<juce::ZipFile>(std::make_unique<juce::MemoryInputStream>(
+          BinaryData::panel_zip, static_cast<std::size_t>(BinaryData::panel_zipSize), false))),
       desk_(owner, [this](const juce::String& words, BeatDesk::Said kind) { tell(words, kind); }),
       browser_(options()) {
   // Read first: setting the limits below resizes the window, and a resize is remembered.

@@ -2,7 +2,7 @@
 
 The first slices of boombapbot as a plugin: РИТМ-12's eight voices, played
 from MIDI notes or from the patterns of a beat saved from the site, in time
-with the host, with the machine's knobs as host parameters. It is a JUCE 8.0.9
+with the host, with the machine's knobs as host parameters. It is a JUCE 8.0.17
 VST3 instrument on the same engine the site, the phone apps and the desktop
 app play through (`engine/`, built natively for
 `packages/machine-ritm12`).
@@ -205,7 +205,7 @@ carries none. Two options change this:
 - `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` builds the panel drawn here in place of
   the painted one. That build needs neither pnpm nor a web view.
 
-JUCE is fetched at configure time (`FetchContent`, tag 8.0.9) and is not
+JUCE is fetched at configure time (`FetchContent`, tag `8.0.17-security`) and is not
 vendored. To build against a checkout you already have, add
 `-DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE`.
 
@@ -519,7 +519,7 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 2026-11-22:
 
 - A configure and a Release build from an empty build directory, with JUCE
-  8.0.9 from a local checkout.
+  8.0.17 fetched by the build.
 - Steinberg's validator from VST3 SDK 3.8.1, extensive tests: 537 of 537 pass
   on arm64 and on x86_64 under Rosetta.
 - The binary holds both architectures (`lipo -archs`: `x86_64 arm64`).
@@ -666,13 +666,20 @@ and, clause for clause, in JUCE 9's:
   has no licence, and it does not hold JUCE, which the build fetches (1.17
   forbids handing JUCE on by itself).
 
-Not done yet, so builds are still for the machine that made them and CI still
-throws its build away:
+The VST3 SDK inside JUCE has terms of its own. From JUCE 8.0.11 it is SDK
+3.8, under the MIT licence, which is why the plugin is on a JUCE that new:
+the SDK in 8.0.9 was 3.7.12, offered under the GPLv3 or an agreement signed
+with Steinberg.
 
-- The VST3 SDK that JUCE 8.0.9 bundles is 3.7.12, offered under the GPLv3 or
-  Steinberg's own agreement. Without the GPL, that agreement has to be signed
-  with Steinberg, or JUCE moved to a version that bundles the MIT-licensed
-  SDK 3.8.
-- Nothing else. The owner sells as a person, with no company formed, so the
-  limit that applies is the first: what the use of JUCE brings in. Forming a
-  company would change that to everything the company receives.
+The owner sells as a person, with no company formed, so the limit that
+applies is the first: what the use of JUCE brings in. Forming a company would
+change that to everything the company receives.
+
+Left before a build is given to anyone:
+
+- The MIT licence asks that its notice goes with every copy. A build that is
+  handed on needs a notices file with the VST3 SDK's licence in it, and the
+  licences of whatever else it carries. There is none yet.
+- Steinberg's `VST3_Usage_Guidelines.pdf`, beside the SDK in JUCE, says how
+  the VST name and logo may be used. It has not been read against how the
+  plugin will be described.
