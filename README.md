@@ -328,8 +328,10 @@ which features it will unlock is not decided.
   plugin's C++ too, is in [docs/license-file.md](docs/license-file.md).
   `pnpm license:keypair` makes the pair. A license with `withdrawn_at` set
   (`apps/site/drizzle/0007_license_withdrawn.sql`) gives out no more files,
-  and the files it gave out before keep working. Nothing sets that mark
-  yet. The owner made the real pair on 2026-11-22: its public half is
+  and the files it gave out before keep working. A payment
+  refunded in full sets that mark and takes the license off its account
+  (the Stripe webhook's `charge.refunded`, which the endpoint in Stripe's
+  dashboard has to be set to send). The owner made the real pair on 2026-11-22: its public half is
   `LICENSE_PUBLIC_KEY`.
 - The site, the desktop app and the phone apps keep a license file and
   check it themselves (`packages/editor/src/upgrade/device-license.ts`),
@@ -360,16 +362,20 @@ which features it will unlock is not decided.
   out of the address. Someone back before Stripe's webhook has arrived is
   thanked and not offered it again, and a logged-in buyer is looked up every
   two seconds, for half a minute, until the key is on the account.
-- The modal's words for the open upgrade are stand-ins, and none of them says
-  what the upgrade unlocks. They are the owner's to write before it is sold.
+- The modal's words name the six effects and say how they are unlocked. They
+  are a draft for the owner to read before it is sold, and say nothing of
+  refunds.
 
 What has been checked: all of the above against the built server with its
 database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`), the
 modal included, and the modal by hand on that same server at a computer's
-width and a phone's. What
-has not: anything against real Stripe or a real email, and nothing has
-written to the live database, which has had the empty `licenses` table
-since 2026-11-17, when the migration was run there.
+width and a phone's. On the live site, on 2026-11-23, the owner gave their own account a license
+by adding a row to `licenses` by hand, and logging in unlocked all ten
+effects, which played; logging out locked them again, and logged in with
+the network off they stayed unlocked. What has not: anything against real
+Stripe or a real email, a key alone on the live site, and the desktop and
+phone apps with a license. The live `licenses` table, there since
+2026-11-17, has held only that hand-made row.
 
 ## Tests
 

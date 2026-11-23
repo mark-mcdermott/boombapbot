@@ -295,14 +295,25 @@ site its icon still opens a modal that says it is not open.
         in Vercel as `LICENSE_SIGNING_KEY` and nowhere else; the public
         half is `LICENSE_PUBLIC_KEY` in
         `packages/contracts/src/license-file.ts`, and goes into the plugin
-        when its check is written. Nobody has checked the two halves
-        against each other: the first file the live server signs, checked
-        against the built-in key, is what will. Losing the signing key
+        when its check is written. The two halves go together: on
+        2026-11-23 the live site's page kept a file the live server signed
+        (see below). Losing the signing key
         means a new pair and new builds of every program; files signed
         with the old one stop verifying in them.
-      - Nothing sets `withdrawn_at`. The Stripe webhook still has no case
-        for a refund, and a withdrawn license still counts as upgraded on
-        the site (`isUpgraded`) and still shows its key.
+      - **A refund in full withdraws the license**, since 2026-11-23. The
+        Stripe webhook hears `charge.refunded` and, when the whole payment
+        went back, sets `withdrawn_at` and takes the license off its
+        account, which is then an account that has not upgraded and can buy
+        again. The key gets no more license files, goes onto no account
+        and is not emailed again. A refund in part changes nothing. It has
+        only run in the tests. **Stripe has to be told to send the event:**
+        in the dashboard, under Developers, Webhooks, add
+        `charge.refunded` to the events of the endpoint the site already
+        has. Until then a refund withdraws nothing. A device that already
+        holds the license's file keeps its effects: one an account
+        unlocked until it is logged out, one a key unlocked until the key
+        is removed, as agreed for files that do not run out. A license
+        made by hand, with no payment, can only be withdrawn by hand.
       - **The site, the desktop app and the phone apps fetch, keep and
         check a file**, since 2026-11-23
         (`packages/editor/src/upgrade/device-license.ts`). A page that
@@ -314,9 +325,16 @@ site its icon still opens a modal that says it is not open.
         signed with another key, is fetched and not kept. The unlocked path
         was run once by hand in a browser with a page built for a
         throwaway pair: four effects before, ten after, and still ten
-        offline and logged out. Nobody has done it with a real license on
-        the live site, which is also what will first check the two halves
-        of the real pair against each other. What is left of it:
+        offline and logged out. **It works on the live site**: on 2026-11-23 the
+        owner gave their own account a license by adding a row to
+        `licenses` by hand on Neon (its `stripe_session_id` starts
+        `manual_`, since no payment made it), logged in on the site, and
+        the selector reached all ten effects, each of which played. Logged
+        out, it reached four again; logged in with the network off and the
+        page reloaded, it still reached ten. Not tried there: a key alone,
+        which the site's modal offers only while the upgrade is open; a
+        license made by a payment; and the desktop and phone apps. What is
+        left of it:
         - **A key alone unlocks the site and the desktop app**, since
           2026-11-23: typed with nobody logged in, it fetches its file
           (`POST /api/upgrade/license`) and goes onto no account. The
@@ -351,8 +369,7 @@ site its icon still opens a modal that says it is not open.
         - Nothing gates the six effects on the server: a beat that names
           one is saved and loaded for anybody, and plays without it.
       - The key route's limit, ten tries in ten minutes from one address,
-        has run on the test server and not on Vercel. Its refusal borrows
-        the words of the key-by-email limit, which say "an hour".
+        has run on the test server and not on Vercel.
       - Both routes answer whether or not the upgrade is open, like the
         routes that enter and recover a key.
   - **The modal is built**, on 2026-11-18, and shows only while the server
@@ -362,16 +379,16 @@ site its icon still opens a modal that says it is not open.
     shown to an upgraded account. It has run in the tests and by hand
     against the stand-in for Stripe, never against Stripe itself. What is
     left of it:
-    - **Its words.** What it says while the upgrade is open is a stand-in,
-      and nothing in it says what the five dollars unlocks, because that is
-      not decided. All of it is the owner's to write
-      (`packages/editor/src/ui/Upgrade.tsx`), and so is the wording of the
-      key's two emails (`src/server/email.ts`), the name Stripe shows
-      (`PRODUCT_NAME` in `api/upgrade/checkout.ts`) and the refusals in
-      `src/server/upgrade.ts`, which the modal shows as they are.
-    - Entering a key needs an account, so the modal sends somebody with no
-      account to the account modal and they have to come back to it
-      themselves. If a key alone is to unlock a device, this changes.
+    - **Its words are a draft**, since 2026-11-23, written to what is now
+      true and waiting for the owner to read: the six effects by name, that
+      it is paid once and the four stay free, that the key or an upgraded
+      account's log-in unlocks them and offline too, and that a beat using
+      one opens for anybody and plays without it. It says nothing of
+      refunds, the desktop app, the phone apps or the plugin. Still the
+      owner's to write: the key's two emails (`src/server/email.ts`), the
+      name Stripe shows (`PRODUCT_NAME` in `api/upgrade/checkout.ts`) and
+      the refusals in `src/server/upgrade.ts`, which the modal shows as
+      they are.
     - While the upgrade is closed the modal offers nothing, so a key bought
       earlier could not be entered or asked for again there. That only
       matters if the upgrade is ever closed after it has sold.
@@ -385,11 +402,12 @@ site its icon still opens a modal that says it is not open.
     email and its Stripe payment's id, and stays after the account is
     deleted.
   - **Open it.** Set `UPGRADE_OPEN=on` in Vercel and deploy. The Stripe
-    webhook already registered for the shop is the one it uses; nothing
-    changes in the Stripe dashboard.
-  - **Refunds.** Refunding the payment in Stripe does not take the key
-    back. That needs a column to mark a license withdrawn and a case in
-    the webhook, once there is a refund policy.
+    webhook already registered for the shop is the one it uses, with
+    `charge.refunded` added to its events for refunds.
+  - **Refunds.** Refunding the whole payment in Stripe withdraws the
+    license (see the license file above), once Stripe sends
+    `charge.refunded`. There is still no refund policy on the Policies
+    page.
   - **The key-by-email route is limited and answers alike**, since
     2026-11-18. One address can be asked about three times an hour, and one
     visitor's address can ask five times in ten minutes; past that the

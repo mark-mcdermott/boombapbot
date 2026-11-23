@@ -12,7 +12,7 @@ import {
 import { openEditor, scanner } from './helpers';
 import { mailTo, newAddress } from './mail';
 import { startServer, type SecondServer } from './second-server';
-import { checkoutEvent } from './stripe';
+import { checkoutEvent, refundEvent } from './stripe';
 
 // The one-time upgrade and its license key. Like the shop's tests these run
 // against the built server with its database in memory, the outbox in place
@@ -333,6 +333,46 @@ test('an order from the shop is still an order, not a license', async ({ request
   expect(mailTo(address, /./)).toEqual([]);
 });
 
+test('a refund in full withdraws the license: off its account, no more files, and the key is dead', async ({ request }) => {
+  const address = await signedUpRequest(request);
+  const asked = await checkout(request);
+  expect((await paid(request, eventFor(asked, address))).status()).toBe(200);
+  const { license } = await (await request.get('/api/upgrade/key')).json();
+  const payment = `pi_${asked.id}`;
+  const refund = (charge: { payment_intent: string; refunded: boolean }) =>
+    request.post('/api/webhooks/stripe', refundEvent({ id: `ch_${crypto.randomUUID()}`, ...charge }));
+
+  // Part of the money back, or all of somebody else's, takes nothing away.
+  expect((await refund({ payment_intent: payment, refunded: false })).status()).toBe(200);
+  expect((await refund({ payment_intent: 'pi_an_order_from_the_shop', refunded: true })).status()).toBe(200);
+  expect((await upgrade(request)).upgraded).toBe(true);
+  await licenseFileIn(await request.get('/api/upgrade/license'));
+
+  // All of it back, however often Stripe says so.
+  for (let said = 0; said < 2; said += 1) expect((await refund({ payment_intent: payment, refunded: true })).status()).toBe(200);
+  expect((await upgrade(request)).upgraded).toBe(false);
+  await refused(await request.get('/api/upgrade/key'), 404, 'no_license');
+  await refused(await request.get('/api/upgrade/license'), 404, 'no_license');
+  await refused(await licenseFile(request, license.key), 403, 'withdrawn');
+  await refused(await redeem(request, license.key), 403, 'withdrawn');
+
+  // The key is not emailed again, and the account can buy the upgrade as if it never had.
+  expect((await remind(request, address)).status()).toBe(202);
+  await expect.poll(() => keysMailedTo(address), { timeout: 2000 }).toEqual([license.key]);
+  const again = await checkout(request);
+  expect((await paid(request, eventFor(again, address))).status()).toBe(200);
+  expect((await upgrade(request)).upgraded).toBe(true);
+  expect((await (await request.get('/api/upgrade/key')).json()).license.key).not.toBe(license.key);
+});
+
+test('a refund Stripe did not sign withdraws nothing', async ({ request }) => {
+  const key = await boughtWithoutAccount(request);
+  const forged = refundEvent({ id: 'ch_forged', payment_intent: 'pi_forged', refunded: true });
+  const answer = await request.post('/api/webhooks/stripe', { ...forged, headers: { ...forged.headers, 'stripe-signature': 't=1,v1=00' } });
+  expect(answer.status()).toBe(400);
+  await licenseFileIn(await licenseFile(request, key));
+});
+
 async function openUpgrade(page: Page): Promise<void> {
   await page.getByTestId('upgrade').click();
   await expect(page.getByTestId('upgrade-modal')).toBeVisible();
@@ -639,7 +679,7 @@ test.describe('until the upgrade is switched on', () => {
     expect(answers.map((answer) => answer.status())).toEqual([202, 202, 202, 429]);
     expect(await answers.at(-1)!.json()).toEqual({
       code: 'too_many',
-      message: 'I have had that request a lot just now. Try again in an hour.',
+      message: 'I have had that request a lot just now. Try again later.',
     });
     expect((await remindFrom('198.51.100.5', newAddress())).status()).toBe(202);
   });
