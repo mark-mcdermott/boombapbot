@@ -869,12 +869,24 @@ equation without the cofactor, which is stricter than the site's check for a
 signature its own signer has bent, and the same for every file the server
 signs.
 
+The MIT licence asks that its notice goes with every copy, and so do the
+licences of the rest of what the plugin carries. Since 2026-11-23 the build
+writes them into the bundle, as `Contents/Resources/NOTICES.txt`, before it
+is signed (`cmake/WriteNotices.cmake`). The texts are read from the sources
+the build fetched, so they are the ones that came with the code compiled:
+the VST3 SDK, Monocypher, and what the JUCE modules the plugin links carry
+(zlib, libpng, HarfBuzz and SheenBidi, and the sentence the Independent JPEG
+Group asks for). The packages built into the window's page are listed by the
+page's own build (`web/vite.config.ts` writes `third-party-notices.txt`,
+from each package's licence file, the font's included) and follow in the
+same file; a package with no licence text fails the page's build.
+`vst3.bundle_notices` checks the bundle has the file and that it names them.
+It lists what is in a macOS build with the web panel; a build for another
+platform or with other JUCE modules has to be looked at again. Nobody
+qualified has read it.
+
 Left before a build is given to anyone:
 
-- The MIT licence asks that its notice goes with every copy. A build that is
-  handed on needs a notices file with the VST3 SDK's licence in it, and the
-  licences of whatever else it carries. There is none yet. Monocypher's
-  2-clause BSD notice belongs in it too.
 - Steinberg's `VST3_Usage_Guidelines.pdf`, beside the SDK in JUCE, says how
   the VST name and logo may be used. It has not been read against how the
   plugin will be described.
