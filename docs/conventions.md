@@ -545,8 +545,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   (`--footer-drop`, `.sb-below-machine`). On a page of words it follows the
   words, so a short page ends where its words do. Keep
   Policies true to what the site does: it covers accounts, saved beats and
-  the shop, with the returns policy in the owner's words. Update it before
-  the upgrade is sold.
+  the shop, with the returns policy in the owner's words, and the upgrade,
+  with the owner's refund rule (30 days, whatever the reason). It says the
+  upgrade is not for sale yet; take that out when it opens.
   Every footer modal goes through `ui/Modal.tsx`.
 - Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
   and a move of its own when pointed at. The tip is for the eye only: the
@@ -717,8 +718,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - It is closed until `UPGRADE_OPEN` is `on`, and without Stripe's key or the
   webhook's secret (`upgradeOpen`). Closed, checkout refuses. A payment
   already made is still honoured: the webhook does not ask whether it is
-  open. Do not set the switch for the owner; the Policies page has to
-  cover the upgrade before it is sold.
+  open. Do not set the switch for the owner.
 - A row in `licenses` is a license somebody paid for. Checkout records
   nothing; only the signed Stripe webhook makes a row (`issueLicense`).
   `stripe_session_id` is unique and the insert steps aside for a row that

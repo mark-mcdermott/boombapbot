@@ -179,6 +179,23 @@ target_link_libraries(boombapbot_plugin
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)
 
+# The licences of what the plugin is built from go with every copy of it,
+# inside the bundle. They are written before the bundle is signed.
+set(plugin_notices "$<TARGET_GENEX_EVAL:boombapbot_plugin_VST3,$<TARGET_PROPERTY:boombapbot_plugin_VST3,JUCE_PLUGIN_ARTEFACT_FILE>>/Contents/Resources/NOTICES.txt")
+set(page_notices "")
+if(BOOMBAPBOT_VST3_WEB_PANEL)
+  set(page_notices "-DPAGE_NOTICES=${panel_page}/third-party-notices.txt")
+endif()
+add_custom_command(TARGET boombapbot_plugin_VST3 POST_BUILD
+  COMMAND "${CMAKE_COMMAND}"
+    "-DJUCE_DIR=${juce_SOURCE_DIR}"
+    "-DMONOCYPHER_DIR=${monocypher_SOURCE_DIR}"
+    "-DNOTICES=${plugin_notices}"
+    ${page_notices}
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/WriteNotices.cmake"
+  COMMENT "Writing the notices that go with the plugin"
+  VERBATIM)
+
 # JUCE signs the bundle and then writes moduleinfo.json into it, which leaves
 # the signature not matching the bundle, and macOS refuses to load that. Custom
 # commands run in the order they were added, so this one signs last, when
@@ -237,6 +254,13 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
   # The check of the license file is told where the machine's file is, so it
   # never reads, writes or removes the one a person keeps.
   add_test(NAME vst3.license_file COMMAND boombapbot_license_file_test)
+  set(noticed_names "VST 3 SDK|Monocypher|zlib|libpng|HarfBuzz|SheenBidi|Independent JPEG Group")
+  if(BOOMBAPBOT_VST3_WEB_PANEL)
+    string(APPEND noticed_names "|react-dom|sofia-sans-condensed")
+  endif()
+  add_test(NAME vst3.bundle_notices
+    COMMAND "${CMAKE_COMMAND}" "-DNOTICES=${plugin_notices}" "-DNAMES=${noticed_names}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckNotices.cmake")
   set_tests_properties(vst3.license_file PROPERTIES
     ENVIRONMENT "BOOMBAPBOT_LICENSE_FILE=${CMAKE_CURRENT_BINARY_DIR}/license-file-test/boombapbot.license")
   add_test(NAME vst3.window_snapshot

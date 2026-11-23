@@ -421,17 +421,20 @@ site its icon still opens a modal that says it is not open.
       the key still arrives by email.
     - About still says of the upgrade that its button "only says so for
       now". Change it when the upgrade opens.
-  - **Policies.** Before it is sold the page has to say what the upgrade
-    costs, how a refund for it works, and that a license keeps the buyer's
-    email and its Stripe payment's id, and stays after the account is
-    deleted.
+  - **Policies covers it**, since 2026-11-23: what the upgrade is and
+    costs, the key and that it is not counted by device, what a license
+    keeps and that it stays after its account is deleted, asking for a lost
+    key, the license file on a device, and refunds. The owner decided the
+    refund rule: within 30 days, whatever the reason. The rest of the
+    wording is a stand-in for the owner to rewrite, and the page still says
+    the upgrade is not for sale yet; take that sentence out when it opens.
   - **Open it.** Set `UPGRADE_OPEN=on` in Vercel and deploy. The Stripe
     webhook already registered for the shop is the one it uses, with
     `charge.refunded` added to its events for refunds.
   - **Refunds.** Refunding the whole payment in Stripe withdraws the
     license (see the license file above), once Stripe sends
-    `charge.refunded`. There is still no refund policy on the Policies
-    page.
+    `charge.refunded`. The Policies page promises a refund within 30
+    days; giving one is done by hand, in Stripe.
   - **The key-by-email route is limited and answers alike**, since
     2026-11-18. One address can be asked about three times an hour, and one
     visitor's address can ask five times in ten minutes; past that the
@@ -477,7 +480,7 @@ site its icon still opens a modal that says it is not open.
   and how the shop works. It was drafted from how the site behaves and is
   not legal advice; nobody qualified has read it. It says no sales tax or
   VAT is collected, which is true of the site and is not a view on what the
-  owner owes. Update it again before the upgrade is sold.
+  owner owes. It covers the upgrade since 2026-11-23.
 - **The manifesto** ("Stay Stoked, Stay Woke") is the owner's own position.
   Their first text went in word for word on 2026-11-15, and a rewrite of it
   they asked for on 2026-11-18 followed. Later that day they gave a new text
