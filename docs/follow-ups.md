@@ -216,10 +216,15 @@ site its icon still opens a modal that says it is not open.
     (2026-11-18) and nowhere else: no control reaches them and РИТМ-12's
     document cannot name them, so nothing a visitor has changes. They pass
     the engine's tests, natively and in WebAssembly alike. How each sounds
-    was set by measurement and nobody has listened: the crusher's rate and
-    levels, tape's drive and wobble, how deep the pump ducks (it halves the
-    loudness of the test beat at full), the filter's range and ring,
-    vinyl's hiss and pops, the phaser's sweep. To hear them, `pnpm audition`
+    was set by measurement: the crusher's rate and levels, tape's drive and
+    wobble, how the pump ducks, the filter's range and ring, vinyl's hiss
+    and pops, the phaser's sweep. The owner listened on 2026-11-22: four
+    were decent, and tape and the pump could not be told from the dry beat
+    on a kick. Both were made stronger the same day and have not been heard
+    since. Tape is driven about twice as hard, with more wobble and less
+    top. The pump was a compressor on the low end, which only made a kick
+    quieter; it now ducks on each low hit (about 8 dB under a kick at full)
+    and is back, and a little over, while the hit still rings. To hear them, `pnpm audition`
     renders a beat through each, half on and full on, into
     `build/auditions`. Still to do before they are
     sold: the owner listens and they are tuned; РИТМ-12's document takes

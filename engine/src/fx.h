@@ -84,6 +84,8 @@ class Effect {
     pumpTone_ = onePole(kPumpToneHz, sampleRate);
     pumpAttack_ = timeConstant(kPumpAttackSeconds, sampleRate);
     pumpRelease_ = timeConstant(kPumpReleaseSeconds, sampleRate);
+    pumpFall_ = timeConstant(kPumpFallSeconds, sampleRate);
+    pumpCatchUp_ = timeConstant(kPumpCatchUpSeconds, sampleRate);
     filterTop_ = static_cast<float>(std::min(kFilterTopHz, 0.45 * sampleRate) / sampleRate);
     filterFloor_ = static_cast<float>(std::min(kFilterFloorHz, 0.1 * sampleRate) / sampleRate);
     vinylHoldFrames_ = static_cast<std::uint32_t>(kVinylHoldSeconds * sampleRate);
@@ -187,15 +189,22 @@ class Effect {
   // Tape: its slow and its quick wobble, where its top rolls off, how hard it is driven.
   static constexpr double kWowHz = 0.55;
   static constexpr double kFlutterHz = 6.3;
-  static constexpr double kTapeDampHz = 6500.0;
-  static constexpr float kTapeDrive = 1.4f;
-  static constexpr float kTapeLevel = 0.6f;
-  // The pump listens to the low end and ducks everything under it.
+  static constexpr float kTapeLateMs = 2.8f;
+  static constexpr float kWowMs = 2.2f;
+  static constexpr float kFlutterMs = 0.3f;
+  static constexpr double kTapeDampHz = 4000.0;
+  static constexpr float kTapeDrive = 3.0f;
+  static constexpr float kTapeLevel = 0.45f;
+  // The pump listens to the low end and ducks everything under a hit: how
+  // quickly it comes down, how quickly the level it hears falls, how soon a
+  // level becomes the usual one, how slowly the mix comes back, and how far.
   static constexpr double kPumpToneHz = 150.0;
-  static constexpr double kPumpAttackSeconds = 0.008;
-  static constexpr double kPumpReleaseSeconds = 0.16;
-  static constexpr float kPumpDepth = 6.0f;
-  static constexpr float kPumpMakeup = 0.4f;
+  static constexpr double kPumpAttackSeconds = 0.005;
+  static constexpr double kPumpFallSeconds = 0.05;
+  static constexpr double kPumpCatchUpSeconds = 0.1;
+  static constexpr double kPumpReleaseSeconds = 0.12;
+  static constexpr float kPumpDepth = 16.0f;
+  static constexpr float kPumpMakeup = 0.6f;
   // The filter: where it stands open and shut, and how little it damps its own ring.
   static constexpr double kFilterTopHz = 18000.0;
   static constexpr double kFilterFloorHz = 180.0;
@@ -314,6 +323,8 @@ class Effect {
     tapeRight_ = 0.0f;
     pumpLow1_ = 0.0f;
     pumpLow2_ = 0.0f;
+    pumpLevel_ = 0.0f;
+    pumpUsual_ = 0.0f;
     pumpEnvelope_ = 0.0f;
     filterLeft_ = Sweepable{};
     filterRight_ = Sweepable{};
@@ -454,7 +465,7 @@ class Effect {
   // amount asked for, the lateness too, so at nothing it is the signal as it came.
   void tape(float& left, float& right) {
     write(left, right);
-    const float late = 1.0f + wet_ * milliseconds(1.3f + sine(wowPhase_) + 0.15f * sine(flutterPhase_));
+    const float late = 1.0f + wet_ * milliseconds(kTapeLateMs + kWowMs * sine(wowPhase_) + kFlutterMs * sine(flutterPhase_));
     wowPhase_ += wowStep_;
     flutterPhase_ += flutterStep_;
     const float heardLeft = tap(lineLeft_, late);
@@ -467,16 +478,22 @@ class Effect {
     right = blend(heardRight, warm(tapeRight_), wet_);
   }
 
-  // A compressor that hears only the low end. It comes down quickly enough
-  // to let the front of a hit through and comes back slowly, so everything
-  // ducks under the kick and swells back after it.
+  // Ducks everything under each low hit and lets it swell back. It listens
+  // to the low end for a rise, the level against where the level has lately
+  // been, so a hit ducks the mix as it lands and the mix is back while the
+  // hit still rings. The front of the hit is through before it comes down.
   void pump(float& left, float& right) {
     pumpLow1_ += (0.5f * (left + right) - pumpLow1_) * pumpTone_;
     pumpLow2_ += (pumpLow1_ - pumpLow2_) * pumpTone_;
     const float level = std::fabs(pumpLow2_);
-    pumpEnvelope_ += (level - pumpEnvelope_) * (level > pumpEnvelope_ ? pumpAttack_ : pumpRelease_);
+    pumpLevel_ += (level - pumpLevel_) * (level > pumpLevel_ ? pumpAttack_ : pumpFall_);
+    pumpUsual_ += (pumpLevel_ - pumpUsual_) * pumpCatchUp_;
+    const float rise = std::max(0.0f, pumpLevel_ - pumpUsual_);
+    pumpEnvelope_ += (rise - pumpEnvelope_) * (rise > pumpEnvelope_ ? pumpAttack_ : pumpRelease_);
     settle(pumpLow1_);
     settle(pumpLow2_);
+    settle(pumpLevel_);
+    settle(pumpUsual_);
     settle(pumpEnvelope_);
     const float gain = (1.0f + kPumpMakeup * wet_) / (1.0f + kPumpDepth * wet_ * pumpEnvelope_);
     left *= gain;
@@ -620,8 +637,12 @@ class Effect {
   float pumpTone_ = 1.0f;
   float pumpAttack_ = 1.0f;
   float pumpRelease_ = 1.0f;
+  float pumpFall_ = 1.0f;
+  float pumpCatchUp_ = 1.0f;
   float pumpLow1_ = 0.0f;
   float pumpLow2_ = 0.0f;
+  float pumpLevel_ = 0.0f;
+  float pumpUsual_ = 0.0f;
   float pumpEnvelope_ = 0.0f;
 
   float filterTop_ = 0.0f;
