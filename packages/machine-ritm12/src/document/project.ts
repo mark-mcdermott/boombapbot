@@ -17,7 +17,12 @@ import { createStarterPatterns } from './starter';
  * knob and switch stands.
  */
 export const MACHINE_ID = 'ritm12';
-export const PROJECT_SCHEMA_VERSION = 3;
+export const PROJECT_SCHEMA_VERSION = 4;
+/**
+ * The version before a beat could name an effect of the upgrade. Nothing
+ * else differs: everything such a beat holds means what it means now.
+ */
+const SCHEMA_VERSION_BEFORE_UPGRADE_EFFECTS = 3;
 
 /** The effects the machine has for anyone. */
 export const FREE_EFFECT_KINDS = ['delay', 'reverb', 'flanger', 'chorus'] as const;
@@ -90,9 +95,16 @@ function describeIssues(error: z.ZodError): string[] {
   });
 }
 
-/** Validates a РИТМ-12 project. Never throws. */
+/** A project of the version before this one as this version has it. Nothing is lost on the way. */
+function broughtUpToDate(input: unknown): unknown {
+  if (typeof input !== 'object' || input === null) return input;
+  const { schemaVersion } = input as { schemaVersion?: unknown };
+  return schemaVersion === SCHEMA_VERSION_BEFORE_UPGRADE_EFFECTS ? { ...input, schemaVersion: PROJECT_SCHEMA_VERSION } : input;
+}
+
+/** Validates a РИТМ-12 project, bringing one of the version before up to date. Never throws. */
 export function parseProject(input: unknown): ParseResult {
-  const result = projectSchema.safeParse(input);
+  const result = projectSchema.safeParse(broughtUpToDate(input));
   if (!result.success) return { ok: false, errors: describeIssues(result.error) };
   return { ok: true, project: result.data, changes: [] };
 }

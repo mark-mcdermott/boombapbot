@@ -13,7 +13,7 @@ test('the beat is kept in this browser and comes back on the next visit', async 
   await page.reload();
   await expect(page.getByTestId('plate')).toBeVisible();
   const back = await beat(page);
-  expect(back).toMatchObject({ machine: 'ritm12', schemaVersion: 3, size: 12, panel: { pattern: 3, selected: 'perc' } });
+  expect(back).toMatchObject({ machine: 'ritm12', schemaVersion: 4, size: 12, panel: { pattern: 3, selected: 'perc' } });
   expect(stepsOn(back.patterns[3]!.steps.perc)).toEqual([6]);
   await expect(step(page, 6)).toHaveAttribute('aria-pressed', 'true');
 });
@@ -90,7 +90,7 @@ test('the project file names its machine and comes back in as it went out', asyn
   await step(page, 9).click();
   const written = await beat(page);
   const file = JSON.parse((await downloadBytes(await exportVia(page, 'export-project'))).toString('utf8')) as { machine: string; schemaVersion: number };
-  expect(file).toMatchObject({ machine: 'ritm12', schemaVersion: 3 });
+  expect(file).toMatchObject({ machine: 'ritm12', schemaVersion: 4 });
   await page.getByTestId('settings-close').click();
   await page.getByTestId('clear-pattern').click();
   await page.getByTestId('import-input').setInputFiles({

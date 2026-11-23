@@ -109,7 +109,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   Its eight voices are `engine/voices.cpp` (pitch, tone and decay; their
   place in the table is their sound number, never reorder); what voices are
   built from is shared in `engine/include/boombapbot/dsp.h`. Its project
-  document is `src/document/` (schema version 3, `machine: 'ritm12'`: a tempo
+  document is `src/document/` (schema version 4, `machine: 'ritm12'`: a tempo
   in beats a minute, four patterns of eight sixteen-step rows and an accent
   row, the mix, the voices' knobs, the effect and where the panel stands),
   with the voice table in `data/ritm12.machine.json`. `src/engine.ts` turns
@@ -476,7 +476,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
 - A change to the project schema needs a step in `parseProject` that brings
   an older project up to date and reports what was lost, and a fixture.
   `fixtures/four-patterns.project.json` is the current format; a unit test
-  reads it and writes it back unchanged.
+  reads it and writes it back unchanged. `fixtures/version-3.project.json`
+  is the one before it, which another reads and finds brought up to date.
 - A new project gets the starter patterns (`src/document/starter.ts`). They
   are written for boombapbot. Browser tests that need an empty pattern use
   В or Г.

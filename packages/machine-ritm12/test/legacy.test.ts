@@ -8,7 +8,7 @@ describe('a beat from before РИТМ-12', () => {
     if (!read.ok) throw new Error(read.errors.join('; '));
     const { project, changes } = read;
     expect(parseProject(project).ok).toBe(true);
-    expect(project).toMatchObject({ machine: 'ritm12', schemaVersion: 3, id: 'fixture-mixed-rhythms', tempo: 124, size: 16 });
+    expect(project).toMatchObject({ machine: 'ritm12', schemaVersion: 4, id: 'fixture-mixed-rhythms', tempo: 124, size: 16 });
     const [first, ...rest] = project.patterns;
     expect(first!.steps.kick).toBe('x...x...x..xx...');
     expect(first!.steps.snare).toBe('....x.......x..x');

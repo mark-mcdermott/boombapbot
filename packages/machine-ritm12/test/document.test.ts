@@ -35,7 +35,7 @@ import { codec, earlier, newProject } from './helpers';
 describe('the РИТМ-12 project document', () => {
   it('names its machine, and a new one opens on the starter patterns', () => {
     const project = newProject();
-    expect(project).toMatchObject({ format: PROJECT_FORMAT, schemaVersion: 3, machine: 'ritm12', tempo: 104, size: 16 });
+    expect(project).toMatchObject({ format: PROJECT_FORMAT, schemaVersion: 4, machine: 'ritm12', tempo: 104, size: 16 });
     expect(project.patterns).toHaveLength(PATTERN_COUNT);
     expect(countHits(project.patterns[0]!)).toBeGreaterThan(8);
     expect(countHits(project.patterns[1]!)).toBeGreaterThan(countHits(project.patterns[0]!));
@@ -84,6 +84,7 @@ describe('the РИТМ-12 project document', () => {
   });
 
   it('owns only its own documents, and keeps its draft in a place of its own', () => {
+    expect(documentRitm12.owns({ machine: 'ritm12', schemaVersion: 4 })).toBe(true);
     expect(documentRitm12.owns({ machine: 'ritm12', schemaVersion: 3 })).toBe(true);
     expect(documentRitm12.owns({ schemaVersion: 2 })).toBe(false);
     expect(documentRitm12.draftKey).toBe('boombapbot.draft.v3.ritm12');
@@ -105,6 +106,20 @@ describe('the effects a beat can name', () => {
     expect(FREE_EFFECT_KINDS.some(isPaidEffect)).toBe(false);
     expect(reachableEffects(false)).toEqual(FREE_EFFECT_KINDS);
     expect(reachableEffects(true)).toEqual(EFFECT_KINDS);
+  });
+
+  it('brings a beat of version 3, from before those six could be named, up to date with nothing lost', () => {
+    const text = readFileSync(new URL('../fixtures/version-3.project.json', import.meta.url), 'utf8');
+    const saved = JSON.parse(text) as { schemaVersion: number };
+    expect(saved.schemaVersion).toBe(3);
+    const result = codec.parseText(text);
+    if (!result.ok) throw new Error(result.errors.join('; '));
+    expect(result.changes).toEqual([]);
+    expect(result.adopted).toBeUndefined();
+    expect(result.project).toEqual({ ...saved, schemaVersion: 4 });
+    // A version this build has not heard of is refused, not guessed at.
+    expect(parseProject({ ...saved, schemaVersion: 5 }).ok).toBe(false);
+    expect(parseProject({ ...saved, schemaVersion: 2 }).ok).toBe(false);
   });
 
   it('reads a beat that names an effect of the upgrade, and writes it back unchanged', () => {

@@ -1496,7 +1496,7 @@ void testBeatFile() {
       {"JSON that is not a beat", "{\"format\": \"something.else\", \"schemaVersion\": 3}"},
       {"a list", "[1, 2, 3]"},
       {"a beat of the earlier machine", fixture("earlier-v2.project.json")},
-      {"a beat from a newer version", with([](const juce::var& beat) { put(beat, "schemaVersion", 4); })},
+      {"a beat from a newer version", with([](const juce::var& beat) { put(beat, "schemaVersion", 5); })},
       {"a beat for another machine", with([](const juce::var& beat) { put(beat, "machine", "808"); })},
       {"a row of fifteen steps", with([](const juce::var& beat) { put(beat["patterns"][0]["steps"], "kick", "x.............."); })},
       {"a row with a letter that is no step", with([](const juce::var& beat) { put(beat["patterns"][3], "accents", "x......X........"); })},
@@ -1516,6 +1516,11 @@ void testBeatFile() {
   check(paid.wasOk() && leftOut == "crusher" && plugin(*processor).beatName() == "Paid effect fixture" &&
             std::abs(valueOf(*processor, "effect_kind")) < 1e-6f && std::abs(valueOf(*processor, "kick_pitch") - 0.35f) < 1e-6f,
         context, text("a beat naming an effect of the upgrade loads with its effect off, and says which: %s", leftOut.toRawUTF8()));
+
+  // A beat of the version before this one is the same beat.
+  const juce::Result versionThree = plugin(*processor).loadBeat(fixture("version-3.project.json"));
+  check(versionThree.wasOk() && plugin(*processor).beatName() == "Version 3 fixture" && std::abs(valueOf(*processor, "effect_kind") - 2.0f) < 1e-6f,
+        context, "a beat of version 3 loads as it is");
 
   const juce::Result loaded = plugin(*processor).loadBeat(fourPatterns(), &leftOut);
   check(loaded.wasOk() && leftOut.isEmpty() && plugin(*processor).beatName() == "Four patterns fixture", context,

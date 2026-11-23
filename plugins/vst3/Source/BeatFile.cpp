@@ -96,7 +96,7 @@ juce::Result checkKind(const juce::var& document) {
 
   const juce::var& version = document["schemaVersion"];
   if (!isNumber(version)) return wrong("This beat file does not say which version it is.");
-  if (static_cast<int>(version) < kBeatSchemaVersion) {
+  if (static_cast<int>(version) < kBeatSchemaVersionOldest) {
     return wrong("This beat was saved by an earlier boombapbot. Open it on the site and save it again.");
   }
   if (static_cast<int>(version) > kBeatSchemaVersion) {

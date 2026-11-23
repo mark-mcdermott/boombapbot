@@ -1,0 +1,141 @@
+{
+  "format": "boombapbot.project",
+  "schemaVersion": 3,
+  "machine": "ritm12",
+  "id": "fixture-version-3",
+  "name": "Version 3 fixture",
+  "createdAt": "2026-11-17T12:00:00.000Z",
+  "updatedAt": "2026-11-17T12:00:00.000Z",
+  "tempo": 96,
+  "swing": 0.4,
+  "size": 16,
+  "patterns": [
+    {
+      "steps": {
+        "kick": "x.....x...x.....",
+        "snare": "....x.......x...",
+        "clap": "................",
+        "closed_hat": "x.x.x.x.x.x.x.x.",
+        "open_hat": ".......x.......x",
+        "tom": "................",
+        "rim": "..x..........x..",
+        "perc": "................"
+      },
+      "accents": "x.......x.....x."
+    },
+    {
+      "steps": {
+        "kick": "x..x..x..xx.....",
+        "snare": "....x.......x..x",
+        "clap": "............x...",
+        "closed_hat": "xxx.xxx.xxx.x.x.",
+        "open_hat": "...x...x...x...x",
+        "tom": ".........x....x.",
+        "rim": "................",
+        "perc": ".x....x....x...."
+      },
+      "accents": "x...x...x...x.x."
+    },
+    {
+      "steps": {
+        "kick": "................",
+        "snare": "................",
+        "clap": "................",
+        "closed_hat": "................",
+        "open_hat": "................",
+        "tom": "..x.......x.....",
+        "rim": "................",
+        "perc": "................"
+      },
+      "accents": "..........x....."
+    },
+    {
+      "steps": {
+        "kick": "................",
+        "snare": "................",
+        "clap": "................",
+        "closed_hat": "................",
+        "open_hat": "................",
+        "tom": "................",
+        "rim": "................",
+        "perc": "...............x"
+      },
+      "accents": "................"
+    }
+  ],
+  "mix": {
+    "volume": 0.8,
+    "accent": 0.6,
+    "levels": {
+      "kick": 0.75,
+      "snare": 0.75,
+      "clap": 0.5,
+      "closed_hat": 0.75,
+      "open_hat": 0.75,
+      "tom": 0.75,
+      "rim": 0.75,
+      "perc": 0.75
+    },
+    "mutes": {
+      "kick": false,
+      "snare": false,
+      "clap": false,
+      "closed_hat": false,
+      "open_hat": false,
+      "tom": false,
+      "rim": true,
+      "perc": false
+    }
+  },
+  "voices": {
+    "kick": {
+      "pitch": 0.35,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "snare": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "clap": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "closed_hat": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "open_hat": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "tom": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "rim": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    },
+    "perc": {
+      "pitch": 0.5,
+      "decay": 0.5,
+      "tone": 0.5
+    }
+  },
+  "effect": {
+    "kind": "reverb",
+    "mix": 0.3
+  },
+  "panel": {
+    "selected": "tom",
+    "pattern": 2,
+    "write": "hits"
+  }
+}

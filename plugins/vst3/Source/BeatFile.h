@@ -49,7 +49,10 @@ struct Beat {
   juce::String upgradeEffect;
 };
 
-inline constexpr int kBeatSchemaVersion = 3;
+inline constexpr int kBeatSchemaVersion = 4;
+// The oldest version read: the one before a beat could name an effect of the
+// upgrade, which differs in nothing else.
+inline constexpr int kBeatSchemaVersionOldest = 3;
 // Far more than a beat file ever is. Anything larger is not one.
 inline constexpr int kBeatFileBytesMost = 1 << 20;
 

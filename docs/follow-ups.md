@@ -233,10 +233,10 @@ site its icon still opens a modal that says it is not open.
     hold the upgrade opens it, plays it without that effect, and says so
     (`engineSetup`, `holdsUpgrade` in the machine's `src/upgrade.ts`, which
     answers no everywhere until a program is given its license file). The
-    schema's version is still 3: every beat there was is still a beat, and
-    one that names none of the six still opens in a program from before.
-    One that names one is refused there, as naming an effect the machine
-    does not have. The selector still reaches only the four, so nothing
+    schema is version 4 for it, by the owner's decision. A beat of
+    version 3 is brought up to date as it is read, with nothing lost
+    (`fixtures/version-3.project.json`); a program from before version 4
+    refuses any beat saved since, and the plugin reads both. The selector still reaches only the four, so nothing
     writes such a beat yet. The plugin loads one with its effect off and
     says which effect that was, but does not keep the name: saved from the
     plugin, the beat has no effect. The six names on the label are
