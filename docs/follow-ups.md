@@ -274,19 +274,20 @@ site its icon still opens a modal that says it is not open.
       the unit tests (changed, cut short, wrong key, wrong version, and
       against Node's own Ed25519) and against the built server with its
       database in memory. What is left, in order:
-      - **Run the migration before the code is deployed.**
+      - **The migration is run.**
         `apps/site/drizzle/0007_license_withdrawn.sql` adds `withdrawn_at`
-        to `licenses`. It has not been run on Neon. The Stripe webhook
-        reads whole license rows, so the deployed code needs the column to
-        be there first.
-      - **Make the real key pair** with `pnpm license:keypair`. The signing
-        half goes into Vercel as `LICENSE_SIGNING_KEY` and nowhere else;
-        the public half goes into `LICENSE_PUBLIC_KEY` in
-        `packages/contracts/src/license-file.ts`, and into the plugin when
-        its check is written. Until the first is set the routes answer 503
-        `no_signing_key`; until the second is, no program accepts a file.
-        Losing the signing key means a new pair and new builds of every
-        program; files signed with the old one stop verifying in them.
+        to `licenses`. It was run on Neon on 2026-11-22, before the code was
+        deployed: eight migrations are applied, the column is there, and
+        every table holds the rows it held before.
+      - **The real key pair is made**, on 2026-11-22. The signing half is
+        in Vercel as `LICENSE_SIGNING_KEY` and nowhere else; the public
+        half is `LICENSE_PUBLIC_KEY` in
+        `packages/contracts/src/license-file.ts`, and goes into the plugin
+        when its check is written. Nobody has checked the two halves
+        against each other: the first file the live server signs, checked
+        against the built-in key, is what will. Losing the signing key
+        means a new pair and new builds of every program; files signed
+        with the old one stop verifying in them.
       - Nothing sets `withdrawn_at`. The Stripe webhook still has no case
         for a refund, and a withdrawn license still counts as upgraded on
         the site (`isUpgraded`) and still shows its key.

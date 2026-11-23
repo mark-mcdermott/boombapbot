@@ -20,7 +20,7 @@ export const LICENSE_FILE_MAX_LENGTH = 2048;
  * bytes. Empty until the owner has made the pair (`pnpm license:keypair`);
  * until then no file is accepted against it.
  */
-export const LICENSE_PUBLIC_KEY = '';
+export const LICENSE_PUBLIC_KEY = 'y81EeMMs4ew8-3oswEVqNUzKpp9DB4Yux-_6GXJuFgk';
 
 const SEPARATOR = '.';
 const PUBLIC_KEY_BYTES = 32;
