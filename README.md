@@ -329,8 +329,17 @@ which features it will unlock is not decided.
   `pnpm license:keypair` makes the pair. A license with `withdrawn_at` set
   (`apps/site/drizzle/0007_license_withdrawn.sql`) gives out no more files,
   and the files it gave out before keep working. Nothing sets that mark
-  yet, and nothing reads or keeps a file yet. The owner made the real pair
-  on 2026-11-22: its public half is `LICENSE_PUBLIC_KEY`.
+  yet. The owner made the real pair on 2026-11-22: its public half is
+  `LICENSE_PUBLIC_KEY`.
+- The site, the desktop app and the phone apps keep a license file and
+  check it themselves (`packages/editor/src/upgrade/device-license.ts`).
+  When an upgraded account is found logged in, or a key has just gone onto
+  one, the page fetches the file, checks it against `LICENSE_PUBLIC_KEY` and
+  keeps it in the browser's storage beside the draft; a file that does not
+  check out is not kept. From then РИТМ-12's selector reaches the six paid
+  effects and a beat that names one plays it, with no server, after a
+  log-out too. A key alone does not do it yet: no program takes a key
+  without an account, and the plugin reads no file.
 - The upgrade icon's modal (`packages/editor/src/ui/Upgrade.tsx`) asks
   `GET /api/upgrade` when it is opened, never before. Closed, it says what it
   has always said and offers nothing to press. Open, it shows the price and a

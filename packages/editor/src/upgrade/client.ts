@@ -1,9 +1,11 @@
 import {
   CheckoutAnswerSchema,
   LicenseAnswerSchema,
+  LicenseFileAnswerSchema,
   UpgradeAnswerSchema,
   UpgradeRefusalSchema,
   type License,
+  type LicenseFileAnswer,
   type UpgradeAnswer,
   type UpgradeRefusal,
 } from '@boombapbot/contracts';
@@ -37,6 +39,11 @@ export function startCheckout(baseUrl: string): Promise<Asked<{ url: string }>> 
 /** The license of the account that is logged in. */
 export function fetchLicense(baseUrl: string): Promise<Asked<{ license: License }>> {
   return ask(address(baseUrl, '/key'), LicenseAnswerSchema);
+}
+
+/** A signed license file for the account that is logged in, to keep on this device. */
+export function fetchLicenseFile(baseUrl: string): Promise<Asked<LicenseFileAnswer>> {
+  return ask(address(baseUrl, '/license'), LicenseFileAnswerSchema);
 }
 
 /** Puts a key bought without an account onto the account that is logged in. */
