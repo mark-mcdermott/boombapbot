@@ -2,7 +2,14 @@ import { generateKeyPairSync } from 'node:crypto';
 import { LICENSE_PUBLIC_KEY, signLicenseFile, type LicenseFilePayload } from '@boombapbot/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KeyValueStorage } from '../src/state/draft-storage';
-import { DeviceLicense, LICENSE_FILE_KEY, fetchDeviceLicense } from '../src/upgrade/device-license';
+import {
+  DeviceLicense,
+  LICENSE_FILE_KEY,
+  LICENSE_SOURCE_KEY,
+  fetchDeviceLicense,
+  unlockWithKey,
+  type LicenseSource,
+} from '../src/upgrade/device-license';
 
 class MemoryStorage implements KeyValueStorage {
   readonly items = new Map<string, string>();
@@ -40,15 +47,16 @@ const PAYLOAD: LicenseFilePayload = {
 const FILE = signLicenseFile(PAYLOAD, pair.signingKey);
 const SITE = 'https://site.example/';
 
-const holding = (file: string | null, storage = new MemoryStorage()) => {
+const holding = (file: string | null, source?: LicenseSource, storage = new MemoryStorage()) => {
   if (file !== null) storage.items.set(LICENSE_FILE_KEY, file);
+  if (source) storage.items.set(LICENSE_SOURCE_KEY, source);
   return { storage, license: new DeviceLicense(storage, pair.publicKey) };
 };
 
 function answering(status: number, said: unknown) {
   const asked: string[] = [];
-  vi.stubGlobal('fetch', async (url: string) => {
-    asked.push(url);
+  vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+    asked.push(init.method === 'POST' ? `POST ${url} ${String(init.body)}` : url);
     return new Response(JSON.stringify(said), { status });
   });
   return asked;
@@ -60,7 +68,7 @@ describe('the license file a device holds', () => {
   it('upgrades the device from the moment it is kept, and after the page is opened again', () => {
     const { storage, license } = holding(null);
     expect(license.upgraded).toBe(false);
-    expect(license.keep(FILE)).toBe(true);
+    expect(license.keep(FILE, 'account')).toBe(true);
     expect(license.upgraded).toBe(true);
     expect(storage.items.get(LICENSE_FILE_KEY)).toBe(FILE);
     expect(new DeviceLicense(storage, pair.publicKey).upgraded).toBe(true);
@@ -84,7 +92,7 @@ describe('the license file a device holds', () => {
     for (const forged of forgeries) {
       expect(holding(forged).license.upgraded, forged.slice(0, 50)).toBe(false);
       const { storage, license } = holding(null);
-      expect(license.keep(forged), forged.slice(0, 50)).toBe(false);
+      expect(license.keep(forged, 'account'), forged.slice(0, 50)).toBe(false);
       expect(license.upgraded).toBe(false);
       expect(storage.items.has(LICENSE_FILE_KEY)).toBe(false);
     }
@@ -92,7 +100,7 @@ describe('the license file a device holds', () => {
 
   it('is not lost to a bad file that comes after it', () => {
     const { storage, license } = holding(FILE);
-    expect(license.keep(FILE.slice(0, -8))).toBe(false);
+    expect(license.keep(FILE.slice(0, -8), 'account')).toBe(false);
     expect(license.upgraded).toBe(true);
     expect(storage.items.get(LICENSE_FILE_KEY)).toBe(FILE);
   });
@@ -101,7 +109,7 @@ describe('the license file a device holds', () => {
     const blocked = new MemoryStorage();
     blocked.failWrites = true;
     const license = new DeviceLicense(blocked, pair.publicKey);
-    expect(license.keep(FILE)).toBe(true);
+    expect(license.keep(FILE, 'account')).toBe(true);
     expect(license.upgraded).toBe(true);
 
     const unreadable = holding(FILE).storage;
@@ -110,20 +118,79 @@ describe('the license file a device holds', () => {
     expect(new DeviceLicense(null, pair.publicKey).upgraded).toBe(false);
   });
 
-  it('tells whoever is listening once, when the device becomes upgraded', () => {
+  it('is locked again when nobody is logged in, if an account unlocked it', () => {
+    const { storage, license } = holding(null);
+    license.keep(FILE, 'account');
+    expect(license.source).toBe('account');
+    license.removeKey();
+    expect(license.upgraded).toBe(true);
+    license.loggedOut();
+    expect(license.upgraded).toBe(false);
+    expect(license.source).toBeNull();
+    expect(storage.items.size).toBe(0);
+    expect(new DeviceLicense(storage, pair.publicKey).upgraded).toBe(false);
+  });
+
+  it('stays unlocked with nobody logged in, if a typed key unlocked it, until the key is removed', () => {
+    const { storage, license } = holding(null);
+    license.keep(FILE, 'key');
+    license.loggedOut();
+    expect(license.source).toBe('key');
+    expect(new DeviceLicense(storage, pair.publicKey).source).toBe('key');
+    license.removeKey();
+    expect(license.upgraded).toBe(false);
+    expect(storage.items.size).toBe(0);
+  });
+
+  it('stays a key\u2019s when an account logs in after, and becomes a key\u2019s when one is typed after', () => {
+    const typedFirst = holding(null).license;
+    typedFirst.keep(FILE, 'key');
+    typedFirst.keep(FILE, 'account');
+    typedFirst.loggedOut();
+    expect(typedFirst.source).toBe('key');
+
+    const loggedInFirst = holding(null).license;
+    loggedInFirst.keep(FILE, 'account');
+    loggedInFirst.keep(FILE, 'key');
+    loggedInFirst.loggedOut();
+    expect(loggedInFirst.source).toBe('key');
+  });
+
+  it('takes a file kept before it was said how for an account\u2019s, which a log-out locks', () => {
+    for (const source of [undefined, 'somebody' as LicenseSource]) {
+      const { license } = holding(FILE, source);
+      expect(license.source).toBe('account');
+      license.loggedOut();
+      expect(license.upgraded).toBe(false);
+    }
+  });
+
+  it('is locked for the visit even where storage will not let the file go', () => {
+    const { storage, license } = holding(FILE, 'account');
+    storage.removeItem = () => {
+      throw new Error('storage is blocked');
+    };
+    license.loggedOut();
+    expect(license.upgraded).toBe(false);
+  });
+
+  it('tells whoever is listening when the device is unlocked and when it is locked, once each', () => {
     const { license } = holding(null);
     const heard = vi.fn();
     const stop = license.subscribe(heard);
-    license.keep('not a file');
+    license.keep('not a file', 'account');
     expect(heard).not.toHaveBeenCalled();
-    license.keep(FILE);
-    license.keep(FILE);
+    license.keep(FILE, 'account');
+    license.keep(FILE, 'account');
     expect(heard).toHaveBeenCalledTimes(1);
+    license.loggedOut();
+    license.loggedOut();
+    expect(heard).toHaveBeenCalledTimes(2);
     stop();
     const quiet = holding(null).license;
     const unheard = vi.fn();
     quiet.subscribe(unheard)();
-    quiet.keep(FILE);
+    quiet.keep(FILE, 'account');
     expect(unheard).not.toHaveBeenCalled();
   });
 });
@@ -132,14 +199,14 @@ describe('fetching the license file of the account that is logged in', () => {
   it('keeps the file the server gives', async () => {
     const asked = answering(200, { file: FILE });
     const { license } = holding(null);
-    await fetchDeviceLicense(SITE, license);
+    await fetchDeviceLicense(SITE, undefined, license);
     expect(asked).toEqual([`${SITE}api/upgrade/license`]);
     expect(license.upgraded).toBe(true);
   });
 
   it('asks nothing of the server when the device already holds a good one', async () => {
     const asked = answering(200, { file: FILE });
-    await fetchDeviceLicense(SITE, holding(FILE).license);
+    await fetchDeviceLicense(SITE, undefined, holding(FILE).license);
     expect(asked).toEqual([]);
   });
 
@@ -153,7 +220,7 @@ describe('fetching the license file of the account that is logged in', () => {
     ] as const) {
       answering(status, said);
       const { license } = holding(null);
-      await fetchDeviceLicense(SITE, license);
+      await fetchDeviceLicense(SITE, undefined, license);
       expect(license.upgraded, JSON.stringify(said)).toBe(false);
     }
   });
@@ -163,7 +230,44 @@ describe('fetching the license file of the account that is logged in', () => {
       throw new TypeError('Failed to fetch');
     });
     const { license } = holding(null);
-    await expect(fetchDeviceLicense(SITE, license)).resolves.toBeUndefined();
+    await expect(fetchDeviceLicense(SITE, undefined, license)).resolves.toBeUndefined();
+    expect(license.upgraded).toBe(false);
+  });
+
+  it('does not keep a file that arrives after its account has logged out', async () => {
+    answering(200, { file: FILE });
+    const { license } = holding(null);
+    await fetchDeviceLicense(SITE, () => false, license);
+    expect(license.upgraded).toBe(false);
+  });
+});
+
+describe('unlocking a device with a typed key and nobody logged in', () => {
+  it('asks for the key\u2019s file and keeps it as a key\u2019s', async () => {
+    const asked = answering(200, { file: FILE });
+    const { license } = holding(null);
+    expect(await unlockWithKey(SITE, 'BOOM-7K3QF-9XW2M-HT4RD-6VNPA', license)).toBeNull();
+    expect(asked).toEqual([`POST ${SITE}api/upgrade/license {"key":"BOOM-7K3QF-9XW2M-HT4RD-6VNPA"}`]);
+    expect(license.source).toBe('key');
+  });
+
+  it('says why not, in the server\u2019s words, and unlocks nothing', async () => {
+    for (const [status, code] of [
+      [404, 'unknown_key'],
+      [403, 'withdrawn'],
+      [429, 'too_many'],
+    ] as const) {
+      answering(status, { code, message: 'No.' });
+      const { license } = holding(null);
+      expect(await unlockWithKey(SITE, 'BOOM-00000-00000-00000-00000', license)).toEqual({ status, code, message: 'No.' });
+      expect(license.upgraded).toBe(false);
+    }
+  });
+
+  it('says so when the server\u2019s file is not one this program accepts', async () => {
+    answering(200, { file: signLicenseFile(PAYLOAD, throwawayPair().signingKey) });
+    const { license } = holding(null);
+    expect((await unlockWithKey(SITE, 'BOOM-7K3QF-9XW2M-HT4RD-6VNPA', license))?.message).toMatch(/does not accept/);
     expect(license.upgraded).toBe(false);
   });
 });

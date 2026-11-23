@@ -3,7 +3,7 @@ import { Copy, Sparkles } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { authClient, draftKeeper, explain, type Failure } from '../account/client';
 import { signedInAccount } from '../account/session';
-import { fetchDeviceLicense, useDeviceUpgraded } from '../upgrade/device-license';
+import { deviceLicense, fetchDeviceLicense, unlockWithKey, useDeviceLicenseSource } from '../upgrade/device-license';
 import { askUpgrade, fetchLicense, redeemKey, remindKey, startCheckout } from '../upgrade/client';
 import { takeParams } from './arrival';
 import { LinkButton, Problem as SharedProblem, useAttempt } from './attempt';
@@ -153,21 +153,17 @@ interface EnterKeyProps {
   signedIn: boolean;
   logIn(): void;
   redeemed(): void;
-  back(): void;
+  /** The way back to the offer, where there is one. */
+  back?(): void;
+  /** The way to ask for a lost key, where the offer is not there to lead to it. */
+  toLost?(): void;
 }
 
-function EnterKey({ baseUrl, signedIn, logIn, redeemed, back }: EnterKeyProps) {
-  if (!signedIn) {
-    return (
-      <div data-testid="upgrade-key-needs-account">
-        <p className="sb-modal-text">
-          A key goes onto an account, so log in or make one first. Then come back here and enter it.
-        </p>
-        <LogInButton logIn={logIn} />
-        <Back onClick={back} />
-      </div>
-    );
-  }
+/**
+ * A key typed in. With somebody logged in it goes onto their account; with
+ * nobody, it unlocks this device and stays on whatever account it is on.
+ */
+function EnterKey({ baseUrl, signedIn, logIn, redeemed, back, toLost }: EnterKeyProps) {
   return (
     <>
       <KeyForm
@@ -176,13 +172,18 @@ function EnterKey({ baseUrl, signedIn, logIn, redeemed, back }: EnterKeyProps) {
         busy="Checking it…"
         field="key"
         submit={async (key) => {
+          if (!signedIn) return unlockWithKey(baseUrl, key);
           const asked = await redeemKey(baseUrl, key);
           if (!asked.ok) return asked.failure;
           redeemed();
           return null;
         }}
       >
-        <p className="sb-modal-text sb-form-lead">Enter the key from your email and it goes onto this account.</p>
+        <p className="sb-modal-text sb-form-lead">
+          {signedIn
+            ? 'Enter the key from your email and it goes onto this account.'
+            : `Enter the key from your email and it unlocks the upgrade on ${draftKeeper()}. It needs no account.`}
+        </p>
         <TextField
           label="License key"
           name="key"
@@ -192,8 +193,45 @@ function EnterKey({ baseUrl, signedIn, logIn, redeemed, back }: EnterKeyProps) {
           hint={`It looks like ${KEY_SHAPE}.`}
         />
       </KeyForm>
-      <Back onClick={back} />
+      <p className="sb-account-links">
+        {!signedIn && (
+          <LinkButton testId="upgrade-log-in" onClick={logIn}>
+            Log in to put it on an account
+          </LinkButton>
+        )}
+        {toLost && (
+          <LinkButton testId="upgrade-to-lost" onClick={toLost}>
+            I lost my key
+          </LinkButton>
+        )}
+      </p>
+      {back && <Back onClick={back} />}
     </>
+  );
+}
+
+/** A device a typed key unlocked: it says so, and the key can be taken off it again. */
+function KeyOnDevice() {
+  return (
+    <div data-testid="upgrade-key-on-device">
+      <p className="sb-modal-text">
+        The upgrade is unlocked on {draftKeeper()} with a license key. It stays unlocked offline, and with nobody
+        logged in.
+      </p>
+      <div className="sb-form">
+        <button
+          className="sb-button"
+          type="button"
+          data-testid="upgrade-remove-key"
+          onClick={() => deviceLicense().removeKey()}
+        >
+          Remove the key from {draftKeeper()}
+        </button>
+        <p className="sb-hint">
+          That locks the upgrade here. The key is not lost: it can be entered again, here or anywhere else.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -240,14 +278,18 @@ interface OfferProps {
   baseUrl: string;
   upgrade: UpgradeAnswer;
   signedIn: boolean;
+  /** Whether it can be bought here. Where it cannot, a key is all there is to enter. */
+  sells: boolean;
   logIn(): void;
   redeemed(): void;
 }
 
-/** The upgrade while it is for sale: buy it, enter a key bought earlier, or ask for a lost one. */
-function Offer({ baseUrl, upgrade, signedIn, logIn, redeemed }: OfferProps) {
-  const [view, setView] = useState<View>({ name: 'buy' });
-  const back = () => setView({ name: 'buy' });
+/** The upgrade for somebody who does not hold it: buy it where it is sold, enter a key bought earlier, or ask for a lost one. */
+function Offer({ baseUrl, upgrade, signedIn, sells, logIn, redeemed }: OfferProps) {
+  const start: View = sells ? { name: 'buy' } : { name: 'key' };
+  const [view, setView] = useState<View>(start);
+  const back = () => setView(start);
+  const toLost = () => setView({ name: 'lost' });
   switch (view.name) {
     case 'buy':
       return (
@@ -256,11 +298,20 @@ function Offer({ baseUrl, upgrade, signedIn, logIn, redeemed }: OfferProps) {
           price={formatPrice(upgrade.priceCents)}
           signedIn={signedIn}
           toKey={() => setView({ name: 'key' })}
-          toLost={() => setView({ name: 'lost' })}
+          toLost={toLost}
         />
       );
     case 'key':
-      return <EnterKey baseUrl={baseUrl} signedIn={signedIn} logIn={logIn} redeemed={redeemed} back={back} />;
+      return (
+        <EnterKey
+          baseUrl={baseUrl}
+          signedIn={signedIn}
+          logIn={logIn}
+          redeemed={redeemed}
+          back={sells ? back : undefined}
+          toLost={sells ? undefined : toLost}
+        />
+      );
     case 'lost':
       return <LostKey baseUrl={baseUrl} sent={(email) => setView({ name: 'sent', email })} back={back} />;
     case 'sent':
@@ -303,11 +354,15 @@ type Held = { state: 'loading' } | { state: 'failed'; problem: string } | { stat
 function Upgraded({ baseUrl }: { baseUrl: string }) {
   const [held, setHeld] = useState<Held>({ state: 'loading' });
   const [copied, setCopied] = useState<string | null>(null);
-  const onDevice = useDeviceUpgraded();
+  const onDevice = useDeviceLicenseSource();
 
   // An account upgraded a moment ago, by paying or by a key, logged in before it was.
   useEffect(() => {
-    void fetchDeviceLicense(baseUrl);
+    let shown = true;
+    void fetchDeviceLicense(baseUrl, () => shown);
+    return () => {
+      shown = false;
+    };
   }, [baseUrl]);
 
   useEffect(() => {
@@ -334,9 +389,10 @@ function Upgraded({ baseUrl }: { baseUrl: string }) {
   return (
     <div data-testid="upgrade-upgraded">
       <p className="sb-modal-text">This account is upgraded. This is its license key.</p>
-      {onDevice && (
+      {onDevice === 'account' && (
         <p className="sb-modal-text" data-testid="upgrade-on-device">
-          The upgrade is unlocked on {draftKeeper()}, and stays unlocked offline.
+          The upgrade is unlocked on {draftKeeper()} while you are logged in, offline too. Logging out locks it here
+          again.
         </p>
       )}
       {held.state === 'loading' && (
@@ -374,6 +430,7 @@ function Upgraded({ baseUrl }: { baseUrl: string }) {
           </p>
         </div>
       )}
+      {onDevice === 'key' && <KeyOnDevice />}
     </div>
   );
 }
@@ -392,16 +449,24 @@ interface UpgradeProps {
   baseUrl: string;
   /** Where the modal mounts, so it inherits the page's theme. */
   container: RefObject<HTMLElement | null>;
-  /** Opens the account modal, for somebody who needs an account to put a key on. */
+  /** Opens the account modal, for somebody who wants a key on an account. */
   logIn(): void;
+  /**
+   * Whether the upgrade can be bought here, which it can on the site. A
+   * program that sells nothing takes a key bought there, and takes one
+   * whether or not the upgrade is open.
+   */
+  sells?: boolean;
 }
 
 /**
  * The upgrade button in the footer and its modal: what it costs and the way
- * to pay, a key to enter or ask for again, and an upgraded account's key.
- * While the server says it is closed, the modal only says so.
+ * to pay, a key to enter or ask for again, an upgraded account's key, and a
+ * key that unlocked this device. Where it is sold, the modal only says so
+ * while the server says it is closed.
  */
-export function Upgrade({ baseUrl, container, logIn }: UpgradeProps) {
+export function Upgrade({ baseUrl, container, logIn, sells = true }: UpgradeProps) {
+  const keyHere = useDeviceLicenseSource() === 'key';
   const session = authClient().useSession();
   const account = signedInAccount(session.data);
   const accountId = account?.id ?? null;
@@ -468,6 +533,8 @@ export function Upgrade({ baseUrl, container, logIn }: UpgradeProps) {
   };
 
   const body = () => {
+    // A key on the device is shown with no server to ask. An upgraded account's own view has it too.
+    if (keyHere && !upgrade?.upgraded) return <KeyOnDevice />;
     if (loaded.state === 'unreachable') return <Unreachable />;
     if (!upgrade || session.isPending) {
       return (
@@ -478,12 +545,13 @@ export function Upgrade({ baseUrl, container, logIn }: UpgradeProps) {
     }
     if (upgrade.upgraded) return <Upgraded baseUrl={baseUrl} />;
     if (justPaid) return <JustPaid signedIn={accountId !== null} waiting={stillWaiting} logIn={toAccount} />;
-    if (!upgrade.open) return <Closed />;
+    if (sells && !upgrade.open) return <Closed />;
     return (
       <Offer
         baseUrl={baseUrl}
         upgrade={upgrade}
         signedIn={accountId !== null}
+        sells={sells}
         logIn={toAccount}
         redeemed={() => {
           setNotice('That key is on this account now.');

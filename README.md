@@ -332,19 +332,28 @@ which features it will unlock is not decided.
   yet. The owner made the real pair on 2026-11-22: its public half is
   `LICENSE_PUBLIC_KEY`.
 - The site, the desktop app and the phone apps keep a license file and
-  check it themselves (`packages/editor/src/upgrade/device-license.ts`).
-  When an upgraded account is found logged in, or a key has just gone onto
-  one, the page fetches the file, checks it against `LICENSE_PUBLIC_KEY` and
-  keeps it in the browser's storage beside the draft; a file that does not
-  check out is not kept. From then РИТМ-12's selector reaches the six paid
-  effects and a beat that names one plays it, with no server, after a
-  log-out too. A key alone does not do it yet: no program takes a key
-  without an account, and the plugin reads no file.
+  check it themselves (`packages/editor/src/upgrade/device-license.ts`),
+  against `LICENSE_PUBLIC_KEY` and with no server; a file that does not
+  check out is not kept. While a device holds one, РИТМ-12's selector
+  reaches the six paid effects and a beat that names one plays it. A device
+  comes by a file in one of two ways, and is locked again the way it was
+  unlocked:
+  - **By an account.** A page that finds an upgraded account logged in, or
+    has just put a key on one, fetches the file. When the server says
+    nobody is logged in, the file is removed and the device has four
+    effects again. A server that cannot be reached says nothing, so the
+    device stays unlocked offline.
+  - **By a key alone.** In the site's modal and the desktop app's, a key
+    typed with nobody logged in fetches its file and goes onto no account.
+    The device stays unlocked, logged in or not, until "Remove the key" is
+    pressed in the same modal. The phone apps have no such modal: a store's
+    app may not be unlocked by a typed key.
+  The plugin reads no file yet.
 - The upgrade icon's modal (`packages/editor/src/ui/Upgrade.tsx`) asks
   `GET /api/upgrade` when it is opened, never before. Closed, it says what it
   has always said and offers nothing to press. Open, it shows the price and a
-  button that goes to Stripe, a way to enter a key (which needs an account,
-  so it leads to the account modal first), and a way to have a lost key
+  button that goes to Stripe, a way to enter a key (onto the account that
+  is logged in, or with nobody logged in to unlock the browser alone), and a way to have a lost key
   emailed again. An upgraded account sees its key, with a button to copy it.
 - Stripe sends the buyer back to `/?upgrade=paid`, or to `/?upgrade=open` if
   they changed their mind; the modal opens on either and takes the parameter

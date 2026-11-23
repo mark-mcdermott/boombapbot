@@ -317,17 +317,35 @@ site its icon still opens a modal that says it is not open.
         offline and logged out. Nobody has done it with a real license on
         the live site, which is also what will first check the two halves
         of the real pair against each other. What is left of it:
-        - A key alone unlocks nothing yet. No program takes a key without
-          an account: the site's modal sends such a person to log in, and
-          the desktop app has no upgrade modal at all.
+        - **A key alone unlocks the site and the desktop app**, since
+          2026-11-23: typed with nobody logged in, it fetches its file
+          (`POST /api/upgrade/license`) and goes onto no account. The
+          desktop app has the upgrade's modal for it, which sells nothing
+          and takes a key whether or not the upgrade is open. The phone
+          apps have no modal and unlock by logging in only.
         - The plugin reads no file and its C++ check is not written. The
           desktop app keeps its file in its web view's storage, where the
           plugin cannot read it; the one place they share is not chosen.
         - The phone apps keep the file in the web view's storage, which
           the system may clear. Logging in fetches it again.
-        - A device stays unlocked after a log-out, on a shared computer
-          too. That follows from files that do not run out and no limit on
-          devices; it is the owner's to change.
+        - **A device is locked the way it was unlocked**, decided by the
+          owner on 2026-11-23. One an account unlocked has its file removed
+          when the server says nobody is logged in: after a log-out, a
+          deleted account or a session that ran out. One a typed key
+          unlocked stays unlocked until "Remove the key" is pressed in the
+          modal. A server that cannot be reached locks nothing. Run once by
+          hand in a browser with a page built for a throwaway pair: on the
+          site, four effects, ten with a key alone, ten after a reload with
+          the server cut off, four once the key was removed; ten logged in
+          to an upgraded account and after a reload, four after logging
+          out; and on the desktop app's page, four, then ten with a key
+          alone. Left of it: a tab open while another tab logs out keeps
+          its effects until it next asks who is logged in; and a beat left
+          on a paid effect when the device is locked keeps the name and
+          plays without it.
+        - The desktop app's modal has not been seen in the app's own
+          window, only as its page in a browser. Its "I lost my key" and
+          an upgraded account's key are the site's, untried there.
         - A logged-in account that has not upgraded is asked about once
           for each page it opens, and answered 404.
         - Nothing gates the six effects on the server: a beat that names

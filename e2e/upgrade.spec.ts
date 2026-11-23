@@ -428,14 +428,14 @@ test('someone logged in buys it in the modal, and the key shows there once Strip
   await expect(page.getByTestId('upgrade-buy')).toHaveCount(0);
 });
 
-test('a key bought without an account is entered in the modal, once somebody is logged in', async ({ page, request }) => {
+test('a key bought without an account goes onto an account in the modal, for somebody who logs in', async ({ page, request }) => {
   const key = await boughtWithoutAccount(request);
 
-  // With nobody logged in the modal says a key needs an account, and leads to one.
+  // With nobody logged in a key unlocks the browser alone, and the modal leads to an account for one that should go onto it.
   await openEditor(page);
   await openUpgrade(page);
   await page.getByTestId('upgrade-to-key').click();
-  await expect(page.getByTestId('upgrade-key-form')).toHaveCount(0);
+  await expect(page.getByTestId('upgrade-key-form')).toContainText('It needs no account.');
   await page.getByTestId('upgrade-log-in').click();
   await expect(page.getByTestId('upgrade-modal')).toHaveCount(0);
   await expect(page.getByTestId('account-log-in')).toBeVisible();
@@ -495,6 +495,33 @@ test('an upgraded account brings its license file to the browser, which trusts o
   const [onLoad] = await Promise.all([fetched(), page.reload()]);
   expect(onLoad.status()).toBe(200);
   expect(await kept()).toBeNull();
+});
+
+test('a key alone is asked about with nobody logged in, and its file unlocks nothing unless the page\u2019s own key signed it', async ({ page, request }) => {
+  const key = await boughtWithoutAccount(request);
+  await openEditor(page);
+  await openUpgrade(page);
+  await page.getByTestId('upgrade-to-key').click();
+  const form = page.getByTestId('upgrade-key-form');
+
+  await form.getByTestId('upgrade-key-input').fill('BOOM-00000-00000-00000-00000');
+  await form.getByTestId('upgrade-submit').click();
+  await expect(page.getByTestId('upgrade-problem')).toHaveText('That is not a license key I know.');
+
+  // The key is real and the server gives its file. This server signs with a
+  // key made for the run, so the page takes the file for a forgery.
+  const answered = page.waitForResponse((answer) => new URL(answer.url()).pathname === '/api/upgrade/license');
+  await form.getByTestId('upgrade-key-input').fill(key);
+  await form.getByTestId('upgrade-submit').click();
+  const answer = await answered;
+  expect(answer.request().method()).toBe('POST');
+  expect(answer.status()).toBe(200);
+  await expect(page.getByTestId('upgrade-problem')).toContainText('a license file this program does not accept');
+  await expect(page.getByTestId('upgrade-key-on-device')).toHaveCount(0);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((name) => name.includes('license')))).toEqual([]);
+  // The key is still on no account.
+  await signedUp(page);
+  expect((await upgrade(page.request)).upgraded).toBe(false);
 });
 
 test('a lost key is asked for in the modal and emailed to the address that bought it', async ({ page, request }) => {
