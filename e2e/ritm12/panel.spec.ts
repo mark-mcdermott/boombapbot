@@ -243,3 +243,61 @@ test('the desk lamp switches the room dark and lit again, and stays as it was le
   await expect(page.getByTestId('night')).toHaveCSS('opacity', '0');
   expect(await page.evaluate(() => localStorage.getItem('boombapbot.ritm12.desk-lamp'))).toBeNull();
 });
+
+test('an ashtray stands by the machine in either light, its cigarette smoking, and is in nobody’s way', async ({ page }) => {
+  const bench = page.getByTestId('bench');
+  await expect(bench).toHaveAttribute('aria-hidden', 'true');
+  await expect(bench).toHaveCSS('pointer-events', 'none');
+  const ashtrays = () =>
+    bench.locator('.rt-ashtray').evaluateAll((nodes) =>
+      nodes.map((node) => ({ loaded: (node as HTMLImageElement).naturalWidth > 0, shown: getComputedStyle(node).opacity === '1' })),
+    );
+  await expect.poll(ashtrays).toEqual([
+    { loaded: true, shown: true },
+    { loaded: true, shown: false },
+  ]);
+  // It stands in the corner of the picture, inside it, beside the last keys and not on them.
+  const frame = (await page.getByTestId('panel').boundingBox())!;
+  const ashtray = (await page.getByTestId('ashtray').boundingBox())!;
+  const clear = (await page.getByTestId('clear-pattern').boundingBox())!;
+  expect(ashtray.x + ashtray.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+  expect(ashtray.y + ashtray.height).toBeLessThanOrEqual(frame.y + frame.height + 1);
+  expect(ashtray.y).toBeGreaterThan(clear.y + clear.height);
+
+  const drawn = () =>
+    page.getByTestId('smoke').evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      let sum = 0;
+      for (let index = 3; index < data.length; index += 4) sum += data[index]! * (index % 97);
+      return sum;
+    });
+  await expect.poll(drawn).toBeGreaterThan(0);
+  const before = await drawn();
+  await expect.poll(drawn).not.toBe(before);
+
+  // With the lamp out the ashtray is the dark room's, and the keys behind the smoke still take a press.
+  await page.getByRole('button', { name: 'Desk lamp' }).click();
+  await expect.poll(async () => (await ashtrays())[1]).toEqual({ loaded: true, shown: true });
+  await emptyPattern(page);
+  await page.getByTestId('dice').click();
+  expect((await beat(page)).patterns.some((pattern) => Object.values(pattern.steps).some((steps) => stepsOn(steps).length > 0))).toBe(true);
+});
+
+test('the smoke holds still for whoever asks for less movement', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const smoke = page.getByTestId('smoke');
+  await expect(smoke).toHaveAttribute('data-still', 'true');
+  const drawn = () =>
+    smoke.evaluate((node) => {
+      const canvas = node as HTMLCanvasElement;
+      const { data } = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height);
+      let sum = 0;
+      for (let index = 3; index < data.length; index += 4) sum += data[index]! * (index % 97);
+      return sum;
+    });
+  await expect.poll(drawn).toBeGreaterThan(0);
+  const first = await drawn();
+  await page.waitForTimeout(400);
+  expect(await drawn()).toBe(first);
+});

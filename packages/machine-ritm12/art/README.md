@@ -28,6 +28,12 @@ does not have.
   and nothing moved. The page lays them over the lit ones when the lamp in
   the picture is pressed. [`cut-night.py`](cut-night.py) makes all of it from
   `plate.webp` and `patch/`. Run it again when either changes.
+- **`props/ashtray.png`** and **`night/props/ashtray.png`** are the ashtray
+  and its cigarette that stand on the bench in the corner of the picture, as
+  they are with the desk lamp lit and with it out. [`cut-ashtray.py`](cut-ashtray.py)
+  lifts them from the owner's two pictures of the whole bench, which are not
+  in the repository. The smoke and the glow of the lit end are drawn by the
+  page.
 - **`pointer/`** holds the pointer line of each kind of knob, on a clear
   background. A knob's painted body stays still; the page turns only its line.
 - **`phone/`** holds the parts of the phone's panel, which the page lays out

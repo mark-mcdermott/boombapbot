@@ -299,6 +299,72 @@
   }
 }
 
+/* ---- The bench ----------------------------------------------------------- */
+
+/* What stands in front of the machine is nearer than the dark the picture's edge goes into, so it lies over that. */
+.rt-bench {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.rt-ashtray,
+.rt-ember,
+.rt-smoke {
+  position: absolute;
+}
+
+.rt-ashtray-night {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.rt-frame[data-lamp='out'] .rt-ashtray-night {
+  opacity: 1;
+}
+
+.rt-ember {
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 150 60 / 0.75), rgb(255 90 20 / 0.28) 45%, transparent);
+  mix-blend-mode: screen;
+  animation: rt-ember 4.6s ease-in-out infinite;
+}
+
+@keyframes rt-ember {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+
+  38% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  61% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+.rt-smoke {
+  filter: blur(2.2px);
+  mix-blend-mode: screen;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-ashtray-night {
+    transition: none;
+  }
+
+  .rt-ember {
+    animation: none;
+    opacity: 0.8;
+  }
+}
+
 /* ---- Knobs --------------------------------------------------------------- */
 
 .rt-knob {

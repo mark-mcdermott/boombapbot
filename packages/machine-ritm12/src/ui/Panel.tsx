@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type RefObject } from 'react';
 import { Segmented } from '@boombapbot/editor';
 import { EFFECT_KINDS, getVoice } from '../document';
+import { Bench } from './Bench';
 import { Key, Lamp, Patch, PointerKnob, boxOf } from './Controls';
 import { ReadoutContext, useReadout } from './context';
 import { setDeskLamp, useDeskLamp } from './desk-lamp';
@@ -187,6 +188,7 @@ function PicturePanel() {
                 ))}
               </div>
             </div>
+            <Bench lampLit={lampLit} />
           </div>
         </div>
 

@@ -79,6 +79,18 @@ export const BUTTONS = {
   clear: [1788, 1100, 1869, 1177],
 } as const satisfies Record<string, Rect>;
 
+const ASHTRAY_AT = { x: 1735, y: 1185 } as const;
+/**
+ * The ashtray on the bench in front of the machine's corner: its picture's
+ * box, the lit end of its cigarette, and the box its smoke rises in, with
+ * the lit end at the middle of that box's foot.
+ */
+export const ASHTRAY = {
+  rect: [ASHTRAY_AT.x, ASHTRAY_AT.y, ASHTRAY_AT.x + 250, ASHTRAY_AT.y + 141] as Rect,
+  ember: { x: ASHTRAY_AT.x + 158, y: ASHTRAY_AT.y + 33, r: 26 },
+  smoke: [ASHTRAY_AT.x + 158 - 250, ASHTRAY_AT.y + 33 - 620, ASHTRAY_AT.x + 158 + 250, ASHTRAY_AT.y + 33] as Rect,
+} as const;
+
 /** The lamp over the machine, which is pressed to switch the room's light off and on. */
 export const DESK_LAMP: Rect = [40, 16, 300, 150];
 
