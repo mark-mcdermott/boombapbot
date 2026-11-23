@@ -419,15 +419,14 @@ site its icon still opens a modal that says it is not open.
     - A logged-in buyer back from Stripe is looked up for half a minute. If
       Stripe's webhook takes longer, the modal says to open it again later;
       the key still arrives by email.
-    - About still says of the upgrade that its button "only says so for
-      now". Change it when the upgrade opens.
+    - About no longer says upgrades are not here yet, since 2026-11-23.
   - **Policies covers it**, since 2026-11-23: what the upgrade is and
     costs, the key and that it is not counted by device, what a license
     keeps and that it stays after its account is deleted, asking for a lost
     key, the license file on a device, and refunds. The owner decided the
     refund rule: within 30 days, whatever the reason. The rest of the
-    wording is a stand-in for the owner to rewrite, and the page still says
-    the upgrade is not for sale yet; take that sentence out when it opens.
+    wording is a stand-in for the owner to rewrite. The sentence saying it
+    was not for sale yet came out on 2026-11-23, ahead of the switch.
   - **Open it.** Set `UPGRADE_OPEN=on` in Vercel and deploy. The Stripe
     webhook already registered for the shop is the one it uses, with
     `charge.refunded` added to its events for refunds.
@@ -486,8 +485,8 @@ site its icon still opens a modal that says it is not open.
   they asked for on 2026-11-18 followed. Later that day they gave a new text
   of three paragraphs, and that is what is there now, word for word under
   the same title. It says "I've added a small paid tier to this app". The
-  upgrade is built and not open, and About says upgrades are not here yet;
-  neither was changed to match. The page's description for search engines
+  upgrade is built and not open. About said upgrades were not here yet
+  until 2026-11-23. The page's description for search engines
   still calls it a footnote to a drum machine, from the text before.
 - **The pages of words** were laid out again on 2026-11-17: a compact
   masthead that names the pages, headings in a rail, About opening on a
