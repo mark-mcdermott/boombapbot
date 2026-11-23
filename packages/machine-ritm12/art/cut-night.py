@@ -55,16 +55,20 @@ def in_room(pixels):
     return machine * case + graded(pixels, **ROOM) * (1 - case)
 
 
+def dimmed(pixels):
+    """A lamp that is out: nothing of it is brighter than a shade in a dark room."""
+    light = pixels.max(axis=2, keepdims=True)
+    over = np.clip(light - LAMP_DARK, 0, None)
+    return np.minimum(pixels, pixels * (LAMP_DARK + over * 0.45) / np.maximum(light, 1e-6))
+
+
 def lamp_out(pixels):
-    """The plate with its lamp out: where the lamp glowed, nothing is brighter than a shade in a dark room."""
+    """The plate with its lamp out, and with it the light it threw on the wall behind it."""
     height, width = pixels.shape[:2]
     ys, xs = np.mgrid[0:height, 0:width]
     (cx, cy), (rx, ry) = LAMP_GLOW['centre'], LAMP_GLOW['reach']
     near = np.clip(1 - np.hypot((xs - cx) / rx, (ys - cy) / ry), 0, 1)[..., None] ** 0.6
-    light = pixels.max(axis=2, keepdims=True)
-    over = np.clip(light - LAMP_DARK, 0, None)
-    dimmed = pixels * (LAMP_DARK + over * 0.45) / np.maximum(light, 1e-6)
-    return pixels * (1 - near) + np.minimum(pixels, dimmed) * near
+    return pixels * (1 - near) + dimmed(pixels) * near
 
 
 def read(path):
@@ -81,6 +85,10 @@ plate = read(here / 'plate.webp')
 write(lamp_out(in_room(plate[..., :3])), plate[..., 3], night / 'plate.webp', quality=92, method=6)
 for patch in sorted((here / 'patch').glob('*.png')):
     pixels = read(patch)
-    lift = KEY_LIFT if patch.name.startswith('key-') else 1
-    write(graded(pixels[..., :3], **MACHINE) * lift, pixels[..., 3], night / 'patch' / patch.name, optimize=True)
+    if patch.name == 'lamp.png':
+        # The larger lamp that cut-lamp.py lays over the plate's own is in the room, not on the machine.
+        colours = dimmed(graded(pixels[..., :3], **ROOM))
+    else:
+        colours = graded(pixels[..., :3], **MACHINE) * (KEY_LIFT if patch.name.startswith('key-') else 1)
+    write(colours, pixels[..., 3], night / 'patch' / patch.name, optimize=True)
     print(patch.name)

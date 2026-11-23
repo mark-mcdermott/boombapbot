@@ -21,7 +21,7 @@ test('the machine is its picture, with every control inside it', async ({ page }
   const images = await page.locator('.rt-stage > .rt-plate, .rt-stage > .rt-patch').evaluateAll((nodes) =>
     nodes.map((node) => ({ src: (node as HTMLImageElement).src, loaded: (node as HTMLImageElement).naturalWidth > 0 })),
   );
-  expect(images.length).toBe(7 + 8 + 1);
+  expect(images.length).toBe(7 + 8 + 1 + 1);
   expect(images.every((image) => image.loaded && image.src.includes('/machines/ritm12/'))).toBe(true);
   // Each instrument key wears its drawing, whatever the controls are set to.
   const drawings = page.locator('.rt-stage > .rt-patch[src*="/patch/key-"]');

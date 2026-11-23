@@ -19,6 +19,9 @@ does not have.
   under it for the status readout: the meter smaller, and a second box
   below, both from the plate's own paint. [`cut-status.py`](cut-status.py)
   makes it, and the page always lays it over the plate.
+- **`patch/lamp.png`** is the desk lamp made larger than the plate has it,
+  which the page always lays over the plate's top left corner.
+  [`cut-lamp.py`](cut-lamp.py) makes it from `plate.webp`.
 - **`instrument-icons.svg`** is the owner's drawing of the eight instruments
   in one picture. [`cut-icons.py`](cut-icons.py) cuts each from it, as the
   phone's `phone/ink-*.svg` and printed onto its key for `patch/key-*.png`.
@@ -30,7 +33,8 @@ does not have.
   `plate.webp` and `patch/`. Run it again when either changes.
 - **`props/ashtray.png`** and **`night/props/ashtray.png`** are the ashtray
   and its cigarette that stand on the bench in the corner of the picture, as
-  they are with the desk lamp lit and with it out. [`cut-ashtray.py`](cut-ashtray.py)
+  they are with the desk lamp lit and with it out, running off the picture's
+  foot. [`cut-ashtray.py`](cut-ashtray.py)
   lifts them from the owner's two pictures of the whole bench, which are not
   in the repository. The smoke and the glow of the lit end are drawn by the
   page.

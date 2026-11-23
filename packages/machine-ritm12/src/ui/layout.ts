@@ -79,20 +79,23 @@ export const BUTTONS = {
   clear: [1788, 1100, 1869, 1177],
 } as const satisfies Record<string, Rect>;
 
-const ASHTRAY_AT = { x: 1735, y: 1185 } as const;
 /**
- * The ashtray on the bench in front of the machine's corner: its picture's
- * box, the lit end of its cigarette, and the box its smoke rises in, with
- * the lit end at the middle of that box's foot.
+ * The ashtray on the bench in front of the machine's corner, running off the
+ * picture's foot: the box of what shows of it, the lit end of its cigarette,
+ * and the box its smoke rises in, with the lit end at the middle of that
+ * box's foot.
  */
+const LIT_END = { x: 1879, y: 1242 } as const;
 export const ASHTRAY = {
-  rect: [ASHTRAY_AT.x, ASHTRAY_AT.y, ASHTRAY_AT.x + 250, ASHTRAY_AT.y + 141] as Rect,
-  ember: { x: ASHTRAY_AT.x + 158, y: ASHTRAY_AT.y + 33, r: 26 },
-  smoke: [ASHTRAY_AT.x + 158 - 250, ASHTRAY_AT.y + 33 - 620, ASHTRAY_AT.x + 158 + 250, ASHTRAY_AT.y + 33] as Rect,
+  rect: [1611, 1186, 2000, 1333] as Rect,
+  ember: { ...LIT_END, r: 38 },
+  smoke: [LIT_END.x - 300, LIT_END.y - 760, LIT_END.x + 300, LIT_END.y] as Rect,
 } as const;
 
 /** The lamp over the machine, which is pressed to switch the room's light off and on. */
-export const DESK_LAMP: Rect = [40, 16, 300, 150];
+export const DESK_LAMP: Rect = [0, 0, 360, 154];
+/** The lamp made larger than the plate has it, laid over the plate's corner. */
+export const DESK_LAMP_PATCH: Rect = [0, 0, 380, 162];
 
 export const POWER_LAMP = { x: 324, y: 1127, r: 15 } as const;
 
