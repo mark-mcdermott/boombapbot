@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { exportVia, downloadBytes, storedDraft } from '../helpers';
 import { DRAFT_KEY, EARLIER_BEAT, EARLIER_DRAFT_KEY, beat, openMachine, step, stepsOn } from './helpers';
@@ -58,6 +59,28 @@ test('a file from the earlier machine imports as a beat for this one, and undo b
   expect((await beat(page)).tempo).toBe(124);
   await page.keyboard.press('ControlOrMeta+z');
   expect((await beat(page)).patterns).toEqual(before.patterns);
+});
+
+test('a beat that names an effect of the upgrade opens, plays without it, says so, and keeps its name until another is chosen', async ({ page }) => {
+  await openMachine(page);
+  await page.getByTestId('import-input').setInputFiles({
+    name: 'paid.boombapbot.json',
+    mimeType: 'application/json',
+    buffer: readFileSync('packages/machine-ritm12/fixtures/paid-effect.project.json'),
+  });
+  await expect(page.getByTestId('notice')).toContainText('Imported “Paid effect fixture”.');
+  expect((await beat(page)).effect).toEqual({ kind: 'crusher', mix: 0.6 });
+  const selector = page.getByTestId('effect');
+  const label = page.getByTestId('effect-label');
+  await expect(selector).toHaveAttribute('aria-label', /Crusher, which comes with the upgrade and is not playing/);
+  await expect(label).toHaveAttribute('data-effect', 'crusher');
+  await expect(label).toHaveAttribute('data-left-out', 'true');
+  // The selector reaches only the four everyone has: from here its next is its first.
+  await selector.click();
+  expect((await beat(page)).effect.kind).toBe('delay');
+  await expect(label).not.toHaveAttribute('data-left-out');
+  for (let press = 0; press < 4; press += 1) await selector.click();
+  expect((await beat(page)).effect.kind).toBe('delay');
 });
 
 test('the project file names its machine and comes back in as it went out', async ({ page }) => {

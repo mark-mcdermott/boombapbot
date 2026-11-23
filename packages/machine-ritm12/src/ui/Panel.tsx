@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type RefObject } from 'react';
 import { Segmented } from '@boombapbot/editor';
-import { EFFECT_KINDS, getVoice } from '../document';
+import { getVoice } from '../document';
 import { Bench } from './Bench';
-import { EffectLabel, EffectUnitArt, selectorAngle, useSelectorTurns } from './EffectUnit';
+import { EffectLabel, EffectUnitArt, useSelectorAngle } from './EffectUnit';
 import { Key, Lamp, Patch, PointerKnob, boxOf } from './Controls';
 import { ReadoutContext, useReadout } from './context';
 import { setDeskLamp, useDeskLamp } from './desk-lamp';
@@ -109,7 +109,7 @@ function PicturePanel() {
   const nightReadout = useMemo(() => ({ ...readout, art: (file: string) => readout.art(`night/${file}`) }), [readout]);
   const words = useLettering();
   const english = useScript() === 'english';
-  const effectAngle = selectorAngle(useSelectorTurns(EFFECT_KINDS.indexOf(wiring.effect), EFFECT_KINDS.length), EFFECT_KINDS.length);
+  const effectAngle = useSelectorAngle(wiring.effect, wiring.effects);
 
   return (
     <ReadoutContext.Provider value={readout}>
@@ -135,7 +135,7 @@ function PicturePanel() {
                 </div>
               ) : null}
 
-              <EffectLabel kind={wiring.effect} name={words.effects[wiring.effect]} style={boxOf(EFFECT_UNIT.label)} />
+              <EffectLabel kind={wiring.effect} name={words.effects[wiring.effect]} leftOut={wiring.effectLeftOut} style={boxOf(EFFECT_UNIT.label)} />
               <ScreenAndMeter line={wiring.line} />
               <div className="rt-readout-slot" style={boxOf(STATUS.box)}>
                 <Readout className="rt-readout-plate" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />

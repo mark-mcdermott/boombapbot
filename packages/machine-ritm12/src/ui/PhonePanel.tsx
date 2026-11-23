@@ -1,8 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from 'react';
-import { EFFECT_KINDS } from '../document';
 import { Hand, Key, Lamp, useTurning, type KnobWiring, type LampWiring } from './Controls';
 import { ReadoutContext, useReadout } from './context';
-import { EffectLabel, selectorAngle, useSelectorTurns } from './EffectUnit';
+import { EffectLabel, useSelectorAngle } from './EffectUnit';
 import { INSTRUMENTS, PHONE_KNOBS } from './layout';
 import { Readout } from './Readout';
 import { PhoneScreen } from './Screen';
@@ -160,7 +159,7 @@ export function PhonePanel() {
   const growth = useGrowth(room);
   const selected = wiring.voices.find((voice) => voice.voice === wiring.selected)!;
   const words = useLettering();
-  const effectAngle = selectorAngle(useSelectorTurns(EFFECT_KINDS.indexOf(wiring.effect), EFFECT_KINDS.length), EFFECT_KINDS.length);
+  const effectAngle = useSelectorAngle(wiring.effect, wiring.effects);
   const english = useScript() === 'english';
 
   const art = (file: string) => {
@@ -328,7 +327,7 @@ export function PhonePanel() {
                         <Part className="rt-ph-effect-knob" file="effect-knob.png" style={{ transform: `rotate(${effectAngle}deg)` }} />
                         <span className="rt-ph-window">
                           <Part file="effect-window.png" />
-                          <EffectLabel className="rt-ph-effect-label" kind={wiring.effect} name={words.effects[wiring.effect]} />
+                          <EffectLabel className="rt-ph-effect-label" kind={wiring.effect} name={words.effects[wiring.effect]} leftOut={wiring.effectLeftOut} />
                         </span>
                       </Key>
                     </div>

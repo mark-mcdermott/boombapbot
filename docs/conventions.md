@@ -212,9 +212,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   filter and a phaser work on the mix itself, and with their amount at 0
   give back exactly what came in, which is what lets one effect fade out
   before the next begins; for the filter the amount is how far it is shut.
-  РИТМ-12 has the first four. The other six are for the upgrade: they are
-  in the engine and in the bridge's `EFFECT`, and no machine's document can
-  name them yet. All of it keeps the engine's promises: every buffer is
+  РИТМ-12 has the first four (`FREE_EFFECT_KINDS`). The other six are for
+  the upgrade (`PAID_EFFECT_KINDS`): its document can name one, in the
+  engine's own order, and `engineSetup` asks the engine for it only where
+  the upgrade is held (`holdsUpgrade`, in the machine's `src/upgrade.ts`).
+  Anywhere else the beat opens and plays without it, the label in the
+  window shows the name struck through, and the selector's next press goes
+  to its first effect. A beat is never refused for naming one. All of it keeps the engine's promises: every buffer is
   allocated when the engine is made, state moves a sample at a time, and
   nothing calls the C library's maths per sample (the filter's and the
   phaser's tangent comes from the same polynomial as the sine). With no

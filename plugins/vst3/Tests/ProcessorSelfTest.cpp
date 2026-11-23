@@ -1510,8 +1510,15 @@ void testBeatFile() {
           text("%s is refused and changes nothing: \"%s\"", file.name, result.getErrorMessage().toRawUTF8()));
   }
 
-  const juce::Result loaded = plugin(*processor).loadBeat(fourPatterns());
-  check(loaded.wasOk() && plugin(*processor).beatName() == "Four patterns fixture", context,
+  // A beat that names an effect of the upgrade is not refused: it loads with its effect off.
+  juce::String leftOut;
+  const juce::Result paid = plugin(*processor).loadBeat(fixture("paid-effect.project.json"), &leftOut);
+  check(paid.wasOk() && leftOut == "crusher" && plugin(*processor).beatName() == "Paid effect fixture" &&
+            std::abs(valueOf(*processor, "effect_kind")) < 1e-6f && std::abs(valueOf(*processor, "kick_pitch") - 0.35f) < 1e-6f,
+        context, text("a beat naming an effect of the upgrade loads with its effect off, and says which: %s", leftOut.toRawUTF8()));
+
+  const juce::Result loaded = plugin(*processor).loadBeat(fourPatterns(), &leftOut);
+  check(loaded.wasOk() && leftOut.isEmpty() && plugin(*processor).beatName() == "Four patterns fixture", context,
         text("the fixture loads and the plugin holds its name: %s", plugin(*processor).beatName().toRawUTF8()));
   const auto is = [&](const char* id, float value) { return std::abs(valueOf(*processor, id) - value) < 1e-6f; };
   check(is("kick_pitch", 0.35f) && is("clap_level", 0.5f) && is("rim_mute", 1.0f) && is("kick_mute", 0.0f) &&

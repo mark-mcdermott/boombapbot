@@ -51,7 +51,9 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // Takes the text of a beat file saved from the site: its patterns, and its
   // knobs as parameter values. A file that is not a beat changes nothing and
   // the result says why. Not for the audio thread.
-  juce::Result loadBeat(const juce::String& json);
+  // When the beat names an effect of the upgrade it is loaded with its effect
+  // off, and `leftOut`, if given, is told which effect that was.
+  juce::Result loadBeat(const juce::String& json, juce::String* leftOut = nullptr);
   // The name of the beat whose patterns are held, or nothing.
   juce::String beatName() const;
   void setBeatName(const juce::String& name);

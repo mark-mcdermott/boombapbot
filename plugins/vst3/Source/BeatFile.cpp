@@ -1,5 +1,6 @@
 #include "BeatFile.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <ctime>
@@ -11,6 +12,8 @@ constexpr const char* kProjectFormat = "boombapbot.project";
 constexpr const char* kMachineId = "ritm12";
 // Named as the document names them, in the order of the engine's effects from 1.
 constexpr std::array<const char*, 4> kEffectKinds{{"delay", "reverb", "flanger", "chorus"}};
+// The effects that come with the upgrade, which a beat can name and this plugin does not play.
+constexpr std::array<const char*, 6> kUpgradeEffectKinds{{"crusher", "tape", "pump", "filter", "vinyl", "phaser"}};
 constexpr int kSlugLongest = 48;
 
 juce::Result wrong(const juce::String& what) { return juce::Result::fail(what); }
@@ -79,8 +82,10 @@ juce::Result readEffect(const juce::var& effect, Beat& out) {
   for (std::size_t index = 0; index < kEffectKinds.size(); ++index) {
     if (kind == kEffectKinds[index]) found = SNARE_EFFECT_DELAY + static_cast<int>(index);
   }
-  if (found == SNARE_EFFECT_NONE) return wrong("effect.kind is not an effect this machine has.");
+  const bool ofTheUpgrade = std::any_of(kUpgradeEffectKinds.begin(), kUpgradeEffectKinds.end(), [&kind](const char* paid) { return kind == juce::String(paid); });
+  if (found == SNARE_EFFECT_NONE && !ofTheUpgrade) return wrong("effect.kind is not an effect this machine has.");
   out.effect = found;
+  out.upgradeEffect = ofTheUpgrade ? kind : juce::String();
   return readKnob(effect["mix"], "effect.mix", out.effectMix);
 }
 

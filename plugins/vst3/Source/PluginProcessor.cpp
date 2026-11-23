@@ -798,11 +798,12 @@ void BoombapbotAudioProcessor::applyBeat(const Beat& beat) {
   updateHostDisplay(ChangeDetails().withNonParameterStateChanged(true));
 }
 
-juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json) {
+juce::Result BoombapbotAudioProcessor::loadBeat(const juce::String& json, juce::String* leftOut) {
   Beat beat;
   if (const juce::Result read = readBeat(json, beat); read.failed()) return read;
   rememberPatterns();
   applyBeat(beat);
+  if (leftOut != nullptr) *leftOut = beat.upgradeEffect;
   return juce::Result::ok();
 }
 

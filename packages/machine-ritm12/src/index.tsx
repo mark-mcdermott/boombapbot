@@ -3,6 +3,7 @@ import { documentRitm12, type Project } from './document';
 import { engineSetup, exportPlan } from './engine';
 import { RESTING, SessionRitm12, memoryOf, type TransientRitm12 } from './session';
 import { setDeskLamp, useDeskLamp } from './ui/desk-lamp';
+import { holdsUpgrade } from './upgrade';
 import { Panel } from './ui/Panel';
 import { KeysHelp, Notes, Options, SettingsActions, StatusLines } from './ui/SettingsParts';
 import './styles.css';
@@ -16,7 +17,7 @@ export const machineRitm12: Machine<Project, TransientRitm12, SessionRitm12> = {
   memory: memoryOf,
   transient: RESTING,
   bpm: (project) => project.tempo,
-  setup: engineSetup,
+  setup: (project) => engineSetup(project, { upgraded: holdsUpgrade() }),
   exportPlan,
   session: (host) => new SessionRitm12(host),
   Panel,

@@ -19,8 +19,21 @@ import { createStarterPatterns } from './starter';
 export const MACHINE_ID = 'ritm12';
 export const PROJECT_SCHEMA_VERSION = 3;
 
-export const EFFECT_KINDS = ['delay', 'reverb', 'flanger', 'chorus'] as const;
+/** The effects the machine has for anyone. */
+export const FREE_EFFECT_KINDS = ['delay', 'reverb', 'flanger', 'chorus'] as const;
+/** The effects that come with the upgrade. A beat can name one whoever opens it; only the upgrade plays it. */
+export const PAID_EFFECT_KINDS = ['crusher', 'tape', 'pump', 'filter', 'vinyl', 'phaser'] as const;
+export const EFFECT_KINDS = [...FREE_EFFECT_KINDS, ...PAID_EFFECT_KINDS] as const;
 export type EffectKind = (typeof EFFECT_KINDS)[number];
+
+export function isPaidEffect(kind: EffectKind): boolean {
+  return (PAID_EFFECT_KINDS as readonly EffectKind[]).includes(kind);
+}
+
+/** The effects the selector reaches, in its order: the six of the upgrade follow the four only for whoever holds it. */
+export function reachableEffects(upgraded: boolean): readonly EffectKind[] {
+  return upgraded ? EFFECT_KINDS : FREE_EFFECT_KINDS;
+}
 
 /** What the step keys write: hits of the selected voice, or the pattern's accents. */
 export const WRITE_MODES = ['hits', 'accents'] as const;

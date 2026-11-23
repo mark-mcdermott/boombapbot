@@ -6,6 +6,7 @@ import {
   levelGain,
   masterGain,
   rowMask,
+  isPaidEffect,
   stepsPerBeat,
   type Pattern,
   type Project,
@@ -29,9 +30,14 @@ function enginePattern(pattern: Pattern, size: Size, swing: number) {
   };
 }
 
-/** Everything the engine is asked for, for one project. */
-export function engineSetup(project: Project): EngineSetup {
-  const { mix } = project;
+/**
+ * Everything the engine is asked for, for one project. An effect of the
+ * upgrade is asked for only where the upgrade is held; anywhere else the
+ * beat plays without it, and is never refused.
+ */
+export function engineSetup(project: Project, { upgraded = false }: { upgraded?: boolean } = {}): EngineSetup {
+  const { mix, effect } = project;
+  const heard = effect.mix > 0 && (upgraded || !isPaidEffect(effect.kind));
   return {
     tempo: project.tempo,
     sounds: VOICES.map((voice) => {
@@ -49,7 +55,7 @@ export function engineSetup(project: Project): EngineSetup {
     accent: accentGains(mix.accent),
     master: masterGain(mix.volume),
     patterns: project.patterns.map((pattern) => enginePattern(pattern, project.size, project.swing)),
-    effect: project.effect.mix > 0 ? { kind: project.effect.kind, wet: project.effect.mix } : undefined,
+    effect: heard ? { kind: effect.kind, wet: effect.mix } : undefined,
     follow: { cue: project.panel.pattern },
   };
 }

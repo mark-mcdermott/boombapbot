@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { useAssetManifest } from '@boombapbot/editor';
 import {
-  EFFECT_KINDS,
+  reachableEffects,
   STEPS,
   VOICES,
   bpmAtKnob,
@@ -12,13 +12,25 @@ import {
   type VoiceId,
 } from '../document';
 import { shownRow } from '../session';
+import { holdsUpgrade } from '../upgrade';
 import type { KeyWiring, KnobWiring, LampWiring } from './Controls';
 import { useEditorState, useRuntime, type Readout } from './context';
 import { LETTERING, useScript } from './lettering';
 import type { ScreenLine } from './Screen';
 
 /** Each effect as it is said. */
-export const EFFECT_NAMES: Record<EffectKind, string> = { delay: 'Delay', reverb: 'Reverb', flanger: 'Flanger', chorus: 'Chorus' };
+export const EFFECT_NAMES: Record<EffectKind, string> = {
+  delay: 'Delay',
+  reverb: 'Reverb',
+  flanger: 'Flanger',
+  chorus: 'Chorus',
+  crusher: 'Crusher',
+  tape: 'Tape',
+  pump: 'Pump',
+  filter: 'Filter',
+  vinyl: 'Vinyl',
+  phaser: 'Phaser',
+};
 /** How long a line a control put on the screen stays there, in milliseconds. */
 const LINE_MS = 1400;
 
@@ -52,6 +64,10 @@ export interface Wiring {
   /** Where each stepped control stands. */
   write: 'hits' | 'accents';
   effect: EffectKind;
+  /** The effects the selector reaches, in its order. */
+  effects: readonly EffectKind[];
+  /** The beat's effect comes with the upgrade and this program does not hold it, so the beat plays without. */
+  effectLeftOut: boolean;
   size: number;
   selected: VoiceId;
   keys: Record<KeyName, KeyWiring>;
@@ -100,6 +116,8 @@ export function useWiring(): Wiring {
   );
 
   const { panel, mix, effect, size } = project;
+  const effects = reachableEffects(holdsUpgrade());
+  const effectLeftOut = !effects.includes(effect.kind);
   const selected = getVoice(panel.selected);
   const knobs = project.voices[panel.selected];
   const accents = panel.write === 'accents';
@@ -250,11 +268,14 @@ export function useWiring(): Wiring {
       },
     },
     effect: {
-      label: `Effect: ${EFFECT_NAMES[effect.kind]}. Press for the next one.`,
+      label: effectLeftOut
+        ? `Effect: ${EFFECT_NAMES[effect.kind]}, which comes with the upgrade and is not playing. Press for the next one.`
+        : `Effect: ${EFFECT_NAMES[effect.kind]}. Press for the next one.`,
       testId: 'effect',
       data: { 'data-position': effect.kind },
       onPress: () => {
-        const next = EFFECT_KINDS[(EFFECT_KINDS.indexOf(effect.kind) + 1) % EFFECT_KINDS.length]!;
+        // From an effect the selector does not reach, the next one is its first.
+        const next = effects[(effects.indexOf(effect.kind) + 1) % effects.length]!;
         session.setEffect(next);
         readout.say(`${words.effect}: ${words.effects[next]}`, `Effect: ${EFFECT_NAMES[next]}`);
       },
@@ -291,6 +312,8 @@ export function useWiring(): Wiring {
     powerLamp: { glow: power ? 0.9 : 0, testId: 'lamp-power' },
     write: panel.write,
     effect: effect.kind,
+    effects,
+    effectLeftOut,
     size,
     selected: panel.selected,
     keys,

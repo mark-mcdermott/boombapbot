@@ -266,6 +266,15 @@
   content: attr(data-let);
 }
 
+/* An effect of the upgrade that is named and not playing. */
+.rt-effect-label[data-left-out] {
+  opacity: 0.45;
+}
+
+.rt-effect-label[data-left-out] [data-let]::after {
+  text-decoration: line-through;
+}
+
 /* The drawing the plate had beside the effect's name, in the label's ink. */
 .rt-effect-icon {
   flex: none;
