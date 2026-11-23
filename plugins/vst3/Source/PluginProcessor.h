@@ -91,6 +91,14 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   // saved with the plugin.
   float windowScale() const;
   void setWindowScale(float scale);
+  // A hand on one of the window's knobs, from when it takes hold to when it
+  // lets go. What the window changes in between reaches the host as one
+  // gesture on each parameter, which is how a host records a knob being
+  // turned. A change outside a hold is a whole gesture by itself.
+  void holdKnob();
+  void letGoOfKnob();
+  // How loud the output is now, from 0, for a meter.
+  float outputLevel() const;
   // The step the sequencer last played in its measure, or -1 when it is not playing.
   int playingStep() const;
   int playingPattern() const;
@@ -182,6 +190,10 @@ class BoombapbotAudioProcessor final : public juce::AudioProcessor, public juce:
   std::atomic<int> selectedVoice_{0};
   std::atomic<float> windowScale_{boombapbot::plugin::kWindowScaleRest};
   std::atomic<double> hostTempo_{boombapbot::plugin::kTempoRest};
+  std::atomic<float> outputLevel_{0.0f};
+  // The parameters changed while a knob is held. Message thread only.
+  bool knobHeld_ = false;
+  std::vector<juce::RangedAudioParameter*> heldParameters_;
   std::atomic<int> shownStep_{-1};
   std::atomic<int> shownPattern_{0};
   mutable std::mutex historyLock_;

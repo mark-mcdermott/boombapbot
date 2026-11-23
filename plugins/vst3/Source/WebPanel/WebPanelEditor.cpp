@@ -5,20 +5,34 @@
 
 #include <BinaryData.h>
 
+#include <cmath>
+
 namespace {
 
 using namespace boombapbot::plugin;
 
 constexpr int kRefreshHz = 30;
 constexpr double kShape = static_cast<double>(BoombapbotWebEditor::kWidth) / BoombapbotWebEditor::kHeight;
-constexpr float kSmallest = 0.6f;
-constexpr float kLargest = 2.0f;
 // The page's own switch between its two views looks at the window's width. A
 // plugin's window is the picture at any size.
 constexpr const char* kPage = "index.html?panel=picture";
 
 const juce::Identifier kBeatEvent{"beat"};
 const juce::Identifier kReportEvent{"report"};
+const juce::Identifier kUndoEvent{"undo"};
+const juce::Identifier kSaidEvent{"said"};
+// A meter is not told of a change it could not show.
+constexpr float kLevelStep = 0.001f;
+
+bool samePatterns(const Beat& a, const Beat& b) {
+  if (a.size != b.size) return false;
+  for (std::size_t index = 0; index < a.patterns.size(); ++index) {
+    if (a.patterns[index].hits != b.patterns[index].hits || a.patterns[index].accents != b.patterns[index].accents) {
+      return false;
+    }
+  }
+  return true;
+}
 
 juce::String mimeOf(const juce::String& path) {
   const juce::String extension = path.fromLastOccurrenceOf(".", false, false).toLowerCase();
@@ -34,6 +48,13 @@ juce::String mimeOf(const juce::String& path) {
   return "application/octet-stream";
 }
 
+// A stamp that never changes, so that two beats written with it are the same
+// text exactly when they are the same beat.
+const BeatStamp& pageStamp() {
+  static const BeatStamp stamp{"plugin", juce::Time(2000, 0, 1, 0, 0, 0, 0, false)};
+  return stamp;
+}
+
 int scaled(int length, float scale) { return juce::roundToInt(static_cast<float>(length) * scale); }
 
 }  // namespace
@@ -44,20 +65,27 @@ BoombapbotWebEditor::BoombapbotWebEditor(BoombapbotAudioProcessor& owner)
       page_(std::make_unique<juce::ZipFile>(
           new juce::MemoryInputStream(BinaryData::panel_zip, static_cast<std::size_t>(BinaryData::panel_zipSize), false),
           true)),
+      desk_(owner, [this](const juce::String& words, BeatDesk::Said kind) { tell(words, kind); }),
       browser_(options()) {
+  // Read first: setting the limits below resizes the window, and a resize is remembered.
+  const float scale = processor_.windowScale();
   addAndMakeVisible(browser_);
   setResizable(true, true);
-  setResizeLimits(scaled(kWidth, kSmallest), scaled(kHeight, kSmallest), scaled(kWidth, kLargest),
-                  scaled(kHeight, kLargest));
+  setResizeLimits(scaled(kWidth, kWindowScaleLeast), scaled(kHeight, kWindowScaleLeast),
+                  scaled(kWidth, kWindowScaleMost), scaled(kHeight, kWindowScaleMost));
   getConstrainer()->setFixedAspectRatio(kShape);
-  setSize(kWidth, kHeight);
+  setSize(scaled(kWidth, scale), scaled(kHeight, scale));
   browser_.goToURL(juce::WebBrowserComponent::getResourceProviderRoot() + kPage);
   startTimerHz(kRefreshHz);
 }
 
 BoombapbotWebEditor::~BoombapbotWebEditor() { stopTimer(); }
 
-void BoombapbotWebEditor::resized() { browser_.setBounds(getLocalBounds()); }
+// The size the window was left at is kept with the plugin, so it opens there again.
+void BoombapbotWebEditor::resized() {
+  browser_.setBounds(getLocalBounds());
+  processor_.setWindowScale(static_cast<float>(getWidth()) / kWidth);
+}
 
 juce::WebBrowserComponent::Options BoombapbotWebEditor::options() {
   using Completion = juce::WebBrowserComponent::NativeFunctionCompletion;
@@ -97,6 +125,39 @@ juce::WebBrowserComponent::Options BoombapbotWebEditor::options() {
                             const double rate = processor_.getSampleRate();
                             done(rate > 0.0 ? rate : 48000.0);
                           })
+      .withNativeFunction("holdKnob",
+                          [this](const juce::Array<juce::var>& arguments, Completion done) {
+                            if (static_cast<bool>(arguments[0])) {
+                              processor_.holdKnob();
+                            } else {
+                              processor_.letGoOfKnob();
+                            }
+                            done(juce::var());
+                          })
+      .withNativeFunction("loadBeat",
+                          [this](const juce::Array<juce::var>&, Completion done) {
+                            desk_.chooseBeat();
+                            done(juce::var());
+                          })
+      .withNativeFunction("saveBeat",
+                          [this](const juce::Array<juce::var>&, Completion done) {
+                            desk_.chooseWhereToSave();
+                            done(juce::var());
+                          })
+      .withNativeFunction("saveMidi",
+                          [this](const juce::Array<juce::var>&, Completion done) {
+                            desk_.chooseWhereToSaveMidi();
+                            done(juce::var());
+                          })
+      .withNativeFunction("dragMidi",
+                          [this](const juce::Array<juce::var>&, Completion done) {
+                            startMidiDrag();
+                            done(juce::var());
+                          })
+      .withNativeFunction("undo",
+                          [this](const juce::Array<juce::var>&, Completion done) {
+                            done(processor_.undoPatterns());
+                          })
       .withNativeFunction("pageReady", [this](const juce::Array<juce::var>&, Completion done) {
         pageReady_ = true;
         done(juce::var());
@@ -119,17 +180,34 @@ std::optional<juce::WebBrowserComponent::Resource> BoombapbotWebEditor::resource
 }
 
 juce::String BoombapbotWebEditor::beatText() const {
-  static const BeatStamp stamp{"plugin", juce::Time(2000, 0, 1, 0, 0, 0, 0, false)};
-  return writeBeat(processor_.currentBeat(), stamp);
+  return writeBeat(processor_.currentBeat(), pageStamp());
 }
 
-// A beat from the page. What the plugin then holds is what the page is taken
-// to have, so the page is not sent its own change back.
+// A beat from the page. What the page sent is what it is taken to have, so
+// it is not sent its own change back, and is sent whatever the plugin did not
+// take: the tempo, which is the host's. A change to the patterns is one step
+// of the plugin's undo, as a press on the panel drawn here is.
 void BoombapbotWebEditor::takeBeat(const juce::String& json) {
   Beat beat;
   if (readBeat(json, beat).failed()) return;
+  if (!samePatterns(beat, processor_.currentBeat())) processor_.rememberPatterns();
   processor_.applyBeat(beat);
-  pageBeat_ = beatText();
+  pageBeat_ = writeBeat(beat, pageStamp());
+}
+
+void BoombapbotWebEditor::tell(const juce::String& words, BeatDesk::Said kind) {
+  juce::DynamicObject::Ptr said = new juce::DynamicObject();
+  said->setProperty("words", words);
+  said->setProperty("problem", kind == BeatDesk::Said::problem);
+  browser_.emitEventIfBrowserIsVisible(kSaidEvent, said.get());
+}
+
+// The page asks for this as its MIDI key is dragged. A drag out of the window
+// is the system's, and it starts from the mouse button that is down; with
+// none down there is nothing to start it from.
+void BoombapbotWebEditor::startMidiDrag() {
+  if (!juce::ModifierKeys::getCurrentModifiersRealtime().isLeftButtonDown()) return;
+  desk_.dragMidiOut(browser_);
 }
 
 BoombapbotWebEditor::Position BoombapbotWebEditor::positionNow() const {
@@ -153,5 +231,16 @@ void BoombapbotWebEditor::timerCallback() {
     report->setProperty("pattern", position.pattern);
     report->setProperty("playing", position.playing);
     browser_.emitEventIfBrowserIsVisible(kReportEvent, report.get());
+  }
+  if (const float level = processor_.outputLevel(); !pageLevel_ || std::abs(level - *pageLevel_) >= kLevelStep) {
+    pageLevel_ = level;
+    juce::DynamicObject::Ptr report = new juce::DynamicObject();
+    report->setProperty("type", "level");
+    report->setProperty("level", level);
+    browser_.emitEventIfBrowserIsVisible(kReportEvent, report.get());
+  }
+  if (const bool canUndo = processor_.canUndoPatterns(); pageCanUndo_ != canUndo) {
+    pageCanUndo_ = canUndo;
+    browser_.emitEventIfBrowserIsVisible(kUndoEvent, canUndo);
   }
 }

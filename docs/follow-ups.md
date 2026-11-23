@@ -511,9 +511,9 @@ What is left:
 The first slices are built in `plugins/vst3`: РИТМ-12 as a JUCE 8.0.9 VST3
 instrument on the engine built natively. Notes from the host play the
 voices, the knobs are host parameters, a beat saved from the site loads and
-its patterns play in time with the host's transport, the panel is drawn for
-the plugin with step keys to write a pattern on, and a beat goes back to the
-site as a file or into the host as MIDI. `plugins/vst3/README.md` has what it
+its patterns play in time with the host's transport, its window is the
+machine's painted panel in a web view with step keys to write a pattern on,
+and a beat goes back to the site as a file or into the host as MIDI. `plugins/vst3/README.md` has what it
 does, what was checked, how, and what was not.
 
 Everything known about it comes from tests: a self-test that drives the
@@ -569,8 +569,33 @@ What is left:
   beats counted from the start of its timeline, whatever its signature says.
   In 3/4 the pattern runs across the bar lines. Whether it should restart at
   each bar is a choice nobody has made.
-- **The picture.** The panel is drawn in code, in the picture's colours. The
-  machine's own picture and its parts are in `packages/machine-ritm12/art`.
+- **The painted window in a host.** Since 2026-11-22 the plugin's window is
+  the painted panel in a web view, with a bar under it for the beat's name,
+  its files and undo; the owner tried the first cut of it in FL Studio that
+  day and chose it. What the finished window has not met:
+  - FL Studio, with the bar and what came with it: the name typed in, undo,
+    load and save, the meter, a knob recorded as automation.
+  - Dragging the MIDI key out of the window. From a web view the drag is
+    started by the plugin once the page says the key is being dragged, with
+    the mouse button still down. No test can hold a mouse button, so nobody
+    knows yet whether the drag starts. A click on the key saves the file, and
+    that is tested.
+  - The keyboard. Whether typing a name works in FL, and whether a click in
+    the web view keeps FL's own shortcuts (the space bar for play) from it
+    until FL's window is clicked again.
+  - Several instances, each with a web view and its processes; a screen that
+    is not Retina.
+  - Windows needs Microsoft's WebView2, at build time and on the user's
+    machine. Linux needs WebKitGTK.
+- **The panel drawn in code** is still in the plugin, behind
+  `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF`, with its tests. Once the painted window
+  has been lived with it can be taken out; that is the owner's to say.
+- **CI does not see the panel change.** The native workflow runs when
+  `plugins/vst3` changes, not when `packages/editor` or
+  `packages/machine-ritm12`'s panel does, though the plugin's page is built
+  from both. A change there that breaks the plugin's window is only caught
+  the next time the workflow runs. Widening its paths would also run the
+  desktop, phone and WebAssembly jobs on every change to the panel.
 - **Other hosts, formats and platforms.** Only macOS has built it and CI
   builds it there alone. Windows, Linux, an Intel Mac, AU and CLAP are
   untried.

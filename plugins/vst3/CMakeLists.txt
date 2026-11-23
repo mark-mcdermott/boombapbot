@@ -54,17 +54,30 @@ set(SNARE_BUILD_TOOLS OFF CACHE BOOL "Build the render command line tools" FORCE
 set(BOOMBAPBOT_MACHINE_DIRS "${MACHINE_RITM12_DIR}" CACHE STRING "Machine packages to build the engine for" FORCE)
 add_subdirectory("${BOOMBAPBOT_REPO_ROOT}/engine" "${CMAKE_CURRENT_BINARY_DIR}/engine")
 
-# ---- The window: the panel drawn here, or the painted one in a web view -----
-# A trial. ON shows the panel the site and the apps show, as a page in a web
-# view (Source/WebPanel, plugins/vst3/web), in place of the panel drawn in
-# Source/Panel. The page has to be built first:
-#   pnpm --filter @boombapbot/vst3-panel build
-option(BOOMBAPBOT_VST3_WEB_PANEL "Show the painted panel in a web view (a trial)" OFF)
+# ---- The window: the painted panel in a web view, or the panel drawn here ----
+# ON, the window shows the panel the site and the apps show, as a page in a
+# web view (Source/WebPanel, plugins/vst3/web). OFF, it shows the panel drawn
+# in Source/Panel, which needs no web view and no page.
+option(BOOMBAPBOT_VST3_WEB_PANEL "Show the painted panel in a web view" ON)
+# The page is built with pnpm as part of the build. OFF packs web/dist as it
+# was last built, for a machine that has the page and not pnpm.
+option(BOOMBAPBOT_VST3_BUILD_PAGE "Build the panel's page with pnpm as part of the build" ON)
 set(web_panel_plugin_options "")
 if(BOOMBAPBOT_VST3_WEB_PANEL)
   set(panel_page "${CMAKE_CURRENT_SOURCE_DIR}/web/dist")
-  if(NOT EXISTS "${panel_page}/index.html")
-    message(FATAL_ERROR "The panel's page is not built. Run: pnpm --filter @boombapbot/vst3-panel build")
+  set(panel_pnpm "")
+  if(BOOMBAPBOT_VST3_BUILD_PAGE)
+    find_program(BOOMBAPBOT_PNPM pnpm)
+    if(BOOMBAPBOT_PNPM)
+      set(panel_pnpm "${BOOMBAPBOT_PNPM}")
+    endif()
+  endif()
+  if(NOT panel_pnpm AND NOT EXISTS "${panel_page}/index.html")
+    message(FATAL_ERROR
+      "The plugin's window is a page that pnpm builds, and the page is not built.\n"
+      "Install pnpm and run \"pnpm install\" at the repository root, or build the page yourself with\n"
+      "  pnpm --filter @boombapbot/vst3-panel build\n"
+      "or pass -DBOOMBAPBOT_VST3_WEB_PANEL=OFF for the panel that needs no page.")
   endif()
   set(web_panel_plugin_options NEEDS_WEB_BROWSER TRUE)
 endif()
@@ -89,6 +102,8 @@ juce_add_plugin(boombapbot_plugin
   ${web_panel_plugin_options})
 
 target_sources(boombapbot_plugin PRIVATE
+  Source/BeatDesk.cpp
+  Source/BeatDesk.h
   Source/BeatFile.cpp
   Source/BeatFile.h
   Source/MachineRitm12.h
@@ -113,20 +128,22 @@ target_compile_definitions(boombapbot_plugin PUBLIC
   JUCE_VST3_CAN_REPLACE_VST2=0)
 
 if(BOOMBAPBOT_VST3_WEB_PANEL)
-  # The page goes into the plugin as one zip, and is served from there. The
-  # engine's WebAssembly build is left out: the plugin has the engine itself.
+  # The page goes into the plugin as one zip, and is served from there. It is
+  # built and packed on every build, and the zip changes only when the page does.
   set(panel_zip "${CMAKE_CURRENT_BINARY_DIR}/panel.zip")
-  file(GLOB_RECURSE panel_files CONFIGURE_DEPENDS RELATIVE "${panel_page}" "${panel_page}/*")
-  list(FILTER panel_files EXCLUDE REGEX "^engine/")
-  list(TRANSFORM panel_files PREPEND "${panel_page}/" OUTPUT_VARIABLE panel_sources)
-  add_custom_command(OUTPUT "${panel_zip}"
-    COMMAND "${CMAKE_COMMAND}" -E tar cf "${panel_zip}" --format=zip -- ${panel_files}
-    WORKING_DIRECTORY "${panel_page}"
-    DEPENDS ${panel_sources}
-    COMMENT "Packing the panel's page"
+  add_custom_target(boombapbot_panel_zip
+    COMMAND "${CMAKE_COMMAND}"
+      "-DREPO_ROOT=${BOOMBAPBOT_REPO_ROOT}"
+      "-DPAGE_DIR=${panel_page}"
+      "-DPANEL_ZIP=${panel_zip}"
+      "-DPNPM=${panel_pnpm}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PackPanelPage.cmake"
+    BYPRODUCTS "${panel_zip}"
+    COMMENT "Building and packing the panel's page"
     VERBATIM)
   juce_add_binary_data(boombapbot_panel_page SOURCES "${panel_zip}")
   set_target_properties(boombapbot_panel_page PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  add_dependencies(boombapbot_panel_page boombapbot_panel_zip)
   target_sources(boombapbot_plugin PRIVATE
     Source/WebPanel/WebPanelEditor.cpp
     Source/WebPanel/WebPanelEditor.h)
@@ -185,28 +202,24 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
   endfunction()
 
   boombapbot_plugin_program(boombapbot_state_writer Tests/StateWriter.cpp)
-  if(BOOMBAPBOT_VST3_WEB_PANEL)
-    # The self-test and the snapshot work the panel drawn here, which a build
-    # with the web view does not have. That build has a check of its own.
-    if(APPLE)
-      boombapbot_plugin_program(boombapbot_web_panel_check Tests/WebPanelCheck.cpp)
-      target_link_libraries(boombapbot_web_panel_check PRIVATE "-framework CoreFoundation")
-      add_test(NAME vst3.web_panel
-        COMMAND boombapbot_web_panel_check "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
-    endif()
-  else()
-    boombapbot_plugin_program(boombapbot_plugin_selftest Tests/ProcessorSelfTest.cpp)
-    # The heap trap stands in for the allocator, and so do the sanitizers. Under
-    # them the trap is left out and the check that needs it says it was skipped.
-    target_sources(boombapbot_plugin_selftest PRIVATE Tests/HeapTrap.cpp Tests/HeapTrap.h)
-    if(BOOMBAPBOT_VST3_SANITIZE)
-      target_compile_definitions(boombapbot_plugin_selftest PRIVATE BOOMBAPBOT_NO_HEAP_TRAP=1)
-    endif()
-    boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
-    add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
-    add_test(NAME vst3.window_snapshot
-      COMMAND boombapbot_window_snapshot "${CMAKE_CURRENT_BINARY_DIR}/window.png"
-        "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
+  boombapbot_plugin_program(boombapbot_plugin_selftest Tests/ProcessorSelfTest.cpp)
+  # The heap trap stands in for the allocator, and so do the sanitizers. Under
+  # them the trap is left out and the check that needs it says it was skipped.
+  target_sources(boombapbot_plugin_selftest PRIVATE Tests/HeapTrap.cpp Tests/HeapTrap.h)
+  if(BOOMBAPBOT_VST3_SANITIZE)
+    target_compile_definitions(boombapbot_plugin_selftest PRIVATE BOOMBAPBOT_NO_HEAP_TRAP=1)
+  endif()
+  boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
+  add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
+  add_test(NAME vst3.window_snapshot
+    COMMAND boombapbot_window_snapshot "${CMAKE_CURRENT_BINARY_DIR}/window.png"
+      "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
+  # The window with the page in it is opened for real, which wants a desktop.
+  if(BOOMBAPBOT_VST3_WEB_PANEL AND APPLE)
+    boombapbot_plugin_program(boombapbot_web_panel_check Tests/WebPanelCheck.cpp)
+    target_link_libraries(boombapbot_web_panel_check PRIVATE "-framework CoreFoundation")
+    add_test(NAME vst3.web_panel
+      COMMAND boombapbot_web_panel_check "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
   endif()
 
   if(APPLE)
@@ -277,13 +290,12 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     if("arm64" IN_LIST CMAKE_OSX_ARCHITECTURES AND "x86_64" IN_LIST CMAKE_OSX_ARCHITECTURES)
       add_test(NAME vst3.bundle_architectures COMMAND lipo "${plugin_binary}" -verify_arch arm64 x86_64)
       if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64" AND NOT rosetta_missing)
+        add_test(NAME vst3.processor_selftest_x86_64
+          COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_plugin_selftest>")
         if(BOOMBAPBOT_VST3_WEB_PANEL)
           add_test(NAME vst3.web_panel_x86_64
             COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_web_panel_check>"
               "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
-        else()
-          add_test(NAME vst3.processor_selftest_x86_64
-            COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_plugin_selftest>")
         endif()
         add_test(NAME vst3.bundle_loads_x86_64
           COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_bundle_load_check>" "${plugin_binary}")

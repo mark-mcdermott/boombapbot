@@ -1,9 +1,10 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createProjectCodec } from '@boombapbot/contracts';
 import { EditorRuntime, NativeAudioController, RuntimeContext, type AudioFactory } from '@boombapbot/editor';
 import { machine } from '@boombapbot/machine-ritm12';
 import type { Project } from '@boombapbot/machine-ritm12/document';
+import { Bar } from './Bar';
 import { connectPlugin, type Plugin } from './juce';
 import { pluginEngine } from './plugin-engine';
 import './styles.css';
@@ -11,7 +12,7 @@ import './styles.css';
 declare global {
   interface Window {
     /** For the check that opens the plugin's window. Not a stable API. */
-    __panel?: { project(): Project };
+    __panel?: { project(): Project; level(): number };
   }
 }
 
@@ -52,38 +53,91 @@ function fromPlugin(text: string): Project | null {
   };
 }
 
-/** Keeps the page's beat and the plugin's the same, whichever side changed it. */
-function keepInStep(plugin: Plugin): void {
+/**
+ * Keeps the page's beat and the plugin's the same, whichever side changed it.
+ * What it answers with sends at once whatever is waiting to go.
+ */
+function keepInStep(plugin: Plugin): () => void {
   let theirs: Project | null = null;
-  let sending = false;
+  let waiting: ReturnType<typeof setTimeout> | null = null;
 
-  const take = (text: string) => {
+  const send = () => {
+    if (waiting === null) return;
+    clearTimeout(waiting);
+    waiting = null;
+    const project = runtime.store.getState().project;
+    if (project !== theirs) void plugin.call('setBeat', codec.serialize(project));
+  };
+
+  plugin.on<string>(BEAT_EVENT, (text) => {
     const project = fromPlugin(text);
     if (!project) return;
     theirs = project;
     runtime.store.adjust(project);
-  };
-
-  plugin.on<string>(BEAT_EVENT, take);
+  });
   runtime.store.subscribe(() => {
     // A change that came from the plugin is not sent back to it, and a burst
     // of changes, as a knob being dragged makes, goes as the last of them.
-    if (runtime.store.getState().project === theirs || sending) return;
-    sending = true;
+    if (runtime.store.getState().project === theirs || waiting !== null) return;
     // A timer, not an animation frame: a window behind another draws no frames.
-    setTimeout(() => {
-      sending = false;
-      const project = runtime.store.getState().project;
-      if (project !== theirs) void plugin.call('setBeat', codec.serialize(project));
-    }, SEND_AFTER_MS);
+    waiting = setTimeout(send, SEND_AFTER_MS);
   });
+  return send;
+}
+
+/**
+ * Tells the plugin while a knob is held, so that a host recording automation
+ * takes the whole turn as one gesture. The last of the turn goes first.
+ */
+function markKnobHolds(plugin: Plugin, sendWaiting: () => void): void {
+  let held = false;
+  const letGo = () => {
+    if (!held) return;
+    held = false;
+    sendWaiting();
+    void plugin.call('holdKnob', false);
+  };
+  window.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!(event.target instanceof Element) || !event.target.closest('[role="slider"]')) return;
+      held = true;
+      void plugin.call('holdKnob', true);
+    },
+    true,
+  );
+  window.addEventListener('pointerup', letGo, true);
+  window.addEventListener('pointercancel', letGo, true);
+}
+
+/**
+ * The controls a host has taken over, by the name each has on the panel. The
+ * host keeps the tempo and does the recording, and the machine is on for as
+ * long as its window is open. They stay in the picture and take no hand.
+ */
+const KEPT_BY_HOST = ['tempo', 'record', 'power'];
+
+function Window() {
+  useEffect(() => {
+    for (const control of KEPT_BY_HOST) {
+      document.querySelector<HTMLElement>(`[data-testid="${control}"]`)?.setAttribute('inert', '');
+    }
+  });
+  return (
+    <>
+      <div className="pb-picture">
+        <machine.Panel />
+      </div>
+      <Bar plugin={plugin} />
+    </>
+  );
 }
 
 async function open(): Promise<void> {
   if (plugin) {
     const held = fromPlugin(await plugin.call<string>('getBeat'));
     if (held) runtime.store.replaceProject(held);
-    keepInStep(plugin);
+    markKnobHolds(plugin, keepInStep(plugin));
   }
   runtime.attach();
   // In a host the machine is on when its window is open, and it plays when the host does.
@@ -95,11 +149,11 @@ async function open(): Promise<void> {
   createRoot(root!).render(
     <StrictMode>
       <RuntimeContext.Provider value={shared}>
-        <machine.Panel />
+        <Window />
       </RuntimeContext.Provider>
     </StrictMode>,
   );
-  window.__panel = { project: () => runtime.store.getState().project };
+  window.__panel = { project: () => runtime.store.getState().project, level: () => runtime.outputLevel() };
   void plugin?.call('pageReady');
 }
 

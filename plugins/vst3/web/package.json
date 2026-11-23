@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A trial: РИТМ-12's painted panel as the page of the VST3 plugin's window, talking to the plugin through JUCE's web view.",
+  "description": "РИТМ-12's painted panel as the page of the VST3 plugin's window, talking to the plugin through JUCE's web view.",
   "scripts": {
-    "assets": "node ../../../scripts/copy-app-assets.mjs .",
+    "assets": "node assets.mjs",
     "build": "pnpm assets && vite build",
     "typecheck": "tsc --noEmit"
   },
