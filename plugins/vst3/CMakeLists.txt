@@ -190,6 +190,36 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     add_test(NAME vst3.bundle_hosted COMMAND boombapbot_bundle_host_check "${plugin_bundle}" "${beat_state}")
     set_tests_properties(vst3.bundle_hosted PROPERTIES FIXTURES_REQUIRED beat_state)
 
+    # Steinberg's own validator, built from its VST3 SDK, which is fetched for
+    # this and is no part of the plugin. Its build is kept apart from this one
+    # because the SDK's build files set options for everything around them.
+    option(BOOMBAPBOT_VST3_STEINBERG_VALIDATOR "Fetch Steinberg's VST3 SDK and run its validator on the bundle" OFF)
+    if(BOOMBAPBOT_VST3_STEINBERG_VALIDATOR)
+      include(ExternalProject)
+      string(REPLACE ";" "|" validator_architectures "${CMAKE_OSX_ARCHITECTURES}")
+      ExternalProject_Add(steinberg_validator
+        GIT_REPOSITORY https://github.com/steinbergmedia/vst3sdk.git
+        GIT_TAG v3.8.1_build_84
+        GIT_SHALLOW TRUE
+        GIT_SUBMODULES base pluginterfaces public.sdk cmake
+        LIST_SEPARATOR |
+        CMAKE_ARGS
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES=${validator_architectures}
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+          -DSMTG_ENABLE_VSTGUI_SUPPORT=OFF
+          -DSMTG_ENABLE_VST3_PLUGIN_EXAMPLES=OFF
+          -DSMTG_ENABLE_VST3_HOSTING_EXAMPLES=ON
+          -DSMTG_RUN_VST_VALIDATOR=OFF
+          -DSMTG_CREATE_PLUGIN_LINK=OFF
+        BUILD_COMMAND "${CMAKE_COMMAND}" --build <BINARY_DIR> --target validator
+        INSTALL_COMMAND "")
+      ExternalProject_Get_Property(steinberg_validator BINARY_DIR)
+      set(steinberg_validator_program "${BINARY_DIR}/bin/Release/validator")
+      # -e runs the extensive tests as well as the plain ones.
+      add_test(NAME vst3.steinberg_validator COMMAND "${steinberg_validator_program}" -e "${plugin_bundle}")
+    endif()
+
     # The Intel half is run under Rosetta where there is one, which is how a
     # host that has not moved to Apple silicon runs it.
     execute_process(COMMAND arch -x86_64 /usr/bin/true RESULT_VARIABLE rosetta_missing OUTPUT_QUIET ERROR_QUIET)
@@ -203,6 +233,10 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
         add_test(NAME vst3.bundle_hosted_x86_64
           COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_bundle_host_check>" "${plugin_bundle}" "${beat_state}")
         set_tests_properties(vst3.bundle_hosted_x86_64 PROPERTIES FIXTURES_REQUIRED beat_state)
+        if(BOOMBAPBOT_VST3_STEINBERG_VALIDATOR)
+          add_test(NAME vst3.steinberg_validator_x86_64
+            COMMAND arch -x86_64 "${steinberg_validator_program}" -e "${plugin_bundle}")
+        endif()
       endif()
     endif()
   endif()

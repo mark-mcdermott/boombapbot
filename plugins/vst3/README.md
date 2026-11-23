@@ -350,6 +350,26 @@ It is how the panel can be looked at without a host:
 build/vst3/boombapbot_window_snapshot panel.png path/to/a.boombapbot.json
 ```
 
+### Steinberg's validator
+
+Steinberg's own VST3 validator runs against the built bundle, with its
+extensive tests, natively and under Rosetta. It is not built unless asked for,
+because it means fetching Steinberg's VST3 SDK (3.8.1, MIT licensed, used only
+to build the validator and no part of the plugin):
+
+```sh
+cmake -S plugins/vst3 -B build/vst3 -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DBOOMBAPBOT_VST3_STEINBERG_VALIDATOR=ON
+cmake --build build/vst3
+ctest --test-dir build/vst3 -R steinberg --output-on-failure
+```
+
+All 537 of its tests pass on each architecture. The first run found one
+failure: the plugin's one program had no name. It is now called "Default".
+The validator checks that the plugin keeps to the VST3 interfaces (buses,
+parameters, state, processing at many rates and block sizes, threading of its
+calls). It does not listen, and it does not open the window.
+
 ### Sanitizers
 
 `-DBOOMBAPBOT_VST3_SANITIZE=` builds everything, JUCE and the engine included,
@@ -404,6 +424,8 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
 
 - A configure and a Release build from an empty build directory, with JUCE
   8.0.9 from a local checkout.
+- Steinberg's validator from VST3 SDK 3.8.1, extensive tests: 537 of 537 pass
+  on arm64 and on x86_64 under Rosetta.
 - The binary holds both architectures (`lipo -archs`: `x86_64 arm64`).
 - The bundle's signature verifies after the build, `moduleinfo.json` included
   (`codesign --verify --deep --strict`: valid on disk, satisfies its
@@ -449,10 +471,9 @@ the build of the hang fix:
 - **A closed hat that may go missing.** In one session the owner sometimes did
   not hear the hat on the fifteenth step of a looping pattern. It was not
   pinned down.
-- **Steinberg's validator has not run.** JUCE bundles the parts of the VST3
-  SDK a plugin needs, and the validator is not among them. `pluginval` has not
-  run either. The hosted check uses JUCE's host against JUCE's wrapper, which
-  cannot catch a mistake both share.
+- **`pluginval` has not run.** Steinberg's validator has, and passes (see
+  "Steinberg's validator" under the tests), but it is one host's view.
+  `pluginval` drives a plugin harder and in other orders.
 - **Locks on the audio thread.** The self-test traps heap use there and finds
   none, and the thread sanitizer finds no race, but nothing traps a lock, a
   system call or a page fault. What a system library allocates inside itself

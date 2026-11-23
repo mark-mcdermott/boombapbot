@@ -525,9 +525,9 @@ What is left:
 - **Listen to it.** The tests compare samples. A knob turned while its voice
   rings changes the next hit and not the ringing one; nobody has judged how
   that feels under automation, or how the delay sounds when the tempo moves.
-- **Steinberg's validator and `pluginval`.** Neither has run. JUCE bundles the
-  parts of the VST3 SDK a plugin needs and the validator is not among them, so
-  running it means fetching the SDK or `pluginval`.
+- **`pluginval`.** Steinberg's validator runs in CI and passes; `pluginval`
+  has not run. It is a download, and it drives a plugin in ways the validator
+  does not.
 - **JUCE's licence.** JUCE 8 is AGPLv3 or commercial, and one of the two has to
   be chosen before a build is given to anyone. It has not been. CI builds the
   plugin and keeps no artefact for that reason.
