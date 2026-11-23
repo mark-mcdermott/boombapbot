@@ -107,10 +107,22 @@ export class DeviceLicense {
 }
 
 let device: DeviceLicense | null = null;
+let chosen: { storage: KeyValueStorage | null } | null = null;
 
-/** The license kept in this browser, read and checked once per page. */
+/**
+ * Says where this program keeps its license file, in place of the browser's
+ * storage: a shell whose file lives on the machine's disk, or one that keeps
+ * none and is handed its file each time it opens. Called once, before
+ * anything asks whether the device is upgraded.
+ */
+export function keepDeviceLicenseIn(storage: KeyValueStorage | null): void {
+  if (device) throw new Error('the license was already read, so it is too late to say where it is kept');
+  chosen = { storage };
+}
+
+/** The license this device keeps, read and checked once per page. */
 export function deviceLicense(): DeviceLicense {
-  device ??= new DeviceLicense(browserStorage());
+  device ??= new DeviceLicense(chosen ? chosen.storage : browserStorage());
   return device;
 }
 
