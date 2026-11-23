@@ -1,4 +1,3 @@
-import { EFFECT_KINDS } from '../document';
 import { LETTERING } from './lettering';
 import { INSTRUMENTS, PATTERN_KEYS, type Rect } from './layout';
 
@@ -18,9 +17,6 @@ export interface PlateLabel {
 }
 
 const english = LETTERING.english;
-
-/** Where the painted names of the effect selector's positions are, top to bottom. */
-const EFFECT_ROWS = [669, 711, 753, 796];
 
 export const PLATE_LABELS: readonly PlateLabel[] = [
   { rect: [243, 293, 410, 352], text: 'INSTRUMENTS', under: 'DRUM VOICES' },
@@ -45,10 +41,6 @@ export const PLATE_LABELS: readonly PlateLabel[] = [
   { rect: [1078, 661, 1200, 688], text: english.decay },
   { rect: [1263, 661, 1319, 688], text: english.tone },
   { rect: [1473, 624, 1582, 652], text: english.effect },
-  ...EFFECT_KINDS.map((kind, index): PlateLabel => ({
-    rect: [1618, EFFECT_ROWS[index]! - 1, 1714, EFFECT_ROWS[index]! + 23],
-    text: english.effects[kind],
-  })),
   { rect: [1777, 662, 1854, 688], text: english.mix },
   { rect: [590, 884, 744, 912], text: english.sequencer },
   { rect: [411, 1072, 556, 1101], text: 'TRANSPORT' },
