@@ -18,10 +18,11 @@ test('the machine is its picture, with every control inside it', async ({ page }
     expect(box.bottom).toBeLessThanOrEqual(frame.y + frame.height + 1);
   }
   // The picture and every piece laid over it came from this build.
-  const images = await page.locator('.rt-stage > .rt-plate, .rt-stage > .rt-patch').evaluateAll((nodes) =>
+  const images = await page.locator('.rt-stage > .rt-plate, .rt-stage > .rt-patch, .rt-stage > .rt-effect-knob').evaluateAll((nodes) =>
     nodes.map((node) => ({ src: (node as HTMLImageElement).src, loaded: (node as HTMLImageElement).naturalWidth > 0 })),
   );
-  expect(images.length).toBe(7 + 8 + 1 + 1);
+  // The plate, three switches, the effect unit and its selector; the eight keys; the lamp; the status box.
+  expect(images.length).toBe(6 + 8 + 1 + 1);
   expect(images.every((image) => image.loaded && image.src.includes('/machines/ritm12/'))).toBe(true);
   // Each instrument key wears its drawing, whatever the controls are set to.
   const drawings = page.locator('.rt-stage > .rt-patch[src*="/patch/key-"]');
@@ -72,14 +73,24 @@ test('the size switch leaves the last four steps out of a twelve-step measure', 
   expect(stepsOn((await beat(page)).patterns[2]!.steps.kick)).toEqual([12]);
 });
 
-test('the effect selector steps through its four positions and the mix knob adds it', async ({ page }) => {
+test('the effect selector turns a quarter for each of its four effects, the window names each, and the mix knob adds it', async ({ page }) => {
+  const knob = page.locator('.rt-stage > .rt-effect-knob');
+  const label = page.getByTestId('effect-label');
+  await expect(knob).toHaveAttribute('style', /rotate\(0deg\)/);
+  await expect(label).toHaveAttribute('data-effect', 'delay');
   const seen: string[] = [];
-  for (let press = 0; press < 4; press += 1) {
+  for (let press = 1; press <= 4; press += 1) {
     await page.getByTestId('effect').click();
-    seen.push((await beat(page)).effect.kind);
+    const { kind } = (await beat(page)).effect;
+    seen.push(kind);
+    // It goes on round: the fourth press brings the first effect back a whole turn on, not back the way it came.
+    await expect(knob).toHaveAttribute('style', new RegExp(`rotate\\(${press * 90}deg\\)`));
+    await expect(label).toHaveAttribute('data-effect', kind);
   }
   expect(seen).toEqual(['reverb', 'flanger', 'chorus', 'delay']);
-  await expect(page.locator('.rt-stage > .rt-patch[src*="effect-delay"]')).toBeVisible();
+  await expect(label.locator('[data-let="ДИЛЭЙ"]')).toBeVisible();
+  await expect(label.locator('.rt-effect-icon')).toBeVisible();
+  await expect(page.locator('.rt-stage > .rt-patch[src*="effect-unit"]')).toBeVisible();
   const mix = page.getByTestId('mix');
   await mix.focus();
   await page.keyboard.press('PageUp');

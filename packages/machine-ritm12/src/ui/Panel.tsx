@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState, type CSSProperties, type
 import { Segmented } from '@boombapbot/editor';
 import { EFFECT_KINDS, getVoice } from '../document';
 import { Bench } from './Bench';
+import { EffectLabel, EffectUnitArt, selectorAngle, useSelectorTurns } from './EffectUnit';
 import { Key, Lamp, Patch, PointerKnob, boxOf } from './Controls';
 import { ReadoutContext, useReadout } from './context';
 import { setDeskLamp, useDeskLamp } from './desk-lamp';
@@ -9,7 +10,7 @@ import {
   BUTTONS,
   DESK_LAMP,
   DESK_LAMP_PATCH,
-  EFFECT_PATCH,
+  EFFECT_UNIT,
   INSTRUMENTS,
   INSTRUMENT_LAMP,
   KNOBS,
@@ -80,7 +81,7 @@ export function Panel() {
 }
 
 /** The picture and every piece laid over it for where the stepped controls stand, from whichever set of pictures is being read. */
-function Pictures({ wiring, plateTestId }: { wiring: Pick<Wiring, 'power' | 'write' | 'size' | 'effect'>; plateTestId: string }) {
+function Pictures({ wiring, effectAngle, plateTestId }: { wiring: Pick<Wiring, 'power' | 'write' | 'size'>; effectAngle: number; plateTestId: string }) {
   const plate = useReadout().art('plate.webp');
   return (
     <>
@@ -93,10 +94,7 @@ function Pictures({ wiring, plateTestId }: { wiring: Pick<Wiring, 'power' | 'wri
       <Patch rect={PATCHES.power} name="power-on" shown={wiring.power} />
       <Patch rect={PATCHES.write} name="write-accents" shown={wiring.write === 'accents'} />
       <Patch rect={PATCHES.size} name="size-16" shown={wiring.size === 16} />
-      {EFFECT_KINDS.map((kind) => {
-        const name = EFFECT_PATCH[kind];
-        return name ? <Patch key={kind} rect={PATCHES.effect} name={name} shown={wiring.effect === kind} /> : null;
-      })}
+      <EffectUnitArt angle={effectAngle} />
     </>
   );
 }
@@ -111,6 +109,7 @@ function PicturePanel() {
   const nightReadout = useMemo(() => ({ ...readout, art: (file: string) => readout.art(`night/${file}`) }), [readout]);
   const words = useLettering();
   const english = useScript() === 'english';
+  const effectAngle = selectorAngle(useSelectorTurns(EFFECT_KINDS.indexOf(wiring.effect), EFFECT_KINDS.length), EFFECT_KINDS.length);
 
   return (
     <ReadoutContext.Provider value={readout}>
@@ -118,10 +117,10 @@ function PicturePanel() {
         <div className="rt-scroll" data-fit={fit}>
           <div ref={wiring.frame} className="rt-frame" data-testid="panel" data-power={power ? 'on' : 'off'} data-lamp={lampLit ? 'lit' : 'out'}>
             <div className="rt-stage" style={{ transform: `scale(${scale})` } as CSSProperties}>
-              <Pictures wiring={wiring} plateTestId="plate" />
+              <Pictures wiring={wiring} effectAngle={effectAngle} plateTestId="plate" />
               <div className="rt-night" data-shown={lampLit ? undefined : ''} data-testid="night">
                 <ReadoutContext.Provider value={nightReadout}>
-                  <Pictures wiring={wiring} plateTestId="night-plate" />
+                  <Pictures wiring={wiring} effectAngle={effectAngle} plateTestId="night-plate" />
                 </ReadoutContext.Provider>
               </div>
 
@@ -136,6 +135,7 @@ function PicturePanel() {
                 </div>
               ) : null}
 
+              <EffectLabel kind={wiring.effect} name={words.effects[wiring.effect]} />
               <ScreenAndMeter line={wiring.line} />
               <div className="rt-readout-slot" style={boxOf(STATUS.box)}>
                 <Readout className="rt-readout-plate" name={words.status} spoken={wiring.spoken} said={wiring.said} scope={wiring.frame} idle={wiring.idle} power={power} cells={24} />
@@ -182,7 +182,7 @@ function PicturePanel() {
                 <Key rect={BUTTONS.dice} {...keys.dice} />
                 <Key rect={BUTTONS.clear} {...keys.clear} />
                 <Key rect={around(SWITCHES.write)} round {...keys.write} />
-                <Key rect={around(SWITCHES.effect)} round {...keys.effect} />
+                <Key rect={around(EFFECT_UNIT.knob)} round {...keys.effect} />
                 <Key rect={around(SWITCHES.size)} round {...keys.size} />
 
                 {(Object.keys(KNOBS) as KnobName[]).map((name) => (

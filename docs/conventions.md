@@ -126,8 +126,11 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   of it. The stage is exactly as large as the picture, 2000 by 1333, and is
   shrunk as a whole to fit its frame, so every position in `ui/layout.ts`
   and every length in `src/styles.css` is in the picture's own pixels. A
-  stepped control (power, write, size, effect) shows another picture of
-  itself for each position (`Patch`); a knob's painted body stays still and
+  stepped control (power, write, size) shows another picture of itself for
+  each position (`Patch`); the effect selector is one picture the page turns,
+  a whole circle shared evenly among the effects there are and never turned
+  back, beside a window whose label the page prints with the effect's
+  drawing and name (`ui/EffectUnit.tsx`, `EFFECT_UNIT`); a knob's painted body stays still and
   only its pointer line, a picture of its own, turns (`PointerKnob`,
   `handTransform`); a lit key or lamp is light laid over the paint with a
   blend mode. The screen and the meter are drawn a frame at a time outside
@@ -703,8 +706,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   rate), tape (saturation, a slow wobble and a duller top), a pump (a
   compressor that ducks everything under the kick), a filter (a resonant
   low-pass swept by the mix knob), vinyl (crackle and hiss) and a phaser.
-  Where they sit on the machine is not decided, so do not tell a visitor
-  what the upgrade unlocks until they can be reached there.
+  On the picture they will be further positions of the effect selector,
+  named in its window. They cannot be reached yet, so do not tell a visitor
+  what the upgrade unlocks until they can.
 - It is closed until `UPGRADE_OPEN` is `on`, and without Stripe's key or the
   webhook's secret (`upgradeOpen`). Closed, checkout refuses. A payment
   already made is still honoured: the webhook does not ask whether it is

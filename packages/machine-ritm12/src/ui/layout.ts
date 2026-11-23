@@ -1,4 +1,4 @@
-import type { EffectKind, VoiceId } from '../document';
+import type { VoiceId } from '../document';
 
 /**
  * Where everything sits on the panel picture, in the picture's own pixels.
@@ -102,25 +102,28 @@ export const POWER_LAMP = { x: 324, y: 1127, r: 15 } as const;
 /** The stepped controls, each a round area that is pressed to move it on. */
 export const SWITCHES = {
   write: { x: 604, y: 693, r: 37 },
-  effect: { x: 1470, y: 756, r: 47 },
   size: { x: 697, y: 827, r: 22 },
 } as const;
 
 /** Where each stepped control's other pictures are laid over the plate. */
 export const PATCHES = {
   write: [574, 656, 648, 721],
-  effect: [1415, 696, 1526, 797],
   size: [674, 804, 727, 846],
   power: [178, 1070, 270, 1186],
 } as const satisfies Record<string, Rect>;
 
-/** The picture of the effect selector in each position. The plate itself shows it on chorus. */
-export const EFFECT_PATCH: Record<EffectKind, string | null> = {
-  delay: 'effect-delay',
-  reverb: 'effect-reverb',
-  flanger: 'effect-flanger',
-  chorus: null,
-};
+/**
+ * The effect unit as art/cut-effect.py fits it: the paint laid over the
+ * plate's own unit, the selector that turns, and the window with the label
+ * the effect is printed on. The selector is painted on the first effect and
+ * turns a whole circle through however many there are.
+ */
+export const EFFECT_UNIT = {
+  patch: [1398, 660, 1724, 852],
+  knob: { x: 1449, y: 756, r: 44 },
+  window: [1503, 712, 1721, 800],
+  label: [1524, 742, 1700, 782],
+} as const satisfies { patch: Rect; knob: { x: number; y: number; r: number }; window: Rect; label: Rect };
 
 export const KNOBS = {
   tempo: { x: 1545, y: 452, r: 42, kind: 'top', pivot: [0.4, -7], face: [2.7, -4.2, 32.5, 29.4] },

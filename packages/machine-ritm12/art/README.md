@@ -11,10 +11,23 @@ does not have.
   control in one position and every knob without its pointer line.
 - **`patch/`** holds a small picture for each other position of a stepped
   control: the write switch on accents, the size switch on 16, the power
-  rocker on, and the effect selector on delay, reverb and flanger. The page
-  lays one over the plate. It also holds the end of each instrument key
+  rocker on, and the old effect selector on delay, reverb and flanger. The page
+  lays one over the plate (the effect's are for the phone's panel alone). It also holds the end of each instrument key
   (`key-*.png`) with the instrument drawn as `instrument-icons.svg` has it,
   which the page always lays over the plate.
+- **`patch/effect-unit.png`** and **`patch/effect-knob.png`** are the effect
+  unit as the owner painted it again, close up: a selector that turns all the
+  way round and a window with a paper label behind it.
+  [`cut-effect.py`](cut-effect.py) fits that painting into the plate's own
+  unit. The first is the unit's paint with the old selector and its lettering
+  painted out, the window in their place with its label blank; the page
+  always lays it over the plate and prints the effect on the label. The
+  second is the selector cut round, at twice its size on the plate, as it
+  stands for the first effect; the page turns it. The painting itself is in
+  `misc/assets/ritm12/effect-unit.webp`. The plate's four-position selector
+  is still under the patch, and `patch/effect-delay.png`, `-reverb` and
+  `-flanger` are still its other positions: the phone's panel is cut from
+  them.
 - **`patch/status.png`** is the level meter's box done again with room
   under it for the status readout: the meter smaller, and a second box
   below, both from the plate's own paint. [`cut-status.py`](cut-status.py)

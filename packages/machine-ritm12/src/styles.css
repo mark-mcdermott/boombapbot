@@ -233,6 +233,54 @@
   visibility: visible;
 }
 
+/* ---- The effect unit ------------------------------------------------------ */
+
+/* The selector, turned about its middle. It is kept at twice its size on the plate. */
+.rt-effect-knob {
+  position: absolute;
+  pointer-events: none;
+  transition: transform 0.16s ease-out;
+}
+
+/* What is printed on the label behind the window: ink on its paper. */
+.rt-effect-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--rt-ink);
+  font-family: var(--font-plate);
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0.86;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  --rt-ink: #1b1812;
+}
+
+.rt-effect-label [data-let]::after {
+  content: attr(data-let);
+}
+
+/* The drawing the plate had beside the effect's name, in the label's ink. */
+.rt-effect-icon {
+  flex: none;
+  width: 28px;
+  height: 26px;
+  background: var(--rt-ink);
+  mask: var(--rt-effect-icon) center / contain no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-effect-knob {
+    transition: none;
+  }
+}
+
 /* ---- The desk lamp ------------------------------------------------------- */
 
 /* The same pictures as the room has them with its lamp out, laid over the lit ones. */
