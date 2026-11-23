@@ -38,7 +38,7 @@ const MESSAGES: Record<UpgradeRefusal, string> = {
   unknown_key: 'That is not a license key I know.',
   key_taken: 'That license key is already on another account.',
   invalid: 'That request could not be read.',
-  too_many: 'I have had that request a lot just now. Try again in an hour.',
+  too_many: 'I have had that request a lot just now. Try again later.',
   withdrawn: 'That license was withdrawn, so it gives out no more license files.',
   no_signing_key: 'License files cannot be made just now.',
 };

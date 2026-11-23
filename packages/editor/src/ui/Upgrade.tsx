@@ -23,6 +23,9 @@ const STRIPE_WAIT_TRIES = 15;
 
 const KEY_SHAPE = `${LICENSE_KEY_PREFIX}-XXXXX-XXXXX-XXXXX-XXXXX`;
 
+/** The six effects the upgrade adds, as the modal names them. */
+const PAID_EFFECTS = 'a crusher, tape, a pump, a filter, vinyl and a phaser';
+
 const Problem = ({ text }: { text: string | null }) => <SharedProblem text={text} testId="upgrade-problem" />;
 
 interface KeyFormProps {
@@ -80,8 +83,8 @@ function Closed() {
   return (
     <div data-testid="upgrade-closed">
       <p className="sb-modal-text">
-        A one-time upgrade is planned: extra effects beyond the free ones, and a place to show your beats. It is not
-        open yet, and nothing can be bought here for now.
+        A one-time upgrade is on its way: six more effects for the machine, beside the four it has. It is not open
+        yet, and nothing can be bought here for now.
       </p>
       <p className="sb-modal-text">Everything on the machine today is free to use, and stays that way.</p>
     </div>
@@ -110,7 +113,12 @@ function Buy({ baseUrl, price, signedIn, toKey, toLost }: BuyProps) {
   return (
     <div data-testid="upgrade-offer">
       <p className="sb-modal-text">
-        The upgrade is paid for once. It comes with a license key, which is emailed to you.
+        The upgrade adds six effects to the machine: {PAID_EFFECTS}. You pay for it once, and the four effects the
+        machine has stay free.
+      </p>
+      <p className="sb-modal-text">
+        It comes with a license key, which is emailed to you. Enter the key in a browser, or log in to an account
+        that has it, and the six are unlocked there, offline too.
       </p>
       <div className="sb-form">
         <p className="sb-cart-total">
@@ -129,7 +137,8 @@ function Buy({ baseUrl, price, signedIn, toKey, toLost }: BuyProps) {
         </button>
         <p className="sb-hint">
           You pay on Stripe&rsquo;s page. I never see your card.{' '}
-          {signedIn ? 'The key goes onto this account as well.' : 'You do not need an account to buy it.'} The{' '}
+          {signedIn ? 'The key goes onto this account as well.' : 'You do not need an account to buy it.'} A beat
+          that uses one of the six still opens for anybody, and plays without it. The{' '}
           <a className="sb-link" href={`${baseUrl}policies`}>
             policies page
           </a>{' '}
@@ -332,8 +341,8 @@ function JustPaid({ signedIn, waiting, logIn }: JustPaidProps) {
     return (
       <div data-testid="upgrade-paid">
         <p className="sb-modal-text">
-          To put the key on an account, log in or make one. Then open this again and choose &ldquo;I have a
-          key&rdquo;.
+          The key in that email unlocks the six effects: close this, open it again and choose &ldquo;I have a
+          key&rdquo;. To put the key on an account, log in or make one first.
         </p>
         <LogInButton logIn={logIn} />
       </div>
@@ -388,7 +397,9 @@ function Upgraded({ baseUrl }: { baseUrl: string }) {
 
   return (
     <div data-testid="upgrade-upgraded">
-      <p className="sb-modal-text">This account is upgraded. This is its license key.</p>
+      <p className="sb-modal-text">
+        This account is upgraded: wherever it is logged in, the machine has all ten effects. This is its license key.
+      </p>
       {onDevice === 'account' && (
         <p className="sb-modal-text" data-testid="upgrade-on-device">
           The upgrade is unlocked on {draftKeeper()} while you are logged in, offline too. Logging out locks it here
