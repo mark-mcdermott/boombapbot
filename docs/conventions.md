@@ -546,8 +546,7 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   words, so a short page ends where its words do. Keep
   Policies true to what the site does: it covers accounts, saved beats and
   the shop, with the returns policy in the owner's words, and the upgrade,
-  with the owner's refund rule (30 days, whatever the reason). It says the
-  upgrade is not for sale yet; take that out when it opens.
+  with the owner's refund rule (30 days, whatever the reason).
   Every footer modal goes through `ui/Modal.tsx`.
 - Each footer icon has a tip with its name (`ui/Tip.tsx`, Base UI's tooltip)
   and a move of its own when pointed at. The tip is for the eye only: the
