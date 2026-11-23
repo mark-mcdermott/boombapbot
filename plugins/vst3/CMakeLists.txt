@@ -46,6 +46,23 @@ FetchContent_Declare(JUCE
   GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
+# ---- Ed25519 ----------------------------------------------------------------
+# The upgrade's license file is signed with Ed25519, which JUCE does not have.
+# Monocypher does, in its optional unit, and is fetched like JUCE and never
+# vendored. It is pinned to the commit its 4.0.2 tag names. See "Licensing" in
+# README.md for its terms.
+FetchContent_Declare(monocypher
+  GIT_REPOSITORY https://github.com/LoupVaillant/Monocypher.git
+  GIT_TAG 0d85f98c9d9b0227e42cf795cb527dff372b40a4)
+FetchContent_MakeAvailable(monocypher)
+add_library(boombapbot_ed25519 STATIC
+  "${monocypher_SOURCE_DIR}/src/monocypher.c"
+  "${monocypher_SOURCE_DIR}/src/optional/monocypher-ed25519.c")
+target_include_directories(boombapbot_ed25519 SYSTEM PUBLIC
+  "${monocypher_SOURCE_DIR}/src"
+  "${monocypher_SOURCE_DIR}/src/optional")
+set_target_properties(boombapbot_ed25519 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # ---- Shared engine ----------------------------------------------------------
 # The same static library the desktop app links. Its tests and the render
 # command line tool are not part of the plugin build.
@@ -106,6 +123,8 @@ target_sources(boombapbot_plugin PRIVATE
   Source/BeatDesk.h
   Source/BeatFile.cpp
   Source/BeatFile.h
+  Source/LicenseFile.cpp
+  Source/LicenseFile.h
   Source/MachineRitm12.h
   Source/Panel/Panel.cpp
   Source/Panel/Panel.h
@@ -153,6 +172,7 @@ endif()
 
 target_link_libraries(boombapbot_plugin
   PRIVATE
+    boombapbot_ed25519
     boombapbot_engine_ritm12
     juce::juce_audio_processors
   PUBLIC
@@ -195,7 +215,9 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     target_compile_definitions(${target} PRIVATE
       $<TARGET_PROPERTY:boombapbot_plugin,COMPILE_DEFINITIONS>
       BOOMBAPBOT_MACHINE_FILE="${MACHINE_RITM12_DIR}/data/ritm12.machine.json"
-      BOOMBAPBOT_FIXTURES_DIR="${MACHINE_RITM12_DIR}/fixtures")
+      BOOMBAPBOT_FIXTURES_DIR="${MACHINE_RITM12_DIR}/fixtures"
+      BOOMBAPBOT_LICENSE_CONTRACT="${BOOMBAPBOT_REPO_ROOT}/packages/contracts/src/license-file.ts"
+      BOOMBAPBOT_LICENSE_PAGE="${BOOMBAPBOT_REPO_ROOT}/docs/license-file.md")
     target_link_libraries(${target} PRIVATE
       boombapbot_plugin
       juce::juce_recommended_warning_flags)
@@ -210,7 +232,13 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
     target_compile_definitions(boombapbot_plugin_selftest PRIVATE BOOMBAPBOT_NO_HEAP_TRAP=1)
   endif()
   boombapbot_plugin_program(boombapbot_window_snapshot Tests/WindowSnapshot.cpp)
+  boombapbot_plugin_program(boombapbot_license_file_test Tests/LicenseFileTest.cpp)
   add_test(NAME vst3.processor_selftest COMMAND boombapbot_plugin_selftest)
+  # The check of the license file is told where the machine's file is, so it
+  # never reads, writes or removes the one a person keeps.
+  add_test(NAME vst3.license_file COMMAND boombapbot_license_file_test)
+  set_tests_properties(vst3.license_file PROPERTIES
+    ENVIRONMENT "BOOMBAPBOT_LICENSE_FILE=${CMAKE_CURRENT_BINARY_DIR}/license-file-test/boombapbot.license")
   add_test(NAME vst3.window_snapshot
     COMMAND boombapbot_window_snapshot "${CMAKE_CURRENT_BINARY_DIR}/window.png"
       "${MACHINE_RITM12_DIR}/fixtures/four-patterns.project.json")
@@ -292,6 +320,10 @@ if(BOOMBAPBOT_VST3_BUILD_TESTS)
       if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64" AND NOT rosetta_missing)
         add_test(NAME vst3.processor_selftest_x86_64
           COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_plugin_selftest>")
+        add_test(NAME vst3.license_file_x86_64
+          COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_license_file_test>")
+        set_tests_properties(vst3.license_file_x86_64 PROPERTIES
+          ENVIRONMENT "BOOMBAPBOT_LICENSE_FILE=${CMAKE_CURRENT_BINARY_DIR}/license-file-test-x86_64/boombapbot.license")
         if(BOOMBAPBOT_VST3_WEB_PANEL)
           add_test(NAME vst3.web_panel_x86_64
             COMMAND arch -x86_64 "$<TARGET_FILE:boombapbot_web_panel_check>"
