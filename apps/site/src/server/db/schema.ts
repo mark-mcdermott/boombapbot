@@ -203,7 +203,8 @@ export const avatar = pgTable(
  * is what keeps one payment to one key however often Stripe reports it. The
  * buyer need not have an account: `userId` is empty until the key is
  * entered in one, and empty again if that account is deleted, when the key
- * can go onto another. An account holds one license at most.
+ * can go onto another, or if the payment is refunded, when it cannot. An
+ * account holds one license at most.
  */
 export const license = pgTable(
   'licenses',
@@ -220,7 +221,7 @@ export const license = pgTable(
     stripePaymentIntentId: text('stripe_payment_intent_id'),
     /** When the key last went out by email. Empty until the first one has. */
     emailedAt: moment('emailed_at'),
-    /** When it was refunded or taken back. From then it gives out no license file; files already out keep working. */
+    /** When it was refunded or taken back. From then it is on no account and gives out no license file; files already out keep working. */
     withdrawnAt: moment('withdrawn_at'),
     createdAt: moment('created_at').notNull().defaultNow(),
     updatedAt: moment('updated_at').notNull().defaultNow(),

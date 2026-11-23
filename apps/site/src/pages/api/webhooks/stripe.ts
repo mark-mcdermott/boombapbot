@@ -4,11 +4,11 @@ import { STRIPE_WEBHOOK_SECRET } from 'astro:env/server';
 import { fulfil } from '../../../server/shop/fulfil';
 import { getStripe } from '../../../server/shop/stripe';
 import { json } from '../../../server/site';
-import { isUpgrade, issueLicense } from '../../../server/upgrade';
+import { isUpgrade, issueLicense, withdrawRefundedLicense } from '../../../server/upgrade';
 
 export const prerender = false;
 
-/** Stripe calls this when a checkout finishes. Only a request it signed is acted on. */
+/** Stripe calls this when a checkout finishes or a payment is refunded. Only a request it signed is acted on. */
 export const POST: APIRoute = async ({ request }) => {
   const stripe = getStripe();
   if (!stripe || !STRIPE_WEBHOOK_SECRET) return json({ message: 'Payments are not set up.' }, 503);
@@ -26,5 +26,6 @@ export const POST: APIRoute = async ({ request }) => {
     const session = event.data.object;
     await (isUpgrade(session) ? issueLicense(session) : fulfil(session));
   }
+  if (event.type === 'charge.refunded') await withdrawRefundedLicense(event.data.object);
   return json({ received: true });
 };

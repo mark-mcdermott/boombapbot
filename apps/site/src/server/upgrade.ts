@@ -39,7 +39,7 @@ const MESSAGES: Record<UpgradeRefusal, string> = {
   key_taken: 'That license key is already on another account.',
   invalid: 'That request could not be read.',
   too_many: 'I have had that request a lot just now. Try again later.',
-  withdrawn: 'That license was withdrawn, so it gives out no more license files.',
+  withdrawn: 'That license was refunded or withdrawn, so it no longer unlocks anything new.',
   no_signing_key: 'License files cannot be made just now.',
 };
 
@@ -110,6 +110,32 @@ export async function issueLicense(session: Stripe.Checkout.Session): Promise<vo
   await db.update(license).set({ emailedAt: now, updatedAt: now }).where(eq(license.id, held.id));
 }
 
+/** The payment a charge was for, as Stripe names it, or undefined where it names none. */
+function paymentIntentOf(charge: Stripe.Charge): string | undefined {
+  const intent = charge.payment_intent;
+  return typeof intent === 'string' ? intent : intent?.id;
+}
+
+/**
+ * Acts on a refund: the license that payment bought is withdrawn and comes
+ * off its account, which is then an account that has not upgraded. From then
+ * no license file is given for it, by its key or to anybody; the files given
+ * before keep working, since no program asks the server. Only a payment
+ * refunded in full does it. A charge that bought no license, such as an
+ * order from the shop, matches nothing here, and Stripe saying so twice
+ * changes nothing the second time.
+ */
+export async function withdrawRefundedLicense(charge: Stripe.Charge): Promise<void> {
+  const paymentIntent = paymentIntentOf(charge);
+  if (!charge.refunded || !paymentIntent) return;
+  const db = await getDb();
+  const now = new Date();
+  await db
+    .update(license)
+    .set({ withdrawnAt: now, userId: null, updatedAt: now })
+    .where(and(eq(license.stripePaymentIntentId, paymentIntent), isNull(license.withdrawnAt)));
+}
+
 /** A license as it leaves the server: named by its uuid, without its row id. */
 const licenseSummary = { id: license.uuid, key: license.key, issuedAt: license.createdAt };
 
@@ -130,8 +156,13 @@ export async function redeemKey(account: SignedInUser, typed: string): Promise<U
   const key = normalizeLicenseKey(typed);
   if (!key) return 'unknown_key';
   const db = await getDb();
-  const [found] = await db.select({ userId: license.userId }).from(license).where(eq(license.key, key)).limit(1);
+  const [found] = await db
+    .select({ userId: license.userId, withdrawnAt: license.withdrawnAt })
+    .from(license)
+    .where(eq(license.key, key))
+    .limit(1);
   if (!found) return 'unknown_key';
+  if (found.withdrawnAt) return 'withdrawn';
   if (found.userId === account.id) return null;
   if (found.userId !== null) return 'key_taken';
   if (await isUpgraded(account)) return 'already_upgraded';
@@ -139,7 +170,7 @@ export async function redeemKey(account: SignedInUser, typed: string): Promise<U
   const claimed = await db
     .update(license)
     .set({ userId: account.id, updatedAt: new Date() })
-    .where(and(eq(license.key, key), isNull(license.userId)))
+    .where(and(eq(license.key, key), isNull(license.userId), isNull(license.withdrawnAt)))
     .returning({ id: license.id });
   return claimed.length > 0 ? null : 'key_taken';
 }
@@ -152,7 +183,8 @@ export async function redeemKey(account: SignedInUser, typed: string): Promise<U
 const REMINDER_GAP_MS = AUTH_RATE_LIMIT === 'off' ? 0 : 10 * 60 * 1000;
 
 /**
- * Emails the keys bought with an address to that address again. A key is
+ * Emails the keys bought with an address to that address again, but for
+ * any that were withdrawn. A key is
  * marked as sent before it goes, in the statement that picks it, so asking
  * over and over fills nobody's inbox: each key goes out once in ten minutes
  * however many requests arrive, on however many servers.
@@ -165,7 +197,13 @@ export async function remindKeys(address: string): Promise<void> {
   const due = await db
     .update(license)
     .set({ emailedAt: now, updatedAt: now })
-    .where(and(eq(license.email, email), or(isNull(license.emailedAt), lte(license.emailedAt, lastSentBefore))))
+    .where(
+      and(
+        eq(license.email, email),
+        isNull(license.withdrawnAt),
+        or(isNull(license.emailedAt), lte(license.emailedAt, lastSentBefore)),
+      ),
+    )
     .returning({ key: license.key });
   for (const { key } of due) await sendLicenseKeyReminder(email, key);
 }
