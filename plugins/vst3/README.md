@@ -130,7 +130,8 @@ build to anyone, and [Not verified](#not-verified) for what nobody has checked.
     the host's project, the file a save suggests and the beat inside that
     file. A line that says what a load or a save did, or why not. And four
     keys: undo, load a beat, save a beat, and the shown pattern as MIDI, which
-    a click saves and a drag carries out of the window.
+    a click saves. A drag is meant to carry it out of the window, and in FL
+    Studio it does not yet: see "Not verified".
   - *Undo.* The host's undo does not reach the patterns, so the plugin has its
     own. A step key, a clear, a throw of the dice, a new measure size and
     loading a beat are each one step back, 64 at the most. It does not undo a
@@ -541,9 +542,8 @@ On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
   JUCE assertion.
 
 GitHub's macOS 26 runner does the same build and runs the same tests, fetching
-JUCE itself (the `vst3` job in `.github/workflows/native.yml`). It passed
-there with the panel drawn here as the window; whether the check that opens
-the painted window passes on a runner was not known when this was written.
+JUCE itself (the `vst3` job in `.github/workflows/native.yml`). All fourteen
+pass there too, the check that opens the painted window among them.
 
 **In FL Studio 2026 (26.1.7, under Rosetta), by the owner on 2026-11-22**, with
 the build of the hang fix, whose window was the panel drawn here:
@@ -560,22 +560,31 @@ the build of the hang fix, whose window was the panel drawn here:
 - the MIDI key dragged onto the Channel Rack imports the shown pattern. FL's
   playlist does not take it; see below.
 
-The owner also tried the first cut of the painted window in FL Studio that
-day, the picture alone with no bar, and found it worked.
+The owner also tried the painted window in FL Studio that day: first the
+picture alone with no bar, which worked, and then the window as it is now.
+With the bar:
+
+- the beat's name can be typed, and FL's own shortcuts do not fire while it
+  is;
+- undo, load and save work;
+- a click on the MIDI key saves the shown pattern, and the `.mid` is right.
+
+Dragging the MIDI key out of the window did not work; see below.
 
 ## Not verified
 
-- **The painted window as it is now, in a host.** The window with its bar has
-  only been opened by the tests. In FL Studio nobody has typed a name into
-  it, pressed its undo, load, save or MIDI keys, watched its meter or
-  recorded a knob as automation.
-- **Dragging the MIDI key out of the painted window.** The page tells the
-  plugin when the key is dragged and the plugin starts the system's drag,
-  which needs the mouse button still down. No test can hold one. A click on
-  the key, which saves the file, is tested.
-- **The keyboard in the painted window.** Whether typing works in a host, and
-  whether a click in the web view keeps the host's own shortcuts from it
-  until the host's window is clicked again.
+- **Dragging the MIDI key out of the painted window does not work.** The
+  owner tried it in FL Studio on 2026-11-22 and nothing was carried out. The
+  page tells the plugin when the key is dragged and the plugin asks the
+  system to start a drag, which needs the mouse button still down; why that
+  does not take, from a web view, has not been looked into. It is a known
+  gap and the owner is not asking for it now. A click on the key saves the
+  file, which then goes onto FL's Channel Rack from the Finder. The panel
+  drawn here drags.
+- **The rest of the painted window in a host.** In FL Studio nobody has
+  watched its meter or recorded a knob as automation, and whether a click in
+  the web view keeps FL's shortcuts from it afterwards, until FL's window is
+  clicked again, is not known. No other host has opened it.
 - **Several painted windows at once,** each with a web view and its
   processes, and how the page looks on a screen that is not Retina.
 - **Other hosts.** FL Studio has run it (see above). No other host has loaded
