@@ -15,7 +15,7 @@ import {
 import { removeAvatar, uploadAvatar } from '../account/avatar';
 import { deviceBeatLinks } from '../account/beat-links';
 import { signedInAccount, type SignedInAccount } from '../account/session';
-import { fetchDeviceLicense } from '../upgrade/device-license';
+import { deviceLicense, fetchDeviceLicense } from '../upgrade/device-license';
 import { takeParams } from './arrival';
 import { LinkButton, Problem as SharedProblem, useAttempt } from './attempt';
 import { Avatar } from './Avatar';
@@ -494,11 +494,20 @@ export function Account({ baseUrl, container, open, setOpen }: AccountProps) {
     setNotice(said ?? null);
   };
 
-  // Logging in is what brings an upgraded account's license file to a device.
+  // Logging in is what brings an upgraded account's license file to a device,
+  // and the server saying nobody is logged in is what takes it away again. A
+  // server that cannot be reached says neither, so a device works offline.
   const accountId = account?.id ?? null;
+  const nobody = !session.isPending && !session.error && accountId === null;
   useEffect(() => {
-    if (accountId) void fetchDeviceLicense(baseUrl);
-  }, [accountId, baseUrl]);
+    if (nobody) deviceLicense().loggedOut();
+    if (!accountId) return;
+    let loggedIn = true;
+    void fetchDeviceLicense(baseUrl, () => loggedIn);
+    return () => {
+      loggedIn = false;
+    };
+  }, [accountId, nobody, baseUrl]);
 
   useEffect(() => {
     const arrival = takeArrival();

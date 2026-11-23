@@ -4,6 +4,7 @@ import { Account } from './Account';
 import { FooterPages } from './Footer';
 import type { SitePageId } from './pages';
 import { Tip, TipGroup } from './Tip';
+import { Upgrade } from './Upgrade';
 
 /** What sits under the machine: handed the settings button and where modals and tips mount. */
 export type BelowMachine = (settings: ReactNode, container: RefObject<HTMLElement | null>) => ReactNode;
@@ -33,6 +34,7 @@ function ShellAccountFooter({ serverUrl, container, settings }: ShellAccountFoot
     <footer className="sb-footer">
       <TipGroup>
         <div className="sb-footer-icons sb-footer-tools">
+          <Upgrade baseUrl={serverUrl} container={container} logIn={() => setAccountOpen(true)} sells={false} />
           {settings}
           <Account baseUrl={serverUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />
         </div>
@@ -43,7 +45,10 @@ function ShellAccountFooter({ serverUrl, container, settings }: ShellAccountFoot
 
 /**
  * What sits under the machine in a shell that reaches the site's server and
- * carries none of its pages: the settings, and beside them the account. Hand
+ * carries none of its pages: a license key to enter, the settings, and
+ * beside them the account. It sells nothing: the key is bought on the site,
+ * and the shell must be one a typed key may unlock, which a store's app is
+ * not. Hand
  * its result to `BoombapbotEditor` as `below`.
  */
 export function shellAccountFooter(serverUrl: string): BelowMachine {

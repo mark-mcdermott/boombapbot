@@ -46,6 +46,11 @@ export function fetchLicenseFile(baseUrl: string): Promise<Asked<LicenseFileAnsw
   return ask(address(baseUrl, '/license'), LicenseFileAnswerSchema);
 }
 
+/** A signed license file for a key alone, with nobody logged in. The key stays on whatever account it is on. */
+export function fetchLicenseFileForKey(baseUrl: string, key: string): Promise<Asked<LicenseFileAnswer>> {
+  return ask(address(baseUrl, '/license'), LicenseFileAnswerSchema, 'POST', { key });
+}
+
 /** Puts a key bought without an account onto the account that is logged in. */
 export function redeemKey(baseUrl: string, key: string): Promise<Asked<unknown>> {
   return ask(address(baseUrl, '/redeem'), ANY_ANSWER, 'POST', { key });
