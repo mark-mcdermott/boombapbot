@@ -514,10 +514,30 @@ the build of the hang fix:
 
 ## Licensing
 
-JUCE 8 is offered under the AGPLv3 or a commercial licence from its makers. A
-plugin built with it can only be given to anyone else under one of the two:
-either boombapbot's plugin source is published under the AGPLv3, or a JUCE
-licence is bought. That choice has not been made. Until it is, builds are for
-the machine that made them, and CI builds the plugin and throws it away. The
-VST3 SDK that JUCE bundles has its own terms, which JUCE's
-`modules/juce_audio_processors/format_types/VST3_SDK` spells out.
+JUCE 8 is offered under the AGPLv3 or a commercial licence from its makers,
+and a plugin built with it can only be given to anyone else under one of the
+two. The owner chose on 2026-11-22: the commercial licence, on its free
+Starter tier, pending JUCE's confirmation that the tier covers this. The
+reason is the upgrade: its paid effects are to be gated in the plugin too, and
+under the AGPLv3 anyone may rebuild the plugin without the gate.
+
+What that tier asks, as the JUCE 8 licence reads (https://juce.com/legal/juce-8-licence/):
+
+- Revenue and funding from every source stay under 20,000 dollars over the
+  last twelve months. Above that a paid tier is needed, or distributing stops.
+- The plugin is not put under an open source licence. The repository can stay
+  public; a public repository is not a licence to use what is in it.
+- JUCE itself is not handed on apart from the plugin.
+
+Not done yet, so builds are still for the machine that made them and CI still
+throws its build away:
+
+- JUCE has not been asked. The licence does not say in so many words that a
+  closed plugin may be sold on the Starter tier; sales@juce.com is where it
+  names for questions.
+- The VST3 SDK that JUCE 8.0.9 bundles is 3.7.12, offered under the GPLv3 or
+  Steinberg's own agreement. Without the GPL, that agreement has to be signed
+  with Steinberg, or JUCE moved to a version that bundles the MIT-licensed
+  SDK 3.8.
+- JUCE's site now sells JUCE 9, whose terms have not been read. The plugin is
+  pinned to 8.0.9.
