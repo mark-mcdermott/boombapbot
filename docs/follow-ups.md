@@ -369,8 +369,7 @@ site its icon still opens a modal that says it is not open.
         - Nothing gates the six effects on the server: a beat that names
           one is saved and loaded for anybody, and plays without it.
       - The key route's limit, ten tries in ten minutes from one address,
-        has run on the test server and not on Vercel. Its refusal borrows
-        the words of the key-by-email limit, which say "an hour".
+        has run on the test server and not on Vercel.
       - Both routes answer whether or not the upgrade is open, like the
         routes that enter and recover a key.
   - **The modal is built**, on 2026-11-18, and shows only while the server
@@ -380,16 +379,16 @@ site its icon still opens a modal that says it is not open.
     shown to an upgraded account. It has run in the tests and by hand
     against the stand-in for Stripe, never against Stripe itself. What is
     left of it:
-    - **Its words.** What it says while the upgrade is open is a stand-in,
-      and nothing in it says what the five dollars unlocks, because that is
-      not decided. All of it is the owner's to write
-      (`packages/editor/src/ui/Upgrade.tsx`), and so is the wording of the
-      key's two emails (`src/server/email.ts`), the name Stripe shows
-      (`PRODUCT_NAME` in `api/upgrade/checkout.ts`) and the refusals in
-      `src/server/upgrade.ts`, which the modal shows as they are.
-    - Entering a key needs an account, so the modal sends somebody with no
-      account to the account modal and they have to come back to it
-      themselves. If a key alone is to unlock a device, this changes.
+    - **Its words are a draft**, since 2026-11-23, written to what is now
+      true and waiting for the owner to read: the six effects by name, that
+      it is paid once and the four stay free, that the key or an upgraded
+      account's log-in unlocks them and offline too, and that a beat using
+      one opens for anybody and plays without it. It says nothing of
+      refunds, the desktop app, the phone apps or the plugin. Still the
+      owner's to write: the key's two emails (`src/server/email.ts`), the
+      name Stripe shows (`PRODUCT_NAME` in `api/upgrade/checkout.ts`) and
+      the refusals in `src/server/upgrade.ts`, which the modal shows as
+      they are.
     - While the upgrade is closed the modal offers nothing, so a key bought
       earlier could not be entered or asked for again there. That only
       matters if the upgrade is ever closed after it has sold.

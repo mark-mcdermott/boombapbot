@@ -362,8 +362,9 @@ which features it will unlock is not decided.
   out of the address. Someone back before Stripe's webhook has arrived is
   thanked and not offered it again, and a logged-in buyer is looked up every
   two seconds, for half a minute, until the key is on the account.
-- The modal's words for the open upgrade are stand-ins, and none of them says
-  what the upgrade unlocks. They are the owner's to write before it is sold.
+- The modal's words name the six effects and say how they are unlocked. They
+  are a draft for the owner to read before it is sold, and say nothing of
+  refunds.
 
 What has been checked: all of the above against the built server with its
 database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`), the

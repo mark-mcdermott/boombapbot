@@ -679,7 +679,7 @@ test.describe('until the upgrade is switched on', () => {
     expect(answers.map((answer) => answer.status())).toEqual([202, 202, 202, 429]);
     expect(await answers.at(-1)!.json()).toEqual({
       code: 'too_many',
-      message: 'I have had that request a lot just now. Try again in an hour.',
+      message: 'I have had that request a lot just now. Try again later.',
     });
     expect((await remindFrom('198.51.100.5', newAddress())).status()).toBe(202);
   });
