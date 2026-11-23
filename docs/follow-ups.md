@@ -572,17 +572,19 @@ What is left:
 - **The painted window in a host.** Since 2026-11-22 the plugin's window is
   the painted panel in a web view, with a bar under it for the beat's name,
   its files and undo; the owner tried the first cut of it in FL Studio that
-  day and chose it. What the finished window has not met:
-  - FL Studio, with the bar and what came with it: the name typed in, undo,
-    load and save, the meter, a knob recorded as automation.
-  - Dragging the MIDI key out of the window. From a web view the drag is
-    started by the plugin once the page says the key is being dragged, with
-    the mouse button still down. No test can hold a mouse button, so nobody
-    knows yet whether the drag starts. A click on the key saves the file, and
-    that is tested.
-  - The keyboard. Whether typing a name works in FL, and whether a click in
-    the web view keeps FL's own shortcuts (the space bar for play) from it
-    until FL's window is clicked again.
+  day and chose it, and then tried the finished window there too: the name
+  can be typed without FL's shortcuts firing, undo, load and save work, and
+  a click on the MIDI key saves a `.mid` that is right. What is left:
+  - **Dragging the MIDI key out of the window does not work.** Tried by the
+    owner in FL Studio on 2026-11-22: nothing is carried out. From a web
+    view the drag is started by the plugin once the page says the key is
+    being dragged, with the mouse button still down, and that does not take;
+    why has not been looked into. The owner is not asking for it now. Until
+    it is mended the way into FL is the click, which saves the file, and the
+    Finder. The panel drawn in code drags.
+  - In FL nobody has watched the meter or recorded a knob as automation, and
+    whether a click in the web view keeps FL's own shortcuts (the space bar
+    for play) from it until FL's window is clicked again is not known.
   - Several instances, each with a web view and its processes; a screen that
     is not Retina.
   - Windows needs Microsoft's WebView2, at build time and on the user's
