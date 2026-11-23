@@ -33,8 +33,10 @@ get_filename_component(BOOMBAPBOT_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." 
 set(MACHINE_RITM12_DIR "${BOOMBAPBOT_REPO_ROOT}/packages/machine-ritm12")
 
 # ---- JUCE -------------------------------------------------------------------
-# Fetched at configure time and never vendored. JUCE 8 is AGPLv3 or commercial;
-# a licence has to be chosen before anything built from this is distributed.
+# Fetched at configure time and never vendored. JUCE 8 is AGPLv3 or commercial.
+# The commercial licence's free tier is chosen: see "Licensing" in README.md
+# for its limits and for what is left before anything built from this is
+# distributed.
 # To build against a local checkout instead of cloning, pass
 # -DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE.
 include(FetchContent)
