@@ -26,11 +26,14 @@ does not have.
   in one picture. [`cut-icons.py`](cut-icons.py) cuts each from it, as the
   phone's `phone/ink-*.svg` and printed onto its key for `patch/key-*.png`.
   Run it again when the sheet or the plate changes.
-- **`night/`** holds the plate and every patch again as the room has them
-  with its desk lamp switched off: cooler and dimmer, the lamp itself out,
-  and nothing moved. The page lays them over the lit ones when the lamp in
-  the picture is pressed. [`cut-night.py`](cut-night.py) makes all of it from
-  `plate.webp` and `patch/`. Run it again when either changes.
+- **`night/`** holds the plate, every patch and every part of the phone's
+  panel again as the room has them with its light out: cooler and dimmer,
+  the lamp itself out, and nothing moved. The page shows them when the lamp
+  in the picture is pressed, or the light switch in the footer.
+  [`cut-night.py`](cut-night.py) makes all of it from `plate.webp`, `patch/`
+  and `phone/`, with one grade for both panels. Run it again when any of
+  them changes; the colours the phone's panel paints itself follow the same
+  grade in `src/styles.css`.
 - **`props/ashtray.png`** and **`night/props/ashtray.png`** are the ashtray
   and its cigarette that stand on the bench in the corner of the picture, as
   they are with the desk lamp lit and with it out, running off the picture's
