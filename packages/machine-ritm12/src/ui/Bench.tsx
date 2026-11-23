@@ -24,6 +24,8 @@ const SMOKE_IN = {
 const BANDS = 11;
 /** The picture ends partway across the smoke's box. The smoke thins out before that edge, where it would otherwise stop dead. */
 const EDGE = { thins: 0.52, gone: 0.69 } as const;
+/** How fast the smoke moves, against how fast its strands are written to: slow, as smoke is in still air. */
+const PACE = 0.25;
 const FRAME_MS = 1000 / 30;
 /** The moment a still picture of the smoke shows, chosen for a good shape. */
 const STILL_AT = 11.5;
@@ -72,7 +74,7 @@ function Smoke({ light }: { light: keyof typeof SMOKE_IN }) {
       const width = Math.round(node.clientWidth * scale);
       const height = Math.round(node.clientHeight * scale);
       if (node.width !== width || node.height !== height) Object.assign(node, { width, height });
-      if (width > 0 && height > 0) draw(context, width, height, still ? STILL_AT : now / 1000, light);
+      if (width > 0 && height > 0) draw(context, width, height, still ? STILL_AT : (now / 1000) * PACE, light);
     };
     const tick = (now: number) => {
       if (now - drawnAt >= FRAME_MS) {
