@@ -97,8 +97,8 @@ in this file has been built unless it says so.
 
 Accounts are built: sign-up with a confirmed address, log-in, log-out and
 password reset, in the account modal, and saving beats to an account. The
-upgrade's server side and its modal are built and switched off; on the live
-site its icon still opens a modal that says it is not open.
+upgrade is built and, since 2026-11-24, open on the live site, where the
+owner has bought it and had it refunded.
 
 - **Accounts are live.** The Neon database has its tables, and Vercel has
   the Resend key, the sending address and its own `BETTER_AUTH_SECRET`. On
@@ -198,10 +198,11 @@ site its icon still opens a modal that says it is not open.
   Decided on 2026-11-17: a key is `BOOM` and four groups of five; it is
   emailed and can be read from the account, or emailed again to the address
   that paid; buying needs no account; a license outlives its account.
-  The server side is built to those decisions and switched off: a Stripe
+  The server side is built to those decisions: a Stripe
   checkout, one license and one emailed key for one payment, a route to
   enter a key in an account, routes to get it back, and `isUpgraded`
-  beside the session. It has only run in the tests. What is left, in order:
+  beside the session. It ran for real on 2026-11-24 (see "It is open"
+  below). What was left, in order:
   - **The migration is run.** `apps/site/drizzle/0003_licenses.sql` adds the
     `licenses` table, and it was run on Neon on 2026-11-17, after the code was
     merged. The table was checked afterwards: its columns, the four unique
@@ -306,8 +307,10 @@ site its icon still opens a modal that says it is not open.
         went back, sets `withdrawn_at` and takes the license off its
         account, which is then an account that has not upgraded and can buy
         again. The key gets no more license files, goes onto no account
-        and is not emailed again. A refund in part changes nothing. It has
-        only run in the tests. **Stripe has to be told to send the event:**
+        and is not emailed again. A refund in part changes nothing. The
+        owner added `charge.refunded` to the endpoint's events on
+        2026-11-24 and a real refund in full withdrew a real license that
+        day. What had to be done: **Stripe has to be told to send the event:**
         in the dashboard, under Developers, Webhooks, add
         `charge.refunded` to the events of the endpoint the site already
         has. Until then a refund withdraws nothing. A device that already
@@ -332,10 +335,9 @@ site its icon still opens a modal that says it is not open.
         `manual_`, since no payment made it), logged in on the site, and
         the selector reached all ten effects, each of which played. Logged
         out, it reached four again; logged in with the network off and the
-        page reloaded, it still reached ten. Not tried there: a key alone,
-        which the site's modal offers only while the upgrade is open; a
-        license made by a payment; and the desktop and phone apps. What is
-        left of it:
+        page reloaded, it still reached ten. A key alone, a license made by a payment and the iOS app followed on
+        2026-11-24 (see "It is open" below); the desktop app and the
+        Android app have not. What is left of it:
         - **A key alone unlocks the site and the desktop app**, since
           2026-11-23: typed with nobody logged in, it fetches its file
           (`POST /api/upgrade/license`) and goes onto no account. The
@@ -427,9 +429,24 @@ site its icon still opens a modal that says it is not open.
     refund rule: within 30 days, whatever the reason. The rest of the
     wording is a stand-in for the owner to rewrite. The sentence saying it
     was not for sale yet came out on 2026-11-23, ahead of the switch.
-  - **Open it.** Set `UPGRADE_OPEN=on` in Vercel and deploy. The Stripe
-    webhook already registered for the shop is the one it uses, with
-    `charge.refunded` added to its events for refunds.
+  - **It is open**, since 2026-11-24: the owner set `UPGRADE_OPEN=on` in
+    Vercel and added `charge.refunded` to the events of the Stripe webhook
+    the shop already had, and the site was deployed again. That day they
+    made a new account on the live site and bought the upgrade. Seen to
+    work: the payment at Stripe, the key by email, ten effects for the
+    account and four logged out, the key alone unlocking a browser with
+    nobody logged in, and the same account reaching ten in the iOS app on
+    an iPhone and four logged out. The phone's earlier build, from
+    2026-11-19, could not fetch a license and reached four either way. A
+    refund in full at Stripe then took the license off the account: the
+    browser that held the key's file kept its ten until the key was
+    removed, the account logged in again reached four, and the key was
+    refused. Not tried with a real license: the desktop app, the plugin,
+    the Android app, a lost key asked for by email, a purchase made while
+    logged out, and a refund in part. The words of the open modal and of
+    the key's email are still stand-ins. The Policies page says no sales
+    tax or VAT is collected, which is what the checkout does; whether any
+    is owed on a digital sale is the owner's to ask an accountant.
   - **Refunds.** Refunding the whole payment in Stripe withdraws the
     license (see the license file above), once Stripe sends
     `charge.refunded`. The Policies page promises a refund within 30
@@ -485,8 +502,8 @@ site its icon still opens a modal that says it is not open.
   they asked for on 2026-11-18 followed. Later that day they gave a new text
   of three paragraphs, and that is what is there now, word for word under
   the same title. It says "I've added a small paid tier to this app". The
-  upgrade is built and not open. About said upgrades were not here yet
-  until 2026-11-23. The page's description for search engines
+  upgrade has been open since 2026-11-24. About said upgrades were not
+  here yet until 2026-11-23. The page's description for search engines
   still calls it a footnote to a drum machine, from the text before.
 - **The pages of words** were laid out again on 2026-11-17: a compact
   masthead that names the pages, headings in a rail, About opening on a
@@ -870,6 +887,6 @@ Started, and open to nobody yet (both under "Upgrade" above):
   upgrade is held, which is nowhere yet.
 - **Paying.** The build spec's billing is, by the owner's decision, a flat
   one-time upgrade with no subscription: a Stripe checkout, a license key
-  and `isUpgraded` on the server, and the modal. It is built and switched
-  off (`UPGRADE_OPEN`), and has run against Stripe's stand-in in the tests,
-  never against Stripe itself.
+  and `isUpgraded` on the server, and the modal. It is built and, since
+  2026-11-24, open, and the owner has paid and been refunded through
+  Stripe itself.

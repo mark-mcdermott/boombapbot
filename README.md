@@ -77,8 +77,8 @@ pnpm serve
   words, in one row, with "by mm.coffee" under it.
   Settings holds the beat name, undo and redo, a reset to the starter
   patterns, a clear for one pattern and one for everything, import and
-  export, and the save and audio status. The upgrade is not for sale: its
-  modal says so, and the server behind it is switched off (see
+  export, and the save and audio status. The upgrade is for sale since
+  2026-11-24: its modal sells it and takes a key (see
   [Upgrade](#upgrade)). The cart is a shop (see [Shop](#shop)).
 - **Accounts, if you want one.** The account button opens a modal to make an
   account, confirm the address from an emailed link, log in and out, and
@@ -300,9 +300,8 @@ webhooks registered (Printful's by `pnpm shop:webhook --register`).
 
 ## Upgrade
 
-A one-time payment of 5 dollars that gives a license key. The server side
-and its modal exist, and it is switched off: nothing checks for it yet, and
-which features it will unlock is not decided.
+A one-time payment of 5 dollars that gives a license key and unlocks six
+more effects. The owner opened it on the live site on 2026-11-24.
 
 - It sells nothing until `UPGRADE_OPEN` is `on` and Stripe's key and webhook
   secret are set. Until then `/api/upgrade/checkout` refuses.
@@ -368,8 +367,8 @@ which features it will unlock is not decided.
   thanked and not offered it again, and a logged-in buyer is looked up every
   two seconds, for half a minute, until the key is on the account.
 - The modal's words name the six effects and say how they are unlocked. They
-  are a draft for the owner to read before it is sold, and say nothing of
-  refunds.
+  are a draft for the owner to rewrite, and say nothing of refunds; the
+  Policies page has the refund rule.
 
 What has been checked: all of the above against the built server with its
 database in memory and a stand-in for Stripe (`e2e/upgrade.spec.ts`), the
@@ -377,10 +376,21 @@ modal included, and the modal by hand on that same server at a computer's
 width and a phone's. On the live site, on 2026-11-23, the owner gave their own account a license
 by adding a row to `licenses` by hand, and logging in unlocked all ten
 effects, which played; logging out locked them again, and logged in with
-the network off they stayed unlocked. What has not: anything against real
-Stripe or a real email, a key alone on the live site, and the desktop and
-phone apps with a license. The live `licenses` table, there since
-2026-11-17, has held only that hand-made row.
+the network off they stayed unlocked.
+
+On 2026-11-24, with the upgrade open on the live site, the owner made a new
+account and bought it for real. Stripe took the 5 dollars, the key came by
+email and the account reached all ten effects; logged out it reached four.
+The key typed with nobody logged in unlocked the browser. The same account
+logged in to the iOS app on an iPhone reached ten there and four when
+logged out; the build that was on the phone, from before the app fetched a
+license, reached four either way. The owner then refunded the payment in
+full at Stripe: the browser, which held the key's file, kept its ten until
+the key was removed from it, and after that the account logged in again
+reached four and the key was refused. What has not been tried with a real
+license: the desktop app, the plugin, the Android app, a lost key asked
+for again by email, a purchase made while logged out, and a refund in
+part.
 
 ## Tests
 
