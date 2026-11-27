@@ -12,6 +12,7 @@
     "sync": "pnpm build && cap sync",
     "ios": "pnpm engine:ios && pnpm sync && cap run ios",
     "android": "pnpm sync && cap run android",
+    "android:bundle": "pnpm sync && cd android && ./gradlew :app:bundleRelease",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
