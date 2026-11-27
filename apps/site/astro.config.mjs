@@ -37,6 +37,8 @@ export default defineConfig({
       STRIPE_API_URL: atRunTime(),
       UPGRADE_OPEN: atRunTime(),
       LICENSE_SIGNING_KEY: atRunTime(),
+      APPLE_APP_ID: atRunTime(),
+      APPLE_ROOT_CA: atRunTime(),
       PRINTFUL_API_KEY: atRunTime(),
       PRINTFUL_STORE_ID: atRunTime(),
       PRINTFUL_WEBHOOK_SECRET: atRunTime(),

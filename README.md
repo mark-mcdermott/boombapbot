@@ -320,7 +320,9 @@ more effects. The owner opened it on the live site on 2026-11-24.
 - A signed license file is what will unlock the paid effects with no server
   to ask. `POST /api/upgrade/license` gives one for a key alone, with no
   account, to at most ten tries in ten minutes from one address;
-  `GET /api/upgrade/license` gives one to a logged-in account that has
+  `POST /api/upgrade/store` gives one for a purchase made in the iOS app,
+  as the App Store signed it, and makes the license the first time it is
+  shown; nothing in the apps calls it yet. `GET /api/upgrade/license` gives one to a logged-in account that has
   upgraded. The server signs with `LICENSE_SIGNING_KEY` and gives out none
   without it. `verifyLicenseFile` in `packages/contracts` checks a file
   against a public key and says what it unlocks; the format, for the
