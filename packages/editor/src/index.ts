@@ -15,6 +15,7 @@ export {
   keepDeviceLicenseIn,
   useDeviceUpgraded,
 } from './upgrade/device-license';
+export type { StoreBridge, StoreBuy, StorePurchase } from './upgrade/store';
 export { SitePage, type SitePageLayout, type SitePageProps } from './ui/SitePage';
 export { RuntimeContext, useAssetManifest, useEditorState, useRuntime } from './ui/context';
 export { useKnob, type KnobOptions } from './ui/knob';

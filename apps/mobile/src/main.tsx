@@ -20,6 +20,7 @@ import { openDeviceStorage } from './device-storage';
 import { PageScreen } from './PageScreen';
 import { PAGES_FILE, PAGES_URL, readPages, type CarriedPages } from './pages';
 import { ENGINE_PLUGIN, checkIfAsked, pluginEngine, type EnginePlugin } from './native-engine';
+import { STORE_PLUGIN, appStore, type StorePlugin } from './native-store';
 import { openTokenStore } from './session-token';
 import { shareThrough, type DeviceFiles } from './share-file';
 import './styles.css';
@@ -81,8 +82,11 @@ const audio: AudioFactory | undefined = enginePlugin
 /** The site, whose server keeps the accounts. A build for a test names another. */
 const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'https://boombapbot.com/';
 
+/** Where the phone has a store plug-in, the upgrade is sold there. In a browser, which has none, the app sells nothing. */
+const store = Capacitor.isPluginAvailable(STORE_PLUGIN) ? appStore(registerPlugin<StorePlugin>(STORE_PLUGIN)) : undefined;
+
 /** The pages are in the app. The shop is on the site and opens in the phone's browser; the account is on its server. */
-const site: ShellSite = { pagesUrl: PAGES_URL, shopUrl: `${SITE_URL}?cart=open`, serverUrl: SITE_URL };
+const site: ShellSite = { pagesUrl: PAGES_URL, shopUrl: `${SITE_URL}?cart=open`, serverUrl: SITE_URL, store };
 
 /** The pages of words the app carries. Without them the machine is all there is, as it was. */
 async function carriedPages(): Promise<CarriedPages | null> {

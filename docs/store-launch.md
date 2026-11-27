@@ -76,7 +76,10 @@ They change. Read them again before building on any of these.
 1. Read Apple's 3.1 and Google's payments policy in full.
 2. One product in each store, bought once, at 5 dollars. Needs the app
    records.
-3. iOS: StoreKit, with "Restore purchases".
+3. iOS: StoreKit, with "Restore purchases". Built, 2026-11-27:
+   `apps/mobile/native-store` and the editor's `StoreUpgrade`. It has run
+   in a simulator, where the store has nothing to sell; nothing has been
+   bought.
 4. Android: Play Billing.
 5. A route on the server that checks a store's receipt with Apple or
    Google itself and makes the license, once however often it is told.
@@ -100,7 +103,9 @@ Before Apple's half can run on the live site, in this order:
   `https://boombapbot.com/api/webhooks/apple`. Until then a refund at
   Apple withdraws nothing.
 7. An upgrade screen in the apps, which have none, with nothing in it that
-   sends a buyer elsewhere to pay.
+   sends a buyer elsewhere to pay. The iOS app has it, 2026-11-27; its
+   words are a stand-in for the owner to rewrite. Android's waits on Play
+   Billing.
 8. Tried in each store's sandbox: buying, restoring, a refund.
 
 ### What a store asks of the app

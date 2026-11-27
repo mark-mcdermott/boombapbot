@@ -321,6 +321,21 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `pnpm prepare:assets` made. `ios/` and `android/` are Capacitor's native
   projects and are committed; `cap sync` rewrites parts of them. Its
   `README.md` says how to run it, what was checked and what is left.
+- A shell that sells the upgrade through the phone's store hands the
+  editor a `StoreBridge` (`upgrade/store.ts`), as `store` on `ShellSite`:
+  three calls, `product`, `buy` and `owned`, and `watch`. The footer then
+  has `StoreUpgrade` (`ui/StoreUpgrade.tsx`) in place of the site's
+  upgrade modal. It takes no license key and names nowhere else to pay,
+  which Apple's rules ask; keep both out of it. A purchase is never
+  believed on the phone: the page shows the server what the store signed
+  (`unlockWithPurchase`) and keeps the license file that comes back, with
+  the source `store`. A device unlocked that way stays unlocked logged
+  out, and is locked again only when the store holds no purchase or the
+  server says it was refunded (`syncWithStore`). The iOS app's store is
+  the plug-in `apps/mobile/native-store`, a package of its own because
+  Capacitor takes one plug-in class from a package. Its product id is
+  `STORE_UPGRADE_PRODUCT` in the contracts, spelled again in the Swift;
+  a unit test holds the two together.
 - The phone's engine plug-in is `apps/mobile/native-engine`, a package the
   app depends on (`link:`) so that Capacitor finds it: Capacitor calls it
   `BoombapbotNativeEngine` and asks its `Package.swift` for a product of

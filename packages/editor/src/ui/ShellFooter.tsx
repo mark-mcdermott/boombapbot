@@ -3,6 +3,8 @@ import { useState, type ReactNode, type RefObject } from 'react';
 import { Account } from './Account';
 import { FooterPages } from './Footer';
 import type { SitePageId } from './pages';
+import type { StoreBridge } from '../upgrade/store';
+import { StoreUpgrade } from './StoreUpgrade';
 import { Tip, TipGroup } from './Tip';
 import { Upgrade } from './Upgrade';
 
@@ -66,6 +68,11 @@ export interface ShellSite {
    * (see `linkServer`). With it the machine's screen has the account button.
    */
   serverUrl?: string;
+  /**
+   * The phone's store, if the shell sells the upgrade there. With it, and a
+   * server to make the license, the machine's screen has the upgrade button.
+   */
+  store?: StoreBridge;
 }
 
 interface ShellSiteFooterProps {
@@ -81,7 +88,8 @@ interface ShellSiteFooterProps {
 /**
  * The footer of a shell that carries the pages of words: the pages, the way
  * out to the shop, the settings, and beside the settings the account, where
- * the shell reaches the site's server. It has no cart or upgrade.
+ * the shell reaches the site's server. It has no cart, and an upgrade only
+ * where the shell sells it through the phone's store.
  */
 export function ShellSiteFooter({ site, container, current, settings }: ShellSiteFooterProps) {
   const [accountOpen, setAccountOpen] = useState(false);
@@ -104,6 +112,14 @@ export function ShellSiteFooter({ site, container, current, settings }: ShellSit
                 <span className="sb-footer-word">Merch</span>
               </a>
             </Tip>
+            {settings && site.serverUrl && site.store && (
+              <StoreUpgrade
+                serverUrl={site.serverUrl}
+                store={site.store}
+                container={container}
+                logIn={() => setAccountOpen(true)}
+              />
+            )}
             {settings}
             {settings && site.serverUrl && (
               <Account baseUrl={site.serverUrl} container={container} open={accountOpen} setOpen={setAccountOpen} />

@@ -1,0 +1,5 @@
+# What Swift Package Manager and Xcode keep beside a package. The app's own
+# Package.resolved, under ios/App, is the one that is committed.
+.build/
+.swiftpm/
+Package.resolved

@@ -19,6 +19,7 @@
     "@boombapbot/editor": "workspace:*",
     "@boombapbot/machine-ritm12": "workspace:*",
     "@boombapbot/native-engine": "link:./native-engine",
+    "@boombapbot/native-store": "link:./native-store",
     "@capacitor/android": "8.6.2",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.6.2",
@@ -32,6 +33,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@boombapbot/contracts": "workspace:*",
     "@capacitor/cli": "8.6.2",
     "@tailwindcss/vite": "4.3.5",
     "@types/node": "22.20.5",

@@ -1,0 +1,11 @@
+{
+  "name": "@boombapbot/native-store",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The phone app's Capacitor plug-in for the phone's store: buying the upgrade and getting a purchase back.",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  }
+}

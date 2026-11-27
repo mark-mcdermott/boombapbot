@@ -150,8 +150,33 @@ for that, and its web view may be asleep:
   leaves makes the engine again, as in front, and the beat plays on only
   if the page is awake to tell it.
 
-The cart and the upgrade are left out on purpose. The machine itself talks
-to no server; the account does, and only once its button is pressed.
+The cart is left out on purpose. The machine itself talks to no server;
+the account does, and only once its button is pressed.
+
+On an iPhone the upgrade is sold through the App Store, since 2026-11-27.
+`native-store/` is a second plug-in, `BoombapbotStore`, in Swift on
+StoreKit: it lists the upgrade with the store's own price, asks the store
+to sell it, and says what the buyer holds. It decides nothing. A purchase
+leaves it as Apple signed it, the page shows that to the site's server
+(`POST /api/upgrade/store`), and the license file the server answers with
+is what unlocks the six effects, as everywhere else. `src/native-store.ts`
+makes the plug-in the `StoreBridge` the editor asks for, and the footer
+then has an Upgrade button (`StoreUpgrade` in the editor): the price, Buy,
+and "Restore purchases". It takes no license key and names nowhere else to
+pay. When the app opens, when somebody logs in and when the store says
+something changed, the page asks the store what the buyer holds: a
+purchase unlocks a phone that was not, as after the app is installed
+again, and goes onto the account that is logged in; none locks a phone a
+purchase had unlocked, which is what a refund comes to. On Android there
+is no store plug-in yet, so the app there sells nothing and unlocks by
+logging in.
+
+What ran: the app in an iPhone simulator with the plug-in loaded, where
+the Upgrade button opens the screen and, the store having no such product
+yet, the screen says it cannot be bought and Buy is switched off. The
+logic is unit tested with a made-up store and server. Nothing has been
+bought: that needs the product in App Store Connect and `APPLE_APP_ID` on
+the server, and then a sandbox account.
 
 The account button beside the settings is the site's: log in, sign up,
 saved beats, log out, delete the account. The app's page is not served from
