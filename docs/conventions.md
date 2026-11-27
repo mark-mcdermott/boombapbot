@@ -14,8 +14,8 @@ store. On both phones it plays through the engine built natively.
 built natively behind the same editor. It runs on the Mac it was built on
 and is not signed. On Windows it compiles and its Rust tests pass in CI,
 and it has not run on a Windows machine. The paid upgrade, a one-time
-payment rather than billing, is built and switched off, and its six effects
-are in the engine only. Background sync is not started.
+payment rather than billing, is on sale on the live site since 2026-11-24
+and unlocks six more effects. Background sync is not started.
 
 ## Commands
 
@@ -554,10 +554,10 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   lucide's icons by their order, so look at all eight after changing an icon
   or upgrading `lucide-react`.
 - The upgrade's modal is `ui/Upgrade.tsx` (see Upgrade below). While the
-  server says it is closed, which the live site does, it says it is not open
-  and offers no form; a browser test holds that. Which features are paid is
-  not decided, so do not add a feature list or a promise to it, open or
-  closed. The cart is the shop (`ui/Shop.tsx`); it shows products only when
+  server says it is closed it says it is not open and offers no form; a
+  browser test holds that. The live site has said it is open since
+  2026-11-24. Open, the modal names the six effects and promises nothing
+  else; do not add to that unasked. The cart is the shop (`ui/Shop.tsx`); it shows products only when
   the server says the shop is open.
 - The footer keeps whether the account modal is open, so that the upgrade's
   modal can close itself and send somebody there to log in.
@@ -703,7 +703,9 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   outlives its account. The price and the shape of a key are in
   `packages/contracts/src/upgrade.ts`; the server is `src/server/upgrade.ts`
   and the routes under `api/upgrade`.
-- This is the entitlement, not the gating. Nothing calls `isUpgraded` yet.
+- The server's side is the entitlement. The gating is the license file a
+  device holds (`upgrade/device-license.ts` in the editor), which the
+  machine asks about and no server route does.
   The owner decided on 2026-11-18 that the upgrade unlocks extra effects:
   new ones, beside the four the machine has, which stay free as the modal
   promises. They are fully gated: someone who has not upgraded cannot hear
@@ -711,13 +713,13 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   rate), tape (saturation, a slow wobble and a duller top), a pump (a
   compressor that ducks everything under the kick), a filter (a resonant
   low-pass swept by the mix knob), vinyl (crackle and hiss) and a phaser.
-  On the picture they will be further positions of the effect selector,
-  named in its window. They cannot be reached yet, so do not tell a visitor
-  what the upgrade unlocks until they can.
+  On the picture they are further positions of the effect selector, named
+  in its window, and only a device that holds a license reaches them.
 - It is closed until `UPGRADE_OPEN` is `on`, and without Stripe's key or the
   webhook's secret (`upgradeOpen`). Closed, checkout refuses. A payment
   already made is still honoured: the webhook does not ask whether it is
-  open. Do not set the switch for the owner.
+  open. The owner set the switch on 2026-11-24. It stays theirs: do not
+  change it for them.
 - A row in `licenses` is a license somebody paid for. Checkout records
   nothing; only the signed Stripe webhook makes a row (`issueLicense`).
   `stripe_session_id` is unique and the insert steps aside for a row that
@@ -744,7 +746,8 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   server says the account is upgraded the modal thanks the buyer, hides the
   button and asks again every two seconds for half a minute. Opened from
   its icon it starts over. Entering a key needs an account, as the server
-  does; whether a key alone should unlock a device is not decided.
+  does. With nobody logged in, a key unlocks the device it is typed on
+  and goes onto no account.
 - The words the modal uses while the upgrade is open, and the refusals it
   shows from `src/server/upgrade.ts`, are stand-ins for the owner to
   rewrite. The closed modal's words are the owner's and were not changed.
@@ -830,7 +833,15 @@ rest: a real change of sound device, the dialog that asks where to keep an
 export, and Windows. The phone app's native engine has run in an iPhone
 simulator and an Android emulator only, and the same holds: no one has
 listened, and no real call, headphones or change of device has happened
-to it. The emulator's faked call is the one interruption that has.
+to it. The emulator's faked call is the one interruption that has. On
+2026-11-24 the owner ran the iOS app on an iPhone, logged in there and
+turned its effect selector; they did not say they listened to it.
+The upgrade has been bought once for real, on the live site on 2026-11-24,
+by the owner on a new account: the payment, the key by email, the six
+effects by account and by key alone in a browser and by account in the iOS
+app, and a refund in full that withdrew the license. Not tried with a real
+license: the desktop app, the plugin, the Android app, a lost key asked
+for by email, a purchase made while logged out, and a refund in part.
 Say so rather than assuming these work.
 
 ## Working in this repo
