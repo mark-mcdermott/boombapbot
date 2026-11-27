@@ -444,10 +444,20 @@ order. What follows is the detail behind parts of it.
 
 - Run it on a real phone. The Galaxy S9 that played the site is the one to
   try first, for stutter. It has run on an emulator only.
-- A release build needs an upload key and Play App Signing. The key is
-  yours to make and keep; it must never be committed.
-- `versionCode` and `versionName` in `android/app/build.gradle` are still 1
-  and "1.0". Every upload to Play needs a higher `versionCode`.
+- **A release build**, since 2026-11-26:
+  `pnpm --filter @boombapbot/mobile android:bundle -PbuildNumber=2` makes
+  `android/app/build/outputs/bundle/release/app-release.aab`, the file Play
+  takes. `buildNumber` is the `versionCode`, 1 when not given; every upload
+  to Play needs a higher one. `versionName` is still "1.0".
+- **The upload key** is yours to make and keep, and is never in the
+  repository. The build reads where it is from
+  `~/.boombapbot/android-upload.properties`, or from the file
+  `BOOMBAPBOT_ANDROID_UPLOAD_KEY` names: four lines, `storeFile`,
+  `storePassword`, `keyAlias` and `keyPassword`. With no such file the
+  bundle is built unsigned, which Play will not take. Both ways were run on
+  2026-11-26, the signed one with a key made for the check and deleted
+  after it. Nothing has been uploaded to Play. Turn on Play App Signing
+  when the app's record is made, so that a lost upload key can be replaced.
 - Play only takes apps that target a recent API level. The project targets
   36; check the rule of the day before the first upload.
 

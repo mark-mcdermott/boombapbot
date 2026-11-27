@@ -89,8 +89,10 @@ They change. Read them again before building on any of these.
 3. ~~`arm64` in place of `armv7` as what the phone must have.~~ Done
    2026-11-26.
 4. Signing for a release build on each, with no team or key committed.
-5. Version numbers. Both are 1 and "1.0", and every upload needs a higher
-   build number.
+   Android's is done, 2026-11-26: the build reads the owner's upload key
+   from a file outside the repository. iOS is left.
+5. Version numbers. Every upload needs a higher build number. Android
+   takes it as `-PbuildNumber`, since 2026-11-26; iOS is still 1.
 6. The Policies page: what the app keeps, and the upgrade as the stores
    sell it. Both listings link to it.
 7. Deleting an account from inside the app, tried on both phones, and a

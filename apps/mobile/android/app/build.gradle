@@ -1,5 +1,16 @@
 apply plugin: 'com.android.application'
 
+// The upload key is the owner's and is never in the repository. A file
+// outside it says where the key is; without one a release build is unsigned.
+def uploadKeyFile = file(System.getenv('BOOMBAPBOT_ANDROID_UPLOAD_KEY') ?: "${System.getProperty('user.home')}/.boombapbot/android-upload.properties")
+def uploadKey = new Properties()
+if (uploadKeyFile.exists()) {
+    uploadKeyFile.withInputStream { uploadKey.load(it) }
+}
+
+// Every upload to Play needs a higher number: -PbuildNumber=7.
+def buildNumber = (findProperty('buildNumber') ?: '1') as Integer
+
 android {
     namespace = "com.boombapbot.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,7 +18,7 @@ android {
         applicationId "com.boombapbot.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode buildNumber
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,8 +27,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        upload {
+            if (uploadKeyFile.exists()) {
+                storeFile file(uploadKey['storeFile'])
+                storePassword uploadKey['storePassword']
+                keyAlias uploadKey['keyAlias']
+                keyPassword uploadKey['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            signingConfig uploadKeyFile.exists() ? signingConfigs.upload : null
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
