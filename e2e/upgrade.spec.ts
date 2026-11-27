@@ -1,5 +1,4 @@
-import { createPrivateKey, createPublicKey, verify } from 'node:crypto';
-import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { PASSWORD, ROW_ID, UUID, signedUp, signedUpRequest } from './account';
 import {
   ACCOUNTS_URL,
@@ -10,6 +9,7 @@ import {
   LICENSE_SIGNING_KEY,
 } from './accounts-server';
 import { openEditor, scanner } from './helpers';
+import { licenseFileIn, refused } from './license';
 import { mailTo, newAddress } from './mail';
 import { startServer, type SecondServer } from './second-server';
 import { checkoutEvent, refundEvent } from './stripe';
@@ -81,39 +81,6 @@ const remind = (request: APIRequestContext, email: unknown) =>
 
 const licenseFile = (request: APIRequestContext, key: unknown, headers: Record<string, string> = json) =>
   request.post('/api/upgrade/license', { data: { key }, headers });
-
-/** The public half of the test server's signing key, worked out by Node from the 32 bytes the server was given. */
-const LICENSE_VERIFYING_KEY = createPublicKey(
-  createPrivateKey({
-    key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(LICENSE_SIGNING_KEY, 'base64url')]),
-    format: 'der',
-    type: 'pkcs8',
-  }),
-);
-
-/**
- * What a license file says, once Node's own Ed25519 has checked it the way
- * docs/license-file.md describes: the signature is over everything before
- * the last dot.
- */
-async function licenseFileIn(answer: APIResponse): Promise<{ version: number; licenseId: string; issuedAt: string; unlocks: string[] }> {
-  expect(answer.status(), await answer.text()).toBe(200);
-  const text = await answer.text();
-  expect(text).not.toMatch(ROW_ID);
-  const body = JSON.parse(text);
-  expect(Object.keys(body)).toEqual(['file']);
-  const [prefix, payload, signature, ...more] = (body.file as string).split('.');
-  expect(more).toEqual([]);
-  expect(prefix).toBe('boombapbot-license');
-  const signed = Buffer.from(`${prefix}.${payload}`);
-  expect(verify(null, signed, LICENSE_VERIFYING_KEY, Buffer.from(signature!, 'base64url'))).toBe(true);
-  return JSON.parse(Buffer.from(payload!, 'base64url').toString('utf8'));
-}
-
-async function refused(answer: APIResponse, status: number, code: string): Promise<void> {
-  expect(answer.status(), await answer.text()).toBe(status);
-  expect(await answer.json()).toMatchObject({ code, message: expect.stringMatching(/\S/) });
-}
 
 test('it costs five dollars, and nobody has it who has not bought it', async ({ request }) => {
   const closedToNobody = { open: true, priceCents: 500, currency: 'usd', upgraded: false };

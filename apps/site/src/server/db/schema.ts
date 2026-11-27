@@ -214,11 +214,16 @@ export const license = pgTable(
     userId: integer('user_id')
       .unique()
       .references(() => user.id, { onDelete: 'set null' }),
-    /** Where the key was sent, in lower case. It can be sent there again. */
-    email: text('email').notNull(),
+    /** Where the key was sent, in lower case. It can be sent there again. Empty for a store's purchase: a store names no address. */
+    email: text('email'),
     key: text('key').notNull().unique(),
-    stripeSessionId: text('stripe_session_id').notNull().unique(),
+    /** The Stripe checkout that paid for it. Empty for a store's purchase. */
+    stripeSessionId: text('stripe_session_id').unique(),
     stripePaymentIntentId: text('stripe_payment_intent_id'),
+    /** The App Store purchase that paid for it, by the id that stays the same when it is restored. */
+    appleTransactionId: text('apple_transaction_id').unique(),
+    /** Bought in a store's sandbox, where nothing is charged: a tester's or a reviewer's. */
+    sandbox: boolean('sandbox').notNull().default(false),
     /** When the key last went out by email. Empty until the first one has. */
     emailedAt: moment('emailed_at'),
     /** When it was refunded or taken back. From then it is on no account and gives out no license file; files already out keep working. */

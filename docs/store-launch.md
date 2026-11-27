@@ -76,7 +76,25 @@ They change. Read them again before building on any of these.
 4. Android: Play Billing.
 5. A route on the server that checks a store's receipt with Apple or
    Google itself and makes the license, once however often it is told.
+   Apple's is built, 2026-11-26: `POST /api/upgrade/store`. Google's is
+   left.
 6. Each store's notice of a refund withdraws the license, as Stripe's does.
+   Apple's is built, 2026-11-26: `POST /api/webhooks/apple`. Google's is
+   left.
+
+Before Apple's half can run on the live site, in this order:
+
+- ~~The migration `0008_store_licenses.sql` is run on Neon before the
+  code is deployed~~, since the code reads the new columns in the
+  statement that makes a Stripe license too. Run on 2026-11-26, before the
+  code was merged: nine migrations are applied, `licenses` has its two new
+  columns, and every table holds the rows it held before.
+- `APPLE_APP_ID` in Vercel: the app's number in App Store Connect. Until
+  it is set the server checks no purchase and answers `no_store`.
+- In App Store Connect, under the app's App Store Server Notifications,
+  version 2, for production and for the sandbox:
+  `https://boombapbot.com/api/webhooks/apple`. Until then a refund at
+  Apple withdraws nothing.
 7. An upgrade screen in the apps, which have none, with nothing in it that
    sends a buyer elsewhere to pay.
 8. Tried in each store's sandbox: buying, restoring, a refund.

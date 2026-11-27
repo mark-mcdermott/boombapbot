@@ -82,6 +82,20 @@ export const LicenseAnswerSchema = z.object({ license: LicenseSchema });
 /** Puts a key that was bought without an account onto the account that asks. */
 export const RedeemKeyRequestSchema = z.object({ key: z.string().min(1).max(80) });
 
+/** What the phone apps are to their stores, and the one thing they sell there. */
+export const APP_BUNDLE_ID = 'com.boombapbot.app';
+export const STORE_UPGRADE_PRODUCT = 'com.boombapbot.app.upgrade';
+
+/**
+ * A purchase made in a store app, as the store signed it: the app hands the
+ * server what the store gave it and never says for itself what was bought.
+ */
+export const StorePurchaseRequestSchema = z.object({
+  store: z.literal('apple'),
+  transaction: z.string().min(1).max(16_384),
+});
+export type StorePurchaseRequest = z.infer<typeof StorePurchaseRequestSchema>;
+
 /** Asks for the keys bought with an address to be emailed to it again. */
 export const KeyReminderRequestSchema = z.object({ email: z.email().max(320) });
 
@@ -93,7 +107,9 @@ export const KeyReminderRequestSchema = z.object({ email: z.email().max(320) });
  * not be read. `too_many`: the same thing was asked too often lately.
  * `withdrawn`: the license was refunded or taken back, and gives out no more
  * license files. `no_signing_key`: the server has no key to sign a license
- * file with. The message is for the person.
+ * file with. `no_store`: the server is not set up to check that store's
+ * purchases. `not_a_purchase`: the store did not sign that as a purchase of
+ * the upgrade in this app. The message is for the person.
  */
 export const UPGRADE_REFUSALS = [
   'closed',
@@ -106,6 +122,8 @@ export const UPGRADE_REFUSALS = [
   'too_many',
   'withdrawn',
   'no_signing_key',
+  'no_store',
+  'not_a_purchase',
 ] as const;
 export type UpgradeRefusal = (typeof UPGRADE_REFUSALS)[number];
 

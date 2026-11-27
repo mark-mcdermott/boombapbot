@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
+import { APPLE_APP_ID, APPLE_ROOT_CA } from './app-store';
 
 // The accounts and shop tests run the built server with its API, beside the
 // plain static server the rest of the suite uses. Its database lives in
 // memory, the email it would send is filed in a folder, and a small fake
-// answers for Stripe and Printful, so nothing leaves the machine.
+// answers for Stripe and Printful, so nothing leaves the machine. The App
+// Store's signatures are checked against a root the tests make for themselves.
 
 export const ACCOUNTS_PORT = Number(process.env.BOOMBAPBOT_E2E_ACCOUNTS_PORT ?? 4174);
 export const ACCOUNTS_URL = `http://127.0.0.1:${ACCOUNTS_PORT}`;
@@ -44,6 +46,8 @@ export function serverEnv(port: number): Record<string, string> {
     STRIPE_WEBHOOK_SECRET,
     STRIPE_API_URL: FAKE_SERVICES_URL,
     LICENSE_SIGNING_KEY,
+    APPLE_APP_ID,
+    APPLE_ROOT_CA,
     PRINTFUL_API_KEY: randomBytes(16).toString('hex'),
     PRINTFUL_WEBHOOK_SECRET,
     PRINTFUL_API_URL: FAKE_SERVICES_URL,
@@ -53,6 +57,9 @@ export function serverEnv(port: number): Record<string, string> {
 /** A second server the upgrade's tests start for themselves, as the live site is until the upgrade opens. */
 export const CLOSED_PORT = Number(process.env.BOOMBAPBOT_E2E_CLOSED_PORT ?? 4176);
 export const CLOSED_URL = `http://127.0.0.1:${CLOSED_PORT}`;
+
+/** One the store purchase tests start with no app named, as the live site is until the app has a record at Apple. */
+export const NO_STORE_PORT = Number(process.env.BOOMBAPBOT_E2E_NO_STORE_PORT ?? 4181);
 
 /** Another the accounts tests start, with its limits on and its database kept in a folder. */
 export const LIMITED_PORT = Number(process.env.BOOMBAPBOT_E2E_LIMITED_PORT ?? 4177);

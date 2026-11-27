@@ -28,6 +28,8 @@ const STATUS: Record<UpgradeRefusal, number> = {
   too_many: 429,
   withdrawn: 403,
   no_signing_key: 503,
+  no_store: 503,
+  not_a_purchase: 400,
 };
 
 const MESSAGES: Record<UpgradeRefusal, string> = {
@@ -41,6 +43,8 @@ const MESSAGES: Record<UpgradeRefusal, string> = {
   too_many: 'I have had that request a lot just now. Try again later.',
   withdrawn: 'That license was refunded or withdrawn, so it no longer unlocks anything new.',
   no_signing_key: 'License files cannot be made just now.',
+  no_store: 'Purchases made in the app cannot be checked just now.',
+  not_a_purchase: 'The store does not know that as a purchase of the upgrade.',
 };
 
 /** The answer when a request is turned down: why, in a word and in a sentence. */
@@ -105,7 +109,7 @@ export async function issueLicense(session: Stripe.Checkout.Session): Promise<vo
   if (!held) throw new Error(`The license for ${session.id} could not be recorded.`);
   if (held.emailedAt) return;
 
-  await sendLicenseKeyEmail(held.email, held.key);
+  await sendLicenseKeyEmail(email, held.key);
   const now = new Date();
   await db.update(license).set({ emailedAt: now, updatedAt: now }).where(eq(license.id, held.id));
 }

@@ -765,6 +765,20 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   `deleteBeat` (`src/server/beats.ts`), which keep `beat_counts` in step in
   the same statement. Anything else that adds or removes beats has to do
   the same, or the limit drifts.
+- A purchase made in a store app is the same license by another door
+  (`src/server/store/`, `api/upgrade/store`, `api/webhooks/apple`). The app
+  sends what the store signed and the server believes only that: Apple's
+  own library checks the signature back to Apple's root, which is in
+  `store/apple-root.ts`, for this app and this product, in production or
+  the sandbox and never what Xcode signs for itself. A purchase's id is
+  unique in `licenses`, so shown twice, or restored, it is one license. A
+  store names no address: such a row has no email, no key is sent, and it
+  goes onto the account that is logged in when it is shown. Apple's notice
+  of a refund withdraws it as Stripe's does. It is closed until
+  `APPLE_APP_ID` is set. `APPLE_ROOT_CA` exists for the browser tests,
+  which sign with a root of their own (`e2e/app-store.ts`); nothing else
+  sets it. A sandbox purchase, a tester's or a reviewer's, makes a real
+  license marked `sandbox`.
 - The tests keep the fake's upgrade checkouts in a log of their own
   (`/calls/upgrade`), so they and the shop's tests can run side by side.
   The modal's tests are in `e2e/upgrade.spec.ts` with the server's, in one
