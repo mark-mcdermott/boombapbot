@@ -84,9 +84,11 @@ They change. Read them again before building on any of these.
 
 Before Apple's half can run on the live site, in this order:
 
-- The migration `0008_store_licenses.sql` is run on Neon **before** the
-  code is deployed. The code reads the new columns in the statement that
-  makes a Stripe license too, so deployed first it would break a sale.
+- ~~The migration `0008_store_licenses.sql` is run on Neon before the
+  code is deployed~~, since the code reads the new columns in the
+  statement that makes a Stripe license too. Run on 2026-11-26, before the
+  code was merged: nine migrations are applied, `licenses` has its two new
+  columns, and every table holds the rows it held before.
 - `APPLE_APP_ID` in Vercel: the app's number in App Store Connect. Until
   it is set the server checks no purchase and answers `no_store`.
 - In App Store Connect, under the app's App Store Server Notifications,
