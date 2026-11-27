@@ -54,7 +54,11 @@ They change. Read them again before building on any of these.
 3. An Android upload key, kept out of the repository, with Play App
    Signing.
 4. The icon and the launch screen. Both are stand-ins.
-5. Twelve testers for Android, if the closed test applies.
+5. Twelve testers for Android. The closed test applies: the owner's Play
+   account is about two months old. Since 2026-11-26 the About page asks
+   for them and links to the owner's Google Group, which is also what the
+   Play Console is given as the list of testers. The group has to let
+   anyone outside the owner's own domain see it and join.
 6. A support address for both listings.
 7. The words of both listings: name, subtitle, description, keywords,
    category, and the age rating's answers.

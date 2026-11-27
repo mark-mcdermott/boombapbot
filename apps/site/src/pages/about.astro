@@ -7,6 +7,7 @@ import Section from '../components/Section.astro';
 import Base from '../layouts/Base.astro';
 
 const base = import.meta.env.BASE_URL;
+const ANDROID_TESTERS = 'https://groups.google.com/a/markmcdermott.io/g/boombapbot-android-testing';
 ---
 
 <Base
@@ -99,6 +100,19 @@ const base = import.meta.env.BASE_URL;
       <p>
         The site loads its own files and nothing else. There are no analytics and no ads. Making an account is
         optional, and logging in sets the site's one cookie.
+      </p>
+    </Section>
+
+    <Section title="Android testers wanted">
+      <p>
+        I'm getting an Android app ready for Google Play. Before I can publish it, Google asks that a dozen people
+        try it for two weeks. If you have an Android phone and would like to be one of them, <a
+          href={ANDROID_TESTERS}
+          target="_blank"
+          rel="noreferrer noopener"
+          data-testid="android-testers">join the testing group</a
+        >. Sign in to Google there and press "Join group"; the page says you don't have permission until you
+        have. I'll post there when there is a build to install.
       </p>
     </Section>
 
