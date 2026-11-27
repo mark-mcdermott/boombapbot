@@ -437,6 +437,9 @@ for long, and the battery it costs.
 
 ## What is left before a store
 
+`docs/store-launch.md` is the whole list from here to both stores, in
+order. What follows is the detail behind parts of it.
+
 ### Android
 
 - Run it on a real phone. The Galaxy S9 that played the site is the one to
@@ -489,33 +492,30 @@ emulator; see above. Left:
 
 ### Accounts in the app
 
-Left out of this slice. To bring them in:
+They are in: the account button, saved beats and deleting an account, as
+"What is here" says. Left:
 
-- The account, saved beats and shop code all ask the page's own address for
-  `/api/...`. In the app that address is the app itself, so each needs to be
-  told where the site is.
-- The site has to let the app in: its log-in keeps a cookie for
-  `boombapbot.com` and checks where a request came from, and the app's
-  pages come from `capacitor://localhost` on iOS and `https://localhost` on
-  Android. That is a change to `apps/site/src/server/auth.ts` and a deploy.
-- **Deleting an account.** Apple and Google both require that an app where
-  an account can be made lets it be deleted from inside the app. The
-  account modal already has that step, so it comes along when the modal
-  does; it has to be reachable without leaving the app. Google also asks,
-  in the Data safety form, for a web address where someone can ask for
-  deletion without the app; the site's account modal can be that.
-- **The upgrade.** Apple's rules want its own in-app purchase for
-  unlocking features inside an app, with exceptions that differ by country,
-  so the planned five dollars through Stripe needs a decision before it is
-  offered in the iOS app. The shop sells physical things, which may be paid
-  for outside Apple's system.
+- **Deleting an account**, which Apple and Google both require inside an
+  app where one can be made, has not been tried on a phone. Google also
+  asks, in the Data safety form, for a web address where someone can ask
+  for deletion without the app; the site's account modal can be that.
+- **The upgrade.** The app unlocks the six paid effects when an upgraded
+  account logs in, and sells nothing. Apple allows that only where the app
+  also sells it through its own in-app purchase, so the owner decided the
+  first store version sells it: see `docs/store-launch.md`.
 
 ### The stores
 
 - **Apple.** An app record for `com.boombapbot.app` in App Store Connect,
   signing with your team (the project has no team set), an icon, screenshots,
-  a privacy answer (the app collects nothing today), and TestFlight before
-  review.
+  the privacy answers (an account's email address and its saved beats), and
+  TestFlight before review. The app has a privacy manifest,
+  `ios/App/App/PrivacyInfo.xcprivacy`, since 2026-11-26: it says why the
+  app reads its own stored settings (the draft and the log-in), file times
+  (exports) and the time since the phone started (the engine's watch), and
+  what an account sends. A plug-in that uses another such API adds to it.
+  `Info.plist` says the app uses no encryption that needs an export
+  filing, which holds while it only talks HTTPS and checks a signature.
 - **Google Play's closed test.** A new personal developer account cannot
   publish until a closed test has had at least 12 testers opted in for 14
   days running. The clock starts when the twelfth joins, so finding the

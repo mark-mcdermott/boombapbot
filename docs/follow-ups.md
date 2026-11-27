@@ -544,6 +544,10 @@ passes unchanged. The desktop app is the first real engine behind it.
 
 ### Capacitor (iOS and Android)
 
+`docs/store-launch.md` is the list from here to both stores, drawn up on
+2026-11-26, when the owner decided the first store version sells the
+upgrade through each store's in-app purchase.
+
 A first slice is built in `apps/mobile`: the editor with РИТМ-12 in a
 Capacitor shell, playing through the web view's own worklet and WASM
 engine, with the draft kept in the device's own store and no accounts,
