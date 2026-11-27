@@ -341,6 +341,8 @@ test.describe('the page around the machine', () => {
     await expect(page.getByRole('link', { name: 'Read the docs' })).toHaveAttribute('href', /\/docs$/);
     // Who made it can be reached.
     await expect(page.locator('section', { hasText: 'Who made it' }).getByRole('link', { name: 'mm.coffee' })).toBeVisible();
+    // And so can the group for Android's testers, on Google's own site.
+    await expect(page.getByTestId('android-testers')).toHaveAttribute('href', /^https:\/\/groups\.google\.com\/.+android-testing$/);
     await page.getByTestId('open-machine').click();
     await expect(page.getByTestId('editor')).toBeVisible();
   });
