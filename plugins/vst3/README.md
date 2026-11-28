@@ -534,7 +534,8 @@ works the page through the web view, as arm64 and again under Rosetta:
   where the window does;
 - the page opens on the plugin's beat; a voice key, a step key and a knob on
   the page move the plugin and the tom's key is heard; a parameter and a step
-  changed in the plugin show on the page; both sides then rest;
+  changed in the plugin show on the page; both sides then rest, the page
+  having sent no beat back;
 - stop and play turn the sequencer off and on;
 - a name typed in the bar names the plugin's beat, and a name set in the
   plugin shows in the bar;
@@ -716,6 +717,15 @@ begun to listen, the plugin says once whether there is a step to take back,
 and where the page was slow to draw the bar never heard and its Undo key
 stayed greyed out. The page now says it is up after the bar listens, and the
 check no longer waits fixed lengths of time.
+
+Without its fixed waits the check found a second fault in the page, on the
+runner on 2026-11-28: of ten effects chosen in the plugin one after another,
+the fifth never showed. The page sent every beat it was given straight back.
+It knew the plugin's beat by being the same object as its own, and its store
+keeps a stamped copy, so the two were never the same. A change made in the
+plugin while that beat was on its way back was undone by it. The page now
+knows the plugin's beat by the copy its store keeps, and the check counts the
+beats the page sends after a change in the plugin: none.
 
 The runner has not built this change. A build with
 `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` was not made again, and the thread sanitizer

@@ -472,6 +472,9 @@ int main(int argc, char** argv) {
 
     // The plugin to the page: a parameter the host automates, and a step written elsewhere.
     letThePageRest(page);
+    ask(page, "(() => { const b = window.__JUCE__.backend; const emit = b.emitEvent.bind(b); window.__beatsSent = 0; "
+              "b.emitEvent = (type, data) => { if (type === '__juce__invoke' && data.name === 'setBeat') "
+              "window.__beatsSent += 1; emit(type, data); }; })()");
     plugin.parameters().getParameter(ids::kSwing)->setValueNotifyingHost(0.8f);
     plugin.parameters().getParameter("tom_pitch")->setValueNotifyingHost(0.9f);
     plugin.setStep(0, 5, 9, true);
@@ -492,9 +495,11 @@ int main(int argc, char** argv) {
     // Neither side sends the other's change back for ever.
     const juce::String settled = ask(page, "JSON.stringify(window.__panel.project())").toString();
     wait(600);
+    const int sentBack = ask(page, "window.__beatsSent");
     check(ask(page, "JSON.stringify(window.__panel.project())").toString() == settled &&
-              std::abs(parameter(plugin, ids::kSwing) - 0.8f) < 1e-6f,
-          "and then both sides rest: nothing is passed back and forth");
+              std::abs(parameter(plugin, ids::kSwing) - 0.8f) < 1e-6f && sentBack == 0,
+          "and then both sides rest: nothing is passed back and forth (" + std::to_string(sentBack) +
+              " beats sent back by the page)");
 
     // The sequencer's switch, which is what play and stop are in a host.
     ask(page, "document.querySelector('[data-testid=stop]').click()");
