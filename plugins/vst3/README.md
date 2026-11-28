@@ -558,6 +558,14 @@ works the page through the web view, as arm64 and again under Rosetta:
 - the window opens at its own size and, left a quarter larger, opens a
   quarter larger.
 
+The check does not wait a length of time for a change to cross between the
+page and the plugin: it waits for the change, for up to ten seconds, so a slow
+machine is given the time it needs. Before it changes the plugin under the
+page it waits until nothing of the page's is on its way, which the page tells
+it through `__panel.atRest()`: the page sends its whole beat, and one sent
+before a change in the plugin and landing after it takes that change back. A
+check of several parts names the parts that did not hold.
+
 To look at it, `BOOMBAPBOT_HOLD_WINDOW=5` keeps the window up that many
 seconds at the end.
 
@@ -628,6 +636,24 @@ On Apple silicon with Rosetta installed, the self-test, the check of the
 license file, the load check and the hosted check each run a second time as
 x86_64, which is how FL Studio runs the plugin.
 
+Where the self-test says two renders are the same samples, it compares the
+samples' bits as whole numbers, to the meaning == has on floats: the same bits
+and a number, or two zeros of either sign. It did compare them as floats, and
+on the CI runner, a virtual Mac, as x86_64 under Rosetta, that comparison said
+about once in three thousand million that two samples with the same bits
+differed. It failed the check of the sequencer against the engine's own frames
+three times between 2026-11-22 and 2026-11-27, each time with a report that
+showed the renders the same. A probe on the runner, on 2026-11-28, ran the
+float comparison eight times over each of 3600 pairs of renders beside a
+memcmp of the same memory: six times one pass of the eight named a frame, a
+different one each time, and no memcmp and no other pass found a difference.
+As arm64 on the runner it did not happen in 1200 pairs, nor as x86_64 under
+Rosetta on the owner's Mac in 12000. The plugin's renders were the same
+throughout; what went wrong was the reading of them, on that machine. A second
+probe ran the check as it now is over 4800 pairs there, 15600 checks, and none
+failed, while a float comparison kept beside it went wrong six times more,
+each time printing two samples with the same bits.
+
 ## Verified
 
 On the owner's Mac (Apple silicon, macOS 26, Xcode's clang, CMake 4.4.3) on
@@ -683,7 +709,13 @@ checkout of JUCE `8.0.17-security` already on the machine, with Monocypher
 The check of the painted window failed once in some twenty runs that day,
 under Rosetta, at a check this change did not touch: the step written on the
 page and taken back by the bar's undo. It passed in every run after, and the
-cause was not looked for. That check waits fixed lengths of time for the page.
+cause was not looked for then. It failed the same way on the CI runner, as
+arm64 and as x86_64, in three runs between 2026-11-23 and 2026-11-27. The cause
+was in the page, not the check: the page said it was up before its bar had
+begun to listen, the plugin says once whether there is a step to take back,
+and where the page was slow to draw the bar never heard and its Undo key
+stayed greyed out. The page now says it is up after the bar listens, and the
+check no longer waits fixed lengths of time.
 
 The runner has not built this change. A build with
 `-DBOOMBAPBOT_VST3_WEB_PANEL=OFF` was not made again, and the thread sanitizer
