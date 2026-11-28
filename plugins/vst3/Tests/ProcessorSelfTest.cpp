@@ -18,8 +18,10 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cmath>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <limits>
@@ -201,7 +203,26 @@ Stereo renderFresh(double rate, int blockSize, const std::vector<Event>& events,
 
 // ---- Measurements -----------------------------------------------------------
 
-bool isZero(float value) { return juce::exactlyEqual(value, 0.0f); }
+// The checks that read every sample of a render compare the samples' bits, as
+// whole numbers, and mean by it what == means on floats. On the virtual Mac CI
+// runs on, as x86_64 under Rosetta, a comparison of two floats says now and
+// then that two samples with the same bits differ: about once in three
+// thousand million, which failed one run of this self-test in a few dozen.
+// The same memory compared as bytes, in the same runs, never differed.
+constexpr std::uint32_t kSignBit = 0x80000000u;
+constexpr std::uint32_t kInfinityBits = 0x7f800000u;
+
+std::uint32_t bitsOf(float sample) { return std::bit_cast<std::uint32_t>(sample); }
+
+bool isZero(float value) { return (bitsOf(value) & ~kSignBit) == 0; }
+
+// As == on floats: the same bits and a number, or zero and zero of either sign.
+bool sameSample(float a, float b) {
+  const std::uint32_t left = bitsOf(a);
+  const std::uint32_t right = bitsOf(b);
+  if (((left | right) & ~kSignBit) == 0) return true;
+  return left == right && (left & ~kSignBit) <= kInfinityBits;
+}
 
 // Index of the first sample that is not exactly zero, or -1.
 int firstNonZero(const std::vector<float>& samples) {
@@ -228,7 +249,7 @@ bool allZero(const Stereo& audio) { return allZero(audio, 0, static_cast<int>(au
 int firstDifference(const std::vector<float>& a, const std::vector<float>& b, int from = 0) {
   const std::size_t size = std::min(a.size(), b.size());
   for (std::size_t i = static_cast<std::size_t>(from); i < size; ++i) {
-    if (!juce::exactlyEqual(a[i], b[i])) return static_cast<int>(i);
+    if (!sameSample(a[i], b[i])) return static_cast<int>(i);
   }
   return a.size() == b.size() ? -1 : static_cast<int>(size);
 }
@@ -816,9 +837,7 @@ void testSequencerMatchesTheEngine(const std::string& context, double rate, int 
     const std::unique_ptr<juce::AudioProcessor> noted = makeBeatProcessor(rate, blockSize, entry.played, false);
     const Stereo bySequencer = renderPlaying(*sequenced, transport, 0.0, {}, total, blockSize, rate);
     const Stereo byNotes = renderPlaying(*noted, transport, 0.0, hits, total, blockSize, rate);
-    // Where the two part, if they do, and by how much. This check has failed
-    // twice on a CI runner, as x86_64, with the left channels identical, and
-    // never on the Mac it was written on.
+    // Where the two part, if they do, and by how much.
     const int partedLeft = firstDifference(bySequencer.left, byNotes.left);
     const int partedRight = firstDifference(bySequencer.right, byNotes.right);
     float widest = 0.0f;
