@@ -134,6 +134,11 @@ function Window() {
       document.querySelector<HTMLElement>(`[data-testid="${control}"]`)?.setAttribute('inert', '');
     }
   });
+  // The plugin starts telling the page things when it hears this, and tells
+  // each once. An effect here runs after the bar's, so the bar is listening.
+  useEffect(() => {
+    void plugin?.call('pageReady');
+  }, []);
   return (
     <>
       <div className="pb-picture">
@@ -160,6 +165,11 @@ async function open(): Promise<void> {
 
   // The context is not generic. The machine's own hooks give its panel the types back.
   const shared = runtime as unknown as EditorRuntime;
+  window.__panel = {
+    project: () => runtime.store.getState().project,
+    level: () => runtime.outputLevel(),
+    upgraded: () => deviceLicense().upgraded,
+  };
   createRoot(root!).render(
     <StrictMode>
       <RuntimeContext.Provider value={shared}>
@@ -167,12 +177,6 @@ async function open(): Promise<void> {
       </RuntimeContext.Provider>
     </StrictMode>,
   );
-  window.__panel = {
-    project: () => runtime.store.getState().project,
-    level: () => runtime.outputLevel(),
-    upgraded: () => deviceLicense().upgraded,
-  };
-  void plugin?.call('pageReady');
 }
 
 void open();
