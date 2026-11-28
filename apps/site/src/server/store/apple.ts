@@ -9,19 +9,10 @@ import {
 } from '@apple/app-store-server-library';
 import { APP_BUNDLE_ID, STORE_UPGRADE_PRODUCT } from '@boombapbot/contracts';
 import { APPLE_ROOT_CA_G3 } from './apple-root';
-
-/** A purchase of the upgrade that the App Store signed for. */
-export interface ApplePurchase {
-  /** The id that stays the same when the purchase is restored on another phone. */
-  transactionId: string;
-  /** Bought in the sandbox, where nothing is charged. */
-  sandbox: boolean;
-  /** Apple has refunded it or taken it back. */
-  revoked: boolean;
-}
+import type { StorePurchase } from './purchase';
 
 /** What Apple's notice asks of a license: nothing, to withdraw it, or to give it back. */
-export type AppleNotice = { purchase: ApplePurchase; effect: 'withdraw' | 'reinstate' } | null;
+export type AppleNotice = { purchase: StorePurchase; effect: 'withdraw' | 'reinstate' } | null;
 
 /**
  * One verifier for each of the App Store's two worlds, the real one first.
@@ -63,17 +54,18 @@ async function verified<T>(read: (verifier: SignedDataVerifier) => Promise<T>): 
   return null;
 }
 
-function purchaseIn(transaction: JWSTransactionDecodedPayload): ApplePurchase | null {
+function purchaseIn(transaction: JWSTransactionDecodedPayload): StorePurchase | null {
   if (transaction.productId !== STORE_UPGRADE_PRODUCT || !transaction.originalTransactionId) return null;
   return {
-    transactionId: transaction.originalTransactionId,
+    store: 'apple',
+    id: transaction.originalTransactionId,
     sandbox: transaction.environment === Environment.SANDBOX,
     revoked: transaction.revocationDate !== undefined,
   };
 }
 
 /** The purchase a signed transaction from the app is, or null when Apple did not sign it for the upgrade in this app. */
-export async function readAppleTransaction(signed: string): Promise<ApplePurchase | null> {
+export async function readAppleTransaction(signed: string): Promise<StorePurchase | null> {
   const transaction = await verified((verifier) => verifier.verifyAndDecodeTransaction(signed));
   return transaction && purchaseIn(transaction);
 }

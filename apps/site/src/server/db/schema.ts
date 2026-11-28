@@ -222,6 +222,8 @@ export const license = pgTable(
     stripePaymentIntentId: text('stripe_payment_intent_id'),
     /** The App Store purchase that paid for it, by the id that stays the same when it is restored. */
     appleTransactionId: text('apple_transaction_id').unique(),
+    /** The Google Play purchase that paid for it, by the token that stays the same when it is restored. */
+    googlePurchaseToken: text('google_purchase_token').unique(),
     /** Bought in a store's sandbox, where nothing is charged: a tester's or a reviewer's. */
     sandbox: boolean('sandbox').notNull().default(false),
     /** When the key last went out by email. Empty until the first one has. */

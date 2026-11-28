@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { z } from 'zod';
 import { json } from '../../../server/site';
 import { appleStoreOpen, readAppleNotice } from '../../../server/store/apple';
-import { reinstateApplePurchase, withdrawApplePurchase } from '../../../server/store/license';
+import { reinstateStorePurchase, withdrawStorePurchase } from '../../../server/store/license';
 
 export const prerender = false;
 
@@ -20,7 +20,7 @@ export const POST: APIRoute = async ({ request }) => {
   if (!sent.success) return json({ message: 'This is not a notice from the App Store.' }, 400);
   const notice = await readAppleNotice(sent.data.signedPayload);
   if (notice === undefined) return json({ message: 'The signature does not match.' }, 400);
-  if (notice?.effect === 'withdraw') await withdrawApplePurchase(notice.purchase);
-  if (notice?.effect === 'reinstate') await reinstateApplePurchase(notice.purchase);
+  if (notice?.effect === 'withdraw') await withdrawStorePurchase(notice.purchase);
+  if (notice?.effect === 'reinstate') await reinstateStorePurchase(notice.purchase);
   return json({ received: true });
 };

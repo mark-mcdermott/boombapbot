@@ -322,7 +322,9 @@ more effects. The owner opened it on the live site on 2026-11-24.
   account, to at most ten tries in ten minutes from one address;
   `POST /api/upgrade/store` gives one for a purchase made in the iOS app,
   as the App Store signed it, and makes the license the first time it is
-  shown; nothing in the apps calls it yet. `GET /api/upgrade/license` gives one to a logged-in account that has
+  shown, or for one made in the Android app, by the token Google Play gave
+  for it, which the server asks Google about; the iOS app calls it and
+  nothing on Android does yet. `GET /api/upgrade/license` gives one to a logged-in account that has
   upgraded. The server signs with `LICENSE_SIGNING_KEY` and gives out none
   without it. `verifyLicenseFile` in `packages/contracts` checks a file
   against a public key and says what it unlocks; the format, for the
