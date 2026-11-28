@@ -19,7 +19,7 @@ import './styles.css';
 declare global {
   interface Window {
     /** For the check that opens the plugin's window. Not a stable API. */
-    __panel?: { project(): Project; level(): number; upgraded(): boolean };
+    __panel?: { project(): Project; level(): number; upgraded(): boolean; atRest(): boolean };
   }
 }
 
@@ -64,13 +64,18 @@ function fromPlugin(text: string): Project | null {
   };
 }
 
-/**
- * Keeps the page's beat and the plugin's the same, whichever side changed it.
- * What it answers with sends at once whatever is waiting to go.
- */
-function keepInStep(plugin: Plugin): () => void {
+interface InStep {
+  /** Sends at once whatever is waiting to go. */
+  sendWaiting(): void;
+  /** Whether a change on the page has yet to be sent. */
+  hasWaiting(): boolean;
+}
+
+/** Keeps the page's beat and the plugin's the same, whichever side changed it. */
+function keepInStep(plugin: Plugin): InStep {
   let theirs: Project | null = null;
   let waiting: ReturnType<typeof setTimeout> | null = null;
+  let taking = false;
 
   const send = () => {
     if (waiting === null) return;
@@ -83,17 +88,20 @@ function keepInStep(plugin: Plugin): () => void {
   plugin.on<string>(BEAT_EVENT, (text) => {
     const project = fromPlugin(text);
     if (!project) return;
-    theirs = project;
+    // The store keeps a stamped copy of what it is given: theirs is that copy.
+    taking = true;
     runtime.store.adjust(project);
+    theirs = runtime.store.getState().project;
+    taking = false;
   });
   runtime.store.subscribe(() => {
     // A change that came from the plugin is not sent back to it, and a burst
     // of changes, as a knob being dragged makes, goes as the last of them.
-    if (runtime.store.getState().project === theirs || waiting !== null) return;
+    if (taking || runtime.store.getState().project === theirs || waiting !== null) return;
     // A timer, not an animation frame: a window behind another draws no frames.
     waiting = setTimeout(send, SEND_AFTER_MS);
   });
-  return send;
+  return { sendWaiting: send, hasWaiting: () => waiting !== null };
 }
 
 /**
@@ -134,6 +142,11 @@ function Window() {
       document.querySelector<HTMLElement>(`[data-testid="${control}"]`)?.setAttribute('inert', '');
     }
   });
+  // The plugin starts telling the page things when it hears this, and tells
+  // each once. An effect here runs after the bar's, so the bar is listening.
+  useEffect(() => {
+    void plugin?.call('pageReady');
+  }, []);
   return (
     <>
       <div className="pb-picture">
@@ -145,13 +158,15 @@ function Window() {
 }
 
 async function open(): Promise<void> {
+  let inStep: InStep | null = null;
   if (plugin) {
     // Before anything is drawn, so the selector reaches the upgrade's effects from the first.
     const license = await plugin.call<string>('licenseFile');
     if (license) deviceLicense().keep(license, 'key');
     const held = fromPlugin(await plugin.call<string>('getBeat'));
     if (held) runtime.store.replaceProject(held);
-    markKnobHolds(plugin, keepInStep(plugin));
+    inStep = keepInStep(plugin);
+    markKnobHolds(plugin, inStep.sendWaiting);
   }
   runtime.attach();
   // In a host the machine is on when its window is open, and it plays when the host does.
@@ -160,6 +175,13 @@ async function open(): Promise<void> {
 
   // The context is not generic. The machine's own hooks give its panel the types back.
   const shared = runtime as unknown as EditorRuntime;
+  window.__panel = {
+    project: () => runtime.store.getState().project,
+    level: () => runtime.outputLevel(),
+    upgraded: () => deviceLicense().upgraded,
+    // Nothing of the page's is on its way to the plugin: all of it was sent, and the plugin has answered.
+    atRest: () => !inStep?.hasWaiting() && (plugin?.answered() ?? true),
+  };
   createRoot(root!).render(
     <StrictMode>
       <RuntimeContext.Provider value={shared}>
@@ -167,12 +189,6 @@ async function open(): Promise<void> {
       </RuntimeContext.Provider>
     </StrictMode>,
   );
-  window.__panel = {
-    project: () => runtime.store.getState().project,
-    level: () => runtime.outputLevel(),
-    upgraded: () => deviceLicense().upgraded,
-  };
-  void plugin?.call('pageReady');
 }
 
 void open();

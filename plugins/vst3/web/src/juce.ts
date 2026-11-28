@@ -19,6 +19,8 @@ declare global {
 export interface Plugin {
   call<Answer>(name: string, ...params: unknown[]): Promise<Answer>;
   on<Payload>(event: string, listener: (payload: Payload) => void): () => void;
+  /** Whether every call made so far has been answered. */
+  answered(): boolean;
 }
 
 /** The plugin behind this page, or null when the page is open somewhere else. */
@@ -44,5 +46,6 @@ export function connectPlugin(): Plugin | null {
       const token = backend.addEventListener(event, listener as (payload: never) => void);
       return () => backend.removeEventListener(token);
     },
+    answered: () => waiting.size === 0,
   };
 }
