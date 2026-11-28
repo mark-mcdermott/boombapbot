@@ -84,10 +84,11 @@ They change. Read them again before building on any of these.
 5. A route on the server that checks a store's receipt with Apple or
    Google itself and makes the license, once however often it is told.
    Apple's is built, 2026-11-26: `POST /api/upgrade/store`. Google's is
-   left.
+   built, 2026-11-28, at the same address: it has only ever asked a
+   stand-in for Google.
 6. Each store's notice of a refund withdraws the license, as Stripe's does.
    Apple's is built, 2026-11-26: `POST /api/webhooks/apple`. Google's is
-   left.
+   built, 2026-11-28: `POST /api/webhooks/google`.
 
 Before Apple's half can run on the live site, in this order:
 
@@ -102,6 +103,26 @@ Before Apple's half can run on the live site, in this order:
   version 2, for production and for the sandbox:
   `https://boombapbot.com/api/webhooks/apple`. Until then a refund at
   Apple withdraws nothing.
+Before Google's half can run on the live site, in this order:
+
+- The migration `0009_google_purchases.sql` is run on Neon before the code
+  is deployed, for the reason `0008` was.
+- A Google Cloud project with the Google Play Android Developer API
+  switched on, and a service account in it with a JSON key. In the Play
+  Console, under Users and permissions, that account is invited and given
+  "View financial data" and "Manage orders and subscriptions" for the app.
+  The key file's text goes into Vercel as `GOOGLE_PLAY_SERVICE_ACCOUNT`.
+  Until it is set the server asks Google nothing and answers `no_store`.
+- A long random `GOOGLE_PLAY_WEBHOOK_SECRET` in Vercel.
+- In the same Cloud project, a Pub/Sub topic that
+  `google-play-developer-notifications@system.gserviceaccount.com` may
+  publish to, and a push subscription on it to
+  `https://boombapbot.com/api/webhooks/google?secret=` and that secret.
+  In the Play Console, under Monetization setup, real-time developer
+  notifications are switched on with the topic's name. Either choice of
+  notifications there carries voided purchases. Until then a refund at
+  Google withdraws nothing.
+
 7. An upgrade screen in the apps, which have none, with nothing in it that
    sends a buyer elsewhere to pay. The iOS app has it, 2026-11-27; its
    words are a stand-in for the owner to rewrite. Android's waits on Play

@@ -87,13 +87,15 @@ export const APP_BUNDLE_ID = 'com.boombapbot.app';
 export const STORE_UPGRADE_PRODUCT = 'com.boombapbot.app.upgrade';
 
 /**
- * A purchase made in a store app, as the store signed it: the app hands the
- * server what the store gave it and never says for itself what was bought.
+ * A purchase made in a store app, as the store gave it: the app hands that
+ * to the server and never says for itself what was bought. The App Store
+ * signs a transaction, which the server checks; Google Play gives a token,
+ * which the server asks Google about.
  */
-export const StorePurchaseRequestSchema = z.object({
-  store: z.literal('apple'),
-  transaction: z.string().min(1).max(16_384),
-});
+export const StorePurchaseRequestSchema = z.discriminatedUnion('store', [
+  z.object({ store: z.literal('apple'), transaction: z.string().min(1).max(16_384) }),
+  z.object({ store: z.literal('google'), token: z.string().min(1).max(4_096) }),
+]);
 export type StorePurchaseRequest = z.infer<typeof StorePurchaseRequestSchema>;
 
 /** Asks for the keys bought with an address to be emailed to it again. */

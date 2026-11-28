@@ -794,6 +794,24 @@ pnpm test:e2e              # Playwright, against apps/site/dist
   which sign with a root of their own (`e2e/app-store.ts`); nothing else
   sets it. A sandbox purchase, a tester's or a reviewer's, makes a real
   license marked `sandbox`.
+- Google Play signs nothing an app can hand on, so its door is the other
+  way round (`store/google.ts`, `api/webhooks/google`). The app sends the
+  purchase's token and the server asks Google what it bought, as the
+  service account in `GOOGLE_PLAY_SERVICE_ACCOUNT`: the key file as Google
+  hands it out, signed with by Node's own crypto, with no library. Google
+  is asked for this app and this product by name, so a token for anything
+  else is not a purchase; one not paid for yet is not either. The token is
+  what is unique in `licenses`. Google refunds a purchase nobody
+  acknowledges within three days, so the server acknowledges it after the
+  license is made, and a failure there is an error the app meets by
+  showing the purchase again. Its notices come through Cloud Pub/Sub,
+  which signs in a way the server does not check: the address Pub/Sub is
+  given carries `GOOGLE_PLAY_WEBHOOK_SECRET` as `?secret=`, as Printful's
+  does; keep the check. A voided purchase withdraws its license, and
+  Google has no notice that gives one back. `GOOGLE_PLAY_API_URL` exists
+  for the browser tests, whose fake stands in for Google too
+  (`e2e/google-play.ts`); nothing else sets it. A license tester's
+  purchase is marked `sandbox`.
 - The tests keep the fake's upgrade checkouts in a log of their own
   (`/calls/upgrade`), so they and the shop's tests can run side by side.
   The modal's tests are in `e2e/upgrade.spec.ts` with the server's, in one

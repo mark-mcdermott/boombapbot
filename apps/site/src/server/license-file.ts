@@ -61,9 +61,9 @@ export async function licenseFileForKey(typed: string): Promise<LicenseFileOutco
   return key ? fileFor(eq(license.key, key), 'unknown_key') : { refusal: 'unknown_key' };
 }
 
-/** The file for the license an App Store purchase paid for. */
-export function licenseFileForApplePurchase(transactionId: string): Promise<LicenseFileOutcome> {
-  return fileFor(eq(license.appleTransactionId, transactionId), 'not_a_purchase');
+/** The file for the license a store's purchase paid for, found by `boughtWith`. */
+export function licenseFileForStorePurchase(boughtWith: SQL): Promise<LicenseFileOutcome> {
+  return fileFor(boughtWith, 'not_a_purchase');
 }
 
 /** The file for the license on an account. */
