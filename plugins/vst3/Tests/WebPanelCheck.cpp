@@ -38,9 +38,17 @@ bool waitFor(const std::function<bool()>& done, int milliseconds) {
   return done();
 }
 
+// For what has no end to wait for: a moment in which nothing should happen.
 void wait(int milliseconds) {
   waitFor([] { return false; }, milliseconds);
 }
+
+// How long a change is given to cross between the page and the plugin. It
+// crosses in a few hundredths of a second; a busy machine can take far longer,
+// and a check that waited a fixed time would then read what was not there yet.
+constexpr int kPatience = 10000;
+
+bool comes(const std::function<bool()>& done) { return waitFor(done, kPatience); }
 
 // Runs a line of JavaScript in the page and waits for what it comes to.
 juce::var ask(juce::WebBrowserComponent& browser, const juce::String& script) {
@@ -53,6 +61,40 @@ juce::var ask(juce::WebBrowserComponent& browser, const juce::String& script) {
   waitFor([&] { return answered; }, 5000);
   return answer;
 }
+
+// Asks the page until its answer is the one wanted, and gives the last answer either way.
+juce::var askUntil(juce::WebBrowserComponent& browser, const juce::String& script,
+                   const std::function<bool(const juce::var&)>& wanted) {
+  const juce::uint32 until = juce::Time::getMillisecondCounter() + static_cast<juce::uint32>(kPatience);
+  juce::var answer = ask(browser, script);
+  while (!wanted(answer) && juce::Time::getMillisecondCounter() < until) {
+    wait(50);
+    answer = ask(browser, script);
+  }
+  return answer;
+}
+
+juce::String askUntilText(juce::WebBrowserComponent& browser, const juce::String& script, const juce::String& wanted) {
+  return askUntil(browser, script, [&wanted](const juce::var& answer) { return answer.toString() == wanted; }).toString();
+}
+
+// Waits until nothing of the page's is on its way to the plugin. The page
+// sends its whole beat, so one sent before a change made in the plugin and
+// landing after it would take that change back.
+void letThePageRest(juce::WebBrowserComponent& browser) {
+  askUntil(browser, "window.__panel.atRest()", [](const juce::var& atRest) { return static_cast<bool>(atRest); });
+}
+
+// The parts of a check that did not hold, by name, so a failure says which.
+struct Parts {
+  void add(bool held, const char* name) {
+    if (!held) failed << (failed.isEmpty() ? "" : ", ") << name;
+  }
+  bool held() const { return failed.isEmpty(); }
+  std::string report() const { return held() ? "" : " (not so: " + failed.toStdString() + ")"; }
+
+  juce::String failed;
+};
 
 float parameter(BoombapbotAudioProcessor& plugin, const juce::String& id) {
   return plugin.parameters().getRawParameterValue(id)->load();
@@ -115,29 +157,28 @@ void checkTheEffect(BoombapbotAudioProcessor& plugin, juce::WebBrowserComponent&
   juce::RangedAudioParameter& effect = *plugin.parameters().getParameter(ids::kEffectKind);
   const auto choose = [&effect](int choice) { effect.setValueNotifyingHost(effect.convertTo0to1(static_cast<float>(choice))); };
   const auto chosen = [&plugin] { return juce::roundToInt(parameter(plugin, ids::kEffectKind)); };
-  const auto onThePage = [&page] { return ask(page, "window.__panel.project().effect.kind").toString(); };
+  const char* const kindOnThePage = "window.__panel.project().effect.kind";
+  const auto onThePage = [&] { return ask(page, kindOnThePage).toString(); };
   // The page hears of the plugin's change, and the plugin of the page's, a moment later.
-  const auto pageComesTo = [&onThePage](const juce::String& kind) {
-    for (int waited = 0; waited < 5000 && onThePage() != kind; waited += 100) wait(100);
-    return onThePage();
-  };
+  const auto pageComesTo = [&](const juce::String& kind) { return askUntilText(page, kindOnThePage, kind); };
   const auto pluginComesTo = [&chosen](int choice) {
-    waitFor([&] { return chosen() == choice; }, 5000);
+    comes([&] { return chosen() == choice; });
     return chosen();
   };
   // The selector is drawn a moment after the page's beat changes, and a press goes on from what is drawn.
   const auto selectorStandsOn = [&page](const juce::String& kind) {
-    const char* const drawn = "document.querySelector('[data-testid=effect]').getAttribute('data-position')";
-    for (int waited = 0; waited < 5000 && ask(page, drawn).toString() != kind; waited += 100) wait(100);
+    askUntilText(page, "document.querySelector('[data-testid=effect]').getAttribute('data-position')", kind);
   };
+  letThePageRest(page);
   const float mix = parameter(plugin, ids::kEffectMix);
   const int before = chosen();
+  const juce::String kindBefore = onThePage();
 
   ask(page, "(() => { const b = window.__JUCE__.backend; b.addEventListener('__juce__complete', (done) => { "
             "if (done.promiseId === 4096) window.__handed = done.result; }); "
             "b.emitEvent('__juce__invoke', {name: 'licenseFile', params: [], resultId: 4096}); })()");
-  wait(300);
-  const juce::String handed = ask(page, "window.__handed").toString();
+  const juce::String handed =
+      askUntil(page, "window.__handed", [](const juce::var& answer) { return answer.toString().isNotEmpty(); }).toString();
   check(plugin.holdsUpgrade() && handed.isNotEmpty() && handed == juce::String(plugin.licenseFile()),
         "the plugin hands the page the license file it holds the upgrade by");
   check(!static_cast<bool>(ask(page, "window.__panel.upgraded()")),
@@ -155,13 +196,16 @@ void checkTheEffect(BoombapbotAudioProcessor& plugin, juce::WebBrowserComponent&
   // The page's own change crosses with the effect in it, and the effect stays.
   const float volume = parameter(plugin, ids::kVolume);
   ask(page, keysOn("volume", "ArrowUp", 1));
-  wait(400);
-  check(parameter(plugin, ids::kVolume) > volume && chosen() == kinds.size() && onThePage() == "phaser" &&
-            std::abs(parameter(plugin, ids::kEffectMix) - mix) < 1e-6f,
-        "a knob turned on the page leaves an effect of the upgrade as the plugin chose it");
+  Parts kept;
+  kept.add(comes([&] { return parameter(plugin, ids::kVolume) > volume; }), "the knob's turn reached the plugin");
+  kept.add(chosen() == kinds.size(), "the plugin's effect stayed");
+  kept.add(onThePage() == "phaser", "the page's effect stayed");
+  kept.add(std::abs(parameter(plugin, ids::kEffectMix) - mix) < 1e-6f, "the effect's mix stayed");
+  check(kept.held(), "a knob turned on the page leaves an effect of the upgrade as the plugin chose it" + kept.report());
+  const float turned = parameter(plugin, ids::kVolume);
   ask(page, keysOn("volume", "ArrowDown", 1));
-  // The page's beat, with the phaser in it, is still on its way: a choice made now would be overtaken by it.
-  wait(400);
+  comes([&] { return parameter(plugin, ids::kVolume) < turned; });
+  letThePageRest(page);
 
   // The selector on the page moves the plugin's parameter.
   choose(SNARE_EFFECT_DELAY);
@@ -180,8 +224,9 @@ void checkTheEffect(BoombapbotAudioProcessor& plugin, juce::WebBrowserComponent&
         "the page's selector moves the Effect parameter, and without the upgrade on the page goes round the four (" +
             round.trim().toStdString() + ")");
 
+  letThePageRest(page);
   choose(before);
-  wait(400);
+  pageComesTo(kindBefore);
 }
 
 // What the bar under the picture does, and what the host keeps for itself.
@@ -204,35 +249,48 @@ void checkTheBar(BoombapbotAudioProcessor& plugin, BoombapbotWebEditor& window, 
   ask(page, "(() => { const i = document.querySelector('[data-testid=beat-name]'); i.focus(); "
             "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '  Named on the page '); "
             "i.dispatchEvent(new Event('input', {bubbles: true})); i.blur(); })()");
-  wait(400);
+  comes([&] { return plugin.beatName() == "Named on the page"; });
   check(plugin.beatName() == "Named on the page", "a name typed in the bar is the plugin's beat name, tidied (" +
                                                       plugin.beatName().toStdString() + ")");
+  letThePageRest(page);
   plugin.setBeatName("Named in the plugin");
-  wait(400);
-  const juce::String shown = ask(page, "document.querySelector('[data-testid=beat-name]').value").toString();
+  const juce::String shown =
+      askUntilText(page, "document.querySelector('[data-testid=beat-name]').value", "Named in the plugin");
   check(shown == "Named in the plugin", "and a name set in the plugin shows in the bar (" + shown.toStdString() + ")");
 
   // Undo: a step written on the page is one step back.
+  const auto undoIsOffered = [&page] {
+    return !static_cast<bool>(askUntil(page, "document.querySelector('[data-testid=undo]').disabled",
+                                       [](const juce::var& disabled) { return !static_cast<bool>(disabled); }));
+  };
   ask(page, "document.querySelector('[data-testid=pattern-2]').click()");
   ask(page, "document.querySelector('[data-testid=voice-kick]').click()");
-  wait(300);
+  Parts undone;
+  undone.add(comes([&] { return juce::roundToInt(parameter(plugin, ids::kPattern)) == 1 && plugin.selectedVoice() == 0; }),
+             "pattern 2 and the kick were chosen in the plugin");
   const bool stepBefore = plugin.stepOn(1, 0, 6);
   ask(page, "document.querySelector('[data-testid=step-7]').click()");
-  wait(400);
-  const bool written = plugin.stepOn(1, 0, 6) != stepBefore;
-  const bool offered = !static_cast<bool>(ask(page, "document.querySelector('[data-testid=undo]').disabled"));
+  undone.add(comes([&] { return plugin.stepOn(1, 0, 6) != stepBefore; }), "the step was written in the plugin");
+  undone.add(undoIsOffered(), "the bar's undo key was offered");
   ask(page, "document.querySelector('[data-testid=undo]').click()");
-  wait(400);
-  const juce::String kickRow = ask(page, "window.__panel.project().patterns[1].steps.kick").toString();
-  check(written && offered && plugin.stepOn(1, 0, 6) == stepBefore && (kickRow[6] == 'x') == stepBefore,
-        "a step written on the page can be taken back with the bar's undo, in the plugin and on the page");
+  undone.add(comes([&] { return plugin.stepOn(1, 0, 6) == stepBefore; }), "the step went back in the plugin");
+  const juce::String kickRow =
+      askUntil(page, "window.__panel.project().patterns[1].steps.kick", [stepBefore](const juce::var& row) {
+        return (row.toString()[6] == 'x') == stepBefore;
+      }).toString();
+  undone.add((kickRow[6] == 'x') == stepBefore, "the step went back on the page");
+  check(undone.held(), "a step written on the page can be taken back with the bar's undo, in the plugin and on the page" +
+                           undone.report());
 
-  // The meter reads what the plugin plays.
+  // The meter reads what the plugin plays. The key's press is on its way to
+  // the audio thread, so blocks are played until it has sounded.
   ask(page, "document.querySelector('[data-testid=voice-kick]').click()");
-  wait(100);
-  play(plugin, 12);
-  wait(300);
-  const double level = ask(page, "window.__panel.level()");
+  comes([&] {
+    play(plugin, 1);
+    return plugin.outputLevel() > 0.001f;
+  });
+  const double level =
+      askUntil(page, "window.__panel.level()", [](const juce::var& heard) { return static_cast<double>(heard) > 0.001; });
   check(plugin.outputLevel() > 0.001f && level > 0.001,
         "the page's meter is given how loud the plugin is (" + std::to_string(level) + ")");
 
@@ -241,13 +299,13 @@ void checkTheBar(BoombapbotAudioProcessor& plugin, BoombapbotWebEditor& window, 
   ask(page, "document.querySelector('[data-testid=volume]').dispatchEvent("
             "new PointerEvent('pointerdown', {bubbles: true, pointerId: 1}))");
   ask(page, keysOn("volume", "ArrowUp", 1));
-  wait(200);
+  comes([&] { return volume.changes >= 1; });
   ask(page, keysOn("volume", "ArrowUp", 1));
-  wait(200);
+  comes([&] { return volume.changes >= 2; });
   const bool held = volume.begun == 1 && volume.ended == 0 && volume.changes >= 2;
   ask(page, keysOn("volume", "ArrowDown", 1));
   ask(page, "window.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, pointerId: 1}))");
-  wait(300);
+  comes([&] { return volume.ended >= 1; });
   check(held && volume.begun == 1 && volume.ended == 1 && volume.changes >= 3,
         "a hold on the page's volume knob reaches the host as one gesture around its changes, the last of them "
         "sent before the hand lets go (" +
@@ -255,7 +313,7 @@ void checkTheBar(BoombapbotAudioProcessor& plugin, BoombapbotWebEditor& window, 
             std::to_string(volume.changes) + " changes)");
   volume.clear();
   ask(page, keysOn("volume", "ArrowUp", 1));
-  wait(300);
+  comes([&] { return volume.ended >= 1; });
   check(volume.begun == 1 && volume.ended == 1 && volume.changes == 1,
         "and a change with no hold is a whole gesture by itself");
 
@@ -265,8 +323,10 @@ void checkTheBar(BoombapbotAudioProcessor& plugin, BoombapbotWebEditor& window, 
                                .toString();
   const int tempo = ask(page, "window.__panel.project().tempo");
   ask(page, keysOn("tempo", "ArrowUp", 5));
+  // Long enough for a turn the page took to have gone to the plugin, and then for the host's tempo to come back.
   wait(500);
-  const int tempoAfter = ask(page, "window.__panel.project().tempo");
+  const int tempoAfter = askUntil(page, "window.__panel.project().tempo",
+                                  [tempo](const juce::var& now) { return static_cast<int>(now) == tempo; });
   check(kept == "true true true" && tempo == tempoAfter && tempo == plugin.currentBeat().tempo,
         "the tempo knob, the record key and the power switch take no hand, and a tempo turned anyway goes back to "
         "the host's (" + std::to_string(tempo) + ")");
@@ -276,24 +336,32 @@ void checkTheBar(BoombapbotAudioProcessor& plugin, BoombapbotWebEditor& window, 
   folder.createDirectory();
   const juce::File beat = folder.getChildFile("kept.boombapbot.json");
   window.desk().saveBeat(beat);
-  wait(300);
-  const juce::String saved = ask(page, "document.querySelector('[data-testid=said]').textContent").toString();
+  const juce::String saved = askUntil(page, "document.querySelector('[data-testid=said]').textContent", [](const juce::var& said) {
+                               return said.toString().startsWith("Saved ");
+                             }).toString();
   boombapbot::plugin::Beat read;
   check(saved.startsWith("Saved kept.boombapbot.json") &&
             boombapbot::plugin::readBeat(beat.loadFileAsString(), read).wasOk() && read.name == "Named in the plugin",
         "saving a beat writes one the site's reader takes, and the bar says so (" + saved.toStdString() + ")");
+  letThePageRest(page);
   window.desk().loadBeat(fixture);
-  wait(500);
-  const juce::String loaded = ask(page, "document.querySelector('[data-testid=said]').textContent + ' / ' + "
-                                        "document.querySelector('[data-testid=beat-name]').value")
-                                 .toString();
+  const juce::String loaded =
+      askUntil(page,
+               "document.querySelector('[data-testid=said]').textContent + ' / ' + "
+               "document.querySelector('[data-testid=beat-name]').value",
+               [](const juce::var& said) {
+                 return said.toString().startsWith("Loaded ") && said.toString().endsWith("/ Four patterns fixture");
+               })
+          .toString();
   check(loaded.startsWith("Loaded ") && loaded.endsWith("/ Four patterns fixture"),
         "loading a beat puts it on the page, and the bar says so (" + loaded.toStdString() + ")");
   window.desk().loadBeat(juce::File(BOOMBAPBOT_MACHINE_FILE));
-  wait(300);
-  const juce::String refused = ask(page, "document.querySelector('[data-testid=said]').dataset.problem + ': ' + "
-                                         "document.querySelector('[data-testid=said]').textContent")
-                                  .toString();
+  const juce::String refused =
+      askUntil(page,
+               "document.querySelector('[data-testid=said]').dataset.problem + ': ' + "
+               "document.querySelector('[data-testid=said]').textContent",
+               [](const juce::var& said) { return said.toString().startsWith("true: "); })
+          .toString();
   check(refused.startsWith("true: ") && plugin.beatName() == "Four patterns fixture",
         "a file that is not a beat is refused in words, and changes nothing (" + refused.toStdString() + ")");
   const juce::File midi = folder.getChildFile("pattern");
@@ -372,13 +440,15 @@ int main(int argc, char** argv) {
     // The page to the plugin: a voice chosen, a step key pressed, a knob turned by its keys.
     ask(page, "document.querySelector('[data-testid=pattern-1]').click()");
     ask(page, "document.querySelector('[data-testid=voice-tom]').click()");
-    wait(300);
+    Parts pressed;
+    pressed.add(comes([&] { return plugin.selectedVoice() == 5 && juce::roundToInt(parameter(plugin, ids::kPattern)) == 0; }),
+                "pattern 1 and the tom were chosen in the plugin");
     const bool before = plugin.stepOn(0, 5, 2);
     ask(page, "document.querySelector('[data-testid=step-3]').click()");
-    wait(400);
-    check(plugin.selectedVoice() == 5 && juce::roundToInt(parameter(plugin, ids::kPattern)) == 0 &&
-              plugin.stepOn(0, 5, 2) != before,
-          "on the page, choosing pattern 1 and the tom and pressing step key 3 writes that step in the plugin");
+    pressed.add(comes([&] { return plugin.stepOn(0, 5, 2) != before; }), "the step was written in the plugin");
+    check(pressed.held(),
+          "on the page, choosing pattern 1 and the tom and pressing step key 3 writes that step in the plugin" +
+              pressed.report());
 
     // A voice's key on the page is heard: the press reaches the audio thread.
     juce::AudioBuffer<float> block(2, 512);
@@ -394,17 +464,20 @@ int main(int argc, char** argv) {
     const float volumeBefore = parameter(plugin, ids::kVolume);
     ask(page, "(() => { const k = document.querySelector('[data-testid=volume]'); k.focus(); "
               "for (let i = 0; i < 3; i++) k.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true})); })()");
-    wait(400);
+    comes([&] { return parameter(plugin, ids::kVolume) < volumeBefore - 0.005f; });
     const float volumeAfter = parameter(plugin, ids::kVolume);
     check(volumeAfter < volumeBefore - 0.005f,
           "turning the page's volume knob down moves the host's Volume parameter (" + std::to_string(volumeBefore) +
               " to " + std::to_string(volumeAfter) + ")");
 
     // The plugin to the page: a parameter the host automates, and a step written elsewhere.
+    letThePageRest(page);
     plugin.parameters().getParameter(ids::kSwing)->setValueNotifyingHost(0.8f);
     plugin.parameters().getParameter("tom_pitch")->setValueNotifyingHost(0.9f);
     plugin.setStep(0, 5, 9, true);
-    wait(500);
+    askUntil(page, "(() => { const p = window.__panel.project(); return Math.abs(p.swing - 0.8) < 1e-5 && "
+                   "Math.abs(p.voices.tom.pitch - 0.9) < 1e-5 && p.patterns[0].steps.tom[9] === 'x'; })()",
+             [](const juce::var& shown) { return static_cast<bool>(shown); });
     const double swing = ask(page, "window.__panel.project().swing");
     const double tomPitch = ask(page, "window.__panel.project().voices.tom.pitch");
     const juce::String tomRow = ask(page, "window.__panel.project().patterns[0].steps.tom").toString();
@@ -425,11 +498,9 @@ int main(int argc, char** argv) {
 
     // The sequencer's switch, which is what play and stop are in a host.
     ask(page, "document.querySelector('[data-testid=stop]').click()");
-    wait(300);
-    const bool stopped = parameter(plugin, ids::kSequencer) < 0.5f;
+    const bool stopped = comes([&] { return parameter(plugin, ids::kSequencer) < 0.5f; });
     ask(page, "document.querySelector('[data-testid=play]').click()");
-    wait(300);
-    check(stopped && parameter(plugin, ids::kSequencer) >= 0.5f,
+    check(stopped && comes([&] { return parameter(plugin, ids::kSequencer) >= 0.5f; }),
           "the page's stop and play keys turn the plugin's sequencer off and on");
 
     checkTheEffect(plugin, page);
