@@ -10,8 +10,14 @@ export const LICENSE_SOURCE_KEY = 'boombapbot.license.source.v1';
  * How a device came by its license file. `account`: somebody upgraded was
  * logged in, and the device is locked again when nobody is. `key`: a key was
  * typed here, and the device stays unlocked until the key is removed from it.
+ * `store`: it was bought in this app from the phone's store, and the device
+ * stays unlocked while the store says the purchase stands.
  */
-export type LicenseSource = 'account' | 'key';
+export type LicenseSource = 'account' | 'key' | 'store';
+
+const SOURCES: readonly LicenseSource[] = ['account', 'key', 'store'];
+/** Which way of holding a file wins when a device comes by a second: the one a log-out does not take away. */
+const LASTING: readonly LicenseSource[] = ['key', 'store'];
 
 /**
  * The license file this device holds, and whether it pays for the upgrade.
@@ -29,7 +35,8 @@ export class DeviceLicense {
     private readonly publicKey: string = LICENSE_PUBLIC_KEY,
   ) {
     // A file with nothing to say how it came is taken for an account's, the kind that a log-out takes away.
-    this.held = this.pays(this.read(LICENSE_FILE_KEY)) ? (this.read(LICENSE_SOURCE_KEY) === 'key' ? 'key' : 'account') : null;
+    const source = SOURCES.find((known) => known === this.read(LICENSE_SOURCE_KEY)) ?? 'account';
+    this.held = this.pays(this.read(LICENSE_FILE_KEY)) ? source : null;
   }
 
   private read(key: string): string | null {
@@ -63,12 +70,12 @@ export class DeviceLicense {
   /**
    * Takes a file the server gave. A file that does not check out is not
    * kept, so nothing a server says can take away an upgrade this device
-   * already holds. A device unlocked by a key stays a key's, whoever logs
-   * in after. True when the device is upgraded by it.
+   * already holds. A device unlocked by a key or by a purchase stays that,
+   * whoever logs in after. True when the device is upgraded by it.
    */
   keep(file: string, source: LicenseSource): boolean {
     if (!this.pays(file)) return false;
-    const next = this.held === 'key' ? 'key' : source;
+    const next = this.held && LASTING.includes(this.held) ? this.held : source;
     try {
       this.storage?.setItem(LICENSE_FILE_KEY, file);
       this.storage?.setItem(LICENSE_SOURCE_KEY, next);
@@ -97,6 +104,11 @@ export class DeviceLicense {
   /** Takes the typed key's file off the device. Whoever is logged in and upgraded unlocks it again. */
   removeKey(): void {
     if (this.held === 'key') this.forget();
+  }
+
+  /** The store no longer says the purchase stands, as after a refund: a device it unlocked is locked again. */
+  purchaseGone(): void {
+    if (this.held === 'store') this.forget();
   }
 
   /** Tells `listener` when the device is unlocked or locked. Returns the way to stop. */

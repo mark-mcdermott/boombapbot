@@ -6,6 +6,7 @@ import {
   UpgradeRefusalSchema,
   type License,
   type LicenseFileAnswer,
+  type StorePurchaseRequest,
   type UpgradeAnswer,
   type UpgradeRefusal,
 } from '@boombapbot/contracts';
@@ -49,6 +50,14 @@ export function fetchLicenseFile(baseUrl: string): Promise<Asked<LicenseFileAnsw
 /** A signed license file for a key alone, with nobody logged in. The key stays on whatever account it is on. */
 export function fetchLicenseFileForKey(baseUrl: string, key: string): Promise<Asked<LicenseFileAnswer>> {
   return ask(address(baseUrl, '/license'), LicenseFileAnswerSchema, 'POST', { key });
+}
+
+/**
+ * A signed license file for a purchase made in a store app, as the store
+ * signed it. It goes onto the account that is logged in, if there is one.
+ */
+export function fetchLicenseFileForPurchase(baseUrl: string, purchase: StorePurchaseRequest): Promise<Asked<LicenseFileAnswer>> {
+  return ask(address(baseUrl, '/store'), LicenseFileAnswerSchema, 'POST', purchase);
 }
 
 /** Puts a key bought without an account onto the account that is logged in. */

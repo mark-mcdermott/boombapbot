@@ -13,6 +13,7 @@ on:
       - packages/machine-*/fixtures/**
       - apps/desktop/**
       - apps/mobile/native-engine/**
+      - apps/mobile/native-store/**
       - plugins/vst3/**
       - packages/contracts/src/license-file.ts
       - docs/license-file.md
@@ -202,6 +203,16 @@ jobs:
             -scheme BoombapbotNativeEngine \
             -destination "id=$simulator" \
             -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/build/spm"
+
+      # It has no tests of its own to run here: buying needs a store. That it compiles is what CI can say.
+      - name: The store plug-in builds
+        working-directory: apps/mobile/native-store
+        run: |
+          xcodebuild build \
+            -scheme BoombapbotNativeStore \
+            -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/build/spm" \
+            CODE_SIGNING_ALLOWED=NO
 
   android:
     name: Phone engine plug-in on Android

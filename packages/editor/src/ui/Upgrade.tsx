@@ -24,7 +24,7 @@ const STRIPE_WAIT_TRIES = 15;
 const KEY_SHAPE = `${LICENSE_KEY_PREFIX}-XXXXX-XXXXX-XXXXX-XXXXX`;
 
 /** The six effects the upgrade adds, as the modal names them. */
-const PAID_EFFECTS = 'a crusher, tape, a pump, a filter, vinyl and a phaser';
+export const PAID_EFFECTS = 'a crusher, tape, a pump, a filter, vinyl and a phaser';
 
 const Problem = ({ text }: { text: string | null }) => <SharedProblem text={text} testId="upgrade-problem" />;
 
