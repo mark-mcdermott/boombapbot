@@ -75,6 +75,7 @@ interface InStep {
 function keepInStep(plugin: Plugin): InStep {
   let theirs: Project | null = null;
   let waiting: ReturnType<typeof setTimeout> | null = null;
+  let taking = false;
 
   const send = () => {
     if (waiting === null) return;
@@ -87,13 +88,16 @@ function keepInStep(plugin: Plugin): InStep {
   plugin.on<string>(BEAT_EVENT, (text) => {
     const project = fromPlugin(text);
     if (!project) return;
-    theirs = project;
+    // The store keeps a stamped copy of what it is given: theirs is that copy.
+    taking = true;
     runtime.store.adjust(project);
+    theirs = runtime.store.getState().project;
+    taking = false;
   });
   runtime.store.subscribe(() => {
     // A change that came from the plugin is not sent back to it, and a burst
     // of changes, as a knob being dragged makes, goes as the last of them.
-    if (runtime.store.getState().project === theirs || waiting !== null) return;
+    if (taking || runtime.store.getState().project === theirs || waiting !== null) return;
     // A timer, not an animation frame: a window behind another draws no frames.
     waiting = setTimeout(send, SEND_AFTER_MS);
   });
